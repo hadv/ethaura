@@ -1,0 +1,83 @@
+# GitHub Actions workflow to test Helios integration
+# This workflow ensures Helios can be installed and configured correctly
+
+name: Helios Integration Test
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+
+jobs:
+  test-helios:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+      
+    - name: Setup environment
+      run: |
+        # Create .env file for testing
+        echo "SEPOLIA_RPC_URL=https://rpc.sepolia.org" > .env
+        
+    - name: Install Helios
+      run: |
+        # Install Helios using heliosup
+        curl https://raw.githubusercontent.com/a16z/helios/master/heliosup/install | bash
+        source ~/.bashrc
+        ~/.helios/bin/heliosup || true
+        
+    - name: Verify Helios installation
+      run: |
+        if [ -f ~/.helios/bin/helios ]; then
+          echo "✓ Helios installed successfully"
+          ~/.helios/bin/helios --version
+        else
+          echo "✗ Helios installation failed"
+          exit 1
+        fi
+        
+    - name: Test Helios configuration
+      run: |
+        # Check if config file exists
+        if [ -f helios-config.toml ]; then
+          echo "✓ Helios configuration file found"
+          cat helios-config.toml
+        else
+          echo "✗ Helios configuration file not found"
+          exit 1
+        fi
+        
+    - name: Test startup script
+      run: |
+        # Make scripts executable
+        chmod +x scripts/*.sh
+        
+        # Verify scripts exist
+        if [ -f scripts/start-helios.sh ]; then
+          echo "✓ Start script found"
+        else
+          echo "✗ Start script not found"
+          exit 1
+        fi
+        
+        if [ -f scripts/test-helios.sh ]; then
+          echo "✓ Test script found"
+        else
+          echo "✗ Test script not found"
+          exit 1
+        fi
+        
+    - name: Summary
+      run: |
+        echo "========================================="
+        echo "Helios Integration Test Summary"
+        echo "========================================="
+        echo "✓ Helios installation: OK"
+        echo "✓ Configuration files: OK"
+        echo "✓ Helper scripts: OK"
+        echo "========================================="
+
