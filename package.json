@@ -1,0 +1,38 @@
+{
+  "name": "ethaura",
+  "version": "0.1.0",
+  "description": "P256 Account Abstraction with Passkeys - ERC-4337 implementation using secp256r1 signatures",
+  "keywords": [
+    "ethereum",
+    "account-abstraction",
+    "erc-4337",
+    "p256",
+    "secp256r1",
+    "webauthn",
+    "passkeys",
+    "smart-wallet"
+  ],
+  "author": "EthAura Team",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/ethaura.git"
+  },
+  "scripts": {
+    "install:all": "forge install && cd frontend && npm install",
+    "build": "forge build",
+    "test": "forge test",
+    "test:gas": "forge test --gas-report",
+    "coverage": "forge coverage",
+    "deploy:sepolia": "forge script script/Deploy.s.sol:DeployScript --rpc-url sepolia --broadcast --verify",
+    "frontend:dev": "cd frontend && npm run dev",
+    "frontend:build": "cd frontend && npm run build",
+    "clean": "forge clean && rm -rf frontend/dist",
+    "format": "forge fmt"
+  },
+  "devDependencies": {},
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
+
