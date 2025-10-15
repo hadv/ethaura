@@ -217,9 +217,40 @@ if (uint256(s) > N / 2) {
 ### 3. Access Control
 
 **Levels**:
-1. **Owner**: Can update public key, withdraw deposits
+1. **Owner**: Can update public key, withdraw deposits, enable/disable 2FA
 2. **EntryPoint**: Can call validateUserOp
 3. **EntryPoint or Owner**: Can execute transactions
+
+### 3.1. Two-Factor Authentication (2FA)
+
+**Optional Security Layer**:
+- When enabled, transactions require **both** P-256 passkey signature **and** owner ECDSA signature
+- Provides defense-in-depth for high-value accounts
+- Can be toggled on/off by owner
+
+**Signature Format**:
+- Normal mode: `r (32) || s (32)` = 64 bytes
+- 2FA mode: `r (32) || s (32) || ownerSig (65)` = 129 bytes
+
+**Validation**:
+```solidity
+if (twoFactorEnabled) {
+    // Verify both P-256 and ECDSA signatures
+    require(P256.verify(hash, r, s, qx, qy));
+    require(ecrecover(hash, v, sigR, sigS) == owner());
+} else {
+    // Verify only P-256 signature
+    require(P256.verify(hash, r, s, qx, qy));
+}
+```
+
+**Use Cases**:
+- High-value accounts requiring dual authorization
+- Corporate/multi-stakeholder accounts
+- Compliance requirements
+- Extra security for critical operations
+
+See [Two-Factor Authentication Guide](docs/TWO_FACTOR_AUTH.md) for details.
 
 ### 4. Precompile Availability
 

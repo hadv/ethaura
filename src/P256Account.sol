@@ -37,12 +37,18 @@ contract P256Account is IAccount, IERC1271, Ownable {
     /// @notice Nonce for replay protection (in addition to EntryPoint nonce)
     uint256 public nonce;
 
+    /// @notice Two-factor authentication enabled flag
+    /// @dev When enabled, transactions require both P-256 passkey signature and owner ECDSA signature
+    bool public twoFactorEnabled;
+
     /*//////////////////////////////////////////////////////////////
                                 EVENTS
     //////////////////////////////////////////////////////////////*/
 
     event PublicKeyUpdated(bytes32 indexed qx, bytes32 indexed qy);
     event P256AccountInitialized(IEntryPoint indexed entryPoint, bytes32 qx, bytes32 qy);
+    event TwoFactorEnabled(address indexed owner);
+    event TwoFactorDisabled(address indexed owner);
 
     /*//////////////////////////////////////////////////////////////
                                 ERRORS
@@ -53,6 +59,8 @@ contract P256Account is IAccount, IERC1271, Ownable {
     error InvalidSignature();
     error InvalidSignatureLength();
     error CallFailed(bytes result);
+    error TwoFactorSignatureRequired();
+    error InvalidOwnerSignature();
 
     /*//////////////////////////////////////////////////////////////
                               CONSTRUCTOR
@@ -111,19 +119,31 @@ contract P256Account is IAccount, IERC1271, Ownable {
      * @param userOp The user operation
      * @param userOpHash The hash of the user operation
      * @return validationData 0 if valid, 1 if invalid
+     * @dev Supports two modes:
+     *      - Normal mode: signature = r (32) || s (32) = 64 bytes
+     *      - 2FA mode: signature = r (32) || s (32) || ownerSig (65) = 129 bytes
      */
     function _validateSignature(PackedUserOperation calldata userOp, bytes32 userOpHash)
         internal
         view
         returns (uint256 validationData)
     {
-        // Signature format: r (32 bytes) || s (32 bytes)
         bytes calldata sig = userOp.signature;
 
-        if (sig.length != 64) {
-            return 1; // SIG_VALIDATION_FAILED
+        // Check signature length based on 2FA mode
+        if (twoFactorEnabled) {
+            // 2FA mode: r (32) + s (32) + ownerSignature (65) = 129 bytes
+            if (sig.length != 129) {
+                return 1; // SIG_VALIDATION_FAILED
+            }
+        } else {
+            // Normal mode: r (32) + s (32) = 64 bytes
+            if (sig.length != 64) {
+                return 1; // SIG_VALIDATION_FAILED
+            }
         }
 
+        // Extract P-256 signature (r, s)
         bytes32 r;
         bytes32 s;
         assembly {
@@ -134,10 +154,27 @@ contract P256Account is IAccount, IERC1271, Ownable {
         // Use SHA-256 for the message hash (compatible with P-256 ecosystem)
         bytes32 messageHash = sha256(abi.encodePacked(userOpHash));
 
-        // Verify the P-256 signature
+        // Verify the P-256 signature (passkey)
         bool isValid = P256.verify(messageHash, r, s, qx, qy);
+        if (!isValid) {
+            return 1; // SIG_VALIDATION_FAILED
+        }
 
-        return isValid ? 0 : 1;
+        // If 2FA is enabled, also verify owner signature
+        if (twoFactorEnabled) {
+            // Extract owner signature (65 bytes: v, r, s)
+            bytes calldata ownerSig = sig[64:129];
+
+            // Recover signer from owner signature
+            address recovered = _recoverSigner(userOpHash, ownerSig);
+
+            // Verify the signer is the owner
+            if (recovered != owner()) {
+                return 1; // SIG_VALIDATION_FAILED
+            }
+        }
+
+        return 0; // SIG_VALIDATION_SUCCESS
     }
 
     /**
@@ -149,6 +186,45 @@ contract P256Account is IAccount, IERC1271, Ownable {
             (bool success,) = payable(msg.sender).call{value: missingAccountFunds}("");
             require(success, "Prefund failed");
         }
+    }
+
+    /**
+     * @notice Recover signer address from ECDSA signature
+     * @param hash The hash that was signed
+     * @param signature The ECDSA signature (65 bytes: r, s, v)
+     * @return The recovered signer address
+     */
+    function _recoverSigner(bytes32 hash, bytes calldata signature) internal pure returns (address) {
+        require(signature.length == 65, "Invalid signature length");
+
+        bytes32 r;
+        bytes32 s;
+        uint8 v;
+
+        assembly {
+            r := calldataload(signature.offset)
+            s := calldataload(add(signature.offset, 32))
+            v := byte(0, calldataload(add(signature.offset, 64)))
+        }
+
+        // EIP-2 still allows signature malleability for ecrecover(). Remove this possibility and make the signature
+        // unique. Appendix F in the Ethereum Yellow paper (https://ethereum.github.io/yellowpaper/paper.pdf), defines
+        // the valid range for s in (301): 0 < s < secp256k1n ÷ 2 + 1, and for v in (302): v ∈ {27, 28}.
+        if (uint256(s) > 0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF5D576E7357A4501DDFE92F46681B20A0) {
+            revert InvalidOwnerSignature();
+        }
+
+        if (v != 27 && v != 28) {
+            revert InvalidOwnerSignature();
+        }
+
+        // If the signature is valid (and not malleable), return the signer address
+        address signer = ecrecover(hash, v, r, s);
+        if (signer == address(0)) {
+            revert InvalidOwnerSignature();
+        }
+
+        return signer;
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -198,6 +274,26 @@ contract P256Account is IAccount, IERC1271, Ownable {
         qx = _qx;
         qy = _qy;
         emit PublicKeyUpdated(_qx, _qy);
+    }
+
+    /**
+     * @notice Enable two-factor authentication
+     * @dev When enabled, all transactions require both P-256 passkey signature and owner ECDSA signature
+     */
+    function enableTwoFactor() external onlyOwner {
+        require(!twoFactorEnabled, "2FA already enabled");
+        twoFactorEnabled = true;
+        emit TwoFactorEnabled(msg.sender);
+    }
+
+    /**
+     * @notice Disable two-factor authentication
+     * @dev When disabled, transactions only require P-256 passkey signature
+     */
+    function disableTwoFactor() external onlyOwner {
+        require(twoFactorEnabled, "2FA already disabled");
+        twoFactorEnabled = false;
+        emit TwoFactorDisabled(msg.sender);
     }
 
     /**

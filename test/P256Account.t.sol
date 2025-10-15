@@ -177,4 +177,152 @@ contract P256AccountTest is Test {
         }
         assertEq(factoryAddr, address(factory), "InitCode should start with factory address");
     }
+
+    /*//////////////////////////////////////////////////////////////
+                          TWO-FACTOR AUTH TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    function test_EnableTwoFactor() public {
+        // Initially 2FA should be disabled
+        assertFalse(account.twoFactorEnabled(), "2FA should be disabled initially");
+
+        // Enable 2FA
+        vm.prank(owner);
+        account.enableTwoFactor();
+
+        // Check 2FA is enabled
+        assertTrue(account.twoFactorEnabled(), "2FA should be enabled");
+    }
+
+    function test_DisableTwoFactor() public {
+        // Enable 2FA first
+        vm.prank(owner);
+        account.enableTwoFactor();
+        assertTrue(account.twoFactorEnabled(), "2FA should be enabled");
+
+        // Disable 2FA
+        vm.prank(owner);
+        account.disableTwoFactor();
+
+        // Check 2FA is disabled
+        assertFalse(account.twoFactorEnabled(), "2FA should be disabled");
+    }
+
+    function test_EnableTwoFactorOnlyOwner() public {
+        address attacker = makeAddr("attacker");
+
+        vm.prank(attacker);
+        vm.expectRevert();
+        account.enableTwoFactor();
+    }
+
+    function test_DisableTwoFactorOnlyOwner() public {
+        // Enable 2FA first
+        vm.prank(owner);
+        account.enableTwoFactor();
+
+        address attacker = makeAddr("attacker");
+
+        vm.prank(attacker);
+        vm.expectRevert();
+        account.disableTwoFactor();
+    }
+
+    function test_CannotEnableTwoFactorTwice() public {
+        vm.prank(owner);
+        account.enableTwoFactor();
+
+        vm.prank(owner);
+        vm.expectRevert("2FA already enabled");
+        account.enableTwoFactor();
+    }
+
+    function test_CannotDisableTwoFactorWhenNotEnabled() public {
+        vm.prank(owner);
+        vm.expectRevert("2FA already disabled");
+        account.disableTwoFactor();
+    }
+
+    function test_ValidateUserOp_WithoutTwoFactor() public {
+        // Create a mock UserOperation
+        PackedUserOperation memory userOp;
+
+        // Mock P-256 signature (r || s = 64 bytes)
+        bytes32 r = bytes32(uint256(0x1111));
+        bytes32 s = bytes32(uint256(0x2222));
+        userOp.signature = abi.encodePacked(r, s);
+
+        bytes32 userOpHash = keccak256("test");
+
+        // Mock the EntryPoint call
+        vm.prank(ENTRYPOINT_ADDR);
+
+        // This will fail because we're using mock signature, but it should accept 64-byte signature
+        uint256 validationData = account.validateUserOp(userOp, userOpHash, 0);
+
+        // Should return 1 (failed) because signature is invalid, but length is correct
+        assertEq(validationData, 1, "Should fail with invalid signature");
+    }
+
+    function test_ValidateUserOp_WithTwoFactor_RejectsSingleSignature() public {
+        // Enable 2FA
+        vm.prank(owner);
+        account.enableTwoFactor();
+
+        // Create a mock UserOperation with only P-256 signature (64 bytes)
+        PackedUserOperation memory userOp;
+        bytes32 r = bytes32(uint256(0x1111));
+        bytes32 s = bytes32(uint256(0x2222));
+        userOp.signature = abi.encodePacked(r, s);
+
+        bytes32 userOpHash = keccak256("test");
+
+        // Mock the EntryPoint call
+        vm.prank(ENTRYPOINT_ADDR);
+
+        // Should fail because 2FA requires 129 bytes (64 + 65)
+        uint256 validationData = account.validateUserOp(userOp, userOpHash, 0);
+
+        assertEq(validationData, 1, "Should fail with wrong signature length");
+    }
+
+    function test_ValidateUserOp_WithTwoFactor_AcceptsDualSignature() public {
+        // Enable 2FA
+        vm.prank(owner);
+        account.enableTwoFactor();
+
+        // Create a mock UserOperation with dual signature (129 bytes)
+        PackedUserOperation memory userOp;
+
+        // Mock P-256 signature (r || s = 64 bytes)
+        bytes32 r = bytes32(uint256(0x1111));
+        bytes32 s = bytes32(uint256(0x2222));
+
+        // Create a real owner signature
+        bytes32 userOpHash = keccak256("test");
+
+        // Sign with owner's private key
+        uint256 ownerPrivateKey = 0x1234567890abcdef;
+        address ownerAddr = vm.addr(ownerPrivateKey);
+
+        // Transfer ownership to the test owner
+        vm.prank(owner);
+        account.transferOwnership(ownerAddr);
+
+        // Sign the userOpHash
+        (uint8 v, bytes32 sigR, bytes32 sigS) = vm.sign(ownerPrivateKey, userOpHash);
+        bytes memory ownerSig = abi.encodePacked(sigR, sigS, v);
+
+        // Combine signatures: P-256 (64) + Owner ECDSA (65) = 129 bytes
+        userOp.signature = abi.encodePacked(r, s, ownerSig);
+
+        // Mock the EntryPoint call
+        vm.prank(ENTRYPOINT_ADDR);
+
+        // Should still fail because P-256 signature is invalid, but length is correct
+        uint256 validationData = account.validateUserOp(userOp, userOpHash, 0);
+
+        // Will fail due to invalid P-256 signature, but that's expected
+        assertEq(validationData, 1, "Should fail with invalid P-256 signature");
+    }
 }

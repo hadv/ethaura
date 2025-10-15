@@ -1,16 +1,25 @@
-# 🔐 EthAura - P256 Account Abstraction with Passkeys
+# 🔐 EthAura - P256 Account Abstraction with Passkeys & Web3Auth
 
-EthAura là một implementation hoàn chỉnh của ERC-4337 Account Abstraction sử dụng chữ ký P-256/secp256r1 và WebAuthn/Passkeys. Dự án tận dụng EIP-7951 precompile có sẵn trên Sepolia testnet sau Fusaka upgrade để verify chữ ký P-256 một cách hiệu quả.
+EthAura là một implementation hoàn chỉnh của ERC-4337 Account Abstraction sử dụng chữ ký P-256/secp256r1 và WebAuthn/Passkeys, kết hợp với Web3Auth cho social login. Dự án tận dụng EIP-7951 precompile có sẵn trên Sepolia testnet sau Fusaka upgrade để verify chữ ký P-256 một cách hiệu quả.
 
 ## ✨ Tính năng
 
+### Smart Contract Features
 - ✅ **P-256 Signature Support**: Sử dụng đường cong secp256r1 thay vì secp256k1 truyền thống
 - ✅ **WebAuthn/Passkeys**: Tích hợp với Secure Enclave, Touch ID, Face ID, Windows Hello
 - ✅ **ERC-4337 Compatible**: Tuân thủ chuẩn Account Abstraction v0.7
 - ✅ **Gas Efficient**: Sử dụng native precompile (~6,900 gas) thay vì Solidity verification
+- ✅ **Two-Factor Authentication (2FA)**: Optional dual signature mode (passkey + owner key)
 - ✅ **Factory Pattern**: Deploy deterministic accounts với CREATE2
 - ✅ **EIP-1271 Support**: Tương thích với dApp signatures
-- ✅ **Frontend Demo**: React app với WebAuthn integration
+
+### Frontend Features
+- 🔐 **Web3Auth Integration**: Social login (Google, Facebook, Twitter, Email)
+- 🔑 **No Seed Phrases**: Automatic wallet creation with Web3Auth
+- 🔒 **Automatic 2FA**: Auto-enable 2FA after account deployment
+- 👤 **User Profile**: Display user info (name, email, profile picture)
+- 📱 **Biometric Auth**: Touch ID/Face ID for transaction signing
+- 🎨 **Modern UI**: React + Vite with clean interface
 
 ## 🏗️ Kiến trúc
 
@@ -31,11 +40,15 @@ src/
 frontend/
 ├── src/
 │   ├── components/
+│   │   ├── Web3AuthLogin.jsx       # Web3Auth social login
 │   │   ├── PasskeyManager.jsx      # Passkey creation
 │   │   ├── AccountManager.jsx      # Account deployment
-│   │   └── TransactionSender.jsx   # Transaction signing
+│   │   └── TransactionSender.jsx   # Transaction signing (2FA)
+│   ├── contexts/
+│   │   └── Web3AuthContext.jsx     # Web3Auth state management
 │   └── utils/
-│       └── webauthn.js             # WebAuthn utilities
+│       ├── webauthn.js             # WebAuthn utilities
+│       └── signatureUtils.js       # Signature combining (2FA)
 ```
 
 ## 🚀 Quick Start
@@ -63,8 +76,20 @@ cd frontend
 npm install
 ```
 
-### 2. Cấu hình environment
+### 2. Setup Web3Auth
 
+1. Go to [Web3Auth Dashboard](https://dashboard.web3auth.io/)
+2. Create a new project
+3. Select "Plug and Play" → "Web"
+4. Configure:
+   - **Project Name**: EthAura
+   - **Network**: Sapphire Devnet (testing) or Mainnet (production)
+   - **Whitelist URLs**: `http://localhost:5173` (and your production domain)
+5. Copy the **Client ID**
+
+### 3. Cấu hình environment
+
+**Backend (.env):**
 ```bash
 # Copy .env.example to .env
 cp .env.example .env
@@ -75,13 +100,26 @@ cp .env.example .env
 # - ETHERSCAN_API_KEY: For contract verification
 ```
 
-### 3. Build và test contracts
+**Frontend (frontend/.env):**
+```bash
+# Copy frontend/.env.example to frontend/.env
+cp frontend/.env.example frontend/.env
+
+# Edit frontend/.env with your values
+VITE_WEB3AUTH_CLIENT_ID=your_web3auth_client_id_here
+VITE_CHAIN_ID=11155111
+VITE_RPC_URL=https://rpc.sepolia.org
+VITE_FACTORY_ADDRESS=your_factory_address_after_deployment
+VITE_ENTRYPOINT_ADDRESS=0x0000000071727De22E5E9d8BAf0edAc6f37da032
+```
+
+### 4. Build và test contracts
 
 ```bash
 # Build contracts
 forge build
 
-# Run tests
+# Run tests (29 tests should pass)
 forge test
 
 # Run tests with gas report
@@ -91,16 +129,17 @@ forge test --gas-report
 forge test --fork-url $SEPOLIA_RPC_URL
 ```
 
-### 4. Deploy contracts
+### 5. Deploy contracts
 
 ```bash
 # Deploy factory to Sepolia
 forge script script/Deploy.s.sol:DeployScript --rpc-url sepolia --broadcast --verify
 
 # Note the factory address from output
+# Update VITE_FACTORY_ADDRESS in frontend/.env
 ```
 
-### 5. Run frontend
+### 6. Run frontend
 
 ```bash
 cd frontend
@@ -111,26 +150,51 @@ Frontend sẽ chạy tại `http://localhost:3000`
 
 ## 📖 Cách sử dụng
 
-### 1. Tạo Passkey
+### 1. Login với Web3Auth
 
-1. Mở frontend demo
-2. Click "Create Passkey"
-3. Xác thực với Touch ID/Face ID/Windows Hello
+1. Mở frontend demo tại `http://localhost:5173`
+2. Click "🚀 Login with Web3Auth"
+3. Chọn login method:
+   - 🔵 Google
+   - 🔵 Facebook
+   - 🐦 Twitter
+   - 📧 Email (Passwordless)
+4. Xác thực với social account
+5. Web3Auth wallet được tạo tự động (no seed phrases!)
+6. User info và wallet address được hiển thị
+
+### 2. Tạo Passkey
+
+1. Click "Create Passkey"
+2. Xác thực với Touch ID/Face ID/Windows Hello
+3. Passkey được lưu trong device
 4. Public key (qx, qy) sẽ được hiển thị
 
-### 2. Deploy Account
+### 3. Deploy Account với 2FA
 
 1. Nhập factory address (từ deployment)
-2. Nhập owner address
-3. Click "Deploy Account"
-4. Account address sẽ được tạo deterministically
+2. Owner address tự động lấy từ Web3Auth wallet
+3. Click "🚀 Deploy Account with 2FA"
+4. Account được deploy với 2FA enabled
+5. Account address sẽ được tạo deterministically
 
-### 3. Gửi Transaction
+### 4. Gửi Transaction với 2FA
 
 1. Nhập target address và amount
-2. Click "Send Transaction"
-3. Ký với passkey
-4. UserOperation được submit lên bundler
+2. Click "🔐 Send Transaction (2FA)"
+3. **Bước 1**: Ký với Passkey (Touch ID/Face ID)
+4. **Bước 2**: Ký với Web3Auth wallet (automatic)
+5. Signatures được combine (129 bytes)
+6. UserOperation được submit lên bundler
+7. EntryPoint validates cả 2 signatures
+8. Transaction executed! ✅
+
+### Signature Details
+
+Khi 2FA enabled, bạn sẽ thấy:
+- **Passkey Signature (P-256)**: r, s values (64 bytes)
+- **Owner Signature (ECDSA)**: Web3Auth wallet signature (65 bytes)
+- **Combined Signature**: 129 bytes total (ready for 2FA validation)
 
 ## 🔧 Smart Contract API
 
@@ -252,9 +316,18 @@ forge script script/Deploy.s.sol:DeployScript \
 
 ### Signature Format
 
-**Raw P-256 Mode** (used in this implementation):
+**Normal Mode (2FA disabled)**:
 ```
 signature = r || s (64 bytes)
+messageHash = SHA256(userOpHash)
+```
+
+**2FA Mode (2FA enabled)**:
+```
+signature = r || s || ownerSignature (129 bytes)
+  where:
+    r, s = P-256 signature (32 + 32 = 64 bytes)
+    ownerSignature = ECDSA signature (r + s + v = 65 bytes)
 messageHash = SHA256(userOpHash)
 ```
 
@@ -266,10 +339,12 @@ messageHash = SHA256(authenticatorData || SHA256(clientDataJSON))
 
 ### Security Considerations
 
-1. **Malleability Protection**: Enforces `s <= N/2`
+1. **Malleability Protection**: Enforces `s <= N/2` for both P-256 and ECDSA
 2. **Replay Protection**: Uses EntryPoint nonce
 3. **Access Control**: Owner-based permissions
 4. **Reentrancy**: Uses checks-effects-interactions pattern
+5. **Two-Factor Authentication**: Optional dual signature validation
+6. **Web3Auth Security**: MPC-based key management, non-custodial
 
 ## 🛠️ Development
 
@@ -293,12 +368,42 @@ ethaura/
 4. Run tests: `forge test`
 5. Deploy and verify
 
+## 📚 Documentation
+
+### Core Documentation
+- [Two-Factor Authentication Guide](docs/TWO_FACTOR_AUTH.md) - Complete guide for 2FA feature
+- [Web3Auth Integration Guide](docs/WEB3AUTH_INTEGRATION.md) - Social login setup and usage
+- [2FA Implementation Summary](docs/2FA_IMPLEMENTATION_SUMMARY.md) - Technical implementation details
+- [Architecture Overview](ARCHITECTURE.md) - System architecture and design
+- [Security Considerations](SECURITY.md) - Security best practices
+- [Deployment Guide](DEPLOYMENT.md) - How to deploy to testnet/mainnet
+
+### Quick Links
+- **Smart Contracts**: See `src/` directory
+- **Tests**: See `test/` directory (29/29 passing)
+- **Frontend**: See `frontend/` directory
+- **Demo Script**: See `script/Demo2FA.s.sol`
+
 ## 🔗 Resources
 
+### Ethereum Standards
 - [EIP-7951: P256 Precompile](https://eips.ethereum.org/EIPS/eip-7951)
 - [ERC-4337: Account Abstraction](https://eips.ethereum.org/EIPS/eip-4337)
+- [EIP-1271: Signature Validation](https://eips.ethereum.org/EIPS/eip-1271)
+
+### Web3Auth
+- [Web3Auth Documentation](https://web3auth.io/docs/)
+- [Web3Auth Dashboard](https://dashboard.web3auth.io/)
+- [Web3Auth Examples](https://github.com/Web3Auth/web3auth-pnp-examples)
+
+### WebAuthn/Passkeys
 - [WebAuthn Specification](https://www.w3.org/TR/webauthn-2/)
+- [WebAuthn Guide](https://webauthn.guide/)
+- [Passkeys.dev](https://passkeys.dev/)
+
+### Other
 - [Sepolia Fusaka Upgrade](https://cointelegraph.com/news/ethereum-fusaka-testnet-sepolia)
+- [Account Abstraction Docs](https://docs.alchemy.com/docs/account-abstraction-overview)
 
 ## 📝 License
 
