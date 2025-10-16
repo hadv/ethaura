@@ -2,6 +2,8 @@
 
 EthAura là một implementation hoàn chỉnh của ERC-4337 Account Abstraction sử dụng chữ ký P-256/secp256r1 và WebAuthn/Passkeys, kết hợp với Web3Auth cho social login. Dự án tận dụng EIP-7951 precompile có sẵn trên Sepolia testnet sau Fusaka upgrade để verify chữ ký P-256 một cách hiệu quả.
 
+**🆕 Now with Helios Light Client support for trustless RPC access!**
+
 ## ✨ Tính năng
 
 ### Smart Contract Features
@@ -20,6 +22,12 @@ EthAura là một implementation hoàn chỉnh của ERC-4337 Account Abstractio
 - 👤 **User Profile**: Display user info (name, email, profile picture)
 - 📱 **Biometric Auth**: Touch ID/Face ID for transaction signing
 - 🎨 **Modern UI**: React + Vite with clean interface
+
+### Infrastructure Features
+- 🌐 **Helios Light Client**: Trustless, verified RPC access
+- 🔒 **Cryptographic Verification**: All RPC data verified locally
+- ⚡ **Fast Sync**: Light client syncs in seconds
+- 💾 **Minimal Storage**: No need for full node storage
 
 ## 🏗️ Kiến trúc
 
@@ -377,6 +385,13 @@ ethaura/
 - [Architecture Overview](ARCHITECTURE.md) - System architecture and design
 - [Security Considerations](SECURITY.md) - Security best practices
 - [Deployment Guide](DEPLOYMENT.md) - How to deploy to testnet/mainnet
+
+### Infrastructure Documentation
+- **[Production Setup Guide](PRODUCTION_SETUP.md)** - Complete production deployment guide
+- [Helios Quick Start](HELIOS_QUICKSTART.md) - 5-minute Helios setup
+- [Helios Setup Guide](docs/HELIOS_SETUP.md) - Comprehensive Helios configuration
+- [Consensus Node Setup](docs/CONSENSUS_NODE_SETUP.md) - Production consensus node (Linux)
+- [Helios Architecture](docs/HELIOS_ARCHITECTURE.md) - Architecture deep dive
 
 ### Quick Links
 - **Smart Contracts**: See `src/` directory

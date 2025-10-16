@@ -1,0 +1,62 @@
+# Helios Configuration for EthAura
+# This file configures Helios light client to provide a local, trustless RPC endpoint
+
+# =============================================================================
+# DEVELOPMENT CONFIGURATION (Sepolia Testnet)
+# =============================================================================
+# For development, using public beacon APIs is sufficient and cost-effective
+[sepolia]
+# Consensus RPC endpoint - using public beacon chain API (sufficient for dev)
+consensus_rpc = "https://ethereum-sepolia-beacon-api.publicnode.com"
+
+# Execution RPC endpoint - your existing RPC provider
+# This will be verified by Helios and made trustless
+execution_rpc = "${SEPOLIA_RPC_URL}"
+
+# Weak subjectivity checkpoint (update periodically)
+# Get latest from: https://sepolia.beaconcha.in
+# This should be the block root of the first slot in a finalized epoch
+# Example checkpoint (update with a recent one):
+checkpoint = "0x6c68a8f2e9b2c0e5d5f5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5"
+
+# Local RPC server configuration
+rpc_port = 8545
+rpc_bind_ip = "127.0.0.1"
+
+# Data directory for caching
+data_dir = "~/.helios/sepolia"
+
+# =============================================================================
+# PRODUCTION CONFIGURATION (Ethereum Mainnet)
+# =============================================================================
+# For production, run your own consensus node for maximum security
+# See docs/CONSENSUS_NODE_SETUP.md for detailed setup instructions
+[mainnet]
+# Consensus RPC endpoint
+# DEVELOPMENT: Use public API (below)
+# PRODUCTION: Use your own Nimbus node - "http://127.0.0.1:5052"
+consensus_rpc = "https://www.lightclientdata.org"
+
+# Execution RPC endpoint - still use Alchemy/Infura (Helios verifies it)
+execution_rpc = "${MAINNET_RPC_URL}"
+
+# Weak subjectivity checkpoint (update periodically)
+# Get latest from: https://beaconcha.in
+checkpoint = "0x85e6151a246e8fdba36db27a0c7678a575346272fe978c9281e13a8b26cdfa68"
+
+# Local RPC server configuration
+rpc_port = 8545
+rpc_bind_ip = "127.0.0.1"
+
+# Data directory for caching
+data_dir = "~/.helios/mainnet"
+
+# Holesky Testnet Configuration (alternative testnet)
+[holesky]
+consensus_rpc = "http://testing.holesky.beacon-api.nimbus.team"
+execution_rpc = "${HOLESKY_RPC_URL}"
+checkpoint = "0x60409a013161b33c8c68c6183c7753e779ec6c24be2f3c50c6036c30e13b34a6"
+rpc_port = 8545
+rpc_bind_ip = "127.0.0.1"
+data_dir = "~/.helios/holesky"
+

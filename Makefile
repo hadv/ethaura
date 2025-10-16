@@ -13,6 +13,16 @@ help:
 	@echo "  make frontend       - Run frontend dev server"
 	@echo "  make clean          - Clean build artifacts"
 	@echo ""
+	@echo "Helios Light Client (Development):"
+	@echo "  make helios-install   - Install Helios light client"
+	@echo "  make helios-sepolia   - Start Helios for Sepolia (dev)"
+	@echo "  make helios-mainnet   - Start Helios for Mainnet (prod)"
+	@echo "  make helios-test      - Test Helios RPC connection"
+	@echo "  make helios-checkpoint - Update checkpoint"
+	@echo ""
+	@echo "Production Consensus Node (Linux only):"
+	@echo "  make consensus-setup  - Set up production consensus node"
+	@echo ""
 
 # Install dependencies
 install:
@@ -89,3 +99,39 @@ snapshot:
 	forge snapshot
 	@echo "✅ Snapshot complete!"
 
+# Helios Light Client commands
+helios-install:
+	@echo "Installing Helios..."
+	@curl https://raw.githubusercontent.com/a16z/helios/master/heliosup/install | bash
+	@echo "Run: source ~/.bashrc && heliosup"
+
+helios-sepolia:
+	@echo "Starting Helios for Sepolia (development)..."
+	@chmod +x scripts/start-helios.sh
+	@./scripts/start-helios.sh sepolia
+
+helios-mainnet:
+	@echo "Starting Helios for Mainnet (production)..."
+	@chmod +x scripts/start-helios.sh
+	@./scripts/start-helios.sh mainnet
+
+helios-test:
+	@echo "Testing Helios RPC connection..."
+	@chmod +x scripts/test-helios.sh
+	@./scripts/test-helios.sh
+
+helios-checkpoint:
+	@echo "Updating Helios checkpoint..."
+	@chmod +x scripts/update-checkpoint.sh
+	@./scripts/update-checkpoint.sh $(NETWORK)
+
+# Production Consensus Node setup (Linux only)
+consensus-setup:
+	@echo "Setting up production consensus node..."
+	@if [ "$$(uname)" != "Linux" ]; then \
+		echo "Error: This command is for Linux production environments only"; \
+		echo "For development, use: make helios-sepolia"; \
+		exit 1; \
+	fi
+	@chmod +x scripts/setup-production-consensus.sh
+	@sudo ./scripts/setup-production-consensus.sh
