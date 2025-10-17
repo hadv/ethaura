@@ -5,6 +5,7 @@ import { formatSignatureForDisplay } from '../utils/signatureUtils'
 import { useP256SDK } from '../hooks/useP256SDK'
 import { ethers } from 'ethers'
 import { buildSendEthUserOp, getUserOpHash, signUserOperation } from '../lib/userOperation'
+import { getUserFriendlyMessage, getSuggestedAction, isRetryableError } from '../lib/errors'
 
 function TransactionSender({ accountAddress, credential }) {
   const { isConnected, signMessage } = useWeb3Auth()
@@ -125,7 +126,18 @@ function TransactionSender({ accountAddress, credential }) {
 
     } catch (err) {
       console.error('Error sending transaction:', err)
-      setError(err.message || 'Transaction failed')
+
+      // Get user-friendly error message
+      const friendlyMessage = getUserFriendlyMessage(err)
+      const suggestedAction = getSuggestedAction(err)
+      const canRetry = isRetryableError(err)
+
+      // Format error message with suggestion
+      const errorMessage = canRetry
+        ? `${friendlyMessage}\n\n💡 ${suggestedAction}\n\n🔄 This error is temporary - you can try again.`
+        : `${friendlyMessage}\n\n💡 ${suggestedAction}`
+
+      setError(errorMessage)
       setStatus('')
     } finally {
       setLoading(false)
