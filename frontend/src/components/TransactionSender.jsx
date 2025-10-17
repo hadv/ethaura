@@ -1,11 +1,14 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
-import { signWithPasskey, derToRS } from '../utils/webauthn'
-import { combineTwoFactorSignatures, formatSignatureForDisplay } from '../utils/signatureUtils'
-import { keccak256 } from 'viem'
+import { signWithPasskey } from '../utils/webauthn'
+import { formatSignatureForDisplay } from '../utils/signatureUtils'
+import { useP256SDK } from '../hooks/useP256SDK'
+import { ethers } from 'ethers'
+import { buildSendEthUserOp, getUserOpHash, signUserOperation } from '../lib/userOperation'
 
 function TransactionSender({ accountAddress, credential }) {
   const { isConnected, signMessage } = useWeb3Auth()
+  const sdk = useP256SDK()
   const [status, setStatus] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -15,6 +18,22 @@ function TransactionSender({ accountAddress, credential }) {
   const [passkeySignature, setPasskeySignature] = useState(null)
   const [ownerSignature, setOwnerSignature] = useState(null)
   const [combinedSignature, setCombinedSignature] = useState(null)
+  const [accountInfo, setAccountInfo] = useState(null)
+
+  // Load account info
+  useEffect(() => {
+    const loadAccountInfo = async () => {
+      if (accountAddress && sdk) {
+        try {
+          const info = await sdk.getAccountInfo(accountAddress)
+          setAccountInfo(info)
+        } catch (err) {
+          console.error('Error loading account info:', err)
+        }
+      }
+    }
+    loadAccountInfo()
+  }, [accountAddress, sdk])
 
   const sendTransaction = async () => {
     if (!targetAddress || !amount) {
@@ -27,6 +46,11 @@ function TransactionSender({ accountAddress, credential }) {
       return
     }
 
+    if (!accountInfo) {
+      setError('Loading account info...')
+      return
+    }
+
     setLoading(true)
     setError('')
     setStatus('Preparing transaction...')
@@ -36,80 +60,72 @@ function TransactionSender({ accountAddress, credential }) {
     setCombinedSignature(null)
 
     try {
-      // Step 1: Create UserOperation
-      setStatus('Creating UserOperation...')
+      const amountWei = ethers.parseEther(amount)
 
-      const userOp = {
-        sender: accountAddress,
-        nonce: '0x0', // In production, fetch from contract
-        callData: '0x', // Encode execute(target, value, data)
-        callGasLimit: '0x10000',
-        verificationGasLimit: '0x10000',
-        preVerificationGas: '0x5000',
-        maxFeePerGas: '0x3b9aca00',
-        maxPriorityFeePerGas: '0x3b9aca00',
-        signature: '0x',
-      }
+      // Step 1: Build UserOperation
+      setStatus('Building UserOperation...')
+      const userOp = await buildSendEthUserOp({
+        accountAddress,
+        targetAddress,
+        amount: amountWei,
+        provider: sdk.provider,
+        needsDeployment: !accountInfo.deployed,
+        initCode: accountInfo.deployed ? '0x' : await sdk.accountManager.getInitCode(
+          accountInfo.qx || credential.publicKey.x,
+          accountInfo.qy || credential.publicKey.y,
+          accountInfo.owner,
+          0n
+        ),
+      })
 
       // Step 2: Get userOpHash
       setStatus('Computing userOpHash...')
-      // In production, compute proper userOpHash
-      const userOpHash = new Uint8Array(32)
-      crypto.getRandomValues(userOpHash)
-      const userOpHashHex = '0x' + Array.from(userOpHash).map(b => b.toString(16).padStart(2, '0')).join('')
+      const userOpHash = await getUserOpHash(userOp, sdk.provider, sdk.chainId)
+      const userOpHashBytes = ethers.getBytes(userOpHash)
 
       // Step 3: Sign with passkey (P-256)
       setStatus('🔑 Signing with Passkey (Touch ID/Face ID)...')
-      const passkeySignatureRaw = await signWithPasskey(credential, userOpHash)
+      const passkeySignatureRaw = await signWithPasskey(credential, userOpHashBytes)
 
       // Step 4: Decode DER signature to r,s
       setStatus('Decoding P-256 signature...')
-      const { r, s } = derToRS(passkeySignatureRaw.signature)
+      const { r, s } = sdk.derToRS(passkeySignatureRaw.signature)
       const passkeyR = '0x' + r
       const passkeyS = '0x' + s
 
       setPasskeySignature({ r: passkeyR, s: passkeyS })
 
-      // Step 5: Sign with Web3Auth wallet (ECDSA)
-      setStatus('🔐 Signing with Web3Auth wallet (2FA)...')
-      const ownerSig = await signMessage(userOpHashHex)
-      setOwnerSignature(ownerSig)
+      // Step 5: Check if 2FA is enabled
+      let ownerSig = null
+      if (accountInfo.twoFactorEnabled) {
+        setStatus('🔐 Signing with Web3Auth wallet (2FA)...')
+        ownerSig = await signMessage(ethers.getBytes(userOpHash))
+        setOwnerSignature(ownerSig)
+      }
 
-      // Step 6: Combine signatures for 2FA
-      setStatus('Combining signatures for 2FA...')
-      const finalSignature = combineTwoFactorSignatures(
+      // Step 6: Combine signatures
+      setStatus('Preparing final signature...')
+      const signedUserOp = signUserOperation(
+        userOp,
         { r: passkeyR, s: passkeyS },
         ownerSig
       )
-      setCombinedSignature(finalSignature)
+      setCombinedSignature(signedUserOp.signature)
 
-      // Step 7: Submit UserOperation
-      setStatus('Submitting UserOperation with 2FA...')
+      // Step 7: Submit UserOperation to bundler
+      setStatus('Submitting to bundler...')
+      const receipt = await sdk.bundler.sendUserOperationAndWait(signedUserOp)
 
-      // In production, submit to bundler
-      // const response = await fetch('https://bundler.example.com/rpc', {
-      //   method: 'POST',
-      //   body: JSON.stringify({
-      //     jsonrpc: '2.0',
-      //     method: 'eth_sendUserOperation',
-      //     params: [{ ...userOp, signature: finalSignature }, entryPointAddress],
-      //     id: 1,
-      //   }),
-      // })
+      setTxHash(receipt.transactionHash)
+      setStatus(`✅ Transaction confirmed! ${accountInfo.deployed ? '' : 'Account deployed + '}Transaction executed`)
 
-      // Simulate for demo
-      await new Promise(resolve => setTimeout(resolve, 2000))
-
-      const mockTxHash = '0x' + Array.from(
-        new Uint8Array(32).map(() => Math.floor(Math.random() * 256))
-      ).map(b => b.toString(16).padStart(2, '0')).join('')
-
-      setTxHash(mockTxHash)
-      setStatus('✅ Transaction sent successfully with 2FA!')
+      // Refresh account info
+      const updatedInfo = await sdk.getAccountInfo(accountAddress)
+      setAccountInfo(updatedInfo)
 
     } catch (err) {
       console.error('Error sending transaction:', err)
-      setError(err.message)
+      setError(err.message || 'Transaction failed')
       setStatus('')
     } finally {
       setLoading(false)
@@ -118,15 +134,21 @@ function TransactionSender({ accountAddress, credential }) {
 
   return (
     <div className="card">
-      <h2>3️⃣ Send Transaction with 2FA</h2>
+      <h2>3️⃣ Send Transaction</h2>
       <p className="text-sm mb-4">
-        Send a transaction using your P256Account wallet with Two-Factor Authentication.
-        You'll need to sign with both your Passkey and Web3Auth wallet.
+        Send ETH using your P256Account wallet.
+        {accountInfo?.twoFactorEnabled && " You'll need to sign with both your Passkey and Web3Auth wallet (2FA)."}
       </p>
 
-      <div className="status status-info mb-4">
-        🔒 2FA Required: This transaction needs both signatures
-      </div>
+      {accountInfo && (
+        <div className="status status-info mb-4">
+          {accountInfo.deployed
+            ? `✅ Account deployed | Nonce: ${accountInfo.nonce?.toString() || '0'}`
+            : '⏳ Account will deploy on first transaction'
+          }
+          {accountInfo.twoFactorEnabled && ' | 🔒 2FA Enabled'}
+        </div>
+      )}
 
       <div className="flex-col">
         <div>
@@ -156,9 +178,9 @@ function TransactionSender({ accountAddress, credential }) {
         <button
           className="button"
           onClick={sendTransaction}
-          disabled={loading || !isConnected}
+          disabled={loading || !isConnected || !accountInfo}
         >
-          {loading ? 'Sending...' : '🔐 Send Transaction (2FA)'}
+          {loading ? 'Sending...' : accountInfo?.twoFactorEnabled ? '🔐 Send Transaction (2FA)' : '📤 Send Transaction'}
         </button>
       </div>
 
