@@ -178,10 +178,27 @@ function AccountManager({ credential, onAccountCreated, accountAddress }) {
             </div>
           )}
 
+          {!accountInfo?.deployed && (
+            <div className="status status-warning mt-4">
+              <strong>📤 Next Step: Fund Your Account</strong>
+              <p className="text-xs mt-2">
+                Send ETH to the address above from:
+              </p>
+              <ul className="text-xs mt-2" style={{ marginLeft: '20px' }}>
+                <li>Sepolia Faucet: <a href="https://sepoliafaucet.com" target="_blank" rel="noopener noreferrer" style={{ color: '#4f46e5' }}>sepoliafaucet.com</a></li>
+                <li>Your existing wallet (MetaMask, etc.)</li>
+                <li>A centralized exchange</li>
+              </ul>
+              <p className="text-xs mt-2">
+                ⚡ Your account will deploy automatically when you send your first transaction!
+              </p>
+            </div>
+          )}
+
           <p className="text-xs mt-4">
             {accountInfo?.deployed
-              ? "Your smart contract wallet is deployed! You can now send transactions."
-              : "Your account address is ready! Send ETH to this address, then send your first transaction to deploy it automatically."
+              ? "✅ Your smart contract wallet is deployed! You can now send transactions."
+              : "💡 Your account address is ready! Fund it with ETH, then send your first transaction to deploy it automatically."
             }
           </p>
         </div>
