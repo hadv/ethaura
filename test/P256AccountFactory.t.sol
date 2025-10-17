@@ -23,7 +23,7 @@ contract P256AccountFactoryTest is Test {
     function setUp() public {
         // Deploy EntryPoint (using a mock address for testing)
         entryPoint = IEntryPoint(address(0x0000000071727De22E5E9d8BAf0edAc6f37da032));
-        
+
         // Deploy factory
         factory = new P256AccountFactory(entryPoint);
     }
@@ -33,10 +33,10 @@ contract P256AccountFactoryTest is Test {
      */
     function test_DifferentPublicKeysProduceDifferentAddresses() public view {
         uint256 salt = 0;
-        
+
         address addr1 = factory.getAddress(QX1, QY1, owner1, salt);
         address addr2 = factory.getAddress(QX2, QY2, owner1, salt);
-        
+
         assertTrue(addr1 != addr2, "Different public keys should produce different addresses");
     }
 
@@ -45,10 +45,10 @@ contract P256AccountFactoryTest is Test {
      */
     function test_DifferentOwnersProduceDifferentAddresses() public view {
         uint256 salt = 0;
-        
+
         address addr1 = factory.getAddress(QX1, QY1, owner1, salt);
         address addr2 = factory.getAddress(QX1, QY1, owner2, salt);
-        
+
         assertTrue(addr1 != addr2, "Different owners should produce different addresses");
     }
 
@@ -58,7 +58,7 @@ contract P256AccountFactoryTest is Test {
     function test_DifferentSaltsProduceDifferentAddresses() public view {
         address addr1 = factory.getAddress(QX1, QY1, owner1, 0);
         address addr2 = factory.getAddress(QX1, QY1, owner1, 1);
-        
+
         assertTrue(addr1 != addr2, "Different salts should produce different addresses");
     }
 
@@ -67,10 +67,10 @@ contract P256AccountFactoryTest is Test {
      */
     function test_SameParametersProduceSameAddress() public view {
         uint256 salt = 0;
-        
+
         address addr1 = factory.getAddress(QX1, QY1, owner1, salt);
         address addr2 = factory.getAddress(QX1, QY1, owner1, salt);
-        
+
         assertEq(addr1, addr2, "Same parameters should produce same address");
     }
 
@@ -79,14 +79,14 @@ contract P256AccountFactoryTest is Test {
      */
     function test_GetAddressMatchesDeployment() public {
         uint256 salt = 0;
-        
+
         // Get predicted address
         address predicted = factory.getAddress(QX1, QY1, owner1, salt);
-        
+
         // Deploy account
         vm.deal(address(this), 1 ether);
         P256Account account = factory.createAccount(QX1, QY1, owner1, salt);
-        
+
         // Verify addresses match
         assertEq(address(account), predicted, "Predicted address should match deployed address");
     }
@@ -96,11 +96,11 @@ contract P256AccountFactoryTest is Test {
      */
     function test_NoCollisionWithSameSalt() public view {
         uint256 salt = 42; // Same salt for all
-        
+
         address addr1 = factory.getAddress(QX1, QY1, owner1, salt);
         address addr2 = factory.getAddress(QX2, QY2, owner1, salt);
         address addr3 = factory.getAddress(QX1, QY1, owner2, salt);
-        
+
         // All addresses should be different
         assertTrue(addr1 != addr2, "User 1 and User 2 should have different addresses");
         assertTrue(addr1 != addr3, "User 1 with owner1 and owner2 should have different addresses");
@@ -110,20 +110,16 @@ contract P256AccountFactoryTest is Test {
     /**
      * Test: Fuzz test - random parameters produce unique addresses
      */
-    function testFuzz_UniqueAddresses(
-        bytes32 qx1,
-        bytes32 qy1,
-        bytes32 qx2,
-        bytes32 qy2,
-        address owner,
-        uint256 salt
-    ) public view {
+    function testFuzz_UniqueAddresses(bytes32 qx1, bytes32 qy1, bytes32 qx2, bytes32 qy2, address owner, uint256 salt)
+        public
+        view
+    {
         // Skip if public keys are the same
         vm.assume(qx1 != qx2 || qy1 != qy2);
-        
+
         address addr1 = factory.getAddress(qx1, qy1, owner, salt);
         address addr2 = factory.getAddress(qx2, qy2, owner, salt);
-        
+
         assertTrue(addr1 != addr2, "Different public keys should always produce different addresses");
     }
 
@@ -132,13 +128,13 @@ contract P256AccountFactoryTest is Test {
      */
     function test_InitCodeProducesCorrectAddress() public view {
         uint256 salt = 0;
-        
+
         // Get predicted address
         address predicted = factory.getAddress(QX1, QY1, owner1, salt);
-        
+
         // Get initCode
         bytes memory initCode = factory.getInitCode(QX1, QY1, owner1, salt);
-        
+
         // Verify initCode contains factory address
         address factoryFromInitCode;
         assembly {
@@ -156,11 +152,10 @@ contract P256AccountFactoryTest is Test {
         address addr2 = factory.getAddress(QX2, QY1, owner1, 0); // Different qx
         address addr3 = factory.getAddress(QX1, QY2, owner1, 0); // Different qy
         address addr4 = factory.getAddress(QX1, QY1, owner2, 0); // Different owner
-        
+
         // All should be different
         assertTrue(addr1 != addr2, "qx should affect address");
         assertTrue(addr1 != addr3, "qy should affect address");
         assertTrue(addr1 != addr4, "owner should affect address");
     }
 }
-

@@ -106,4 +106,3 @@ contract Demo2FA is Script {
         console2.log("For more info, see: docs/TWO_FACTOR_AUTH.md");
     }
 }
-
