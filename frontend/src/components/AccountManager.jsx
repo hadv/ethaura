@@ -1,13 +1,41 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
+import { useP256SDK } from '../hooks/useP256SDK'
+import { formatPublicKeyForContract } from '../lib/accountManager'
 
 function AccountManager({ credential, onAccountCreated, accountAddress }) {
   const { isConnected, address: ownerAddress } = useWeb3Auth()
+  const sdk = useP256SDK()
   const [status, setStatus] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [factoryAddress, setFactoryAddress] = useState('')
+  const [accountInfo, setAccountInfo] = useState(null)
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(false)
+
+  // Load factory address from env
+  useEffect(() => {
+    const envFactoryAddress = import.meta.env.VITE_FACTORY_ADDRESS
+    if (envFactoryAddress) {
+      setFactoryAddress(envFactoryAddress)
+    }
+  }, [])
+
+  // Check account info when address is available
+  useEffect(() => {
+    const checkAccountInfo = async () => {
+      if (accountAddress && sdk) {
+        try {
+          const info = await sdk.getAccountInfo(accountAddress)
+          setAccountInfo(info)
+          setTwoFactorEnabled(info.twoFactorEnabled)
+        } catch (err) {
+          console.error('Error fetching account info:', err)
+        }
+      }
+    }
+    checkAccountInfo()
+  }, [accountAddress, sdk])
 
   const deployAccount = async () => {
     if (!credential) {
@@ -27,36 +55,29 @@ function AccountManager({ credential, onAccountCreated, accountAddress }) {
 
     setLoading(true)
     setError('')
-    setStatus('Deploying account...')
+    setStatus('Creating account (counterfactual)...')
 
     try {
-      // In a real implementation, you would:
-      // 1. Connect to the blockchain
-      // 2. Call factory.createAccount(qx, qy, owner, salt)
-      // 3. Wait for transaction confirmation
-      // 4. Get the deployed account address
-      // 5. Enable 2FA automatically
+      // Create account using SDK (counterfactual - no deployment yet!)
+      setStatus('Calculating account address...')
+      const accountData = await sdk.createAccount(
+        credential.publicKey,
+        ownerAddress,
+        0n // salt
+      )
 
-      // For demo purposes, we'll simulate this
-      setStatus('Simulating deployment...')
+      setStatus('Account created successfully!')
+      setAccountInfo(accountData)
 
-      // Simulate network delay
-      await new Promise(resolve => setTimeout(resolve, 2000))
+      // Check if 2FA is enabled (will be false until account is deployed)
+      setTwoFactorEnabled(false)
 
-      // Calculate deterministic address (simplified)
-      const mockAddress = '0x' + Array.from(
-        new Uint8Array(20).map(() => Math.floor(Math.random() * 256))
-      ).map(b => b.toString(16).padStart(2, '0')).join('')
+      onAccountCreated(accountData.address)
 
-      setStatus('Enabling Two-Factor Authentication...')
-      await new Promise(resolve => setTimeout(resolve, 1000))
-
-      setTwoFactorEnabled(true)
-      setStatus('Account deployed successfully with 2FA enabled!')
-      onAccountCreated(mockAddress)
+      setStatus(`✅ Account ready! ${accountData.isDeployed ? 'Already deployed' : 'Will deploy on first transaction'}`)
 
     } catch (err) {
-      console.error('Error deploying account:', err)
+      console.error('Error creating account:', err)
       setError(err.message)
       setStatus('')
     } finally {
@@ -132,18 +153,53 @@ function AccountManager({ credential, onAccountCreated, accountAddress }) {
             {accountAddress}
           </div>
 
-          {twoFactorEnabled && (
-            <div className="status status-success mt-4">
-              🔒 Two-Factor Authentication: <strong>ENABLED</strong>
+          {accountInfo && (
+            <div className="mt-3">
+              <div className="status status-info">
+                <strong>Status:</strong> {accountInfo.deployed ? '✅ Deployed' : '⏳ Not deployed yet (counterfactual)'}
+              </div>
+
+              {accountInfo.deployed && (
+                <>
+                  <div className="status status-info mt-2">
+                    <strong>Nonce:</strong> {accountInfo.nonce?.toString() || '0'}
+                  </div>
+                </>
+              )}
+
+              {twoFactorEnabled && (
+                <div className="status status-success mt-3">
+                  🔒 Two-Factor Authentication: <strong>ENABLED</strong>
+                  <p className="text-xs mt-2">
+                    All transactions require both Passkey and Web3Auth signatures
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {!accountInfo?.deployed && (
+            <div className="status status-warning mt-4">
+              <strong>📤 Next Step: Fund Your Account</strong>
               <p className="text-xs mt-2">
-                All transactions require both Passkey and Web3Auth signatures
+                Send ETH to the address above from:
+              </p>
+              <ul className="text-xs mt-2" style={{ marginLeft: '20px' }}>
+                <li>Sepolia Faucet: <a href="https://sepoliafaucet.com" target="_blank" rel="noopener noreferrer" style={{ color: '#4f46e5' }}>sepoliafaucet.com</a></li>
+                <li>Your existing wallet (MetaMask, etc.)</li>
+                <li>A centralized exchange</li>
+              </ul>
+              <p className="text-xs mt-2">
+                ⚡ Your account will deploy automatically when you send your first transaction!
               </p>
             </div>
           )}
 
           <p className="text-xs mt-4">
-            Your smart contract wallet is now deployed with 2FA!
-            You'll need to sign with both your Passkey and Web3Auth wallet for transactions.
+            {accountInfo?.deployed
+              ? "✅ Your smart contract wallet is deployed! You can now send transactions."
+              : "💡 Your account address is ready! Fund it with ETH, then send your first transaction to deploy it automatically."
+            }
           </p>
         </div>
       )}

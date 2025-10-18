@@ -57,8 +57,9 @@ contract P256AccountFactory {
             return P256Account(payable(addr));
         }
 
-        // Deploy new account using CREATE2
-        account = new P256Account{salt: bytes32(salt)}(ENTRYPOINT);
+        // Deploy new account using CREATE2 with combined salt
+        bytes32 finalSalt = keccak256(abi.encodePacked(qx, qy, owner, salt));
+        account = new P256Account{salt: finalSalt}(ENTRYPOINT);
 
         // Initialize the account
         account.initialize(qx, qy, owner);
@@ -75,8 +76,10 @@ contract P256AccountFactory {
      * @return The predicted address
      */
     function getAddress(bytes32 qx, bytes32 qy, address owner, uint256 salt) public view returns (address) {
+        // Include qx, qy, and owner in the salt to ensure unique addresses per user
+        bytes32 finalSalt = keccak256(abi.encodePacked(qx, qy, owner, salt));
         return Create2.computeAddress(
-            bytes32(salt), keccak256(abi.encodePacked(type(P256Account).creationCode, abi.encode(ENTRYPOINT)))
+            finalSalt, keccak256(abi.encodePacked(type(P256Account).creationCode, abi.encode(ENTRYPOINT)))
         );
     }
 
