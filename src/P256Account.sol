@@ -119,9 +119,12 @@ contract P256Account is IAccount, IERC1271, Ownable {
      * @param userOp The user operation
      * @param userOpHash The hash of the user operation
      * @return validationData 0 if valid, 1 if invalid
-     * @dev Supports two modes:
-     *      - Normal mode: signature = r (32) || s (32) = 64 bytes
-     *      - 2FA mode: signature = r (32) || s (32) || ownerSig (65) = 129 bytes
+     * @dev Signature format: r (32) || s (32) || authenticatorDataLen (2) || authenticatorData || clientDataJSON [|| ownerSig (65)]
+     *      - r, s: P-256 signature components
+     *      - authenticatorDataLen: uint16 length of authenticatorData
+     *      - authenticatorData: WebAuthn authenticator data
+     *      - clientDataJSON: WebAuthn client data JSON string
+     *      - ownerSig: Optional ECDSA signature from owner (if 2FA enabled)
      */
     function _validateSignature(PackedUserOperation calldata userOp, bytes32 userOpHash)
         internal
@@ -130,43 +133,55 @@ contract P256Account is IAccount, IERC1271, Ownable {
     {
         bytes calldata sig = userOp.signature;
 
-        // Check signature length based on 2FA mode
-        if (twoFactorEnabled) {
-            // 2FA mode: r (32) + s (32) + ownerSignature (65) = 129 bytes
-            if (sig.length != 129) {
-                return 1; // SIG_VALIDATION_FAILED
-            }
-        } else {
-            // Normal mode: r (32) + s (32) = 64 bytes
-            if (sig.length != 64) {
-                return 1; // SIG_VALIDATION_FAILED
-            }
-        }
-
-        // Extract P-256 signature (r, s)
-        bytes32 r;
-        bytes32 s;
-        assembly {
-            r := calldataload(sig.offset)
-            s := calldataload(add(sig.offset, 32))
-        }
-
-        // Use SHA-256 for the message hash (compatible with P-256 ecosystem)
-        bytes32 messageHash = sha256(abi.encodePacked(userOpHash));
-
-        // Verify the P-256 signature (passkey)
-        bool isValid = P256.verify(messageHash, r, s, qx, qy);
-        if (!isValid) {
+        // Minimum length: r (32) + s (32) + authDataLen (2) + minAuthData (37) + minClientData (20) = 123 bytes
+        if (sig.length < 123) {
             return 1; // SIG_VALIDATION_FAILED
+        }
+
+        // Extract and verify P-256 signature
+        {
+            bytes32 r;
+            bytes32 s;
+            uint16 authDataLen;
+
+            assembly {
+                r := calldataload(sig.offset)
+                s := calldataload(add(sig.offset, 32))
+                // Load 2 bytes for authDataLen (stored as uint16 big-endian)
+                authDataLen := shr(240, calldataload(add(sig.offset, 64)))
+            }
+
+            // Calculate offsets
+            uint256 authDataOffset = 66; // After r (32) + s (32) + len (2)
+            uint256 clientDataOffset = authDataOffset + authDataLen;
+
+            // Determine clientDataJSON length
+            uint256 clientDataLen = twoFactorEnabled
+                ? sig.length - clientDataOffset - 65
+                : sig.length - clientDataOffset;
+
+            // Verify minimum length for 2FA
+            if (twoFactorEnabled && sig.length < clientDataOffset + 66) {
+                return 1; // SIG_VALIDATION_FAILED
+            }
+
+            // Extract authenticatorData and clientDataJSON
+            bytes calldata authenticatorData = sig[authDataOffset:clientDataOffset];
+            bytes calldata clientDataJSON = sig[clientDataOffset:clientDataOffset + clientDataLen];
+
+            // Verify WebAuthn signature
+            // WebAuthn signs: SHA256(authenticatorData || SHA256(clientDataJSON))
+            bytes32 messageHash = sha256(abi.encodePacked(authenticatorData, sha256(clientDataJSON)));
+
+            if (!P256.verify(messageHash, r, s, qx, qy)) {
+                return 1; // SIG_VALIDATION_FAILED
+            }
         }
 
         // If 2FA is enabled, also verify owner signature
         if (twoFactorEnabled) {
-            // Extract owner signature (65 bytes: v, r, s)
-            bytes calldata ownerSig = sig[64:129];
-
-            // Recover signer from owner signature
-            address recovered = _recoverSigner(userOpHash, ownerSig);
+            // Recover signer from owner signature (last 65 bytes)
+            address recovered = _recoverSigner(userOpHash, sig[sig.length - 65:]);
 
             // Verify the signer is the owner
             if (recovered != owner()) {
@@ -176,6 +191,8 @@ contract P256Account is IAccount, IERC1271, Ownable {
 
         return 0; // SIG_VALIDATION_SUCCESS
     }
+
+
 
     /**
      * @notice Pay the EntryPoint the required prefund
