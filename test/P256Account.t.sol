@@ -300,7 +300,8 @@ contract P256AccountTest is Test {
 
         // Mock WebAuthn data
         bytes memory authenticatorData = hex"49960de5880e8c687434170f6476605b8fe4aeb9a28632c7995cf3ba831d97631d00000000";
-        bytes memory clientDataJSON = bytes('{"type":"webauthn.get","challenge":"test","origin":"http://localhost:3000","crossOrigin":false}');
+        bytes memory clientDataJSON =
+            bytes('{"type":"webauthn.get","challenge":"test","origin":"http://localhost:3000","crossOrigin":false}');
         uint16 authDataLen = uint16(authenticatorData.length);
 
         // Create a real owner signature
