@@ -35,26 +35,11 @@ export class P256AccountManager {
       factoryAddress: this.factoryAddress,
     })
 
-    const onChain = await this.factory.getAddress(qx, qy, owner, salt)
+    const address = await this.factory.getAddress(qx, qy, owner, salt)
 
-    console.log('🏭 Factory returned:', {
-      onChain,
-      factoryAddress: this.factoryAddress,
-      isFactoryAddress: onChain && this.factoryAddress && onChain.toLowerCase() === this.factoryAddress.toLowerCase(),
-    })
+    console.log('🏭 Factory returned address:', address)
 
-    if (
-      onChain &&
-      this.factoryAddress &&
-      onChain.toLowerCase() === this.factoryAddress.toLowerCase()
-    ) {
-      // Fallback: compute locally
-      console.log('⚠️ Factory returned its own address! Using local computation fallback')
-      const local = await this.computeLocalAddress(qx, qy, owner, salt)
-      console.log('🏠 Local computation result:', local)
-      return local
-    }
-    return onChain
+    return address
   }
 
   /**
