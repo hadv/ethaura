@@ -88,28 +88,10 @@ function PasskeyManager({ onCredentialCreated, credential }) {
         userId: Array.from(userId).map(b => b.toString(16).padStart(2, '0')).join(''),
       })
 
-      // Check if there's an existing credential in localStorage to exclude
-      const existingCredentials = []
-      const storedCredential = localStorage.getItem('ethaura_passkey_credential')
-      if (storedCredential) {
-        try {
-          const parsed = JSON.parse(storedCredential)
-          if (parsed.rawId) {
-            // Convert base64 rawId back to ArrayBuffer
-            const rawIdBytes = Uint8Array.from(atob(parsed.rawId), c => c.charCodeAt(0))
-            existingCredentials.push({
-              type: 'public-key',
-              id: rawIdBytes,
-            })
-            console.log('🚫 Excluding existing credential from creation:', {
-              id: parsed.id,
-              rawId: parsed.rawId.slice(0, 20) + '...',
-            })
-          }
-        } catch (e) {
-          console.warn('Failed to parse existing credential for exclusion:', e)
-        }
-      }
+      // NOTE: We do NOT use excludeCredentials because:
+      // 1. It causes the browser to reject credential creation
+      // 2. We already check if credential exists in localStorage above
+      // 3. User should clear localStorage before creating a new passkey
 
       // Create credential options
       const createCredentialOptions = {
@@ -136,7 +118,6 @@ function PasskeyManager({ onCredentialCreated, credential }) {
             residentKey: 'required', // WebAuthn Level 2
             userVerification: 'required', // Require biometric/PIN
           },
-          excludeCredentials: existingCredentials, // Prevent creating duplicate passkeys
           timeout: 60000,
           attestation: 'direct', // Get attestation to extract public key
         },
