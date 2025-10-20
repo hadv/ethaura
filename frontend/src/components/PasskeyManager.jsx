@@ -1,12 +1,62 @@
 import { useState } from 'react'
-import { parsePublicKey, decodeCredential } from '../utils/webauthn'
+import { parsePublicKey } from '../utils/webauthn'
+import { useWeb3Auth } from '../contexts/Web3AuthContext'
 
 function PasskeyManager({ onCredentialCreated, credential }) {
+  const { address: ownerAddress } = useWeb3Auth()
   const [status, setStatus] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
+  const discoverPasskey = async () => {
+    setLoading(true)
+    setError('')
+    setStatus('Looking for existing passkey...')
+
+    try {
+      // Check if WebAuthn is supported
+      if (!window.PublicKeyCredential) {
+        throw new Error('WebAuthn is not supported in this browser')
+      }
+
+      // Try to discover existing passkey
+      const challenge = new Uint8Array(32)
+      crypto.getRandomValues(challenge)
+
+      const assertion = await navigator.credentials.get({
+        publicKey: {
+          challenge,
+          rpId: window.location.hostname,
+          userVerification: 'required',
+          timeout: 60000,
+        },
+      })
+
+      if (assertion) {
+        console.log('✅ Found existing passkey!')
+
+        // We can't extract the public key from an assertion, so we need to store it
+        // For now, just show a message
+        setStatus('Found existing passkey! But we need the public key. Please create a new one.')
+        setError('Cannot extract public key from existing passkey. Please create a new one.')
+        setLoading(false)
+        return
+      }
+    } catch (err) {
+      console.log('No existing passkey found, will create new one')
+    }
+
+    // If no passkey found, create a new one
+    await createPasskey()
+  }
+
   const createPasskey = async () => {
+    // Prevent creating a new passkey if one already exists
+    if (credential) {
+      setError('Passkey already exists! Use "Clear Passkey" button to start over.')
+      return
+    }
+
     setLoading(true)
     setError('')
     setStatus('Creating passkey...')
@@ -21,6 +71,17 @@ function PasskeyManager({ onCredentialCreated, credential }) {
       const challenge = new Uint8Array(32)
       crypto.getRandomValues(challenge)
 
+      // Create a deterministic user ID based on owner address
+      // This ensures the same user always gets the same passkey
+      const userId = ownerAddress
+        ? new TextEncoder().encode(ownerAddress.toLowerCase()).slice(0, 16)
+        : crypto.getRandomValues(new Uint8Array(16))
+
+      console.log('👤 Creating passkey with user ID:', {
+        ownerAddress,
+        userId: Array.from(userId).map(b => b.toString(16).padStart(2, '0')).join(''),
+      })
+
       // Create credential options
       const createCredentialOptions = {
         publicKey: {
@@ -30,9 +91,9 @@ function PasskeyManager({ onCredentialCreated, credential }) {
             id: window.location.hostname,
           },
           user: {
-            id: new Uint8Array(16),
-            name: 'user@ethaura.wallet',
-            displayName: 'EthAura User',
+            id: userId,
+            name: ownerAddress ? `${ownerAddress.slice(0, 6)}...${ownerAddress.slice(-4)}@ethaura.wallet` : 'user@ethaura.wallet',
+            displayName: ownerAddress ? `EthAura User (${ownerAddress.slice(0, 6)}...${ownerAddress.slice(-4)})` : 'EthAura User',
           },
           pubKeyCredParams: [
             {
@@ -42,11 +103,12 @@ function PasskeyManager({ onCredentialCreated, credential }) {
           ],
           authenticatorSelection: {
             authenticatorAttachment: 'platform',
-            requireResidentKey: false,
-            userVerification: 'preferred',
+            requireResidentKey: true, // Store passkey on device
+            residentKey: 'required', // WebAuthn Level 2
+            userVerification: 'required', // Require biometric/PIN
           },
           timeout: 60000,
-          attestation: 'none',
+          attestation: 'direct', // Get attestation to extract public key
         },
       }
 
@@ -79,6 +141,14 @@ function PasskeyManager({ onCredentialCreated, credential }) {
     }
   }
 
+  const clearPasskey = () => {
+    localStorage.removeItem('ethaura_passkey_credential')
+    localStorage.removeItem('ethaura_account_address')
+    onCredentialCreated(null)
+    setStatus('Passkey cleared. You can create a new one.')
+    console.log('🗑️ Cleared passkey from localStorage')
+  }
+
   return (
     <div className="card">
       <h2>1️⃣ Create Passkey</h2>
@@ -88,16 +158,25 @@ function PasskeyManager({ onCredentialCreated, credential }) {
       </p>
 
       {!credential ? (
-        <button 
-          className="button" 
+        <button
+          className="button"
           onClick={createPasskey}
           disabled={loading}
         >
           {loading ? 'Creating...' : '🔑 Create Passkey'}
         </button>
       ) : (
-        <div className="status status-success">
-          ✅ Passkey created successfully!
+        <div>
+          <div className="status status-success">
+            ✅ Passkey created successfully!
+          </div>
+          <button
+            className="button button-secondary mt-4"
+            onClick={clearPasskey}
+            style={{ backgroundColor: '#dc3545' }}
+          >
+            🗑️ Clear Passkey & Start Over
+          </button>
         </div>
       )}
 
