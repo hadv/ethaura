@@ -10,6 +10,7 @@ import {
   parseBundlerError,
   isRetryableError,
 } from './errors.js'
+import { toRpcUserOp } from './userOperation.js'
 
 /**
  * Retry a function with exponential backoff
@@ -64,24 +65,32 @@ export class BundlerClient {
    */
   async sendRequest(method, params) {
     try {
+      console.log(`🌐 Bundler request to ${this.bundlerUrl}:`, { method, params })
+
       const controller = new AbortController()
       const timeoutId = setTimeout(() => controller.abort(), 30000) // 30s timeout
+
+      const requestBody = {
+        jsonrpc: '2.0',
+        id: Date.now(),
+        method,
+        params,
+      }
+
+      console.log('📨 Request body:', JSON.stringify(requestBody, null, 2))
 
       const response = await fetch(this.bundlerUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          jsonrpc: '2.0',
-          id: Date.now(),
-          method,
-          params,
-        }),
+        body: JSON.stringify(requestBody),
         signal: controller.signal,
       })
 
       clearTimeout(timeoutId)
+
+      console.log(`📥 Response status: ${response.status} ${response.statusText}`)
 
       if (!response.ok) {
         if (response.status === 429) {
@@ -109,7 +118,18 @@ export class BundlerClient {
 
       const data = await response.json()
 
+      console.log('📦 Response data:', JSON.stringify(data, null, 2))
+
       if (data.error) {
+        // Log full error details for debugging
+        console.error('❌ Bundler RPC error:', {
+          method,
+          error: data.error,
+          errorData: data.error.data,
+          errorCode: data.error.code,
+          params: params,
+        })
+
         // Parse the error to provide better error messages
         const error = new Error(data.error.message || JSON.stringify(data.error))
         error.data = data.error.data
@@ -117,6 +137,7 @@ export class BundlerClient {
         throw parseBundlerError(error, { method, params })
       }
 
+      console.log('✅ Bundler RPC success:', { method, result: data.result })
       return data.result
     } catch (error) {
       // Handle network errors
@@ -153,7 +174,29 @@ export class BundlerClient {
    */
   async sendUserOperation(userOp) {
     try {
-      return await this.sendRequest('eth_sendUserOperation', [userOp, this.entryPointAddress])
+      const rpcUserOp = toRpcUserOp(userOp)
+
+      // Log detailed UserOp info for debugging
+      console.log('📤 Sending UserOperation:', {
+        sender: rpcUserOp.sender,
+        nonce: rpcUserOp.nonce,
+        hasFactory: !!(rpcUserOp.factory),
+        factory: rpcUserOp.factory,
+        factoryDataLength: rpcUserOp.factoryData ? rpcUserOp.factoryData.length : 0,
+        callDataLength: rpcUserOp.callData.length,
+        callGasLimit: rpcUserOp.callGasLimit,
+        verificationGasLimit: rpcUserOp.verificationGasLimit,
+        preVerificationGas: rpcUserOp.preVerificationGas,
+        maxFeePerGas: rpcUserOp.maxFeePerGas,
+        maxPriorityFeePerGas: rpcUserOp.maxPriorityFeePerGas,
+        hasPaymaster: !!(rpcUserOp.paymaster),
+        signatureLength: rpcUserOp.signature.length,
+      })
+
+      // Log full RPC UserOp for deep debugging
+      console.log('📋 Full RPC UserOperation:', JSON.stringify(rpcUserOp, null, 2))
+
+      return await this.sendRequest('eth_sendUserOperation', [rpcUserOp, this.entryPointAddress])
     } catch (error) {
       throw parseBundlerError(error, { operation: 'sendUserOperation', userOp })
     }
@@ -166,7 +209,22 @@ export class BundlerClient {
    */
   async estimateUserOperationGas(userOp) {
     try {
-      return await this.sendRequest('eth_estimateUserOperationGas', [userOp, this.entryPointAddress])
+      const rpcUserOp = toRpcUserOp(userOp)
+
+      // Log detailed UserOp info for debugging
+      console.log('⛽ Estimating gas for UserOperation:', {
+        sender: rpcUserOp.sender,
+        nonce: rpcUserOp.nonce,
+        hasFactory: !!(rpcUserOp.factory),
+        factory: rpcUserOp.factory,
+        factoryDataLength: rpcUserOp.factoryData ? rpcUserOp.factoryData.length : 0,
+        callDataLength: rpcUserOp.callData.length,
+      })
+
+      // Log full RPC UserOp for deep debugging
+      console.log('📋 Full RPC UserOperation (for gas estimation):', JSON.stringify(rpcUserOp, null, 2))
+
+      return await this.sendRequest('eth_estimateUserOperationGas', [rpcUserOp, this.entryPointAddress])
     } catch (error) {
       throw parseBundlerError(error, { operation: 'estimateUserOperationGas', userOp })
     }
@@ -196,6 +254,19 @@ export class BundlerClient {
    */
   async getSupportedEntryPoints() {
     return await this.sendRequest('eth_supportedEntryPoints', [])
+  }
+
+  /**
+   * Get Pimlico gas price (for Pimlico bundlers)
+   * @returns {Promise<Object>} Gas price object with slow, standard, fast
+   */
+  async getUserOperationGasPrice() {
+    try {
+      return await this.sendRequest('pimlico_getUserOperationGasPrice', [])
+    } catch (error) {
+      console.warn('Failed to get Pimlico gas price, falling back to provider gas price')
+      return null
+    }
   }
 
   /**
