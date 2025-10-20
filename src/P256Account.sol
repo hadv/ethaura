@@ -156,9 +156,8 @@ contract P256Account is IAccount, IERC1271, Ownable {
             uint256 clientDataOffset = authDataOffset + authDataLen;
 
             // Determine clientDataJSON length
-            uint256 clientDataLen = twoFactorEnabled
-                ? sig.length - clientDataOffset - 65
-                : sig.length - clientDataOffset;
+            uint256 clientDataLen =
+                twoFactorEnabled ? sig.length - clientDataOffset - 65 : sig.length - clientDataOffset;
 
             // Verify minimum length for 2FA
             if (twoFactorEnabled && sig.length < clientDataOffset + 66) {
@@ -191,8 +190,6 @@ contract P256Account is IAccount, IERC1271, Ownable {
 
         return 0; // SIG_VALIDATION_SUCCESS
     }
-
-
 
     /**
      * @notice Pay the EntryPoint the required prefund
