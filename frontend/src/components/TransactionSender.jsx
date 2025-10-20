@@ -282,6 +282,14 @@ function TransactionSender({ accountAddress, credential }) {
         initCode: accountInfo.isDeployed ? '0x' : accountInfo.initCode,
       })
 
+      console.log('📋 UserOp initCode details:', {
+        isDeployed: accountInfo.isDeployed,
+        initCodeLength: userOp.initCode.length,
+        initCodePreview: userOp.initCode.slice(0, 66) + '...',
+        factoryAddress: userOp.initCode.slice(0, 42),
+        sender: userOp.sender,
+      })
+
       // Apply Pimlico gas prices if available
       if (gasPrices) {
         const { maxFeePerGas, maxPriorityFeePerGas } = gasPrices
