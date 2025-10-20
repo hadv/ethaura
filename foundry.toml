@@ -11,7 +11,7 @@ optimizer_runs = 1000000
 sepolia = "${SEPOLIA_RPC_URL}"
 
 [etherscan]
-sepolia = { key = "${ETHERSCAN_API_KEY}" }
+sepolia = { key = "${ETHERSCAN_API_KEY}", url = "https://api-sepolia.etherscan.io/api" }
 
 # See more config options https://github.com/foundry-rs/foundry/tree/master/config
 
