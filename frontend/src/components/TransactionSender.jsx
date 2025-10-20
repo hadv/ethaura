@@ -329,8 +329,14 @@ function TransactionSender({ accountAddress, credential }) {
       // But we're using a simplified approach where we just extract the raw signature
       setStatus('🔑 Signing with Passkey (Touch ID/Face ID)...')
 
+      // Get credential ID (support both old and new format)
+      const credentialId = credential.rawId || credential.credentialId
+      const credentialIdBytes = credentialId instanceof ArrayBuffer
+        ? new Uint8Array(credentialId)
+        : new Uint8Array(credentialId)
+
       console.log('🔑 Using credential:', {
-        credentialId: Array.from(new Uint8Array(credential.credentialId)).map(b => b.toString(16).padStart(2, '0')).join(''),
+        credentialId: Array.from(credentialIdBytes).map(b => b.toString(16).padStart(2, '0')).join(''),
         publicKey: credential.publicKey,
       })
 

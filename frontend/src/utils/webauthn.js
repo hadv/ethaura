@@ -101,6 +101,24 @@ export function parsePublicKey(attestationObject) {
  * @returns {Promise<Object>} Signature data including authenticatorData, clientDataJSON, and signature
  */
 export async function signWithPasskey(credential, message) {
+  // Get the credential ID (support both old and new format)
+  const credentialId = credential.rawId || credential.credentialId
+
+  // Convert to Uint8Array if needed
+  let credentialIdBytes
+  if (credentialId instanceof ArrayBuffer) {
+    credentialIdBytes = new Uint8Array(credentialId)
+  } else if (Array.isArray(credentialId)) {
+    credentialIdBytes = new Uint8Array(credentialId)
+  } else {
+    credentialIdBytes = credentialId
+  }
+
+  console.log('🔑 Signing with credential ID:', {
+    credentialIdHex: Array.from(credentialIdBytes).map(b => b.toString(16).padStart(2, '0')).join(''),
+    credentialIdLength: credentialIdBytes.length,
+  })
+
   // Create assertion options
   const getCredentialOptions = {
     publicKey: {
@@ -108,7 +126,7 @@ export async function signWithPasskey(credential, message) {
       rpId: window.location.hostname,
       allowCredentials: [{
         type: 'public-key',
-        id: new Uint8Array(credential.credentialId),
+        id: credentialIdBytes,
       }],
       userVerification: 'preferred',
       timeout: 60000,
