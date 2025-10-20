@@ -10,8 +10,8 @@ export const NETWORKS = {
   sepolia: {
     chainId: 11155111,
     name: 'Sepolia',
-    rpcUrl: 'https://rpc.sepolia.org',
-    bundlerUrl: 'https://api.pimlico.io/v2/sepolia/rpc?apikey=YOUR_API_KEY', // Replace with your bundler
+    rpcUrl: import.meta.env.VITE_RPC_URL || 'https://eth-sepolia.g.alchemy.com/v2/demo',
+    bundlerUrl: import.meta.env.VITE_BUNDLER_URL || 'https://api.pimlico.io/v2/sepolia/rpc?apikey=YOUR_API_KEY',
     explorerUrl: 'https://sepolia.etherscan.io',
   },
   mainnet: {
@@ -26,7 +26,7 @@ export const NETWORKS = {
 // Default gas values (can be overridden)
 export const DEFAULT_GAS_VALUES = {
   callGasLimit: 200000n,
-  verificationGasLimit: 500000n,
+  verificationGasLimit: 2000000n, // Increased for deployment with WebAuthn signature
   preVerificationGas: 100000n,
   maxFeePerGas: 2000000000n, // 2 gwei
   maxPriorityFeePerGas: 1000000000n, // 1 gwei

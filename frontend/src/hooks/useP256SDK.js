@@ -20,7 +20,9 @@ export function useP256SDK(config = null) {
       chainId: parseInt(import.meta.env.VITE_CHAIN_ID || NETWORKS.sepolia.chainId),
     }
 
-    return createSDK(config || defaultConfig)
+    const finalConfig = config || defaultConfig
+
+    return createSDK(finalConfig)
   }, [config])
 
   return sdk
