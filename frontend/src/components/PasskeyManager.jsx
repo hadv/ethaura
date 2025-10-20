@@ -19,9 +19,11 @@ function PasskeyManager({ onCredentialCreated, credential }) {
         throw new Error('WebAuthn is not supported in this browser')
       }
 
-      // Try to discover existing passkey
+      // Try to discover existing passkey by prompting user to authenticate
       const challenge = new Uint8Array(32)
       crypto.getRandomValues(challenge)
+
+      console.log('🔍 Attempting to discover existing passkey...')
 
       const assertion = await navigator.credentials.get({
         publicKey: {
@@ -33,21 +35,25 @@ function PasskeyManager({ onCredentialCreated, credential }) {
       })
 
       if (assertion) {
-        console.log('✅ Found existing passkey!')
+        console.log('✅ Found existing passkey!', {
+          credentialId: assertion.id,
+          rawId: btoa(String.fromCharCode(...new Uint8Array(assertion.rawId))).slice(0, 20) + '...',
+        })
 
-        // We can't extract the public key from an assertion, so we need to store it
-        // For now, just show a message
-        setStatus('Found existing passkey! But we need the public key. Please create a new one.')
-        setError('Cannot extract public key from existing passkey. Please create a new one.')
+        // We found a passkey, but we can't extract the public key from an assertion
+        // We need to re-create the credential to get the public key
+        // This is a WebAuthn limitation - public keys are only available during creation
+        setStatus('Found existing passkey! However, we need to re-register it to get the public key.')
+        setError('Please click "Create Passkey" to re-register your existing passkey with the public key.')
         setLoading(false)
         return
       }
     } catch (err) {
-      console.log('No existing passkey found, will create new one')
+      console.log('No existing passkey found or user cancelled:', err.message)
+      setError('No existing passkey found. Please create a new one.')
     }
 
-    // If no passkey found, create a new one
-    await createPasskey()
+    setLoading(false)
   }
 
   const createPasskey = async () => {
@@ -82,6 +88,29 @@ function PasskeyManager({ onCredentialCreated, credential }) {
         userId: Array.from(userId).map(b => b.toString(16).padStart(2, '0')).join(''),
       })
 
+      // Check if there's an existing credential in localStorage to exclude
+      const existingCredentials = []
+      const storedCredential = localStorage.getItem('ethaura_passkey_credential')
+      if (storedCredential) {
+        try {
+          const parsed = JSON.parse(storedCredential)
+          if (parsed.rawId) {
+            // Convert base64 rawId back to ArrayBuffer
+            const rawIdBytes = Uint8Array.from(atob(parsed.rawId), c => c.charCodeAt(0))
+            existingCredentials.push({
+              type: 'public-key',
+              id: rawIdBytes,
+            })
+            console.log('🚫 Excluding existing credential from creation:', {
+              id: parsed.id,
+              rawId: parsed.rawId.slice(0, 20) + '...',
+            })
+          }
+        } catch (e) {
+          console.warn('Failed to parse existing credential for exclusion:', e)
+        }
+      }
+
       // Create credential options
       const createCredentialOptions = {
         publicKey: {
@@ -107,6 +136,7 @@ function PasskeyManager({ onCredentialCreated, credential }) {
             residentKey: 'required', // WebAuthn Level 2
             userVerification: 'required', // Require biometric/PIN
           },
+          excludeCredentials: existingCredentials, // Prevent creating duplicate passkeys
           timeout: 60000,
           attestation: 'direct', // Get attestation to extract public key
         },
