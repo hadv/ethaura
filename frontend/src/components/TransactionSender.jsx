@@ -214,11 +214,22 @@ function TransactionSender({ accountAddress, credential }) {
       setStatus('Building UserOperation...')
 
       console.log('🏗️ Building UserOperation:', {
+        accountAddress,
+        isDeployed: accountInfo.isDeployed,
         needsDeployment: !accountInfo.isDeployed,
         initCodeLength: accountInfo.isDeployed ? 0 : accountInfo.initCode.length,
         credentialPublicKey: credential.publicKey,
         accountInfoQx: accountInfo.qx,
         accountInfoQy: accountInfo.qy,
+      })
+
+      // Check if account code exists on-chain
+      const accountCode = await sdk.provider.getCode(accountAddress)
+      console.log('📝 Account code check:', {
+        accountAddress,
+        codeLength: accountCode.length,
+        hasCode: accountCode !== '0x',
+        isDeployedFlag: accountInfo.isDeployed,
       })
 
       // Check account balance
