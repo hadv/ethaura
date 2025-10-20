@@ -2,6 +2,8 @@
  * WebAuthn utilities for P-256 signature handling
  */
 
+import { decode } from 'cbor-x'
+
 /**
  * Parse public key from attestation object
  * @param {ArrayBuffer} attestationObject - The attestation object from credential creation
@@ -9,24 +11,86 @@
  */
 export function parsePublicKey(attestationObject) {
   // Decode CBOR attestation object
-  const attestationBuffer = new Uint8Array(attestationObject)
-  
-  // This is a simplified parser - in production use a proper CBOR library
-  // For demo purposes, we'll generate mock coordinates
-  // In real implementation, parse the COSE key from attestationObject
-  
-  // Mock P-256 public key (in production, extract from attestationObject)
-  const x = Array.from(crypto.getRandomValues(new Uint8Array(32)))
+  const attestation = decode(new Uint8Array(attestationObject))
+
+  // Extract the authData
+  const authData = attestation.authData
+
+  // The credential public key starts at byte 55 in authData
+  // Format: https://www.w3.org/TR/webauthn-2/#sctn-attested-credential-data
+  // - rpIdHash: 32 bytes
+  // - flags: 1 byte
+  // - signCount: 4 bytes
+  // - aaguid: 16 bytes
+  // - credentialIdLength: 2 bytes
+  // - credentialId: credentialIdLength bytes
+  // - credentialPublicKey: CBOR-encoded COSE key
+
+  const rpIdHashLength = 32
+  const flagsLength = 1
+  const signCountLength = 4
+  const aaguidLength = 16
+  const credentialIdLengthBytes = 2
+
+  let offset = rpIdHashLength + flagsLength + signCountLength + aaguidLength
+
+  // Read credential ID length (big-endian uint16)
+  const credentialIdLength = (authData[offset] << 8) | authData[offset + 1]
+  offset += credentialIdLengthBytes + credentialIdLength
+
+  // The rest is the COSE key (CBOR-encoded)
+  const coseKeyBytes = authData.slice(offset)
+  const coseKey = decode(coseKeyBytes)
+
+  // COSE key format for P-256:
+  // {
+  //   1: 2,        // kty: EC2
+  //   3: -7,       // alg: ES256
+  //   -1: 1,       // crv: P-256
+  //   -2: x,       // x coordinate (32 bytes)
+  //   -3: y        // y coordinate (32 bytes)
+  // }
+
+  console.log('🔍 COSE key:', coseKey)
+  console.log('🔍 COSE key type:', typeof coseKey)
+  console.log('🔍 COSE key constructor:', coseKey?.constructor?.name)
+
+  // Access coordinates - CBOR may decode as Map or Object
+  let x, y
+  if (coseKey instanceof Map) {
+    console.log('🔍 COSE key is a Map')
+    console.log('🔍 Map keys:', Array.from(coseKey.keys()))
+    x = coseKey.get(-2)
+    y = coseKey.get(-3)
+  } else if (typeof coseKey === 'object') {
+    console.log('🔍 COSE key is an Object')
+    console.log('🔍 Object keys:', Object.keys(coseKey))
+    // Try different ways to access negative keys
+    x = coseKey[-2] || coseKey['-2'] || coseKey['x']
+    y = coseKey[-3] || coseKey['-3'] || coseKey['y']
+  }
+
+  console.log('🔍 Extracted x:', x)
+  console.log('🔍 Extracted y:', y)
+
+  if (!x || !y) {
+    throw new Error(`Failed to extract public key coordinates from COSE key. COSE key type: ${typeof coseKey}, constructor: ${coseKey?.constructor?.name}`)
+  }
+
+  // Convert to hex strings
+  const xHex = '0x' + Array.from(new Uint8Array(x))
     .map(b => b.toString(16).padStart(2, '0'))
     .join('')
-  
-  const y = Array.from(crypto.getRandomValues(new Uint8Array(32)))
+
+  const yHex = '0x' + Array.from(new Uint8Array(y))
     .map(b => b.toString(16).padStart(2, '0'))
     .join('')
-  
+
+  console.log('✅ Extracted real public key from passkey:', { x: xHex, y: yHex })
+
   return {
-    x: '0x' + x,
-    y: '0x' + y,
+    x: xHex,
+    y: yHex,
   }
 }
 
@@ -71,57 +135,78 @@ export async function signWithPasskey(credential, message) {
  * @returns {Object} Object with r and s as hex strings (without 0x prefix)
  */
 export function derToRS(derSignature) {
+  console.log('🔧 derToRS called - CODE VERSION: 2025-10-20-v2 - NORMALIZATION ENABLED')
+
   // DER format: 0x30 [total-length] 0x02 [r-length] [r] 0x02 [s-length] [s]
-  
+
   let offset = 0
-  
+
   // Check sequence tag
   if (derSignature[offset++] !== 0x30) {
     throw new Error('Invalid DER signature: missing sequence tag')
   }
-  
+
   // Skip total length
   offset++
-  
+
   // Check integer tag for r
   if (derSignature[offset++] !== 0x02) {
     throw new Error('Invalid DER signature: missing r integer tag')
   }
-  
+
   // Get r length
   let rLength = derSignature[offset++]
-  
+
   // Extract r (skip leading zero if present)
   let rOffset = offset
   if (derSignature[rOffset] === 0x00) {
     rOffset++
     rLength--
   }
-  
+
   const r = derSignature.slice(rOffset, rOffset + rLength)
   offset = rOffset + rLength
-  
+
   // Check integer tag for s
   if (derSignature[offset++] !== 0x02) {
     throw new Error('Invalid DER signature: missing s integer tag')
   }
-  
+
   // Get s length
   let sLength = derSignature[offset++]
-  
+
   // Extract s (skip leading zero if present)
   let sOffset = offset
   if (derSignature[sOffset] === 0x00) {
     sOffset++
     sLength--
   }
-  
+
   const s = derSignature.slice(sOffset, sOffset + sLength)
-  
+
   // Pad to 32 bytes if needed
   const rPadded = padTo32Bytes(r)
-  const sPadded = padTo32Bytes(s)
-  
+  let sPadded = padTo32Bytes(s)
+
+  // Normalize s to prevent signature malleability
+  // If s > N/2, replace with N - s
+  // secp256r1 curve order N
+  const N = BigInt('0xFFFFFFFF00000000FFFFFFFFFFFFFFFFBCE6FAADA7179E84F3B9CAC2FC632551')
+  const N_half = N / 2n
+
+  const sBigInt = BigInt('0x' + Array.from(sPadded).map(b => b.toString(16).padStart(2, '0')).join(''))
+
+  if (sBigInt > N_half) {
+    console.log('⚠️ Normalizing s value to prevent malleability (s > N/2)')
+    const sNormalized = N - sBigInt
+    const sNormalizedHex = sNormalized.toString(16).padStart(64, '0')
+    sPadded = new Uint8Array(32)
+    for (let i = 0; i < 32; i++) {
+      sPadded[i] = parseInt(sNormalizedHex.slice(i * 2, i * 2 + 2), 16)
+    }
+    console.log('✅ Normalized s:', '0x' + sNormalizedHex)
+  }
+
   return {
     r: Array.from(rPadded).map(b => b.toString(16).padStart(2, '0')).join(''),
     s: Array.from(sPadded).map(b => b.toString(16).padStart(2, '0')).join(''),

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Web3AuthProvider } from './contexts/Web3AuthContext'
 import Web3AuthLogin from './components/Web3AuthLogin'
 import PasskeyManager from './components/PasskeyManager'
@@ -6,8 +6,84 @@ import AccountManager from './components/AccountManager'
 import TransactionSender from './components/TransactionSender'
 
 function App() {
-  const [passkeyCredential, setPasskeyCredential] = useState(null)
-  const [accountAddress, setAccountAddress] = useState(null)
+  // Helper to serialize credential (convert ArrayBuffers to base64)
+  const serializeCredential = (cred) => {
+    if (!cred) return null
+    return {
+      id: cred.id,
+      rawId: cred.rawId ? btoa(String.fromCharCode(...new Uint8Array(cred.rawId))) : null,
+      publicKey: {
+        x: cred.publicKey?.x,
+        y: cred.publicKey?.y,
+      },
+      response: cred.response ? {
+        attestationObject: cred.response.attestationObject
+          ? btoa(String.fromCharCode(...new Uint8Array(cred.response.attestationObject)))
+          : null,
+        clientDataJSON: cred.response.clientDataJSON
+          ? btoa(String.fromCharCode(...new Uint8Array(cred.response.clientDataJSON)))
+          : null,
+      } : null,
+    }
+  }
+
+  // Helper to deserialize credential (convert base64 back to ArrayBuffers)
+  const deserializeCredential = (stored) => {
+    if (!stored) return null
+    try {
+      const parsed = JSON.parse(stored)
+      return {
+        id: parsed.id,
+        rawId: parsed.rawId ? Uint8Array.from(atob(parsed.rawId), c => c.charCodeAt(0)).buffer : null,
+        publicKey: parsed.publicKey,
+        response: parsed.response ? {
+          attestationObject: parsed.response.attestationObject
+            ? Uint8Array.from(atob(parsed.response.attestationObject), c => c.charCodeAt(0)).buffer
+            : null,
+          clientDataJSON: parsed.response.clientDataJSON
+            ? Uint8Array.from(atob(parsed.response.clientDataJSON), c => c.charCodeAt(0)).buffer
+            : null,
+        } : null,
+      }
+    } catch (e) {
+      console.error('Failed to deserialize credential:', e)
+      return null
+    }
+  }
+
+  // Load credential from localStorage on mount
+  const [passkeyCredential, setPasskeyCredential] = useState(() => {
+    const stored = localStorage.getItem('ethaura_passkey_credential')
+    return deserializeCredential(stored)
+  })
+
+  const [accountAddress, setAccountAddress] = useState(() => {
+    return localStorage.getItem('ethaura_account_address') || null
+  })
+
+  // Save credential to localStorage when it changes
+  useEffect(() => {
+    if (passkeyCredential) {
+      const serialized = serializeCredential(passkeyCredential)
+      localStorage.setItem('ethaura_passkey_credential', JSON.stringify(serialized))
+      console.log('💾 Saved passkey credential to localStorage:', {
+        id: passkeyCredential.id,
+        hasPublicKey: !!passkeyCredential.publicKey,
+      })
+    } else {
+      localStorage.removeItem('ethaura_passkey_credential')
+    }
+  }, [passkeyCredential])
+
+  // Save account address to localStorage when it changes
+  useEffect(() => {
+    if (accountAddress) {
+      localStorage.setItem('ethaura_account_address', accountAddress)
+      console.log('💾 Saved account address to localStorage')
+    } else {
+      localStorage.removeItem('ethaura_account_address')
+    }
+  }, [accountAddress])
 
   return (
     <Web3AuthProvider>
