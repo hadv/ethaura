@@ -122,12 +122,24 @@ function PasskeyManager({ onCredentialCreated, credential }) {
       // Parse the public key from the credential
       const publicKey = parsePublicKey(credential.response.attestationObject)
 
-      // Store credential info
+      // Store credential info in the format expected by App.jsx
       const credentialInfo = {
-        credentialId: Array.from(new Uint8Array(credential.rawId)),
+        id: credential.id,
+        rawId: credential.rawId,
         publicKey: publicKey,
-        challenge: Array.from(challenge),
+        response: {
+          attestationObject: credential.response.attestationObject,
+          clientDataJSON: credential.response.clientDataJSON,
+        },
       }
+
+      console.log('✅ Passkey created:', {
+        id: credential.id,
+        publicKey: {
+          x: publicKey.x.slice(0, 20) + '...',
+          y: publicKey.y.slice(0, 20) + '...',
+        },
+      })
 
       setStatus('Passkey created successfully!')
       onCredentialCreated(credentialInfo)
