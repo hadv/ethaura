@@ -53,8 +53,17 @@ export class P256AccountSDK {
   async createAccount(passkeyPublicKey, ownerAddress, salt = 0n) {
     const { qx, qy } = formatPublicKeyForContract(passkeyPublicKey)
 
+    console.log('🔧 SDK createAccount - formatted public key:', {
+      qx,
+      qy,
+      owner: ownerAddress,
+      salt: salt.toString(),
+    })
+
     // Calculate counterfactual address
     const accountAddress = await this.accountManager.getAccountAddress(qx, qy, ownerAddress, salt)
+
+    console.log('🏠 SDK createAccount - got address from factory:', accountAddress)
 
     // Get initCode for deployment
     const initCode = await this.accountManager.getInitCode(qx, qy, ownerAddress, salt)

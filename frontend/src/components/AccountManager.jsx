@@ -67,11 +67,23 @@ function AccountManager({ credential, onAccountCreated, accountAddress }) {
     try {
       // Create account using SDK (counterfactual - no deployment yet!)
       setStatus('Calculating account address...')
+
+      console.log('🔑 Creating account with public key:', {
+        x: credential.publicKey.x,
+        y: credential.publicKey.y,
+        owner: ownerAddress,
+      })
+
       const accountData = await sdk.createAccount(
         credential.publicKey,
         ownerAddress,
         0n // salt
       )
+
+      console.log('📍 Account created:', {
+        address: accountData.address,
+        isDeployed: accountData.isDeployed,
+      })
 
       // Guard: ensure we are not accidentally using the factory address as the account
       if (accountData.address && sdk.factoryAddress && accountData.address.toLowerCase() === sdk.factoryAddress.toLowerCase()) {
