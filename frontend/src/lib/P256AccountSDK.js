@@ -53,8 +53,17 @@ export class P256AccountSDK {
   async createAccount(passkeyPublicKey, ownerAddress, salt = 0n) {
     const { qx, qy } = formatPublicKeyForContract(passkeyPublicKey)
 
+    console.log('🔧 SDK createAccount - formatted public key:', {
+      qx,
+      qy,
+      owner: ownerAddress,
+      salt: salt.toString(),
+    })
+
     // Calculate counterfactual address
     const accountAddress = await this.accountManager.getAccountAddress(qx, qy, ownerAddress, salt)
+
+    console.log('🏠 SDK createAccount - got address from factory:', accountAddress)
 
     // Get initCode for deployment
     const initCode = await this.accountManager.getInitCode(qx, qy, ownerAddress, salt)
@@ -276,10 +285,24 @@ export class P256AccountSDK {
       .join('')
       .padStart(64, '0')
 
-    const s = Array.from(sBytes[0] === 0 ? sBytes.slice(1) : sBytes)
+    let s = Array.from(sBytes[0] === 0 ? sBytes.slice(1) : sBytes)
       .map(b => b.toString(16).padStart(2, '0'))
       .join('')
       .padStart(64, '0')
+
+    // Normalize s to prevent signature malleability
+    // If s > N/2, replace with N - s
+    // secp256r1 curve order N
+    const N = BigInt('0xFFFFFFFF00000000FFFFFFFFFFFFFFFFBCE6FAADA7179E84F3B9CAC2FC632551')
+    const N_half = N / 2n
+    const sBigInt = BigInt('0x' + s)
+
+    if (sBigInt > N_half) {
+      console.log('⚠️ SDK: Normalizing s value to prevent malleability (s > N/2)')
+      const sNormalized = N - sBigInt
+      s = sNormalized.toString(16).padStart(64, '0')
+      console.log('✅ SDK: Normalized s:', '0x' + s)
+    }
 
     return { r, s }
   }

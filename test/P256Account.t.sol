@@ -298,6 +298,12 @@ contract P256AccountTest is Test {
         bytes32 r = bytes32(uint256(0x1111));
         bytes32 s = bytes32(uint256(0x2222));
 
+        // Mock WebAuthn data
+        bytes memory authenticatorData = hex"49960de5880e8c687434170f6476605b8fe4aeb9a28632c7995cf3ba831d97631d00000000";
+        bytes memory clientDataJSON =
+            bytes('{"type":"webauthn.get","challenge":"test","origin":"http://localhost:3000","crossOrigin":false}');
+        uint16 authDataLen = uint16(authenticatorData.length);
+
         // Create a real owner signature
         bytes32 userOpHash = keccak256("test");
 
@@ -313,8 +319,8 @@ contract P256AccountTest is Test {
         (uint8 v, bytes32 sigR, bytes32 sigS) = vm.sign(ownerPrivateKey, userOpHash);
         bytes memory ownerSig = abi.encodePacked(sigR, sigS, v);
 
-        // Combine signatures: P-256 (64) + Owner ECDSA (65) = 129 bytes
-        userOp.signature = abi.encodePacked(r, s, ownerSig);
+        // Combine signatures: r (32) || s (32) || authDataLen (2) || authenticatorData || clientDataJSON || ownerSig (65)
+        userOp.signature = abi.encodePacked(r, s, authDataLen, authenticatorData, clientDataJSON, ownerSig);
 
         // Mock the EntryPoint call
         vm.prank(ENTRYPOINT_ADDR);

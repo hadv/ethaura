@@ -1,3 +1,6 @@
+// Polyfills must be imported FIRST before anything else
+import './polyfills.js'
+
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App.jsx'

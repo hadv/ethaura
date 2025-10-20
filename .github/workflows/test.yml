@@ -44,6 +44,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: stable
+
+      - name: Build contracts
+        run: forge build
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -54,9 +64,7 @@ jobs:
 
       - name: Install dependencies
         working-directory: frontend
-        run: |
-          rm -f package-lock.json
-          npm install
+        run: npm ci --prefer-offline --no-audit
 
       - name: Build frontend
         working-directory: frontend
