@@ -7,8 +7,8 @@ import { ENTRYPOINT_ADDRESS, DEFAULT_GAS_VALUES } from './constants.js'
 
 /**
  * Pack gas limits into bytes32
- * @param {bigint} verificationGasLimit 
- * @param {bigint} callGasLimit 
+ * @param {bigint} verificationGasLimit
+ * @param {bigint} callGasLimit
  * @returns {string} Packed bytes32
  */
 export function packAccountGasLimits(verificationGasLimit, callGasLimit) {
@@ -19,14 +19,107 @@ export function packAccountGasLimits(verificationGasLimit, callGasLimit) {
 
 /**
  * Pack gas fees into bytes32
- * @param {bigint} maxPriorityFeePerGas 
- * @param {bigint} maxFeePerGas 
+ * @param {bigint} maxPriorityFeePerGas
+ * @param {bigint} maxFeePerGas
  * @returns {string} Packed bytes32
  */
 export function packGasFees(maxPriorityFeePerGas, maxFeePerGas) {
   const priorityHex = maxPriorityFeePerGas.toString(16).padStart(32, '0')
   const maxHex = maxFeePerGas.toString(16).padStart(32, '0')
   return '0x' + priorityHex + maxHex
+}
+
+/**
+ * Convert any bigint/number/0x-hex string into a minimal hex quantity (no leading zeros)
+ * @param {bigint|number|string} v
+ * @returns {string} 0x-prefixed minimal hex quantity
+ */
+export function toQuantity(v) {
+  try {
+    const n = typeof v === 'bigint' ? v : (typeof v === 'number' ? BigInt(v) : BigInt(v))
+    return '0x' + n.toString(16)
+  } catch {
+    // If already a hex string without numeric meaning, return as-is
+    return typeof v === 'string' ? v : '0x0'
+  }
+}
+
+/**
+ * Unpack bytes32 accountGasLimits into verificationGasLimit and callGasLimit (hex strings)
+ * @param {string} packed - 0x + 64 bytes hex
+ * @returns {{ verificationGasLimit: string, callGasLimit: string }}
+ */
+export function unpackAccountGasLimits(packed) {
+  if (typeof packed !== 'string') {
+    console.error('unpackAccountGasLimits received non-string:', packed, typeof packed)
+    throw new Error(`Expected string for accountGasLimits, got ${typeof packed}`)
+  }
+  const p = packed.startsWith('0x') ? packed.slice(2) : packed
+  const verificationHex = '0x' + p.slice(0, 32)
+  const callHex = '0x' + p.slice(32, 64)
+  return { verificationGasLimit: verificationHex, callGasLimit: callHex }
+}
+
+/**
+ * Unpack bytes32 gasFees into maxPriorityFeePerGas and maxFeePerGas (hex strings)
+ * @param {string} packed - 0x + 64 bytes hex
+ * @returns {{ maxPriorityFeePerGas: string, maxFeePerGas: string }}
+ */
+export function unpackGasFees(packed) {
+  if (typeof packed !== 'string') {
+    console.error('unpackGasFees received non-string:', packed, typeof packed)
+    throw new Error(`Expected string for gasFees, got ${typeof packed}`)
+  }
+  const p = packed.startsWith('0x') ? packed.slice(2) : packed
+  const maxPriorityFeePerGas = '0x' + p.slice(0, 32)
+  const maxFeePerGas = '0x' + p.slice(32, 64)
+  return { maxPriorityFeePerGas, maxFeePerGas }
+}
+
+/**
+ * Convert PackedUserOperation (EP v0.7) to RPC UserOperation (v0.7 JSON schema expected by many bundlers)
+ * - Unpacks accountGasLimits/gasFees into individual fields
+ * - Splits initCode => factory + factoryData if present
+ * - Splits paymasterAndData => paymaster + paymasterData if present
+ * - Normalizes numeric fields to minimal hex quantities
+ * @param {Object} userOp - PackedUserOperation with accountGasLimits/gasFees
+ * @returns {Object} RPC user operation with unpacked fields
+ */
+export function toRpcUserOp(userOp) {
+  const { verificationGasLimit, callGasLimit } = unpackAccountGasLimits(userOp.accountGasLimits)
+  const { maxPriorityFeePerGas, maxFeePerGas } = unpackGasFees(userOp.gasFees)
+
+  const rpc = {
+    sender: userOp.sender,
+    nonce: toQuantity(userOp.nonce),
+    callData: userOp.callData,
+    callGasLimit: toQuantity(callGasLimit),
+    verificationGasLimit: toQuantity(verificationGasLimit),
+    preVerificationGas: toQuantity(userOp.preVerificationGas),
+    maxFeePerGas: toQuantity(maxFeePerGas),
+    maxPriorityFeePerGas: toQuantity(maxPriorityFeePerGas),
+    signature: userOp.signature,
+  }
+
+  // Translate deployment fields
+  if (userOp.initCode && userOp.initCode !== '0x') {
+    const hex = userOp.initCode.startsWith('0x') ? userOp.initCode.slice(2) : userOp.initCode
+    const factory = '0x' + hex.slice(0, 40)
+    const factoryData = '0x' + hex.slice(40)
+    rpc.factory = factory
+    rpc.factoryData = factoryData
+  }
+
+  // Translate paymaster fields
+  if (userOp.paymasterAndData && userOp.paymasterAndData !== '0x') {
+    const hex = userOp.paymasterAndData.startsWith('0x') ? userOp.paymasterAndData.slice(2) : userOp.paymasterAndData
+    const paymaster = '0x' + hex.slice(0, 40)
+    const paymasterData = '0x' + hex.slice(40)
+    rpc.paymaster = paymaster
+    rpc.paymasterData = paymasterData
+  }
+
+  return rpc
 }
 
 /**
@@ -188,27 +281,51 @@ export async function buildSendEthUserOp({
 }
 
 /**
- * Sign UserOperation with P256 passkey signature
+ * Sign UserOperation with P256 passkey signature (WebAuthn format)
  * @param {Object} userOp - UserOperation
- * @param {Object} passkeySignature - { r, s } from passkey
+ * @param {Object} passkeySignature - { r, s, authenticatorData, clientDataJSON } from passkey
  * @param {string} ownerSignature - ECDSA signature from owner (for 2FA)
  * @returns {Object} UserOperation with signature
  */
 export function signUserOperation(userOp, passkeySignature, ownerSignature = null) {
-  const { r, s } = passkeySignature
-  
+  const { r, s, authenticatorData, clientDataJSON } = passkeySignature
+
   // Remove 0x prefix if present
   const rClean = r.startsWith('0x') ? r.slice(2) : r
   const sClean = s.startsWith('0x') ? s.slice(2) : s
-  
-  let signature = '0x' + rClean + sClean
-  
+
+  // Convert authenticatorData (Uint8Array) to hex
+  const authDataHex = Array.from(authenticatorData)
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('')
+
+  // Convert clientDataJSON (string) to hex
+  const clientDataHex = Array.from(new TextEncoder().encode(clientDataJSON))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('')
+
+  // Encode authenticatorData length as uint16 (2 bytes, big-endian)
+  const authDataLen = authenticatorData.length
+  const authDataLenHex = authDataLen.toString(16).padStart(4, '0')
+
+  // Build signature: r || s || authDataLen || authenticatorData || clientDataJSON [|| ownerSig]
+  let signature = '0x' + rClean + sClean + authDataLenHex + authDataHex + clientDataHex
+
   // If 2FA is enabled, append owner signature
   if (ownerSignature) {
     const ownerSigClean = ownerSignature.startsWith('0x') ? ownerSignature.slice(2) : ownerSignature
     signature += ownerSigClean
   }
-  
+
+  console.log('📝 Signature components:', {
+    rLength: rClean.length / 2,
+    sLength: sClean.length / 2,
+    authDataLength: authDataLen,
+    clientDataLength: clientDataJSON.length,
+    ownerSigLength: ownerSignature ? 65 : 0,
+    totalSignatureLength: signature.length / 2 - 1, // -1 for '0x'
+  })
+
   return {
     ...userOp,
     signature,
