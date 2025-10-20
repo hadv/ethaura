@@ -2,7 +2,7 @@ import { createContext, useContext, useState, useEffect } from 'react';
 import { Web3Auth } from '@web3auth/modal';
 import { CHAIN_NAMESPACES, WEB3AUTH_NETWORK } from '@web3auth/base';
 import { EthereumPrivateKeyProvider } from '@web3auth/ethereum-provider';
-import { createWalletClient, custom, http } from 'viem';
+import { createWalletClient, custom } from 'viem';
 import { sepolia } from 'viem/chains';
 
 const Web3AuthContext = createContext(null);
@@ -23,6 +23,7 @@ export const Web3AuthProvider = ({ children }) => {
   const [address, setAddress] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isConnected, setIsConnected] = useState(false);
+  const [initError, setInitError] = useState(null);
 
   useEffect(() => {
     const init = async () => {
@@ -31,7 +32,7 @@ export const Web3AuthProvider = ({ children }) => {
         const chainConfig = {
           chainNamespace: CHAIN_NAMESPACES.EIP155,
           chainId: '0xaa36a7', // Sepolia chain ID (11155111)
-          rpcTarget: 'https://rpc.sepolia.org',
+          rpcTarget: import.meta.env.VITE_RPC_URL || 'https://eth-sepolia.g.alchemy.com/v2/demo',
           displayName: 'Sepolia Testnet',
           blockExplorerUrl: 'https://sepolia.etherscan.io',
           ticker: 'ETH',
@@ -48,6 +49,7 @@ export const Web3AuthProvider = ({ children }) => {
           web3AuthNetwork: WEB3AUTH_NETWORK.SAPPHIRE_DEVNET,
           chainConfig,
           privateKeyProvider,
+          uxMode: 'redirect', // Use redirect mode instead of popup to avoid COOP issues
           uiConfig: {
             appName: 'EthAura - P256 Account Abstraction',
             mode: 'light',
@@ -87,6 +89,7 @@ export const Web3AuthProvider = ({ children }) => {
         }
       } catch (error) {
         console.error('Error initializing Web3Auth:', error);
+        setInitError(error.message || 'Failed to initialize Web3Auth');
       } finally {
         setIsLoading(false);
       }
@@ -212,6 +215,55 @@ export const Web3AuthProvider = ({ children }) => {
     signTypedData,
     getPrivateKey,
   };
+
+  // Show error state if initialization failed
+  if (initError) {
+    return (
+      <Web3AuthContext.Provider value={value}>
+        <div style={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          minHeight: '100vh',
+          color: 'white',
+          fontSize: '18px',
+          flexDirection: 'column',
+          gap: '20px',
+          padding: '20px',
+          textAlign: 'center'
+        }}>
+          <div>❌ Web3Auth Initialization Error</div>
+          <div style={{ fontSize: '14px', opacity: 0.8, maxWidth: '600px' }}>
+            {initError}
+          </div>
+          <div style={{ fontSize: '12px', opacity: 0.6 }}>
+            Check the console for more details
+          </div>
+        </div>
+      </Web3AuthContext.Provider>
+    );
+  }
+
+  // Show loading state while initializing
+  if (isLoading) {
+    return (
+      <Web3AuthContext.Provider value={value}>
+        <div style={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          minHeight: '100vh',
+          color: 'white',
+          fontSize: '18px',
+          flexDirection: 'column',
+          gap: '20px'
+        }}>
+          <div>🔄 Initializing Web3Auth...</div>
+          <div style={{ fontSize: '14px', opacity: 0.8 }}>This may take a few seconds</div>
+        </div>
+      </Web3AuthContext.Provider>
+    );
+  }
 
   return (
     <Web3AuthContext.Provider value={value}>

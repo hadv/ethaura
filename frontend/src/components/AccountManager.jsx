@@ -1,17 +1,24 @@
 import { useState, useEffect } from 'react'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
 import { useP256SDK } from '../hooks/useP256SDK'
+import { NETWORKS } from '../lib/constants'
 import { formatPublicKeyForContract } from '../lib/accountManager'
 
 function AccountManager({ credential, onAccountCreated, accountAddress }) {
   const { isConnected, address: ownerAddress } = useWeb3Auth()
-  const sdk = useP256SDK()
   const [status, setStatus] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const [factoryAddress, setFactoryAddress] = useState('')
+  const [factoryAddress, setFactoryAddress] = useState(import.meta.env.VITE_FACTORY_ADDRESS || '')
   const [accountInfo, setAccountInfo] = useState(null)
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(false)
+
+  const sdk = useP256SDK({
+    factoryAddress,
+    rpcUrl: import.meta.env.VITE_RPC_URL || NETWORKS.sepolia.rpcUrl,
+    bundlerUrl: import.meta.env.VITE_BUNDLER_URL || NETWORKS.sepolia.bundlerUrl,
+    chainId: parseInt(import.meta.env.VITE_CHAIN_ID || NETWORKS.sepolia.chainId)
+  })
 
   // Load factory address from env
   useEffect(() => {
@@ -65,6 +72,11 @@ function AccountManager({ credential, onAccountCreated, accountAddress }) {
         ownerAddress,
         0n // salt
       )
+
+      // Guard: ensure we are not accidentally using the factory address as the account
+      if (accountData.address && sdk.factoryAddress && accountData.address.toLowerCase() === sdk.factoryAddress.toLowerCase()) {
+        throw new Error('Derived account address equals the factory address. Please verify VITE_FACTORY_ADDRESS and contract ABI.')
+      }
 
       setStatus('Account created successfully!')
       setAccountInfo(accountData)
