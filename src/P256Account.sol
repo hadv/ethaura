@@ -42,6 +42,58 @@ contract P256Account is IAccount, IERC1271, Ownable {
     bool public twoFactorEnabled;
 
     /*//////////////////////////////////////////////////////////////
+                          GUARDIAN & RECOVERY
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice Timelock duration for administrative actions (48 hours)
+    uint256 public constant ADMIN_TIMELOCK = 48 hours;
+
+    /// @notice Timelock duration for recovery execution (24 hours)
+    uint256 public constant RECOVERY_TIMELOCK = 24 hours;
+
+    /// @notice Guardian addresses
+    mapping(address => bool) public guardians;
+
+    /// @notice List of guardian addresses
+    address[] public guardianList;
+
+    /// @notice Number of guardian approvals required for recovery
+    uint256 public guardianThreshold;
+
+    /// @notice Recovery request nonce
+    uint256 public recoveryNonce;
+
+    /// @notice Pending public key update
+    struct PendingPublicKeyUpdate {
+        bytes32 qx;
+        bytes32 qy;
+        uint256 executeAfter;
+        bool executed;
+        bool cancelled;
+    }
+
+    /// @notice Pending public key updates by actionHash
+    mapping(bytes32 => PendingPublicKeyUpdate) public pendingPublicKeyUpdates;
+
+    /// @notice List of all pending action hashes (for enumeration)
+    bytes32[] public pendingActionHashes;
+
+    /// @notice Recovery request
+    struct RecoveryRequest {
+        bytes32 newQx;
+        bytes32 newQy;
+        address newOwner;
+        uint256 approvalCount;
+        mapping(address => bool) approvals;
+        uint256 executeAfter;
+        bool executed;
+        bool cancelled;
+    }
+
+    /// @notice Active recovery requests
+    mapping(uint256 => RecoveryRequest) public recoveryRequests;
+
+    /*//////////////////////////////////////////////////////////////
                                 EVENTS
     //////////////////////////////////////////////////////////////*/
 
@@ -49,6 +101,24 @@ contract P256Account is IAccount, IERC1271, Ownable {
     event P256AccountInitialized(IEntryPoint indexed entryPoint, bytes32 qx, bytes32 qy);
     event TwoFactorEnabled(address indexed owner);
     event TwoFactorDisabled(address indexed owner);
+
+    // Guardian events
+    event GuardianAdded(address indexed guardian);
+    event GuardianRemoved(address indexed guardian);
+    event GuardianThresholdChanged(uint256 newThreshold);
+
+    // Recovery events
+    event RecoveryInitiated(
+        uint256 indexed nonce, address indexed initiator, bytes32 newQx, bytes32 newQy, address newOwner
+    );
+    event RecoveryApproved(uint256 indexed nonce, address indexed guardian);
+    event RecoveryExecuted(uint256 indexed nonce);
+    event RecoveryCancelled(uint256 indexed nonce);
+
+    // Timelock events
+    event PublicKeyUpdateProposed(bytes32 indexed actionHash, bytes32 qx, bytes32 qy, uint256 executeAfter);
+    event PublicKeyUpdateExecuted(bytes32 indexed actionHash, bytes32 qx, bytes32 qy);
+    event PublicKeyUpdateCancelled(bytes32 indexed actionHash);
 
     /*//////////////////////////////////////////////////////////////
                                 ERRORS
@@ -61,6 +131,27 @@ contract P256Account is IAccount, IERC1271, Ownable {
     error CallFailed(bytes result);
     error TwoFactorSignatureRequired();
     error InvalidOwnerSignature();
+
+    // Guardian errors
+    error NotGuardian();
+    error GuardianAlreadyExists();
+    error GuardianDoesNotExist();
+    error InvalidThreshold();
+    error InsufficientGuardians();
+
+    // Recovery errors
+    error RecoveryNotFound();
+    error RecoveryAlreadyExecuted();
+    error RecoveryAlreadyCancelled();
+    error RecoveryAlreadyApproved();
+    error RecoveryNotReady();
+    error InsufficientApprovals();
+
+    // Timelock errors
+    error ActionNotFound();
+    error ActionAlreadyExecuted();
+    error ActionAlreadyCancelled();
+    error TimelockNotExpired();
 
     /*//////////////////////////////////////////////////////////////
                               CONSTRUCTOR
@@ -85,7 +176,18 @@ contract P256Account is IAccount, IERC1271, Ownable {
         qx = _qx;
         qy = _qy;
         _transferOwnership(_owner);
+
+        // Add owner as the first guardian
+        guardians[_owner] = true;
+        guardianList.push(_owner);
+        guardianThreshold = 1; // Owner alone can initiate recovery
+
+        // Enable two-factor authentication by default
+        twoFactorEnabled = true;
+
         emit P256AccountInitialized(ENTRYPOINT, _qx, _qy);
+        emit GuardianAdded(_owner);
+        emit TwoFactorEnabled(_owner);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -280,34 +382,92 @@ contract P256Account is IAccount, IERC1271, Ownable {
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @notice Update the P-256 public key
+     * @notice Propose a P-256 public key update (with timelock)
      * @param _qx The new x-coordinate
      * @param _qy The new y-coordinate
+     * @return actionHash The hash of the proposed action
+     * @dev Owner can propose, but must wait ADMIN_TIMELOCK before execution
      */
-    function updatePublicKey(bytes32 _qx, bytes32 _qy) external onlyOwner {
-        qx = _qx;
-        qy = _qy;
-        emit PublicKeyUpdated(_qx, _qy);
+    function proposePublicKeyUpdate(bytes32 _qx, bytes32 _qy) external onlyOwner returns (bytes32) {
+        bytes32 actionHash = keccak256(abi.encode("updatePublicKey", _qx, _qy, block.timestamp));
+
+        pendingPublicKeyUpdates[actionHash] = PendingPublicKeyUpdate({
+            qx: _qx, qy: _qy, executeAfter: block.timestamp + ADMIN_TIMELOCK, executed: false, cancelled: false
+        });
+
+        pendingActionHashes.push(actionHash);
+
+        emit PublicKeyUpdateProposed(actionHash, _qx, _qy, block.timestamp + ADMIN_TIMELOCK);
+        return actionHash;
+    }
+
+    /**
+     * @notice Execute a pending public key update
+     * @param actionHash The hash of the action to execute
+     * @dev Can be executed by anyone after timelock expires
+     */
+    function executePublicKeyUpdate(bytes32 actionHash) external {
+        PendingPublicKeyUpdate storage action = pendingPublicKeyUpdates[actionHash];
+
+        if (action.executeAfter == 0) revert ActionNotFound();
+        if (action.executed) revert ActionAlreadyExecuted();
+        if (action.cancelled) revert ActionAlreadyCancelled();
+        if (block.timestamp < action.executeAfter) revert TimelockNotExpired();
+
+        action.executed = true;
+        qx = action.qx;
+        qy = action.qy;
+
+        // Remove from pending list
+        _removePendingActionHash(actionHash);
+
+        emit PublicKeyUpdateExecuted(actionHash, action.qx, action.qy);
+        emit PublicKeyUpdated(action.qx, action.qy);
+    }
+
+    /**
+     * @notice Cancel a pending public key update (via passkey signature through EntryPoint)
+     * @param actionHash The hash of the action to cancel
+     * @dev Only callable via UserOperation (passkey signature)
+     */
+    function cancelPendingAction(bytes32 actionHash) external {
+        if (msg.sender != address(ENTRYPOINT)) revert OnlyEntryPoint();
+
+        PendingPublicKeyUpdate storage action = pendingPublicKeyUpdates[actionHash];
+        if (action.executeAfter == 0) revert ActionNotFound();
+        if (action.executed) revert ActionAlreadyExecuted();
+        if (action.cancelled) revert ActionAlreadyCancelled();
+
+        action.cancelled = true;
+
+        // Remove from pending list
+        _removePendingActionHash(actionHash);
+
+        emit PublicKeyUpdateCancelled(actionHash);
     }
 
     /**
      * @notice Enable two-factor authentication
      * @dev When enabled, all transactions require both P-256 passkey signature and owner ECDSA signature
+     * @dev Can only be called via UserOperation (passkey signature)
      */
-    function enableTwoFactor() external onlyOwner {
+    function enableTwoFactor() external {
+        if (msg.sender != address(ENTRYPOINT)) revert OnlyEntryPoint();
         require(!twoFactorEnabled, "2FA already enabled");
         twoFactorEnabled = true;
-        emit TwoFactorEnabled(msg.sender);
+        emit TwoFactorEnabled(owner());
     }
 
     /**
      * @notice Disable two-factor authentication
      * @dev When disabled, transactions only require P-256 passkey signature
+     * @dev Can only be called via UserOperation (passkey signature)
      */
-    function disableTwoFactor() external onlyOwner {
+    function disableTwoFactor() external {
+        if (msg.sender != address(ENTRYPOINT)) revert OnlyEntryPoint();
         require(twoFactorEnabled, "2FA already disabled");
         twoFactorEnabled = false;
-        emit TwoFactorDisabled(msg.sender);
+        emit TwoFactorDisabled(owner());
     }
 
     /**
@@ -315,9 +475,10 @@ contract P256Account is IAccount, IERC1271, Ownable {
      * @param dest The destination address
      * @param value The amount of ETH to send
      * @param func The calldata
+     * @dev SECURITY: Only callable via EntryPoint (passkey signature required)
      */
     function execute(address dest, uint256 value, bytes calldata func) external {
-        _requireFromEntryPointOrOwner();
+        if (msg.sender != address(ENTRYPOINT)) revert OnlyEntryPoint();
         _call(dest, value, func);
     }
 
@@ -326,15 +487,231 @@ contract P256Account is IAccount, IERC1271, Ownable {
      * @param dest Array of destination addresses
      * @param value Array of ETH amounts
      * @param func Array of calldata
+     * @dev SECURITY: Only callable via EntryPoint (passkey signature required)
      */
     function executeBatch(address[] calldata dest, uint256[] calldata value, bytes[] calldata func) external {
-        _requireFromEntryPointOrOwner();
+        if (msg.sender != address(ENTRYPOINT)) revert OnlyEntryPoint();
         require(dest.length == func.length && dest.length == value.length, "Length mismatch");
 
         for (uint256 i = 0; i < dest.length; i++) {
             _call(dest[i], value[i], func[i]);
         }
     }
+
+    /*//////////////////////////////////////////////////////////////
+                          GUARDIAN MANAGEMENT
+    //////////////////////////////////////////////////////////////*/
+
+    /**
+     * @notice Add a guardian (via passkey signature through EntryPoint)
+     * @param guardian The guardian address to add
+     * @dev Only callable via UserOperation (passkey signature)
+     */
+    function addGuardian(address guardian) external {
+        if (msg.sender != address(ENTRYPOINT)) revert OnlyEntryPoint();
+        if (guardians[guardian]) revert GuardianAlreadyExists();
+        if (guardian == address(0)) revert InvalidThreshold();
+
+        guardians[guardian] = true;
+        guardianList.push(guardian);
+
+        emit GuardianAdded(guardian);
+    }
+
+    /**
+     * @notice Remove a guardian (via passkey signature through EntryPoint)
+     * @param guardian The guardian address to remove
+     * @dev Only callable via UserOperation (passkey signature)
+     */
+    function removeGuardian(address guardian) external {
+        if (msg.sender != address(ENTRYPOINT)) revert OnlyEntryPoint();
+        if (!guardians[guardian]) revert GuardianDoesNotExist();
+
+        guardians[guardian] = false;
+
+        // Remove from guardianList
+        for (uint256 i = 0; i < guardianList.length; i++) {
+            if (guardianList[i] == guardian) {
+                guardianList[i] = guardianList[guardianList.length - 1];
+                guardianList.pop();
+                break;
+            }
+        }
+
+        emit GuardianRemoved(guardian);
+    }
+
+    /**
+     * @notice Set the guardian threshold (via passkey signature through EntryPoint)
+     * @param threshold The new threshold
+     * @dev Only callable via UserOperation (passkey signature)
+     */
+    function setGuardianThreshold(uint256 threshold) external {
+        if (msg.sender != address(ENTRYPOINT)) revert OnlyEntryPoint();
+        if (threshold == 0 || threshold > guardianList.length) revert InvalidThreshold();
+
+        guardianThreshold = threshold;
+        emit GuardianThresholdChanged(threshold);
+    }
+
+    /**
+     * @notice Get the list of guardians
+     * @return The array of guardian addresses
+     */
+    function getGuardians() external view returns (address[] memory) {
+        return guardianList;
+    }
+
+    /**
+     * @notice Get the number of guardians
+     * @return The count of guardians
+     */
+    function getGuardianCount() external view returns (uint256) {
+        return guardianList.length;
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                          SOCIAL RECOVERY
+    //////////////////////////////////////////////////////////////*/
+
+    /**
+     * @notice Initiate a recovery request
+     * @param newQx The new x-coordinate of the public key
+     * @param newQy The new y-coordinate of the public key
+     * @param newOwner The new owner address
+     * @dev Can be called by any guardian
+     */
+    function initiateRecovery(bytes32 newQx, bytes32 newQy, address newOwner) external {
+        if (!guardians[msg.sender]) revert NotGuardian();
+        if (guardianThreshold == 0) revert InvalidThreshold();
+
+        uint256 requestNonce = recoveryNonce++;
+        RecoveryRequest storage request = recoveryRequests[requestNonce];
+
+        request.newQx = newQx;
+        request.newQy = newQy;
+        request.newOwner = newOwner;
+        request.approvalCount = 1;
+        request.approvals[msg.sender] = true;
+        request.executeAfter = block.timestamp + RECOVERY_TIMELOCK;
+        request.executed = false;
+        request.cancelled = false;
+
+        emit RecoveryInitiated(requestNonce, msg.sender, newQx, newQy, newOwner);
+        emit RecoveryApproved(requestNonce, msg.sender);
+    }
+
+    /**
+     * @notice Approve a recovery request
+     * @param requestNonce The recovery request nonce
+     * @dev Can be called by any guardian
+     */
+    function approveRecovery(uint256 requestNonce) external {
+        if (!guardians[msg.sender]) revert NotGuardian();
+
+        RecoveryRequest storage request = recoveryRequests[requestNonce];
+        if (request.executeAfter == 0) revert RecoveryNotFound();
+        if (request.executed) revert RecoveryAlreadyExecuted();
+        if (request.cancelled) revert RecoveryAlreadyCancelled();
+        if (request.approvals[msg.sender]) revert RecoveryAlreadyApproved();
+
+        request.approvals[msg.sender] = true;
+        request.approvalCount++;
+
+        emit RecoveryApproved(requestNonce, msg.sender);
+    }
+
+    /**
+     * @notice Execute a recovery request
+     * @param requestNonce The recovery request nonce
+     * @dev Can be called by anyone after threshold is met and timelock expires
+     */
+    function executeRecovery(uint256 requestNonce) external {
+        RecoveryRequest storage request = recoveryRequests[requestNonce];
+
+        if (request.executeAfter == 0) revert RecoveryNotFound();
+        if (request.executed) revert RecoveryAlreadyExecuted();
+        if (request.cancelled) revert RecoveryAlreadyCancelled();
+        if (request.approvalCount < guardianThreshold) revert InsufficientApprovals();
+        if (block.timestamp < request.executeAfter) revert RecoveryNotReady();
+
+        request.executed = true;
+
+        // Update account
+        qx = request.newQx;
+        qy = request.newQy;
+        _transferOwnership(request.newOwner);
+
+        emit RecoveryExecuted(requestNonce);
+        emit PublicKeyUpdated(request.newQx, request.newQy);
+    }
+
+    /**
+     * @notice Cancel a recovery request (via passkey signature through EntryPoint)
+     * @param requestNonce The recovery request nonce
+     * @dev Only callable via UserOperation (passkey signature)
+     */
+    function cancelRecovery(uint256 requestNonce) external {
+        if (msg.sender != address(ENTRYPOINT)) revert OnlyEntryPoint();
+
+        RecoveryRequest storage request = recoveryRequests[requestNonce];
+        if (request.executeAfter == 0) revert RecoveryNotFound();
+        if (request.executed) revert RecoveryAlreadyExecuted();
+        if (request.cancelled) revert RecoveryAlreadyCancelled();
+
+        request.cancelled = true;
+        emit RecoveryCancelled(requestNonce);
+    }
+
+    /**
+     * @notice Get recovery request details
+     * @param requestNonce The recovery request nonce
+     * @return newQx The new x-coordinate
+     * @return newQy The new y-coordinate
+     * @return newOwner The new owner address
+     * @return approvalCount The number of approvals
+     * @return executeAfter The timestamp after which the request can be executed
+     * @return executed Whether the request has been executed
+     * @return cancelled Whether the request has been cancelled
+     */
+    function getRecoveryRequest(uint256 requestNonce)
+        external
+        view
+        returns (
+            bytes32 newQx,
+            bytes32 newQy,
+            address newOwner,
+            uint256 approvalCount,
+            uint256 executeAfter,
+            bool executed,
+            bool cancelled
+        )
+    {
+        RecoveryRequest storage request = recoveryRequests[requestNonce];
+        return (
+            request.newQx,
+            request.newQy,
+            request.newOwner,
+            request.approvalCount,
+            request.executeAfter,
+            request.executed,
+            request.cancelled
+        );
+    }
+
+    /**
+     * @notice Check if a guardian has approved a recovery request
+     * @param requestNonce The recovery request nonce
+     * @param guardian The guardian address
+     * @return Whether the guardian has approved
+     */
+    function hasApprovedRecovery(uint256 requestNonce, address guardian) external view returns (bool) {
+        return recoveryRequests[requestNonce].approvals[guardian];
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                          INTERNAL FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
 
     /**
      * @notice Internal function to execute a call
@@ -350,11 +727,18 @@ contract P256Account is IAccount, IERC1271, Ownable {
     }
 
     /**
-     * @notice Require the caller to be the EntryPoint or the owner
+     * @notice Internal function to remove an action hash from the pending list
+     * @param actionHash The hash to remove
      */
-    function _requireFromEntryPointOrOwner() internal view {
-        if (msg.sender != address(ENTRYPOINT) && msg.sender != owner()) {
-            revert OnlyEntryPointOrOwner();
+    function _removePendingActionHash(bytes32 actionHash) internal {
+        uint256 length = pendingActionHashes.length;
+        for (uint256 i = 0; i < length; i++) {
+            if (pendingActionHashes[i] == actionHash) {
+                // Move the last element to this position and pop
+                pendingActionHashes[i] = pendingActionHashes[length - 1];
+                pendingActionHashes.pop();
+                break;
+            }
         }
     }
 
@@ -383,8 +767,85 @@ contract P256Account is IAccount, IERC1271, Ownable {
      * @notice Withdraw deposit from the EntryPoint
      * @param withdrawAddress The address to withdraw to
      * @param amount The amount to withdraw
+     * @dev SECURITY: Only callable via EntryPoint (passkey signature required)
      */
-    function withdrawDepositTo(address payable withdrawAddress, uint256 amount) public onlyOwner {
+    function withdrawDepositTo(address payable withdrawAddress, uint256 amount) public {
+        if (msg.sender != address(ENTRYPOINT)) revert OnlyEntryPoint();
         ENTRYPOINT.withdrawTo(withdrawAddress, amount);
+    }
+
+    /**
+     * @notice Get pending public key update details
+     * @param actionHash The hash of the pending action
+     * @return proposedQx The proposed x-coordinate
+     * @return proposedQy The proposed y-coordinate
+     * @return executeAfter The timestamp when the action can be executed
+     * @return executed Whether the action has been executed
+     * @return cancelled Whether the action has been cancelled
+     */
+    function getPendingPublicKeyUpdate(bytes32 actionHash)
+        public
+        view
+        returns (bytes32 proposedQx, bytes32 proposedQy, uint256 executeAfter, bool executed, bool cancelled)
+    {
+        PendingPublicKeyUpdate storage action = pendingPublicKeyUpdates[actionHash];
+        return (action.qx, action.qy, action.executeAfter, action.executed, action.cancelled);
+    }
+
+    /**
+     * @notice Get the number of pending action hashes
+     * @return The count of pending action hashes
+     */
+    function getPendingActionCount() public view returns (uint256) {
+        return pendingActionHashes.length;
+    }
+
+    /**
+     * @notice Get all active (not executed and not cancelled) pending actions
+     * @return actionHashes Array of active action hashes
+     * @return qxValues Array of proposed qx values
+     * @return qyValues Array of proposed qy values
+     * @return executeAfters Array of execution timestamps
+     */
+    function getActivePendingActions()
+        public
+        view
+        returns (
+            bytes32[] memory actionHashes,
+            bytes32[] memory qxValues,
+            bytes32[] memory qyValues,
+            uint256[] memory executeAfters
+        )
+    {
+        // First pass: count active actions
+        uint256 activeCount = 0;
+        for (uint256 i = 0; i < pendingActionHashes.length; i++) {
+            PendingPublicKeyUpdate storage action = pendingPublicKeyUpdates[pendingActionHashes[i]];
+            if (!action.executed && !action.cancelled) {
+                activeCount++;
+            }
+        }
+
+        // Allocate arrays
+        actionHashes = new bytes32[](activeCount);
+        qxValues = new bytes32[](activeCount);
+        qyValues = new bytes32[](activeCount);
+        executeAfters = new uint256[](activeCount);
+
+        // Second pass: populate arrays
+        uint256 index = 0;
+        for (uint256 i = 0; i < pendingActionHashes.length; i++) {
+            bytes32 hash = pendingActionHashes[i];
+            PendingPublicKeyUpdate storage action = pendingPublicKeyUpdates[hash];
+            if (!action.executed && !action.cancelled) {
+                actionHashes[index] = hash;
+                qxValues[index] = action.qx;
+                qyValues[index] = action.qy;
+                executeAfters[index] = action.executeAfter;
+                index++;
+            }
+        }
+
+        return (actionHashes, qxValues, qyValues, executeAfters);
     }
 }
