@@ -73,27 +73,75 @@ Same public key + salt = same address across all networks.
 
 ### What happens if I lose my passkey?
 
-If you lose access to your passkey:
-- You can still access the account via the owner address
-- Owner can update the public key to a new passkey
-- Consider implementing social recovery for additional security
+**EthAura has multiple recovery options:**
+
+**Option 1: Owner-initiated recovery (48 hours)**
+1. Login to Web3Auth from a new device
+2. Propose a new passkey update
+3. Wait 48 hours (timelock)
+4. Execute the update
+5. ✅ Access restored
+
+**Option 2: Guardian-based recovery (24 hours, recommended)**
+1. Contact your guardians
+2. Guardian initiates recovery with your new passkey
+3. Other guardians approve (e.g., 2 out of 3)
+4. Wait 24 hours (timelock)
+5. Execute recovery
+6. ✅ Access restored
+
+**Important:** If you still have access to your passkey, you can cancel any malicious recovery attempts!
+
+### What if I lose BOTH my passkey AND Web3Auth access?
+
+**This is why guardians are critical!**
+
+If you lose both:
+1. Contact your guardians
+2. Guardians initiate recovery
+3. Multiple guardians approve (threshold required)
+4. Wait 24 hours
+5. Execute recovery
+6. ✅ Access restored
+
+**Without guardians:** Funds may be permanently lost. **Always set up guardians!**
+
+### What if my Web3Auth account is hacked?
+
+**Your funds are safe!** The new security model prevents this attack:
+
+1. Attacker gains access to your social login
+2. Attacker tries to propose a new passkey
+3. ⏰ **48-hour timelock starts**
+4. You receive notification
+5. You cancel the proposal with your passkey signature
+6. ✅ **Attack prevented, funds safe**
+
+**Key protection:** Owner address CANNOT execute transactions or immediately change passkey.
 
 ### Can I have multiple passkeys for one account?
 
 The current implementation supports one public key per account. However, you can:
-- Update the public key to a different passkey
-- Implement multi-key support (requires contract modification)
-- Use the owner address as a backup
+- Update the public key to a different passkey (with timelock)
+- Set up multiple guardians as backup
+- Use 2FA (passkey + owner signature) for high-value transactions
 
 ## Security Questions
 
 ### Is this secure?
 
-The security depends on:
-- ✅ P-256 cryptography (NIST standard)
-- ✅ EIP-7951 precompile implementation
-- ✅ ERC-4337 EntryPoint security
-- ❌ **Not audited** - use at your own risk
+**EthAura implements defense-in-depth security:**
+
+- ✅ **Passkey-first**: All transactions require passkey signature
+- ✅ **No owner bypass**: Owner cannot execute transactions directly
+- ✅ **Timelock protection**: 48-hour delay for administrative changes
+- ✅ **Guardian recovery**: Decentralized social recovery
+- ✅ **P-256 cryptography**: NIST standard, hardware-backed
+- ✅ **EIP-7951 precompile**: Efficient signature verification
+- ✅ **ERC-4337 EntryPoint**: Battle-tested account abstraction
+- ⚠️ **Not externally audited** - use at your own risk
+
+**See [SECURITY_MODEL.md](./SECURITY_MODEL.md) for detailed security analysis.**
 
 ### What about signature malleability?
 
@@ -113,6 +161,96 @@ If a critical bug is found in the precompile:
 - Network upgrade would be required to fix
 - Existing accounts would be affected
 - This is why auditing is crucial before mainnet
+
+## Guardian & Recovery Questions
+
+### What are guardians?
+
+Guardians are trusted contacts who can help you recover your account if you lose access to your passkey. They are:
+- **Decentralized**: No single guardian can recover your account
+- **Multi-sig**: Requires threshold approval (e.g., 2 out of 3)
+- **Time-locked**: 24-hour delay before recovery executes
+- **Cancellable**: You can cancel malicious recovery attempts
+
+### How do I set up guardians?
+
+**Important:** Your owner address (from Web3Auth) is **automatically added as the first guardian** when you create your account! This means you can initiate recovery immediately even before adding other guardians.
+
+1. **You already have 1 guardian**: Your owner address (threshold = 1)
+2. **Choose 2+ additional trusted contacts**: Family, friends, colleagues
+3. **Add guardians** via passkey signature:
+   ```javascript
+   await account.addGuardian(guardianAddress)
+   ```
+4. **Set threshold** (e.g., 2 out of 3 total guardians):
+   ```javascript
+   await account.setGuardianThreshold(2)
+   ```
+5. **Inform guardians**: Let them know they're your guardians
+
+### Who should I choose as guardians?
+
+**Good guardian choices:**
+- ✅ Family members you trust
+- ✅ Close friends
+- ✅ Trusted colleagues
+- ✅ People in different locations
+- ✅ People with different risk profiles
+
+**Bad guardian choices:**
+- ❌ People you don't trust completely
+- ❌ All guardians in same location
+- ❌ People who might collude
+- ❌ People who might lose access to their keys
+
+### What if a guardian's key is compromised?
+
+**Single guardian compromised:**
+- ✅ No problem! Threshold prevents single guardian attack
+- ✅ Remove compromised guardian with passkey signature
+- ✅ Add new guardian
+
+**Multiple guardians compromised:**
+- ⚠️ If threshold is met, they can initiate recovery
+- ✅ You have 24 hours to cancel with passkey
+- ✅ Monitor recovery requests closely
+
+### Can I remove guardians?
+
+Yes! You can remove guardians anytime with passkey signature:
+```javascript
+await account.removeGuardian(guardianAddress)
+```
+
+### What's the recovery process?
+
+**Step 1: Guardian initiates recovery**
+```javascript
+await account.initiateRecovery(newQx, newQy, newOwner)
+```
+
+**Step 2: Other guardians approve**
+```javascript
+await account.approveRecovery(requestNonce)
+```
+
+**Step 3: Wait 24 hours (timelock)**
+
+**Step 4: Execute recovery**
+```javascript
+await account.executeRecovery(requestNonce)
+```
+
+**Step 5: Access restored!**
+
+### Can I cancel a recovery request?
+
+Yes! If you still have access to your passkey, you can cancel any recovery request:
+```javascript
+await account.cancelRecovery(requestNonce)
+```
+
+This protects against malicious guardians.
 
 ## Usage Questions
 

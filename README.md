@@ -14,6 +14,9 @@ EthAura là một implementation hoàn chỉnh của ERC-4337 Account Abstractio
 - ✅ **Two-Factor Authentication (2FA)**: Optional dual signature mode (passkey + owner key)
 - ✅ **Factory Pattern**: Deploy deterministic accounts với CREATE2
 - ✅ **EIP-1271 Support**: Tương thích với dApp signatures
+- 🛡️ **Guardian-Based Social Recovery**: Decentralized account recovery with multi-sig guardians (owner auto-added as first guardian)
+- ⏰ **Timelock Protection**: 48-hour delay for administrative changes, 24-hour for recovery
+- 🔒 **No Owner Bypass**: Owner cannot execute transactions directly (passkey required)
 
 ### Frontend Features
 - 🔐 **Web3Auth Integration**: Social login (Google, Facebook, Twitter, Email)
