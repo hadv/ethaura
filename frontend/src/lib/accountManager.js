@@ -245,6 +245,42 @@ export class P256AccountManager {
       throw new Error('Failed to read account info. Ensure the address is a deployed P256Account, not the factory address.')
     }
   }
+
+  /**
+   * Get guardians for an account
+   * @param {string} accountAddress - Account address
+   * @returns {Promise<Object>} Guardian info { guardians: address[], threshold: number }
+   */
+  async getGuardians(accountAddress) {
+    const account = this.getAccountContract(accountAddress)
+
+    try {
+      const [guardianList, threshold] = await Promise.all([
+        account.getGuardians(),
+        account.guardianThreshold(),
+      ])
+
+      return {
+        guardians: guardianList,
+        threshold: Number(threshold),
+      }
+    } catch (e) {
+      console.error('Error fetching guardians:', e)
+      return {
+        guardians: [],
+        threshold: 0,
+      }
+    }
+  }
+
+  /**
+   * Get account contract instance
+   * @param {string} accountAddress - Account address
+   * @returns {ethers.Contract} Account contract
+   */
+  getAccountContract(accountAddress) {
+    return new ethers.Contract(accountAddress, P256_ACCOUNT_ABI, this.provider)
+  }
 }
 
 /**

@@ -49,6 +49,13 @@ export const P256_ACCOUNT_ABI = [
   'function addDeposit() payable',
   'function withdrawDepositTo(address payable withdrawAddress, uint256 amount) external',
   'function getNonce() view returns (uint256)',
+  // Guardian management
+  'function addGuardian(address guardian) external',
+  'function removeGuardian(address guardian) external',
+  'function setGuardianThreshold(uint256 threshold) external',
+  'function getGuardians() view returns (address[])',
+  'function guardians(address) view returns (bool)',
+  'function guardianThreshold() view returns (uint256)',
 ]
 
 export const ENTRYPOINT_ABI = [
