@@ -3,6 +3,7 @@ import { Web3AuthProvider } from './contexts/Web3AuthContext'
 import Web3AuthLogin from './components/Web3AuthLogin'
 import PasskeyManager from './components/PasskeyManager'
 import AccountManager from './components/AccountManager'
+import GuardianManager from './components/GuardianManager'
 import TransactionSender from './components/TransactionSender'
 
 function App() {
@@ -103,6 +104,7 @@ function App() {
               <li>🔐 Social login with Web3Auth (Google, Facebook, Twitter, Email)</li>
               <li>✅ Create Passkey credentials using WebAuthn API</li>
               <li>🔒 Two-Factor Authentication (Passkey + Web3Auth wallet)</li>
+              <li>👥 Guardian-based social recovery (owner auto-added as first guardian)</li>
               <li>✅ Deploy P256Account smart contract wallet</li>
               <li>✅ Sign transactions with dual signatures (2FA)</li>
               <li>✅ Submit UserOperations to ERC-4337 EntryPoint</li>
@@ -127,10 +129,17 @@ function App() {
         </div>
 
         {accountAddress && passkeyCredential && (
-          <TransactionSender
-            accountAddress={accountAddress}
-            credential={passkeyCredential}
-          />
+          <>
+            <GuardianManager
+              accountAddress={accountAddress}
+              credential={passkeyCredential}
+            />
+
+            <TransactionSender
+              accountAddress={accountAddress}
+              credential={passkeyCredential}
+            />
+          </>
         )}
 
         <div className="card">

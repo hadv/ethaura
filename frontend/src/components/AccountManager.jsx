@@ -12,6 +12,7 @@ function AccountManager({ credential, onAccountCreated, accountAddress }) {
   const [factoryAddress, setFactoryAddress] = useState(import.meta.env.VITE_FACTORY_ADDRESS || '')
   const [accountInfo, setAccountInfo] = useState(null)
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(false)
+  const [guardianInfo, setGuardianInfo] = useState(null)
 
   const sdk = useP256SDK({
     factoryAddress,
@@ -36,6 +37,12 @@ function AccountManager({ credential, onAccountCreated, accountAddress }) {
           const info = await sdk.getAccountInfo(accountAddress)
           setAccountInfo(info)
           setTwoFactorEnabled(info.twoFactorEnabled)
+
+          // Fetch guardian info if account is deployed
+          if (info.deployed) {
+            const guardians = await sdk.getGuardians(accountAddress)
+            setGuardianInfo(guardians)
+          }
         } catch (err) {
           console.error('Error fetching account info:', err)
         }
@@ -197,6 +204,48 @@ function AccountManager({ credential, onAccountCreated, accountAddress }) {
                   <p className="text-xs mt-2">
                     All transactions require both Passkey and Web3Auth signatures
                   </p>
+                </div>
+              )}
+
+              {guardianInfo && (
+                <div className="mt-3">
+                  <div className="status status-info">
+                    <strong>👥 Guardians:</strong> {guardianInfo.guardians.length} configured
+                  </div>
+                  <div className="status status-info mt-2">
+                    <strong>🔢 Threshold:</strong> {guardianInfo.threshold} guardian{guardianInfo.threshold !== 1 ? 's' : ''} required for recovery
+                  </div>
+
+                  {guardianInfo.guardians.length > 0 && (
+                    <div className="mt-3">
+                      <strong className="text-sm">Guardian List:</strong>
+                      <div className="mt-2" style={{ maxHeight: '150px', overflowY: 'auto' }}>
+                        {guardianInfo.guardians.map((guardian, index) => (
+                          <div
+                            key={index}
+                            className="code-block mt-1"
+                            style={{ fontSize: '0.75rem', padding: '0.5rem' }}
+                          >
+                            {index + 1}. {guardian}
+                            {ownerAddress && guardian.toLowerCase() === ownerAddress.toLowerCase() && (
+                              <span style={{ color: '#10b981', marginLeft: '8px' }}>
+                                ✓ (Owner - You)
+                              </span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {guardianInfo.guardians.length < 3 && (
+                    <div className="status status-warning mt-3">
+                      <strong>💡 Recommendation:</strong> Add at least 2-3 guardians for better security
+                      <p className="text-xs mt-2">
+                        Guardians can help you recover your account if you lose access to your passkey
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

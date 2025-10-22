@@ -92,6 +92,117 @@ export class P256AccountSDK {
   }
 
   /**
+   * Get guardians for an account
+   * @param {string} accountAddress - Account address
+   * @returns {Promise<Object>} Guardian info { guardians: address[], threshold: number }
+   */
+  async getGuardians(accountAddress) {
+    return await this.accountManager.getGuardians(accountAddress)
+  }
+
+  /**
+   * Add a guardian to the account
+   * @param {Object} params - Parameters
+   * @param {string} params.accountAddress - P256Account address
+   * @param {string} params.guardianAddress - Guardian address to add
+   * @param {Object} params.passkeyCredential - Passkey credential
+   * @param {Function} params.signWithPasskey - Function to sign with passkey
+   * @param {string} params.ownerSignature - Owner signature (for 2FA, optional)
+   * @returns {Promise<Object>} UserOperation receipt
+   */
+  async addGuardian({
+    accountAddress,
+    guardianAddress,
+    passkeyCredential,
+    signWithPasskey,
+    ownerSignature = null,
+  }) {
+    // Encode addGuardian call
+    const accountContract = this.accountManager.getAccountContract(accountAddress)
+    const data = accountContract.interface.encodeFunctionData('addGuardian', [guardianAddress])
+
+    return await this.executeCall({
+      accountAddress,
+      targetAddress: accountAddress,
+      value: 0n,
+      data,
+      passkeyCredential,
+      signWithPasskey,
+      ownerSignature,
+      needsDeployment: false,
+      initCode: '0x',
+    })
+  }
+
+  /**
+   * Remove a guardian from the account
+   * @param {Object} params - Parameters
+   * @param {string} params.accountAddress - P256Account address
+   * @param {string} params.guardianAddress - Guardian address to remove
+   * @param {Object} params.passkeyCredential - Passkey credential
+   * @param {Function} params.signWithPasskey - Function to sign with passkey
+   * @param {string} params.ownerSignature - Owner signature (for 2FA, optional)
+   * @returns {Promise<Object>} UserOperation receipt
+   */
+  async removeGuardian({
+    accountAddress,
+    guardianAddress,
+    passkeyCredential,
+    signWithPasskey,
+    ownerSignature = null,
+  }) {
+    // Encode removeGuardian call
+    const accountContract = this.accountManager.getAccountContract(accountAddress)
+    const data = accountContract.interface.encodeFunctionData('removeGuardian', [guardianAddress])
+
+    return await this.executeCall({
+      accountAddress,
+      targetAddress: accountAddress,
+      value: 0n,
+      data,
+      passkeyCredential,
+      signWithPasskey,
+      ownerSignature,
+      needsDeployment: false,
+      initCode: '0x',
+    })
+  }
+
+  /**
+   * Set guardian threshold
+   * @param {Object} params - Parameters
+   * @param {string} params.accountAddress - P256Account address
+   * @param {number} params.threshold - New threshold value
+   * @param {Object} params.passkeyCredential - Passkey credential
+   * @param {Function} params.signWithPasskey - Function to sign with passkey
+   * @param {string} params.ownerSignature - Owner signature (for 2FA, optional)
+   * @returns {Promise<Object>} UserOperation receipt
+   */
+  async setGuardianThreshold({
+    accountAddress,
+    threshold,
+    passkeyCredential,
+    signWithPasskey,
+    ownerSignature = null,
+  }) {
+    // Encode setGuardianThreshold call
+    const accountContract = this.accountManager.getAccountContract(accountAddress)
+    const data = accountContract.interface.encodeFunctionData('setGuardianThreshold', [threshold])
+
+    return await this.executeCall({
+      accountAddress,
+      targetAddress: accountAddress,
+      value: 0n,
+      data,
+      passkeyCredential,
+      signWithPasskey,
+      ownerSignature,
+      needsDeployment: false,
+      initCode: '0x',
+    })
+  }
+
+  /**
    * Send ETH from P256Account
    * @param {Object} params - Parameters
    * @param {string} params.accountAddress - P256Account address
