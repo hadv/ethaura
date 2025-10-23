@@ -42,34 +42,26 @@ export class P256AccountManager {
    * @returns {Promise<string>} Account address
    */
   async getAccountAddress(qx, qy, owner, salt = 0n) {
-    console.log('🏭 Calling factory.getAddress with:', {
-      qx,
-      qy,
-      owner,
-      salt: salt.toString(),
-      factoryAddress: this.factoryAddress,
-    })
+    try {
+      const onChain = await this.factory.getAddress(qx, qy, owner, salt)
 
-    const onChain = await this.factory.getAddress(qx, qy, owner, salt)
-
-    console.log('🏭 Factory returned:', {
-      onChain,
-      factoryAddress: this.factoryAddress,
-      isFactoryAddress: onChain && this.factoryAddress && onChain.toLowerCase() === this.factoryAddress.toLowerCase(),
-    })
-
-    if (
-      onChain &&
-      this.factoryAddress &&
-      onChain.toLowerCase() === this.factoryAddress.toLowerCase()
-    ) {
-      // Fallback: compute locally
-      console.log('⚠️ Factory returned its own address! Using local computation fallback')
-      const local = await this.computeLocalAddress(qx, qy, owner, salt)
-      console.log('🏠 Local computation result:', local)
-      return local
+      // Check if factory returned an invalid address (its own address)
+      if (
+        onChain &&
+        this.factoryAddress &&
+        onChain.toLowerCase() === this.factoryAddress.toLowerCase()
+      ) {
+        // Fallback: compute locally (factory contract may have bytecode mismatch or RPC caching issue)
+        console.log('ℹ️ Using local address computation (factory returned unexpected value)')
+        const local = await this.computeLocalAddress(qx, qy, owner, salt)
+        return local
+      }
+      return onChain
+    } catch (error) {
+      // If RPC call fails, compute locally
+      console.log('ℹ️ Factory call failed, computing address locally:', error.message)
+      return await this.computeLocalAddress(qx, qy, owner, salt)
     }
-    return onChain
   }
 
   /**
