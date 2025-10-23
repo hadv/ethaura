@@ -24,8 +24,15 @@ function GuardianManager({ accountAddress, credential, onGuardiansUpdated }) {
   // Fetch guardian info
   const fetchGuardianInfo = async () => {
     if (!accountAddress || !sdk) return
-    
+
     try {
+      // Check if account is deployed first
+      const isDeployed = await sdk.accountManager.isDeployed(accountAddress)
+      if (!isDeployed) {
+        console.log('⏭️ Account not deployed yet, skipping guardian fetch')
+        return
+      }
+
       const info = await sdk.getGuardians(accountAddress)
       setGuardianInfo(info)
       if (onGuardiansUpdated) {
