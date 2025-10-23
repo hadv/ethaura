@@ -9,7 +9,7 @@ import { getUserFriendlyMessage, getSuggestedAction, isRetryableError } from '..
 import { formatPublicKeyForContract } from '../lib/accountManager'
 
 function TransactionSender({ accountAddress, credential }) {
-  const { isConnected, signMessage, address: ownerAddress } = useWeb3Auth()
+  const { isConnected, signMessage, signRawHash, address: ownerAddress } = useWeb3Auth()
   const sdk = useP256SDK()
   const [status, setStatus] = useState('')
   const [error, setError] = useState('')
@@ -42,8 +42,8 @@ function TransactionSender({ accountAddress, credential }) {
             deployed: derived.isDeployed,
           })
 
-          // Load balance info
-          await loadBalanceInfo(derived.address)
+          // Don't load balance info here - it will be loaded when user sends transaction
+          // This reduces unnecessary RPC calls
         } catch (err) {
           console.error('Error loading account info:', err)
         }
@@ -213,36 +213,48 @@ function TransactionSender({ accountAddress, credential }) {
       // Step 1: Build UserOperation
       setStatus('Building UserOperation...')
 
+      // Batch RPC calls to reduce rate limiting
+      // Get account code, balance, and factory code in parallel
+      const [accountCode, accountBalance, factoryCode] = await Promise.all([
+        sdk.provider.getCode(accountAddress),
+        sdk.provider.getBalance(accountAddress),
+        !accountInfo.isDeployed ? sdk.provider.getCode(sdk.accountManager.factoryAddress) : Promise.resolve('0x'),
+      ])
+
+      const isActuallyDeployed = accountCode !== '0x'
+
+      console.log('📝 Account code check:', {
+        accountAddress,
+        codeLength: accountCode.length,
+        hasCode: isActuallyDeployed,
+        isDeployedFlag: accountInfo.isDeployed,
+      })
+
+      // If account is actually deployed but accountInfo says it's not, update it
+      if (isActuallyDeployed && !accountInfo.isDeployed) {
+        console.log('🔄 Account is deployed on-chain but accountInfo says it\'s not. Updating...')
+        const updatedInfo = await sdk.createAccount(credential.publicKey, ownerAddress, 0n)
+        setAccountInfo({ ...updatedInfo, deployed: updatedInfo.isDeployed })
+      }
+
       console.log('🏗️ Building UserOperation:', {
         accountAddress,
-        isDeployed: accountInfo.isDeployed,
-        needsDeployment: !accountInfo.isDeployed,
-        initCodeLength: accountInfo.isDeployed ? 0 : accountInfo.initCode.length,
+        isDeployed: isActuallyDeployed,
+        needsDeployment: !isActuallyDeployed,
+        initCodeLength: isActuallyDeployed ? 0 : accountInfo.initCode.length,
         credentialPublicKey: credential.publicKey,
         accountInfoQx: accountInfo.qx,
         accountInfoQy: accountInfo.qy,
       })
 
-      // Check if account code exists on-chain
-      const accountCode = await sdk.provider.getCode(accountAddress)
-      console.log('📝 Account code check:', {
-        accountAddress,
-        codeLength: accountCode.length,
-        hasCode: accountCode !== '0x',
-        isDeployedFlag: accountInfo.isDeployed,
-      })
-
-      // Check account balance
-      const accountBalance = await sdk.provider.getBalance(accountAddress)
       console.log('💰 Account balance:', ethers.formatEther(accountBalance), 'ETH')
 
       if (accountBalance === 0n) {
         throw new Error('Account has no ETH! Please fund the account first.')
       }
 
-      // Check if factory is deployed
-      if (!accountInfo.isDeployed) {
-        const factoryCode = await sdk.provider.getCode(sdk.accountManager.factoryAddress)
+      // Check if factory is deployed (only if account not deployed yet)
+      if (!isActuallyDeployed) {
         console.log('🏭 Factory deployed:', factoryCode !== '0x')
         console.log('🏭 Factory address:', sdk.accountManager.factoryAddress)
 
@@ -289,12 +301,12 @@ function TransactionSender({ accountAddress, credential }) {
         targetAddress,
         amount: amountWei,
         provider: sdk.provider,
-        needsDeployment: !accountInfo.isDeployed,
-        initCode: accountInfo.isDeployed ? '0x' : accountInfo.initCode,
+        needsDeployment: !isActuallyDeployed,
+        initCode: isActuallyDeployed ? '0x' : accountInfo.initCode,
       })
 
       console.log('📋 UserOp initCode details:', {
-        isDeployed: accountInfo.isDeployed,
+        isDeployed: isActuallyDeployed,
         initCodeLength: userOp.initCode.length,
         initCodePreview: userOp.initCode.slice(0, 66) + '...',
         factoryAddress: userOp.initCode.slice(0, 42),
@@ -315,20 +327,30 @@ function TransactionSender({ accountAddress, credential }) {
         const toBig = (v) => (typeof v === 'string' ? BigInt(v) : BigInt(v))
         const callGas = toBig(est.callGasLimit)
         let verifGas = toBig(est.verificationGasLimit)
-        const preVerif = toBig(est.preVerificationGas)
+        let preVerif = toBig(est.preVerificationGas)
 
         // Add 50% buffer to verification gas for P256 signature verification
         // The bundler's estimate is often too low for WebAuthn signatures
         const verifGasWithBuffer = (verifGas * 150n) / 100n
+
+        // Add 10% buffer to preVerificationGas for signature overhead
+        const preVerifWithBuffer = (preVerif * 110n) / 100n
+
         console.log('📊 Verification gas:', {
           estimated: verifGas.toString(),
           withBuffer: verifGasWithBuffer.toString(),
           bufferAdded: '50%'
         })
 
+        console.log('📊 PreVerification gas:', {
+          estimated: preVerif.toString(),
+          withBuffer: preVerifWithBuffer.toString(),
+          bufferAdded: '10%'
+        })
+
         userOp.accountGasLimits = packAccountGasLimits(verifGasWithBuffer, callGas)
-        userOp.preVerificationGas = '0x' + preVerif.toString(16)
-        console.log('✅ Gas estimation successful:', { callGas, verifGas: verifGasWithBuffer, preVerif })
+        userOp.preVerificationGas = '0x' + preVerifWithBuffer.toString(16)
+        console.log('✅ Gas estimation successful:', { callGas, verifGas: verifGasWithBuffer, preVerif: preVerifWithBuffer })
       } catch (e) {
         console.warn('Gas estimation via bundler failed; proceeding with defaults', e)
       }
@@ -369,6 +391,12 @@ function TransactionSender({ accountAddress, credential }) {
         derSignatureLength: passkeySignatureRaw.signature.length,
       })
 
+      console.log('🔑 ClientDataJSON from passkey:', {
+        clientDataJSON: passkeySignatureRaw.clientDataJSON,
+        clientDataJSONLength: passkeySignatureRaw.clientDataJSON.length,
+        clientDataJSONHash: await crypto.subtle.digest('SHA-256', new TextEncoder().encode(passkeySignatureRaw.clientDataJSON)),
+      })
+
       const { r, s } = sdk.derToRS(passkeySignatureRaw.signature)
       const passkeyR = '0x' + r
       const passkeyS = '0x' + s
@@ -396,10 +424,49 @@ function TransactionSender({ accountAddress, credential }) {
 
       // Step 5: Check if 2FA is enabled
       let ownerSig = null
+      console.log('🔐 2FA Check:', {
+        twoFactorEnabled: accountInfo.twoFactorEnabled,
+        accountInfo: accountInfo,
+      })
       if (accountInfo.twoFactorEnabled) {
         setStatus('🔐 Signing with Web3Auth wallet (2FA)...')
-        ownerSig = await signMessage(ethers.getBytes(userOpHash))
-        setOwnerSignature(ownerSig)
+        console.log('🔐 Requesting owner signature for 2FA...')
+        console.log('🔐 UserOpHash for signing:', userOpHash)
+        console.log('🔐 UserOpHash bytes:', userOpHashBytes)
+        try {
+          // Use signRawHash to sign without Ethereum message prefix
+          ownerSig = await signRawHash(userOpHash)
+          console.log('🔐 Owner signature received:', ownerSig)
+          console.log('🔐 Owner signature length:', ownerSig.length)
+          console.log('🔐 Owner signature (hex):', ownerSig)
+
+          // Check signature format
+          if (ownerSig.startsWith('0x')) {
+            const sigLength = (ownerSig.length - 2) / 2
+            console.log('🔐 Owner signature byte length:', sigLength)
+            if (sigLength !== 65) {
+              console.warn('⚠️ WARNING: Owner signature is', sigLength, 'bytes, expected 65 bytes!')
+            }
+
+            // Extract r, s, v
+            const sigHex = ownerSig.slice(2)
+            const r = sigHex.slice(0, 64)
+            const s = sigHex.slice(64, 128)
+            const v = sigHex.slice(128, 130)
+            console.log('🔐 Signature components:', {
+              r: '0x' + r,
+              s: '0x' + s,
+              v: parseInt(v, 16),
+            })
+          }
+
+          setOwnerSignature(ownerSig)
+        } catch (err) {
+          console.error('🔐 Error signing with Web3Auth:', err)
+          throw err
+        }
+      } else {
+        console.warn('⚠️ 2FA is disabled! Owner signature will NOT be included.')
       }
 
       // Step 6: Combine signatures
@@ -416,9 +483,10 @@ function TransactionSender({ accountAddress, credential }) {
       const receipt = await sdk.bundler.sendUserOperationAndWait(signedUserOp)
 
       setTxHash(receipt.transactionHash)
-      setStatus(`✅ Transaction confirmed! ${accountInfo.isDeployed ? '' : 'Account deployed + '}Transaction executed`)
+      setStatus(`✅ Transaction confirmed! ${isActuallyDeployed ? '' : 'Account deployed + '}Transaction executed`)
 
-      // Refresh account info
+      // Clear cache and refresh account info
+      sdk.accountManager.clearCache(accountAddress)
       const updatedInfo = await sdk.createAccount(credential.publicKey, ownerAddress, 0n)
       setAccountInfo({ ...updatedInfo, deployed: updatedInfo.isDeployed })
 

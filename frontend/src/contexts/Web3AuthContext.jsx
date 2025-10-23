@@ -167,6 +167,64 @@ export const Web3AuthProvider = ({ children }) => {
     }
   };
 
+  // Sign raw hash without Ethereum message prefix
+  const signRawHash = async (hash) => {
+    if (!provider || !address) {
+      throw new Error('Wallet not connected');
+    }
+
+    try {
+      console.log('🔐 Signing raw hash (NO PREFIX):', hash);
+
+      // Get private key from Web3Auth
+      let privateKey = await provider.request({
+        method: 'eth_private_key',
+      });
+
+      console.log('🔐 Got private key from Web3Auth:', privateKey);
+
+      // Ensure private key has 0x prefix
+      if (!privateKey.startsWith('0x')) {
+        privateKey = '0x' + privateKey;
+      }
+
+      console.log('🔐 Private key with prefix:', privateKey);
+
+      // Import ethers to sign directly
+      const { ethers } = await import('ethers');
+
+      // Ensure hash has 0x prefix
+      let hashToSign = hash;
+      if (!hashToSign.startsWith('0x')) {
+        hashToSign = '0x' + hashToSign;
+      }
+
+      console.log('🔐 Hash to sign:', hashToSign);
+
+      // Create a signing key from the private key
+      const signingKey = new ethers.SigningKey(privateKey);
+
+      // Sign the hash directly without any prefix
+      // This uses ECDSA signing directly on the hash
+      const signature = signingKey.sign(hashToSign);
+
+      // Convert to compact format: r || s || v
+      const compactSig = signature.serialized;
+
+      console.log('🔐 Raw hash signature (direct ECDSA):', compactSig);
+      console.log('🔐 Signature components:', {
+        r: signature.r,
+        s: signature.s,
+        v: signature.v,
+      });
+
+      return compactSig;
+    } catch (error) {
+      console.error('Error signing raw hash:', error);
+      throw error;
+    }
+  };
+
   const signTypedData = async (typedData) => {
     if (!walletClient || !address) {
       throw new Error('Wallet not connected');
@@ -212,6 +270,7 @@ export const Web3AuthProvider = ({ children }) => {
     login,
     logout,
     signMessage,
+    signRawHash,
     signTypedData,
     getPrivateKey,
   };

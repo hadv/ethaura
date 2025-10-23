@@ -32,6 +32,7 @@ export class P256AccountSDK {
     this.rpcUrl = rpcUrl
     this.bundlerUrl = bundlerUrl
     this.chainId = chainId
+    this.entryPointAddress = ENTRYPOINT_ADDRESS
 
     // Initialize provider
     this.provider = new ethers.JsonRpcProvider(rpcUrl)
@@ -68,8 +69,8 @@ export class P256AccountSDK {
     // Get initCode for deployment
     const initCode = await this.accountManager.getInitCode(qx, qy, ownerAddress, salt)
 
-    // Check if already deployed
-    const isDeployed = await this.accountManager.isDeployed(accountAddress)
+    // Get full account info (includes twoFactorEnabled, deposit, nonce)
+    const accountInfo = await this.accountManager.getAccountInfo(accountAddress)
 
     return {
       address: accountAddress,
@@ -78,7 +79,10 @@ export class P256AccountSDK {
       owner: ownerAddress,
       salt,
       initCode,
-      isDeployed,
+      isDeployed: accountInfo.deployed,
+      twoFactorEnabled: accountInfo.twoFactorEnabled,
+      deposit: accountInfo.deposit,
+      nonce: accountInfo.nonce,
     }
   }
 

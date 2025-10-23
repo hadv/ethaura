@@ -312,8 +312,15 @@ export function signUserOperation(userOp, passkeySignature, ownerSignature = nul
   let signature = '0x' + rClean + sClean + authDataLenHex + authDataHex + clientDataHex
 
   // If 2FA is enabled, append owner signature
+  let ownerSigLength = 0
   if (ownerSignature) {
     const ownerSigClean = ownerSignature.startsWith('0x') ? ownerSignature.slice(2) : ownerSignature
+    ownerSigLength = ownerSigClean.length / 2
+    console.log('📝 Appending owner signature:', {
+      ownerSignatureRaw: ownerSignature,
+      ownerSignatureClean: ownerSigClean,
+      ownerSigByteLength: ownerSigLength,
+    })
     signature += ownerSigClean
   }
 
@@ -322,7 +329,7 @@ export function signUserOperation(userOp, passkeySignature, ownerSignature = nul
     sLength: sClean.length / 2,
     authDataLength: authDataLen,
     clientDataLength: clientDataJSON.length,
-    ownerSigLength: ownerSignature ? 65 : 0,
+    ownerSigLength: ownerSigLength,
     totalSignatureLength: signature.length / 2 - 1, // -1 for '0x'
   })
 
