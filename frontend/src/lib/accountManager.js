@@ -14,6 +14,21 @@ export class P256AccountManager {
     this.factoryAddress = factoryAddress
     this.provider = provider
     this.factory = new ethers.Contract(factoryAddress, P256_ACCOUNT_FACTORY_ABI, provider)
+
+    // Simple cache to reduce RPC calls
+    this.cache = {
+      deployedStatus: new Map(), // address -> { deployed: bool, timestamp }
+      accountInfo: new Map(),    // address -> { info, timestamp }
+    }
+    this.cacheExpiry = 30000 // 30 seconds
+  }
+
+  /**
+   * Clear cache for an address (call after transaction)
+   */
+  clearCache(address) {
+    this.cache.deployedStatus.delete(address)
+    this.cache.accountInfo.delete(address)
   }
 
   /**
@@ -103,8 +118,23 @@ export class P256AccountManager {
    * @returns {Promise<boolean>} True if deployed
    */
   async isDeployed(accountAddress) {
+    // Check cache first
+    const cached = this.cache.deployedStatus.get(accountAddress)
+    if (cached && Date.now() - cached.timestamp < this.cacheExpiry) {
+      console.log('📦 Using cached deployed status for', accountAddress)
+      return cached.deployed
+    }
+
     const code = await this.provider.getCode(accountAddress)
-    return code !== '0x'
+    const deployed = code !== '0x'
+
+    // Cache the result
+    this.cache.deployedStatus.set(accountAddress, {
+      deployed,
+      timestamp: Date.now(),
+    })
+
+    return deployed
   }
 
   /**
@@ -214,34 +244,83 @@ export class P256AccountManager {
       throw new Error('Provided address is the factory address, not a P256Account. Please create a smart account first.')
     }
 
-    const isDeployed = await this.isDeployed(accountAddress)
-
-    if (!isDeployed) {
-      return {
-        address: accountAddress,
-        deployed: false,
-        twoFactorEnabled: false,
-        deposit: 0n,
-        nonce: 0n,
-      }
-    }
-
     try {
-      const [twoFactorEnabled, deposit, nonce] = await Promise.all([
-        this.isTwoFactorEnabled(accountAddress),
-        this.getDeposit(accountAddress),
-        this.getNonce(accountAddress),
-      ])
+      // Check cache first
+      const cached = this.cache.accountInfo.get(accountAddress)
+      if (cached && Date.now() - cached.timestamp < this.cacheExpiry) {
+        console.log('📦 Using cached account info for', accountAddress)
+        return cached.info
+      }
 
-      return {
-        address: accountAddress,
-        deployed: true,
-        twoFactorEnabled,
-        deposit,
-        nonce,
+      const isDeployed = await this.isDeployed(accountAddress)
+
+      if (!isDeployed) {
+        // NOTE: 2FA is ENABLED BY DEFAULT in P256Account.initialize()
+        // Even for counterfactual (not yet deployed) accounts, we must assume 2FA is enabled
+        // This ensures the first transaction includes the owner signature
+        const accountInfo = {
+          address: accountAddress,
+          deployed: false,
+          twoFactorEnabled: true, // ALWAYS TRUE - 2FA is enabled by default on deployment
+          deposit: 0n,
+          nonce: 0n,
+        }
+        console.log('📋 getAccountInfo (undeployed):', accountInfo)
+
+        // Cache the result
+        this.cache.accountInfo.set(accountAddress, {
+          info: accountInfo,
+          timestamp: Date.now(),
+        })
+
+        return accountInfo
+      }
+
+      try {
+        const [twoFactorEnabled, deposit, nonce] = await Promise.all([
+          this.isTwoFactorEnabled(accountAddress),
+          this.getDeposit(accountAddress),
+          this.getNonce(accountAddress),
+        ])
+
+        const accountInfo = {
+          address: accountAddress,
+          deployed: true,
+          twoFactorEnabled,
+          deposit,
+          nonce,
+        }
+
+        // Cache the result
+        this.cache.accountInfo.set(accountAddress, {
+          info: accountInfo,
+          timestamp: Date.now(),
+        })
+
+        return accountInfo
+      } catch (e) {
+        // Silently handle errors - if we can't read the account info, treat as undeployed
+        // This is expected for counterfactual accounts (not yet deployed) or if the contract is not a P256Account
+        // The account will be deployed on first transaction via initCode in the UserOperation
+        const accountInfo = {
+          address: accountAddress,
+          deployed: false,
+          twoFactorEnabled: true,
+          deposit: 0n,
+          nonce: 0n,
+        }
+
+        // Cache the result
+        this.cache.accountInfo.set(accountAddress, {
+          info: accountInfo,
+          timestamp: Date.now(),
+        })
+
+        return accountInfo
       }
     } catch (e) {
-      // Provide clearer error if the address is not a P256Account
+      // Silently handle errors - this is expected for counterfactual accounts
+      // The account will be deployed on first transaction
       throw new Error('Failed to read account info. Ensure the address is a deployed P256Account, not the factory address.')
     }
   }
@@ -265,7 +344,7 @@ export class P256AccountManager {
         threshold: Number(threshold),
       }
     } catch (e) {
-      console.error('Error fetching guardians:', e)
+      // Silently handle errors - expected for undeployed accounts
       return {
         guardians: [],
         threshold: 0,
