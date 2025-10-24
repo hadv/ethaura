@@ -472,6 +472,8 @@ function TransactionSender({ accountAddress, credential, accountConfig }) {
             accountAddress,
             nonce: accountInfo.nonce,
             isDeployment: !isActuallyDeployed,
+            isTwoFactorAuth: false,
+            signatureStep: 'only',
           })
 
           console.log('🔐 Owner signature received:', ownerSig)
@@ -499,10 +501,74 @@ function TransactionSender({ accountAddress, credential, accountConfig }) {
           publicKey: credential.publicKey,
         })
 
+        // Step 4: Check if 2FA is enabled - if so, get Web3Auth signature FIRST
+        let ownerSig = null
+        console.log('🔐 2FA Check:', {
+          twoFactorEnabled: accountInfo.twoFactorEnabled,
+          accountInfo: accountInfo,
+        })
+
+        if (accountInfo.twoFactorEnabled) {
+          // 2FA ENABLED: Show Web3Auth confirmation dialog FIRST
+          setStatus('🔐 Step 1/2: Requesting signature from your social login account...')
+          console.log('🔐 2FA ENABLED: Requesting owner signature FIRST (Step 1/2)...')
+          console.log('🔐 UserOpHash for signing:', userOpHash)
+          console.log('🔐 UserOpHash bytes:', userOpHashBytes)
+          try {
+            // Show confirmation dialog before signing with Web3Auth
+            ownerSig = await requestSignatureWithConfirmation({
+              userOpHash,
+              targetAddress,
+              amount: ethers.parseEther(amount),
+              accountAddress,
+              nonce: accountInfo.nonce,
+              isDeployment: !isActuallyDeployed,
+              isTwoFactorAuth: true,
+              signatureStep: '1/2',
+            })
+
+            console.log('🔐 Owner signature received:', ownerSig)
+            console.log('🔐 Owner signature length:', ownerSig.length)
+            console.log('🔐 Owner signature (hex):', ownerSig)
+
+            // Check signature format
+            if (ownerSig.startsWith('0x')) {
+              const sigLength = (ownerSig.length - 2) / 2
+              console.log('🔐 Owner signature byte length:', sigLength)
+              if (sigLength !== 65) {
+                console.warn('⚠️ WARNING: Owner signature is', sigLength, 'bytes, expected 65 bytes!')
+              }
+
+              // Extract r, s, v
+              const sigHex = ownerSig.slice(2)
+              const r = sigHex.slice(0, 64)
+              const s = sigHex.slice(64, 128)
+              const v = sigHex.slice(128, 130)
+              console.log('🔐 Signature components:', {
+                r: '0x' + r,
+                s: '0x' + s,
+                v: parseInt(v, 16),
+              })
+            }
+
+            setOwnerSignature(ownerSig)
+          } catch (err) {
+            console.error('🔐 Error signing with Web3Auth:', err)
+            throw err
+          }
+        }
+
+        // Step 5: Sign with Passkey (P-256)
+        // If 2FA enabled: This is Step 2/2 (passkey as 2FA confirmation)
+        // If 2FA disabled: This is the only signature needed
+        const stepLabel = accountInfo.twoFactorEnabled ? 'Step 2/2' : 'Only step'
+        setStatus(`🔑 ${stepLabel}: Signing with your passkey (biometric)...`)
+        console.log(`🔑 Signing with passkey (${stepLabel})...`)
+
         const passkeySignatureRaw = await signWithPasskey(credential, userOpHashBytes)
 
-        // Step 4: Decode DER signature to r,s
-        setStatus('Decoding P-256 signature...')
+        // Step 6: Decode DER signature to r,s
+        setStatus(`🔑 ${stepLabel}: Decoding P-256 signature...`)
 
         console.log('🔑 Raw DER signature:', {
           derSignatureHex: Array.from(passkeySignatureRaw.signature).map(b => b.toString(16).padStart(2, '0')).join(''),
@@ -540,62 +606,7 @@ function TransactionSender({ accountAddress, credential, accountConfig }) {
 
         setPasskeySignature({ r: passkeyR, s: passkeyS })
 
-        // Step 5: Check if 2FA is enabled
-        let ownerSig = null
-        console.log('🔐 2FA Check:', {
-          twoFactorEnabled: accountInfo.twoFactorEnabled,
-          accountInfo: accountInfo,
-        })
-        if (accountInfo.twoFactorEnabled) {
-          setStatus('🔐 Requesting signature from your social login account...')
-          console.log('🔐 Requesting owner signature for 2FA...')
-          console.log('🔐 UserOpHash for signing:', userOpHash)
-          console.log('🔐 UserOpHash bytes:', userOpHashBytes)
-          try {
-            // Show confirmation dialog before signing
-            ownerSig = await requestSignatureWithConfirmation({
-              userOpHash,
-              targetAddress,
-              amount: ethers.parseEther(amount),
-              accountAddress,
-              nonce: accountInfo.nonce,
-              isDeployment: !isActuallyDeployed,
-            })
-
-            console.log('🔐 Owner signature received:', ownerSig)
-            console.log('🔐 Owner signature length:', ownerSig.length)
-            console.log('🔐 Owner signature (hex):', ownerSig)
-
-            // Check signature format
-            if (ownerSig.startsWith('0x')) {
-              const sigLength = (ownerSig.length - 2) / 2
-              console.log('🔐 Owner signature byte length:', sigLength)
-              if (sigLength !== 65) {
-                console.warn('⚠️ WARNING: Owner signature is', sigLength, 'bytes, expected 65 bytes!')
-              }
-
-              // Extract r, s, v
-              const sigHex = ownerSig.slice(2)
-              const r = sigHex.slice(0, 64)
-              const s = sigHex.slice(64, 128)
-              const v = sigHex.slice(128, 130)
-              console.log('🔐 Signature components:', {
-                r: '0x' + r,
-                s: '0x' + s,
-                v: parseInt(v, 16),
-              })
-            }
-
-            setOwnerSignature(ownerSig)
-          } catch (err) {
-            console.error('🔐 Error signing with Web3Auth:', err)
-            throw err
-          }
-        } else {
-          console.warn('⚠️ 2FA is disabled! Owner signature will NOT be included.')
-        }
-
-        // Step 6: Combine signatures
+        // Step 7: Combine signatures
         setStatus('Preparing final signature...')
         signedUserOp = signUserOperation(
           userOp,
@@ -605,7 +616,7 @@ function TransactionSender({ accountAddress, credential, accountConfig }) {
         setCombinedSignature(signedUserOp.signature)
       }
 
-      // Step 7: Submit UserOperation to bundler
+      // Step 8: Submit UserOperation to bundler
       setStatus('Submitting to bundler...')
       const receipt = await sdk.bundler.sendUserOperationAndWait(signedUserOp)
 

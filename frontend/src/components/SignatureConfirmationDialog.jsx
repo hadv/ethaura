@@ -31,6 +31,8 @@ function SignatureConfirmationDialog({
     accountAddress,
     nonce,
     isDeployment,
+    isTwoFactorAuth,
+    signatureStep,
   } = signatureData || {}
 
   return (
@@ -58,11 +60,13 @@ function SignatureConfirmationDialog({
         boxShadow: '0 10px 40px rgba(0, 0, 0, 0.5)',
       }}>
         <h2 style={{ marginTop: 0, color: '#fff', fontSize: '1.5rem' }}>
-          🔐 Signature Required
+          🔐 Signature Required {isTwoFactorAuth && `(Step ${signatureStep})`}
         </h2>
-        
+
         <p style={{ color: '#ccc', fontSize: '0.95rem', marginBottom: '1.5rem' }}>
-          Your social login account needs to sign this transaction. Please review the details below:
+          {isTwoFactorAuth
+            ? '🔑 Step 1/2: Your social login account needs to sign this transaction. After this, you\'ll be prompted to confirm with your passkey (biometric).'
+            : 'Your social login account needs to sign this transaction. Please review the details below:'}
         </p>
 
         <div className="signature-details" style={{
