@@ -37,15 +37,16 @@ contract Demo2FA is Script {
         console2.log("");
 
         // Step 2: Create account with mock passkey
-        console2.log("Step 2: Creating P256Account...");
+        console2.log("Step 2: Creating P256Account with 2FA...");
         bytes32 qx = bytes32(uint256(0x1234567890abcdef)); // Mock public key X
         bytes32 qy = bytes32(uint256(0xfedcba0987654321)); // Mock public key Y
         uint256 salt = 0;
 
-        account = factory.createAccount(qx, qy, owner, salt);
+        account = factory.createAccount(qx, qy, owner, salt, true);
         console2.log("Account created at:", address(account));
         console2.log("Public key (qx):", vm.toString(qx));
         console2.log("Public key (qy):", vm.toString(qy));
+        console2.log("2FA enabled:", account.twoFactorEnabled());
         console2.log("");
 
         // Step 3: Check initial 2FA status

@@ -46,19 +46,33 @@ export class P256AccountSDK {
 
   /**
    * Create a new P256Account (counterfactual)
-   * @param {Object} passkeyPublicKey - Public key from WebAuthn { x, y }
-   * @param {string} ownerAddress - Owner address (for 2FA)
+   * @param {Object|null} passkeyPublicKey - Public key from WebAuthn { x, y }, or null for owner-only mode
+   * @param {string} ownerAddress - Owner address
    * @param {bigint} salt - Salt for CREATE2 (default 0)
+   * @param {boolean} enable2FA - Whether to enable 2FA immediately (default: false)
    * @returns {Promise<Object>} Account info
    */
-  async createAccount(passkeyPublicKey, ownerAddress, salt = 0n) {
-    const { qx, qy } = formatPublicKeyForContract(passkeyPublicKey)
+  async createAccount(passkeyPublicKey, ownerAddress, salt = 0n, enable2FA = false) {
+    let qx, qy
+
+    if (passkeyPublicKey) {
+      // Passkey mode: format the public key
+      const formatted = formatPublicKeyForContract(passkeyPublicKey)
+      qx = formatted.qx
+      qy = formatted.qy
+    } else {
+      // Owner-only mode: use zero values
+      qx = '0x' + '0'.repeat(64)
+      qy = '0x' + '0'.repeat(64)
+    }
 
     console.log('🔧 SDK createAccount - formatted public key:', {
       qx,
       qy,
       owner: ownerAddress,
       salt: salt.toString(),
+      enable2FA,
+      mode: passkeyPublicKey ? 'passkey' : 'owner-only',
     })
 
     // Calculate counterfactual address
@@ -67,10 +81,11 @@ export class P256AccountSDK {
     console.log('🏠 SDK createAccount - got address from factory:', accountAddress)
 
     // Get initCode for deployment
-    const initCode = await this.accountManager.getInitCode(qx, qy, ownerAddress, salt)
+    const initCode = await this.accountManager.getInitCode(qx, qy, ownerAddress, salt, enable2FA)
 
     // Get full account info (includes twoFactorEnabled, deposit, nonce)
-    const accountInfo = await this.accountManager.getAccountInfo(accountAddress)
+    // Pass enable2FA so undeployed accounts know the intended 2FA state
+    const accountInfo = await this.accountManager.getAccountInfo(accountAddress, enable2FA)
 
     return {
       address: accountAddress,
@@ -83,16 +98,18 @@ export class P256AccountSDK {
       twoFactorEnabled: accountInfo.twoFactorEnabled,
       deposit: accountInfo.deposit,
       nonce: accountInfo.nonce,
+      hasPasskey: passkeyPublicKey !== null,
     }
   }
 
   /**
    * Get account information
    * @param {string} accountAddress - Account address
+   * @param {boolean} expectedTwoFactorEnabled - Expected 2FA state for undeployed accounts (optional)
    * @returns {Promise<Object>} Account info
    */
-  async getAccountInfo(accountAddress) {
-    return await this.accountManager.getAccountInfo(accountAddress)
+  async getAccountInfo(accountAddress, expectedTwoFactorEnabled = null) {
+    return await this.accountManager.getAccountInfo(accountAddress, expectedTwoFactorEnabled)
   }
 
   /**
