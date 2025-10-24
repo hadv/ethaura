@@ -4,6 +4,14 @@ Welcome to the EthAura documentation! This directory contains additional resourc
 
 ## 📚 Documentation Index
 
+### User Guides
+- **[USER_FLOW.md](./USER_FLOW.md)** - Complete user flow from login to account usage
+- **[RECOVERY_GUIDE.md](./RECOVERY_GUIDE.md)** - Comprehensive account recovery guide
+
+### Technical Guides
+- **[COUNTERFACTUAL_ADDRESS.md](./COUNTERFACTUAL_ADDRESS.md)** - How account addresses are calculated
+- **[DESIGN_DECISIONS.md](./DESIGN_DECISIONS.md)** - Design rationale and trade-offs
+
 ### Visual Resources
 - **[DIAGRAMS.md](./DIAGRAMS.md)** - Architecture diagrams and flow charts
 

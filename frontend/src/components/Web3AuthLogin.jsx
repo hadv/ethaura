@@ -39,13 +39,16 @@ function Web3AuthLogin() {
   if (isConnected && userInfo) {
     return (
       <div className="card">
-        <h2>👤 Logged In</h2>
-        
+        <h2>1️⃣ Primary Account - Social Login</h2>
+        <div className="status status-success mb-4">
+          ✅ Connected with {userInfo.typeOfLogin || 'social login'}
+        </div>
+
         <div className="user-info">
           {userInfo.profileImage && (
-            <img 
-              src={userInfo.profileImage} 
-              alt="Profile" 
+            <img
+              src={userInfo.profileImage}
+              alt="Profile"
               className="profile-image"
               style={{
                 width: '64px',
@@ -55,24 +58,27 @@ function Web3AuthLogin() {
               }}
             />
           )}
-          
+
           <div className="info-row">
             <strong>Name:</strong> {userInfo.name || 'N/A'}
           </div>
-          
+
           <div className="info-row">
             <strong>Email:</strong> {userInfo.email || 'N/A'}
           </div>
-          
+
           <div className="info-row">
             <strong>Login Type:</strong> {userInfo.typeOfLogin || 'N/A'}
           </div>
-          
+
           <div className="info-row">
-            <strong>Wallet Address:</strong>
+            <strong>Primary Wallet Address:</strong>
             <div className="code-block" style={{ marginTop: '0.5rem', fontSize: '0.85rem' }}>
               {address}
             </div>
+            <p className="text-xs mt-2" style={{ color: '#888' }}>
+              This address will be used to sign transactions along with your passkey (2FA)
+            </p>
           </div>
         </div>
 
@@ -95,9 +101,10 @@ function Web3AuthLogin() {
 
   return (
     <div className="card">
-      <h2>🔐 Web3Auth Login</h2>
+      <h2>1️⃣ Login with Social Account</h2>
       <p className="text-sm mb-4">
-        Login with your social account to get started. Your wallet will be created automatically.
+        Start by logging in with your social account. This will be your primary authentication method.
+        Your wallet will be created automatically and secured with your social login.
       </p>
 
       <div className="login-options" style={{ marginBottom: '1rem' }}>
@@ -112,11 +119,11 @@ function Web3AuthLogin() {
         </ul>
       </div>
 
-      <button 
-        className="button button-primary" 
+      <button
+        className="button button-primary"
         onClick={handleLogin}
       >
-        🚀 Login with Web3Auth
+        🚀 Login with Social Account
       </button>
 
       {error && (
