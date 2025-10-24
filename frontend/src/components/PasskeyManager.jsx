@@ -8,6 +8,11 @@ function PasskeyManager({ onCredentialCreated, credential }) {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
+  // Check if user already has an account
+  const existingAccountAddress = localStorage.getItem('ethaura_account_address')
+  const existingAccountConfig = localStorage.getItem('ethaura_account_config')
+  const hasExistingAccount = existingAccountAddress && existingAccountConfig
+
   const discoverPasskey = async () => {
     setLoading(true)
     setError('')
@@ -167,39 +172,92 @@ function PasskeyManager({ onCredentialCreated, credential }) {
   const clearPasskey = () => {
     localStorage.removeItem('ethaura_passkey_credential')
     localStorage.removeItem('ethaura_account_address')
+    localStorage.removeItem('ethaura_account_config')
     onCredentialCreated(null)
     setStatus('Passkey cleared. You can create a new one.')
-    console.log('🗑️ Cleared passkey from localStorage')
+    console.log('🗑️ Cleared passkey and account from localStorage')
   }
 
   return (
     <div className="card">
-      <h2>1️⃣ Create Passkey</h2>
+      <h2>2️⃣ Add Passkey for 2FA (Optional)</h2>
       <p className="text-sm mb-4">
-        Create a WebAuthn passkey that will be used to sign transactions.
-        This uses your device's secure enclave (Touch ID, Face ID, Windows Hello, etc.)
+        <strong>Optional:</strong> Add a passkey for biometric authentication (Touch ID, Face ID, Windows Hello).
+        You can skip this step and create a simple account with just your social login, or add a passkey now for enhanced security.
       </p>
 
+      <div className="mb-4 p-3" style={{ backgroundColor: '#f3f4f6', borderRadius: '8px' }}>
+        <p className="text-sm" style={{ marginBottom: '8px' }}>
+          <strong>💡 What is a Passkey?</strong>
+        </p>
+        <ul className="text-xs" style={{ marginLeft: '20px', lineHeight: '1.6' }}>
+          <li>Uses your device's biometric authentication (fingerprint, face recognition)</li>
+          <li>Stored securely in your device's secure enclave (never leaves your device)</li>
+          <li>Can be used for Two-Factor Authentication (2FA) to protect your account</li>
+          <li>You can add it now or skip and create a simple account first</li>
+        </ul>
+      </div>
+
+      {hasExistingAccount && !credential && (
+        <div className="status status-warning mb-4" style={{ backgroundColor: '#fff3cd', border: '1px solid #ffc107' }}>
+          <p className="text-sm" style={{ marginBottom: '8px' }}>
+            <strong>⚠️ Warning: You already have an account!</strong>
+          </p>
+          <p className="text-xs" style={{ lineHeight: '1.6' }}>
+            Adding a passkey now will require you to <strong>create a NEW account</strong> in Step 3.
+            Your current owner-only account will remain unchanged.
+            If you want to keep using your current account, skip this step.
+          </p>
+        </div>
+      )}
+
       {!credential ? (
-        <button
-          className="button"
-          onClick={createPasskey}
-          disabled={loading}
-        >
-          {loading ? 'Creating...' : '🔑 Create Passkey'}
-        </button>
+        <div>
+          {hasExistingAccount && (
+            <div className="status status-warning mb-3" style={{ backgroundColor: '#fff3cd', borderColor: '#ffc107', color: '#856404' }}>
+              ⚠️ <strong>Warning:</strong> You already have an account. Adding a passkey now will NOT change your existing account.
+              You'll need to create a NEW account in Step 3 if you want to use the passkey.
+            </div>
+          )}
+          <button
+            className="button button-primary"
+            onClick={createPasskey}
+            disabled={loading || !ownerAddress}
+            style={{ width: '100%', marginBottom: '12px' }}
+          >
+            {loading ? 'Creating...' : '🔑 Add Passkey'}
+          </button>
+          <p className="text-xs text-center" style={{ color: '#666' }}>
+            Or skip this step and create a simple account in Step 3
+          </p>
+        </div>
       ) : (
         <div>
           <div className="status status-success">
-            ✅ Passkey created successfully!
+            ✅ Passkey added successfully!
+          </div>
+          <div className="mt-3 p-3" style={{ backgroundColor: '#f0fdf4', borderRadius: '8px', border: '1px solid #86efac' }}>
+            <p className="text-sm" style={{ marginBottom: '8px' }}>
+              <strong>✨ You can now:</strong>
+            </p>
+            <ul className="text-xs" style={{ marginLeft: '20px', lineHeight: '1.6' }}>
+              <li>Create an account with passkey (no 2FA required)</li>
+              <li>Create an account with 2FA (passkey + social login required for all transactions)</li>
+            </ul>
           </div>
           <button
             className="button button-secondary mt-4"
             onClick={clearPasskey}
-            style={{ backgroundColor: '#dc3545' }}
+            style={{ backgroundColor: '#dc3545', width: '100%' }}
           >
             🗑️ Clear Passkey & Start Over
           </button>
+        </div>
+      )}
+
+      {!ownerAddress && !credential && (
+        <div className="status status-info mt-4">
+          ℹ️ Please login with Web3Auth first (Step 1)
         </div>
       )}
 
@@ -217,14 +275,11 @@ function PasskeyManager({ onCredentialCreated, credential }) {
 
       {credential && (
         <div className="mt-4">
-          <h3>Public Key (P-256)</h3>
-          <div className="code-block">
+          <h3>Passkey Public Key (P-256)</h3>
+          <div className="code-block" style={{ fontSize: '0.75rem' }}>
             <div><strong>X:</strong> {credential.publicKey.x}</div>
             <div><strong>Y:</strong> {credential.publicKey.y}</div>
           </div>
-          <p className="text-xs mt-4">
-            This public key will be used to deploy your smart contract wallet.
-          </p>
         </div>
       )}
     </div>

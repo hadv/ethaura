@@ -34,9 +34,9 @@ export const DEFAULT_GAS_VALUES = {
 
 // Contract ABIs (minimal, only what we need)
 export const P256_ACCOUNT_FACTORY_ABI = [
-  'function createAccount(bytes32 qx, bytes32 qy, address owner, uint256 salt) returns (address)',
+  'function createAccount(bytes32 qx, bytes32 qy, address owner, uint256 salt, bool enable2FA) returns (address)',
   'function getAddress(bytes32 qx, bytes32 qy, address owner, uint256 salt) view returns (address)',
-  'function getInitCode(bytes32 qx, bytes32 qy, address owner, uint256 salt) view returns (bytes)',
+  'function getInitCode(bytes32 qx, bytes32 qy, address owner, uint256 salt, bool enable2FA) view returns (bytes)',
 ]
 
 export const P256_ACCOUNT_ABI = [

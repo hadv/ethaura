@@ -5,9 +5,10 @@
 This document describes the integration of Web3Auth for social login with P256Account's Two-Factor Authentication (2FA) feature.
 
 **Key Features**:
-- 🔐 Social login (Google, Facebook, Twitter, Email)
+- 🔐 Social login as primary authentication (Google, Facebook, Twitter, Email)
 - 🔑 Automatic wallet creation (no seed phrases!)
-- 🔒 2FA with Passkey + Web3Auth wallet
+- 🔒 Passkey as Two-Factor Authentication (2FA)
+- ✅ Transparent user consent for all signatures
 - ✅ Seamless user experience
 
 ---
@@ -17,21 +18,27 @@ This document describes the integration of Web3Auth for social login with P256Ac
 ### Authentication Flow
 
 ```
-1. User clicks "Login with Web3Auth"
+1. User clicks "Login with Social Account"
    ↓
 2. Web3Auth modal opens → User selects login method
    ↓
 3. User authenticates (Google/Facebook/Twitter/Email)
    ↓
 4. Web3Auth generates Ethereum wallet (private key managed securely)
+   ├─> This becomes the PRIMARY owner account
+   └─> Used to sign all transactions
    ↓
-5. User creates Passkey (Touch ID/Face ID)
+5. User adds Passkey (Touch ID/Face ID) as 2FA
+   ├─> Passkey provides biometric authentication
+   └─> Enhances security with dual signatures
    ↓
 6. Deploy P256Account with:
    - qx, qy: from Passkey public key
-   - owner: from Web3Auth wallet address
+   - owner: from Web3Auth wallet address (PRIMARY)
    ↓
-7. Enable 2FA automatically
+7. 2FA enabled automatically
+   ├─> Social Login: Primary authentication
+   └─> Passkey: Two-Factor Authentication
    ↓
 8. User can now send transactions with dual signatures
 ```
@@ -45,26 +52,32 @@ This document describes the integration of Web3Auth for social login with P256Ac
    ↓
 3. Compute userOpHash
    ↓
-4. Sign with Passkey (P-256 signature)
+4. Sign with Passkey (P-256 signature) - 2FA Step 1
    ├─> User prompted for biometric (Touch ID/Face ID)
    └─> Get r, s values
    ↓
-5. Sign with Web3Auth wallet (ECDSA signature)
-   ├─> Automatic signing (no user prompt)
+5. Show signature confirmation dialog
+   ├─> Display transaction details
+   ├─> Show what user is signing
+   ├─> Request user consent
+   └─> User clicks "Confirm & Sign"
+   ↓
+6. Sign with Web3Auth wallet (ECDSA signature) - 2FA Step 2
+   ├─> User has confirmed and consented
    └─> Get 65-byte signature (r + s + v)
    ↓
-6. Combine signatures
+7. Combine signatures
    ├─> P-256: r (32) + s (32) = 64 bytes
    ├─> ECDSA: r (32) + s (32) + v (1) = 65 bytes
    └─> Combined: 64 + 65 = 129 bytes
    ↓
-7. Submit UserOperation to bundler
+8. Submit UserOperation to bundler
    ↓
-8. EntryPoint validates both signatures
+9. EntryPoint validates both signatures
    ├─> Verify P-256 signature (passkey)
    └─> Verify ECDSA signature (owner)
    ↓
-9. Transaction executed ✅
+10. Transaction executed ✅
 ```
 
 ---
@@ -231,7 +244,7 @@ Web3Auth manages private keys securely:
 
 ### Login Flow
 
-1. **User clicks "Login with Web3Auth"**
+1. **User clicks "Login with Social Account"**
    - Web3Auth modal opens
    - User sees login options (Google, Facebook, Twitter, Email)
 
@@ -239,17 +252,19 @@ Web3Auth manages private keys securely:
    - Redirected to provider (e.g., Google)
    - Authenticates with existing account
 
-3. **Wallet created automatically**
+3. **Primary wallet created automatically**
    - No seed phrases to remember
+   - Social login becomes primary owner
    - Address displayed immediately
 
-4. **User creates Passkey**
+4. **User adds Passkey as 2FA**
    - Prompted for biometric (Touch ID/Face ID)
-   - Passkey stored in device
+   - Passkey stored in device's secure enclave
+   - Enhances security with two-factor authentication
 
-5. **Account deployed with 2FA**
-   - One-click deployment
-   - 2FA enabled automatically
+5. **Account created with 2FA**
+   - One-click creation
+   - 2FA enabled automatically (Social Login + Passkey)
 
 ### Transaction Flow
 
@@ -257,13 +272,22 @@ Web3Auth manages private keys securely:
    - Target address
    - Amount
 
-2. **User clicks "Send Transaction (2FA)"**
+2. **User clicks "Send Transaction"**
    - Status: "Signing with Passkey..."
    - Biometric prompt appears
 
-3. **User authenticates with biometric**
+3. **User authenticates with biometric (2FA Step 1)**
    - Touch ID/Face ID
    - P-256 signature created
+
+4. **Signature confirmation dialog appears**
+   - Shows transaction details (from, to, amount, hash)
+   - Displays what user is signing
+   - User reviews and confirms
+
+5. **User clicks "Confirm & Sign" (2FA Step 2)**
+   - Social login account signs the transaction
+   - User has full transparency and control
 
 4. **Web3Auth signs automatically**
    - No additional user prompt

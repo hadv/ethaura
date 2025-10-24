@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
 import { useP256SDK } from '../hooks/useP256SDK'
 import { NETWORKS } from '../lib/constants'
@@ -14,15 +14,21 @@ function GuardianManager({ accountAddress, credential, onGuardiansUpdated }) {
   const [newThreshold, setNewThreshold] = useState('')
   const [guardianInfo, setGuardianInfo] = useState(null)
 
-  const sdk = useP256SDK({
+  // Memoize SDK config to prevent recreating SDK on every render
+  const sdkConfig = useMemo(() => ({
     factoryAddress: import.meta.env.VITE_FACTORY_ADDRESS,
     rpcUrl: import.meta.env.VITE_RPC_URL || NETWORKS.sepolia.rpcUrl,
     bundlerUrl: import.meta.env.VITE_BUNDLER_URL || NETWORKS.sepolia.bundlerUrl,
     chainId: parseInt(import.meta.env.VITE_CHAIN_ID || NETWORKS.sepolia.chainId)
-  })
+  }), [])
+
+  const sdk = useP256SDK(sdkConfig)
+
+  // Use ref to track if we've already loaded guardian info for this address
+  const loadedAddressRef = useRef(null)
 
   // Fetch guardian info
-  const fetchGuardianInfo = async () => {
+  const fetchGuardianInfo = useCallback(async () => {
     if (!accountAddress || !sdk) return
 
     try {
@@ -41,12 +47,17 @@ function GuardianManager({ accountAddress, credential, onGuardiansUpdated }) {
     } catch (err) {
       console.error('Error fetching guardian info:', err)
     }
-  }
+  }, [accountAddress, sdk, onGuardiansUpdated])
 
-  // Load guardian info on mount
+  // Load guardian info on mount or when address changes
   useEffect(() => {
-    fetchGuardianInfo()
-  }, [accountAddress, sdk])
+    // Only fetch if address changed or first load
+    if (accountAddress && accountAddress !== loadedAddressRef.current) {
+      loadedAddressRef.current = accountAddress
+      fetchGuardianInfo()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [accountAddress])
 
   const handleAddGuardian = async () => {
     if (!guardianAddress) {

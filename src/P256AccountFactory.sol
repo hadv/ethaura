@@ -42,13 +42,22 @@ contract P256AccountFactory {
 
     /**
      * @notice Create a new P256Account
-     * @param qx The x-coordinate of the P-256 public key
-     * @param qy The y-coordinate of the P-256 public key
+     * @param qx The x-coordinate of the P-256 public key (can be 0 for owner-only mode)
+     * @param qy The y-coordinate of the P-256 public key (can be 0 for owner-only mode)
      * @param owner The owner address for the account
      * @param salt A salt for CREATE2 deployment
+     * @param enable2FA Whether to enable two-factor authentication immediately
      * @return account The address of the created account
+     * @dev If qx=0 and qy=0, creates an owner-only account (no passkey)
+     * @dev If qx and qy are set but enable2FA=false, passkey is registered but 2FA is not enforced
+     * @dev If enable2FA=true, both qx and qy must be non-zero
+     * @dev IMPORTANT: Account address depends ONLY on owner and salt, NOT on passkey (qx, qy)
+     * @dev This allows users to add/change passkey later without changing the account address
      */
-    function createAccount(bytes32 qx, bytes32 qy, address owner, uint256 salt) public returns (P256Account account) {
+    function createAccount(bytes32 qx, bytes32 qy, address owner, uint256 salt, bool enable2FA)
+        public
+        returns (P256Account account)
+    {
         address addr = getAddress(qx, qy, owner, salt);
 
         // If account already exists, return it
@@ -57,27 +66,32 @@ contract P256AccountFactory {
             return P256Account(payable(addr));
         }
 
-        // Deploy new account using CREATE2 with combined salt
-        bytes32 finalSalt = keccak256(abi.encodePacked(qx, qy, owner, salt));
+        // Deploy new account using CREATE2 with salt based ONLY on owner and salt
+        // NOT including qx, qy to allow passkey changes without address changes
+        bytes32 finalSalt = keccak256(abi.encodePacked(owner, salt));
         account = new P256Account{salt: finalSalt}(ENTRYPOINT);
 
-        // Initialize the account
-        account.initialize(qx, qy, owner);
+        // Initialize the account with optional 2FA
+        account.initialize(qx, qy, owner, enable2FA);
 
         emit AccountCreated(address(account), qx, qy, owner, salt);
     }
 
     /**
      * @notice Get the deterministic address for an account
-     * @param qx The x-coordinate of the P-256 public key
-     * @param qy The y-coordinate of the P-256 public key
+     * @param qx The x-coordinate of the P-256 public key (NOT used in address calculation)
+     * @param qy The y-coordinate of the P-256 public key (NOT used in address calculation)
      * @param owner The owner address for the account
      * @param salt A salt for CREATE2 deployment
      * @return The predicted address
+     * @dev Address is calculated ONLY from owner and salt, NOT from passkey (qx, qy)
+     * @dev This allows users to add/change passkey later without changing the account address
      */
     function getAddress(bytes32 qx, bytes32 qy, address owner, uint256 salt) public view returns (address) {
-        // Include qx, qy, and owner in the salt to ensure unique addresses per user
-        bytes32 finalSalt = keccak256(abi.encodePacked(qx, qy, owner, salt));
+        // IMPORTANT: Only use owner and salt for address calculation
+        // This allows the same address regardless of passkey choice
+        // Users can receive funds first, then decide on passkey/2FA later
+        bytes32 finalSalt = keccak256(abi.encodePacked(owner, salt));
         return Create2.computeAddress(
             finalSalt, keccak256(abi.encodePacked(type(P256Account).creationCode, abi.encode(ENTRYPOINT)))
         );
@@ -89,14 +103,15 @@ contract P256AccountFactory {
      * @param qy The y-coordinate of the P-256 public key
      * @param owner The owner address for the account
      * @param salt A salt for CREATE2 deployment
+     * @param enable2FA Whether to enable two-factor authentication immediately
      * @return account The address of the created account
      */
-    function createAccountWithDeposit(bytes32 qx, bytes32 qy, address owner, uint256 salt)
+    function createAccountWithDeposit(bytes32 qx, bytes32 qy, address owner, uint256 salt, bool enable2FA)
         external
         payable
         returns (P256Account account)
     {
-        account = createAccount(qx, qy, owner, salt);
+        account = createAccount(qx, qy, owner, salt, enable2FA);
 
         // Add deposit to EntryPoint if ETH was sent
         if (msg.value > 0) {
@@ -111,13 +126,14 @@ contract P256AccountFactory {
      * @param qy The y-coordinate of the P-256 public key
      * @param owner The owner address for the account
      * @param salt A salt for CREATE2 deployment
+     * @param enable2FA Whether to enable two-factor authentication immediately
      * @return initCode The initCode bytes
      */
-    function getInitCode(bytes32 qx, bytes32 qy, address owner, uint256 salt)
+    function getInitCode(bytes32 qx, bytes32 qy, address owner, uint256 salt, bool enable2FA)
         external
         view
         returns (bytes memory initCode)
     {
-        return abi.encodePacked(address(this), abi.encodeCall(this.createAccount, (qx, qy, owner, salt)));
+        return abi.encodePacked(address(this), abi.encodeCall(this.createAccount, (qx, qy, owner, salt, enable2FA)));
     }
 }

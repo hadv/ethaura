@@ -29,15 +29,15 @@ contract P256AccountFactoryTest is Test {
     }
 
     /**
-     * Test: Different public keys should produce different addresses
+     * Test: Different public keys should produce SAME address (only owner and salt matter)
      */
-    function test_DifferentPublicKeysProduceDifferentAddresses() public view {
+    function test_DifferentPublicKeysProduceSameAddress() public view {
         uint256 salt = 0;
 
         address addr1 = factory.getAddress(QX1, QY1, owner1, salt);
         address addr2 = factory.getAddress(QX2, QY2, owner1, salt);
 
-        assertTrue(addr1 != addr2, "Different public keys should produce different addresses");
+        assertEq(addr1, addr2, "Different public keys should produce SAME address (only owner and salt matter)");
     }
 
     /**
@@ -83,9 +83,9 @@ contract P256AccountFactoryTest is Test {
         // Get predicted address
         address predicted = factory.getAddress(QX1, QY1, owner1, salt);
 
-        // Deploy account
+        // Deploy account with 2FA enabled
         vm.deal(address(this), 1 ether);
-        P256Account account = factory.createAccount(QX1, QY1, owner1, salt);
+        P256Account account = factory.createAccount(QX1, QY1, owner1, salt, true);
 
         // Verify addresses match
         assertEq(address(account), predicted, "Predicted address should match deployed address");
@@ -93,34 +93,42 @@ contract P256AccountFactoryTest is Test {
 
     /**
      * Test: Multiple users can use same salt without collision
+     * Different owners = different addresses (passkey doesn't matter)
      */
     function test_NoCollisionWithSameSalt() public view {
         uint256 salt = 42; // Same salt for all
 
         address addr1 = factory.getAddress(QX1, QY1, owner1, salt);
-        address addr2 = factory.getAddress(QX2, QY2, owner1, salt);
-        address addr3 = factory.getAddress(QX1, QY1, owner2, salt);
+        address addr2 = factory.getAddress(QX2, QY2, owner1, salt); // Same owner, different passkey
+        address addr3 = factory.getAddress(QX1, QY1, owner2, salt); // Different owner, same passkey
 
-        // All addresses should be different
-        assertTrue(addr1 != addr2, "User 1 and User 2 should have different addresses");
-        assertTrue(addr1 != addr3, "User 1 with owner1 and owner2 should have different addresses");
-        assertTrue(addr2 != addr3, "User 2 and User 3 should have different addresses");
+        // Same owner = same address (passkey doesn't matter)
+        assertEq(addr1, addr2, "Same owner should have SAME address regardless of passkey");
+        // Different owners = different addresses
+        assertTrue(addr1 != addr3, "Different owners should have different addresses");
+        assertTrue(addr2 != addr3, "Different owners should have different addresses");
     }
 
     /**
-     * Test: Fuzz test - random parameters produce unique addresses
+     * Test: Fuzz test - same owner produces same address regardless of passkey
      */
-    function testFuzz_UniqueAddresses(bytes32 qx1, bytes32 qy1, bytes32 qx2, bytes32 qy2, address owner, uint256 salt)
-        public
-        view
-    {
-        // Skip if public keys are the same
+    function testFuzz_SameOwnerSameAddress(
+        bytes32 qx1,
+        bytes32 qy1,
+        bytes32 qx2,
+        bytes32 qy2,
+        address owner,
+        uint256 salt
+    ) public view {
+        // Skip if public keys are the same (we want to test different keys)
         vm.assume(qx1 != qx2 || qy1 != qy2);
+        // Skip zero address
+        vm.assume(owner != address(0));
 
         address addr1 = factory.getAddress(qx1, qy1, owner, salt);
         address addr2 = factory.getAddress(qx2, qy2, owner, salt);
 
-        assertTrue(addr1 != addr2, "Different public keys should always produce different addresses");
+        assertEq(addr1, addr2, "Same owner should always produce SAME address regardless of passkey");
     }
 
     /**
@@ -132,8 +140,8 @@ contract P256AccountFactoryTest is Test {
         // Get predicted address
         address predicted = factory.getAddress(QX1, QY1, owner1, salt);
 
-        // Get initCode
-        bytes memory initCode = factory.getInitCode(QX1, QY1, owner1, salt);
+        // Get initCode with 2FA enabled
+        bytes memory initCode = factory.getInitCode(QX1, QY1, owner1, salt, true);
 
         // Verify initCode contains factory address
         address factoryFromInitCode;
@@ -144,18 +152,23 @@ contract P256AccountFactoryTest is Test {
     }
 
     /**
-     * Test: CREATE2 salt includes all parameters
+     * Test: CREATE2 salt includes ONLY owner and salt (NOT passkey)
      */
-    function test_SaltIncludesAllParameters() public view {
-        // If salt didn't include qx, qy, owner, these would be the same
+    function test_SaltIncludesOnlyOwnerAndSalt() public view {
+        // Address should depend ONLY on owner and salt, NOT on passkey (qx, qy)
         address addr1 = factory.getAddress(QX1, QY1, owner1, 0);
         address addr2 = factory.getAddress(QX2, QY1, owner1, 0); // Different qx
         address addr3 = factory.getAddress(QX1, QY2, owner1, 0); // Different qy
         address addr4 = factory.getAddress(QX1, QY1, owner2, 0); // Different owner
+        address addr5 = factory.getAddress(QX1, QY1, owner1, 1); // Different salt
 
-        // All should be different
-        assertTrue(addr1 != addr2, "qx should affect address");
-        assertTrue(addr1 != addr3, "qy should affect address");
+        // qx should NOT affect address (same owner, same salt)
+        assertEq(addr1, addr2, "qx should NOT affect address");
+        // qy should NOT affect address (same owner, same salt)
+        assertEq(addr1, addr3, "qy should NOT affect address");
+        // owner SHOULD affect address
         assertTrue(addr1 != addr4, "owner should affect address");
+        // salt SHOULD affect address
+        assertTrue(addr1 != addr5, "salt should affect address");
     }
 }

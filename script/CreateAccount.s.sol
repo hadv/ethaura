@@ -33,8 +33,8 @@ contract CreateAccountScript is Script {
         address predictedAddr = factory.getAddress(qx, qy, owner, salt);
         console2.log("Predicted account address:", predictedAddr);
 
-        // Create account
-        P256Account account = factory.createAccount(qx, qy, owner, salt);
+        // Create account with 2FA enabled
+        P256Account account = factory.createAccount(qx, qy, owner, salt, true);
 
         console2.log("=== Account Created ===");
         console2.log("Account address:", address(account));
@@ -42,6 +42,7 @@ contract CreateAccountScript is Script {
         console2.log("Public Key Y:", vm.toString(qy));
         console2.log("Owner:", owner);
         console2.log("Salt:", salt);
+        console2.log("2FA Enabled:", account.twoFactorEnabled());
         console2.log("======================");
 
         vm.stopBroadcast();

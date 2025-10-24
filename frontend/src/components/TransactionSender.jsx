@@ -4,11 +4,12 @@ import { signWithPasskey } from '../utils/webauthn'
 import { formatSignatureForDisplay } from '../utils/signatureUtils'
 import { useP256SDK } from '../hooks/useP256SDK'
 import { ethers } from 'ethers'
-import { buildSendEthUserOp, getUserOpHash, signUserOperation, packAccountGasLimits, packGasFees } from '../lib/userOperation'
+import { buildSendEthUserOp, getUserOpHash, signUserOperation, signUserOperationOwnerOnly, packAccountGasLimits, packGasFees } from '../lib/userOperation'
 import { getUserFriendlyMessage, getSuggestedAction, isRetryableError } from '../lib/errors'
 import { formatPublicKeyForContract } from '../lib/accountManager'
+import SignatureConfirmationDialog from './SignatureConfirmationDialog'
 
-function TransactionSender({ accountAddress, credential }) {
+function TransactionSender({ accountAddress, credential, accountConfig }) {
   const { isConnected, signMessage, signRawHash, address: ownerAddress } = useWeb3Auth()
   const sdk = useP256SDK()
   const [status, setStatus] = useState('')
@@ -24,16 +25,85 @@ function TransactionSender({ accountAddress, credential }) {
   const [balanceInfo, setBalanceInfo] = useState(null)
   const [depositLoading, setDepositLoading] = useState(false)
 
-  // Load account info (derive from SDK using passkey + owner to ensure correct initCode)
+  // Signature confirmation dialog state
+  const [showSignatureDialog, setShowSignatureDialog] = useState(false)
+  const [pendingSignatureData, setPendingSignatureData] = useState(null)
+  const [signatureResolver, setSignatureResolver] = useState(null)
+
+  // Helper function to request signature with user confirmation
+  const requestSignatureWithConfirmation = (signatureData) => {
+    return new Promise((resolve, reject) => {
+      setPendingSignatureData(signatureData)
+      setShowSignatureDialog(true)
+      setSignatureResolver({ resolve, reject })
+    })
+  }
+
+  const handleSignatureConfirm = async () => {
+    try {
+      // Actually sign the hash
+      const ownerSig = await signRawHash(pendingSignatureData.userOpHash)
+      setShowSignatureDialog(false)
+      setPendingSignatureData(null)
+      if (signatureResolver) {
+        signatureResolver.resolve(ownerSig)
+        setSignatureResolver(null)
+      }
+    } catch (err) {
+      setShowSignatureDialog(false)
+      setPendingSignatureData(null)
+      if (signatureResolver) {
+        signatureResolver.reject(err)
+        setSignatureResolver(null)
+      }
+    }
+  }
+
+  const handleSignatureCancel = () => {
+    setShowSignatureDialog(false)
+    setPendingSignatureData(null)
+    if (signatureResolver) {
+      signatureResolver.reject(new Error('User cancelled signature'))
+      setSignatureResolver(null)
+    }
+  }
+
+  // Load account info (derive from SDK using passkey + owner OR owner-only)
   useEffect(() => {
     const loadAccountInfo = async () => {
-      if (accountAddress && sdk && credential?.publicKey && ownerAddress) {
+      if (accountAddress && sdk && ownerAddress) {
         try {
-          const derived = await sdk.createAccount(credential.publicKey, ownerAddress, 0n)
+          // Use the passkey that was used during account creation, not the current credential
+          // This prevents issues when user adds passkey AFTER creating owner-only account
+          let passkeyPublicKey = null
+          if (accountConfig && accountConfig.hasPasskey && credential?.publicKey) {
+            passkeyPublicKey = credential.publicKey
+          }
+
+          // Get the salt from account config (default to 0 for backwards compatibility)
+          const salt = accountConfig?.salt !== undefined ? BigInt(accountConfig.salt) : 0n
+
+          // Get the 2FA setting from account config
+          const enable2FA = accountConfig?.twoFactorEnabled || false
+
+          console.log('📋 Loading account info:', {
+            accountAddress,
+            hasAccountConfig: !!accountConfig,
+            accountConfigHasPasskey: accountConfig?.hasPasskey,
+            accountConfigTwoFactorEnabled: accountConfig?.twoFactorEnabled,
+            accountConfigSalt: accountConfig?.salt,
+            hasCredential: !!credential,
+            willUsePasskey: !!passkeyPublicKey,
+            salt: salt.toString(),
+            enable2FA,
+          })
+
+          const derived = await sdk.createAccount(passkeyPublicKey, ownerAddress, salt, enable2FA)
           if (derived.address.toLowerCase() !== accountAddress.toLowerCase()) {
             console.warn('Provided accountAddress differs from derived address from credentials/owner', {
               provided: accountAddress,
               derived: derived.address,
+              salt: salt.toString(),
             })
           }
           // Normalize to shape expected by this component
@@ -50,7 +120,7 @@ function TransactionSender({ accountAddress, credential }) {
       }
     }
     loadAccountInfo()
-  }, [accountAddress, sdk, credential, ownerAddress])
+  }, [accountAddress, sdk, credential, ownerAddress, accountConfig])
 
   // Load balance and deposit info
   const loadBalanceInfo = async (address) => {
@@ -145,51 +215,67 @@ function TransactionSender({ accountAddress, credential }) {
     setCombinedSignature(null)
 
     try {
+      // Determine if this is an owner-only account (no passkey)
+      // Check accountInfo.hasPasskey which comes from the account config or on-chain state
+      const isOwnerOnly = !accountInfo.hasPasskey || accountInfo.qx === '0x0000000000000000000000000000000000000000000000000000000000000000'
+
       // Log account and credential info for debugging
       console.log('📋 Account Info:', {
         address: accountAddress,
         isDeployed: accountInfo.isDeployed,
         twoFactorEnabled: accountInfo.twoFactorEnabled,
+        hasPasskey: accountInfo.hasPasskey,
+        isOwnerOnly,
+        qx: accountInfo.qx,
       })
 
-      console.log('🔐 Passkey Credential:', {
-        id: credential.id,
-        publicKey: credential.publicKey,
+      console.log('🔐 Credential Info:', {
+        hasCredential: !!credential,
+        credentialId: credential?.id,
       })
 
-      // Verify public key matches what's in the contract
-      if (accountInfo.isDeployed) {
-        try {
-          const accountContract = new ethers.Contract(
-            accountAddress,
-            ['function qx() view returns (bytes32)', 'function qy() view returns (bytes32)'],
-            sdk.provider
-          )
-          const [contractQx, contractQy] = await Promise.all([
-            accountContract.qx(),
-            accountContract.qy()
-          ])
+      if (!isOwnerOnly) {
+        console.log('🔐 Passkey Credential:', {
+          id: credential?.id,
+          publicKey: credential?.publicKey,
+        })
 
-          const { qx: credentialQx, qy: credentialQy } = credential.publicKey
+        // Verify public key matches what's in the contract
+        if (accountInfo.isDeployed && credential?.publicKey) {
+          try {
+            const accountContract = new ethers.Contract(
+              accountAddress,
+              ['function qx() view returns (bytes32)', 'function qy() view returns (bytes32)'],
+              sdk.provider
+            )
+            const [contractQx, contractQy] = await Promise.all([
+              accountContract.qx(),
+              accountContract.qy()
+            ])
 
-          console.log('🔍 Public Key Verification:', {
-            contractQx,
-            contractQy,
-            credentialQx,
-            credentialQy,
-            qxMatch: contractQx.toLowerCase() === credentialQx.toLowerCase(),
-            qyMatch: contractQy.toLowerCase() === credentialQy.toLowerCase(),
-          })
+            const { qx: credentialQx, qy: credentialQy } = credential.publicKey
 
-          if (contractQx.toLowerCase() !== credentialQx.toLowerCase() ||
-              contractQy.toLowerCase() !== credentialQy.toLowerCase()) {
-            setError('⚠️ Public key mismatch! The passkey does not match the account.')
-            setLoading(false)
-            return
+            console.log('🔍 Public Key Verification:', {
+              contractQx,
+              contractQy,
+              credentialQx,
+              credentialQy,
+              qxMatch: contractQx.toLowerCase() === credentialQx.toLowerCase(),
+              qyMatch: contractQy.toLowerCase() === credentialQy.toLowerCase(),
+            })
+
+            if (contractQx.toLowerCase() !== credentialQx.toLowerCase() ||
+                contractQy.toLowerCase() !== credentialQy.toLowerCase()) {
+              setError('⚠️ Public key mismatch! The passkey does not match the account.')
+              setLoading(false)
+              return
+            }
+          } catch (err) {
+            console.warn('Could not verify public key:', err)
           }
-        } catch (err) {
-          console.warn('Could not verify public key:', err)
         }
+      } else {
+        console.log('👤 Owner-only account (no passkey required)')
       }
 
       const amountWei = ethers.parseEther(amount)
@@ -233,7 +319,8 @@ function TransactionSender({ accountAddress, credential }) {
       // If account is actually deployed but accountInfo says it's not, update it
       if (isActuallyDeployed && !accountInfo.isDeployed) {
         console.log('🔄 Account is deployed on-chain but accountInfo says it\'s not. Updating...')
-        const updatedInfo = await sdk.createAccount(credential.publicKey, ownerAddress, 0n)
+        const passkeyPublicKey = credential?.publicKey || null
+        const updatedInfo = await sdk.createAccount(passkeyPublicKey, ownerAddress, 0n)
         setAccountInfo({ ...updatedInfo, deployed: updatedInfo.isDeployed })
       }
 
@@ -242,7 +329,8 @@ function TransactionSender({ accountAddress, credential }) {
         isDeployed: isActuallyDeployed,
         needsDeployment: !isActuallyDeployed,
         initCodeLength: isActuallyDeployed ? 0 : accountInfo.initCode.length,
-        credentialPublicKey: credential.publicKey,
+        isOwnerOnly,
+        credentialPublicKey: credential?.publicKey,
         accountInfoQx: accountInfo.qx,
         accountInfoQy: accountInfo.qy,
       })
@@ -263,38 +351,40 @@ function TransactionSender({ accountAddress, credential }) {
         }
       }
 
-      // Verify public key matches
-      const { qx: credQx, qy: credQy } = formatPublicKeyForContract(credential.publicKey)
-      const qxMatches = credQx === accountInfo.qx
-      const qyMatches = credQy === accountInfo.qy
+      // Verify public key matches (only for passkey accounts)
+      if (!isOwnerOnly && credential?.publicKey) {
+        const { qx: credQx, qy: credQy } = formatPublicKeyForContract(credential.publicKey)
+        const qxMatches = credQx === accountInfo.qx
+        const qyMatches = credQy === accountInfo.qy
 
-      console.log('🔍 Public key verification:', {
-        credentialQx: credQx,
-        credentialQy: credQy,
-        accountQx: accountInfo.qx,
-        accountQy: accountInfo.qy,
-        qxMatches,
-        qyMatches,
-      })
+        console.log('🔍 Public key verification:', {
+          credentialQx: credQx,
+          credentialQy: credQy,
+          accountQx: accountInfo.qx,
+          accountQy: accountInfo.qy,
+          qxMatches,
+          qyMatches,
+        })
 
-      if (!qxMatches || !qyMatches) {
-        throw new Error(
-          `❌ PUBLIC KEY MISMATCH!\n\n` +
-          `Your passkey's public key does NOT match the account's public key.\n\n` +
-          `This means you're trying to sign with a DIFFERENT passkey than the one that created the account.\n\n` +
-          `Solutions:\n` +
-          `1. Delete the current passkey and create a NEW account with a new passkey\n` +
-          `2. Or use the SAME passkey that created account ${accountAddress}\n\n` +
-          `Credential Public Key:\n` +
-          `  qx: ${credQx}\n` +
-          `  qy: ${credQy}\n\n` +
-          `Account Public Key (on-chain):\n` +
-          `  qx: ${accountInfo.qx}\n` +
-          `  qy: ${accountInfo.qy}`
-        )
+        if (!qxMatches || !qyMatches) {
+          throw new Error(
+            `❌ PUBLIC KEY MISMATCH!\n\n` +
+            `Your passkey's public key does NOT match the account's public key.\n\n` +
+            `This means you're trying to sign with a DIFFERENT passkey than the one that created the account.\n\n` +
+            `Solutions:\n` +
+            `1. Delete the current passkey and create a NEW account with a new passkey\n` +
+            `2. Or use the SAME passkey that created account ${accountAddress}\n\n` +
+            `Credential Public Key:\n` +
+            `  qx: ${credQx}\n` +
+            `  qy: ${credQy}\n\n` +
+            `Account Public Key (on-chain):\n` +
+            `  qx: ${accountInfo.qx}\n` +
+            `  qy: ${accountInfo.qy}`
+          )
+        }
+
+        console.log('✅ Public key matches! Proceeding with signature...')
       }
-
-      console.log('✅ Public key matches! Proceeding with signature...')
 
       const userOp = await buildSendEthUserOp({
         accountAddress,
@@ -365,118 +455,155 @@ function TransactionSender({ accountAddress, credential }) {
         userOpHashLength: userOpHashBytes.length
       })
 
-      // Step 3: Sign with passkey (P-256)
-      // Note: WebAuthn will wrap this challenge in clientDataJSON and sign sha256(authenticatorData || sha256(clientDataJSON))
-      // But we're using a simplified approach where we just extract the raw signature
-      setStatus('🔑 Signing with Passkey (Touch ID/Face ID)...')
+      // Step 3: Sign the UserOperation
+      let signedUserOp
 
-      // Get credential ID (support both old and new format)
-      const credentialId = credential.rawId || credential.credentialId
-      const credentialIdBytes = credentialId instanceof ArrayBuffer
-        ? new Uint8Array(credentialId)
-        : new Uint8Array(credentialId)
+      if (isOwnerOnly) {
+        // Owner-only account: Sign with owner signature only
+        setStatus('🔐 Requesting signature from your social login account...')
+        console.log('👤 Owner-only account: Signing with owner signature only')
 
-      console.log('🔑 Using credential:', {
-        credentialId: Array.from(credentialIdBytes).map(b => b.toString(16).padStart(2, '0')).join(''),
-        publicKey: credential.publicKey,
-      })
-
-      const passkeySignatureRaw = await signWithPasskey(credential, userOpHashBytes)
-
-      // Step 4: Decode DER signature to r,s
-      setStatus('Decoding P-256 signature...')
-
-      console.log('🔑 Raw DER signature:', {
-        derSignatureHex: Array.from(passkeySignatureRaw.signature).map(b => b.toString(16).padStart(2, '0')).join(''),
-        derSignatureLength: passkeySignatureRaw.signature.length,
-      })
-
-      console.log('🔑 ClientDataJSON from passkey:', {
-        clientDataJSON: passkeySignatureRaw.clientDataJSON,
-        clientDataJSONLength: passkeySignatureRaw.clientDataJSON.length,
-        clientDataJSONHash: await crypto.subtle.digest('SHA-256', new TextEncoder().encode(passkeySignatureRaw.clientDataJSON)),
-      })
-
-      const { r, s } = sdk.derToRS(passkeySignatureRaw.signature)
-      const passkeyR = '0x' + r
-      const passkeyS = '0x' + s
-
-      console.log('🔑 Passkey signature:', {
-        r: passkeyR,
-        s: passkeyS,
-        rLength: r.length,
-        sLength: s.length,
-        authenticatorDataLength: passkeySignatureRaw.authenticatorData.length,
-        clientDataJSONLength: passkeySignatureRaw.clientDataJSON.length,
-        clientDataJSON: passkeySignatureRaw.clientDataJSON,
-        authenticatorDataHex: Array.from(passkeySignatureRaw.authenticatorData).map(b => b.toString(16).padStart(2, '0')).join(''),
-      })
-
-      // Prepare passkey signature with WebAuthn data
-      const passkeySignature = {
-        r: passkeyR,
-        s: passkeyS,
-        authenticatorData: passkeySignatureRaw.authenticatorData,
-        clientDataJSON: passkeySignatureRaw.clientDataJSON,
-      }
-
-      setPasskeySignature({ r: passkeyR, s: passkeyS })
-
-      // Step 5: Check if 2FA is enabled
-      let ownerSig = null
-      console.log('🔐 2FA Check:', {
-        twoFactorEnabled: accountInfo.twoFactorEnabled,
-        accountInfo: accountInfo,
-      })
-      if (accountInfo.twoFactorEnabled) {
-        setStatus('🔐 Signing with Web3Auth wallet (2FA)...')
-        console.log('🔐 Requesting owner signature for 2FA...')
-        console.log('🔐 UserOpHash for signing:', userOpHash)
-        console.log('🔐 UserOpHash bytes:', userOpHashBytes)
         try {
-          // Use signRawHash to sign without Ethereum message prefix
-          ownerSig = await signRawHash(userOpHash)
+          // Show confirmation dialog before signing
+          const ownerSig = await requestSignatureWithConfirmation({
+            userOpHash,
+            targetAddress,
+            amount: ethers.parseEther(amount),
+            accountAddress,
+            nonce: accountInfo.nonce,
+            isDeployment: !isActuallyDeployed,
+          })
+
           console.log('🔐 Owner signature received:', ownerSig)
-          console.log('🔐 Owner signature length:', ownerSig.length)
-          console.log('🔐 Owner signature (hex):', ownerSig)
-
-          // Check signature format
-          if (ownerSig.startsWith('0x')) {
-            const sigLength = (ownerSig.length - 2) / 2
-            console.log('🔐 Owner signature byte length:', sigLength)
-            if (sigLength !== 65) {
-              console.warn('⚠️ WARNING: Owner signature is', sigLength, 'bytes, expected 65 bytes!')
-            }
-
-            // Extract r, s, v
-            const sigHex = ownerSig.slice(2)
-            const r = sigHex.slice(0, 64)
-            const s = sigHex.slice(64, 128)
-            const v = sigHex.slice(128, 130)
-            console.log('🔐 Signature components:', {
-              r: '0x' + r,
-              s: '0x' + s,
-              v: parseInt(v, 16),
-            })
-          }
-
           setOwnerSignature(ownerSig)
+
+          // Sign with owner signature only
+          signedUserOp = signUserOperationOwnerOnly(userOp, ownerSig)
+          setCombinedSignature(signedUserOp.signature)
         } catch (err) {
           console.error('🔐 Error signing with Web3Auth:', err)
           throw err
         }
       } else {
-        console.warn('⚠️ 2FA is disabled! Owner signature will NOT be included.')
-      }
+        // Passkey account: Sign with passkey (and optionally owner for 2FA)
+        setStatus('🔑 Signing with Passkey (Touch ID/Face ID)...')
 
-      // Step 6: Combine signatures
-      setStatus('Preparing final signature...')
-      const signedUserOp = signUserOperation(
-        userOp,
-        passkeySignature,
-        ownerSig
-      )
-      setCombinedSignature(signedUserOp.signature)
+        // Get credential ID (support both old and new format)
+        const credentialId = credential.rawId || credential.credentialId
+        const credentialIdBytes = credentialId instanceof ArrayBuffer
+          ? new Uint8Array(credentialId)
+          : new Uint8Array(credentialId)
+
+        console.log('🔑 Using credential:', {
+          credentialId: Array.from(credentialIdBytes).map(b => b.toString(16).padStart(2, '0')).join(''),
+          publicKey: credential.publicKey,
+        })
+
+        const passkeySignatureRaw = await signWithPasskey(credential, userOpHashBytes)
+
+        // Step 4: Decode DER signature to r,s
+        setStatus('Decoding P-256 signature...')
+
+        console.log('🔑 Raw DER signature:', {
+          derSignatureHex: Array.from(passkeySignatureRaw.signature).map(b => b.toString(16).padStart(2, '0')).join(''),
+          derSignatureLength: passkeySignatureRaw.signature.length,
+        })
+
+        console.log('🔑 ClientDataJSON from passkey:', {
+          clientDataJSON: passkeySignatureRaw.clientDataJSON,
+          clientDataJSONLength: passkeySignatureRaw.clientDataJSON.length,
+          clientDataJSONHash: await crypto.subtle.digest('SHA-256', new TextEncoder().encode(passkeySignatureRaw.clientDataJSON)),
+        })
+
+        const { r, s } = sdk.derToRS(passkeySignatureRaw.signature)
+        const passkeyR = '0x' + r
+        const passkeyS = '0x' + s
+
+        console.log('🔑 Passkey signature:', {
+          r: passkeyR,
+          s: passkeyS,
+          rLength: r.length,
+          sLength: s.length,
+          authenticatorDataLength: passkeySignatureRaw.authenticatorData.length,
+          clientDataJSONLength: passkeySignatureRaw.clientDataJSON.length,
+          clientDataJSON: passkeySignatureRaw.clientDataJSON,
+          authenticatorDataHex: Array.from(passkeySignatureRaw.authenticatorData).map(b => b.toString(16).padStart(2, '0')).join(''),
+        })
+
+        // Prepare passkey signature with WebAuthn data
+        const passkeySignature = {
+          r: passkeyR,
+          s: passkeyS,
+          authenticatorData: passkeySignatureRaw.authenticatorData,
+          clientDataJSON: passkeySignatureRaw.clientDataJSON,
+        }
+
+        setPasskeySignature({ r: passkeyR, s: passkeyS })
+
+        // Step 5: Check if 2FA is enabled
+        let ownerSig = null
+        console.log('🔐 2FA Check:', {
+          twoFactorEnabled: accountInfo.twoFactorEnabled,
+          accountInfo: accountInfo,
+        })
+        if (accountInfo.twoFactorEnabled) {
+          setStatus('🔐 Requesting signature from your social login account...')
+          console.log('🔐 Requesting owner signature for 2FA...')
+          console.log('🔐 UserOpHash for signing:', userOpHash)
+          console.log('🔐 UserOpHash bytes:', userOpHashBytes)
+          try {
+            // Show confirmation dialog before signing
+            ownerSig = await requestSignatureWithConfirmation({
+              userOpHash,
+              targetAddress,
+              amount: ethers.parseEther(amount),
+              accountAddress,
+              nonce: accountInfo.nonce,
+              isDeployment: !isActuallyDeployed,
+            })
+
+            console.log('🔐 Owner signature received:', ownerSig)
+            console.log('🔐 Owner signature length:', ownerSig.length)
+            console.log('🔐 Owner signature (hex):', ownerSig)
+
+            // Check signature format
+            if (ownerSig.startsWith('0x')) {
+              const sigLength = (ownerSig.length - 2) / 2
+              console.log('🔐 Owner signature byte length:', sigLength)
+              if (sigLength !== 65) {
+                console.warn('⚠️ WARNING: Owner signature is', sigLength, 'bytes, expected 65 bytes!')
+              }
+
+              // Extract r, s, v
+              const sigHex = ownerSig.slice(2)
+              const r = sigHex.slice(0, 64)
+              const s = sigHex.slice(64, 128)
+              const v = sigHex.slice(128, 130)
+              console.log('🔐 Signature components:', {
+                r: '0x' + r,
+                s: '0x' + s,
+                v: parseInt(v, 16),
+              })
+            }
+
+            setOwnerSignature(ownerSig)
+          } catch (err) {
+            console.error('🔐 Error signing with Web3Auth:', err)
+            throw err
+          }
+        } else {
+          console.warn('⚠️ 2FA is disabled! Owner signature will NOT be included.')
+        }
+
+        // Step 6: Combine signatures
+        setStatus('Preparing final signature...')
+        signedUserOp = signUserOperation(
+          userOp,
+          passkeySignature,
+          ownerSig
+        )
+        setCombinedSignature(signedUserOp.signature)
+      }
 
       // Step 7: Submit UserOperation to bundler
       setStatus('Submitting to bundler...')
@@ -487,8 +614,8 @@ function TransactionSender({ accountAddress, credential }) {
 
       // Clear cache and refresh account info
       sdk.accountManager.clearCache(accountAddress)
-      const updatedInfo = await sdk.createAccount(credential.publicKey, ownerAddress, 0n)
-      setAccountInfo({ ...updatedInfo, deployed: updatedInfo.isDeployed })
+      const updatedInfo = await sdk.getAccountInfo(accountAddress)
+      setAccountInfo({ ...updatedInfo, deployed: updatedInfo.deployed })
 
     } catch (err) {
       console.error('Error sending transaction:', err)
@@ -512,10 +639,11 @@ function TransactionSender({ accountAddress, credential }) {
 
   return (
     <div className="card">
-      <h2>3️⃣ Send Transaction</h2>
+      <h2>4️⃣ Send Transaction</h2>
       <p className="text-sm mb-4">
         Send ETH using your P256Account wallet.
-        {accountInfo?.twoFactorEnabled && " You'll need to sign with both your Passkey and Web3Auth wallet (2FA)."}
+        {accountInfo?.twoFactorEnabled && " You'll need to sign with your Passkey (biometric) and confirm with your Social Login account."}
+        {accountInfo && !accountInfo.hasPasskey && " You'll sign with your Social Login account only."}
       </p>
 
       {accountInfo && (
@@ -524,7 +652,8 @@ function TransactionSender({ accountAddress, credential }) {
             ? `✅ Account deployed | Nonce: ${accountInfo.nonce?.toString() || '0'}`
             : '⏳ Account will deploy on first transaction'
           }
-          {accountInfo.twoFactorEnabled && ' | 🔒 2FA Enabled'}
+          {accountInfo.twoFactorEnabled && ' | 🔒 2FA Enabled (Social Login + Passkey)'}
+          {accountInfo.hasPasskey === false && ' | 👤 Owner-only (Social Login)'}
         </div>
       )}
 
@@ -672,12 +801,21 @@ function TransactionSender({ accountAddress, credential }) {
         <ol className="text-sm" style={{ marginLeft: '20px', marginTop: '8px' }}>
           <li>Create a UserOperation with your transaction details</li>
           <li>Compute the userOpHash</li>
-          <li>Sign the hash with your passkey (P-256 ECDSA)</li>
+          <li>Sign the hash with your passkey (P-256 ECDSA) - 2FA</li>
+          <li>Review and confirm signature with your social login account</li>
           <li>Decode DER signature to raw r,s components</li>
           <li>Submit UserOperation to bundler</li>
           <li>Bundler submits to EntryPoint, which verifies using P256VERIFY precompile</li>
         </ol>
       </div>
+
+      {/* Signature Confirmation Dialog */}
+      <SignatureConfirmationDialog
+        isOpen={showSignatureDialog}
+        onConfirm={handleSignatureConfirm}
+        onCancel={handleSignatureCancel}
+        signatureData={pendingSignatureData}
+      />
     </div>
   )
 }
