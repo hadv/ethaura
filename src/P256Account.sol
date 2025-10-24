@@ -7,6 +7,8 @@ import {PackedUserOperation} from "@account-abstraction/interfaces/PackedUserOpe
 import {IERC1271} from "@openzeppelin/contracts/interfaces/IERC1271.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {P256} from "./libraries/P256.sol";
+import {Base64Url} from "./libraries/Base64Url.sol";
+import {LibBytes} from "solady/utils/LibBytes.sol";
 
 /**
  * @title P256Account
@@ -167,12 +169,22 @@ contract P256Account is IAccount, IERC1271, Ownable {
 
     /**
      * @notice Initialize the account with a P-256 public key
-     * @param _qx The x-coordinate of the public key
-     * @param _qy The y-coordinate of the public key
+     * @param _qx The x-coordinate of the public key (can be 0 for owner-only mode)
+     * @param _qy The y-coordinate of the public key (can be 0 for owner-only mode)
      * @param _owner The owner of the account
+     * @param _enable2FA Whether to enable two-factor authentication immediately
+     * @dev If _qx and _qy are both 0, the account operates in owner-only mode (no passkey)
+     * @dev If _qx and _qy are set but _enable2FA is false, passkey can be used but 2FA is not required
+     * @dev If _enable2FA is true, both _qx and _qy must be non-zero
      */
-    function initialize(bytes32 _qx, bytes32 _qy, address _owner) external {
+    function initialize(bytes32 _qx, bytes32 _qy, address _owner, bool _enable2FA) external {
         require(qx == bytes32(0) && qy == bytes32(0), "Already initialized");
+
+        // If enabling 2FA, passkey must be provided
+        if (_enable2FA) {
+            require(_qx != bytes32(0) && _qy != bytes32(0), "2FA requires passkey");
+        }
+
         qx = _qx;
         qy = _qy;
         _transferOwnership(_owner);
@@ -182,12 +194,15 @@ contract P256Account is IAccount, IERC1271, Ownable {
         guardianList.push(_owner);
         guardianThreshold = 1; // Owner alone can initiate recovery
 
-        // Enable two-factor authentication by default
-        twoFactorEnabled = true;
+        // Set two-factor authentication based on parameter (default: false)
+        twoFactorEnabled = _enable2FA;
 
         emit P256AccountInitialized(ENTRYPOINT, _qx, _qy);
         emit GuardianAdded(_owner);
-        emit TwoFactorEnabled(_owner);
+
+        if (_enable2FA) {
+            emit TwoFactorEnabled(_owner);
+        }
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -221,12 +236,18 @@ contract P256Account is IAccount, IERC1271, Ownable {
      * @param userOp The user operation
      * @param userOpHash The hash of the user operation
      * @return validationData 0 if valid, 1 if invalid
-     * @dev Signature format: r (32) || s (32) || authenticatorDataLen (2) || authenticatorData || clientDataJSON [|| ownerSig (65)]
-     *      - r, s: P-256 signature components
-     *      - authenticatorDataLen: uint16 length of authenticatorData
-     *      - authenticatorData: WebAuthn authenticator data
-     *      - clientDataJSON: WebAuthn client data JSON string
-     *      - ownerSig: Optional ECDSA signature from owner (if 2FA enabled)
+     * @dev Two signature modes:
+     *      1. Owner-only: 65-byte ECDSA signature from owner
+     *         - Used when qx=0, qy=0 (no passkey configured)
+     *         - Used when qx!=0, qy!=0 but twoFactorEnabled=false (passkey configured but 2FA disabled)
+     *      2. Passkey with 2FA: WebAuthn signature + 65-byte ECDSA signature from owner
+     *         - Used when qx!=0, qy!=0 and twoFactorEnabled=true
+     *
+     *      WebAuthn signature format (2FA mode):
+     *      r (32) || s (32) || authDataLen (2) || challengeIndex (2) || authenticatorData || clientDataJSON || ownerSig (65)
+     *
+     *      SECURITY: The challenge field in clientDataJSON MUST contain the base64url-encoded userOpHash.
+     *                This ensures the WebAuthn signature is actually authorizing this specific transaction.
      */
     function _validateSignature(PackedUserOperation calldata userOp, bytes32 userOpHash)
         internal
@@ -235,62 +256,127 @@ contract P256Account is IAccount, IERC1271, Ownable {
     {
         bytes calldata sig = userOp.signature;
 
-        // Minimum length: r (32) + s (32) + authDataLen (2) + minAuthData (37) + minClientData (20) = 123 bytes
-        if (sig.length < 123) {
-            return 1; // SIG_VALIDATION_FAILED
+        // During counterfactual deployment, storage is empty, so we need to extract
+        // the public key and 2FA setting from the initCode
+        (bytes32 _qx, bytes32 _qy, bool _twoFactorEnabled, address _owner) = _getAccountParams(userOp);
+
+        // Owner-only mode: no passkey OR passkey configured but 2FA disabled
+        if (_qx == bytes32(0) || !_twoFactorEnabled) {
+            if (sig.length != 65) return 1;
+            return _recoverSigner(userOpHash, sig) == _owner ? 0 : 1;
         }
 
-        // Extract and verify P-256 signature
-        {
-            bytes32 r;
-            bytes32 s;
-            uint16 authDataLen;
+        // Passkey with 2FA: requires both passkey and owner signatures
+        // Minimum: r(32) + s(32) + authLen(2) + challengeIdx(2) + authData(37) + clientData(20) + ownerSig(65) = 190 bytes
+        if (sig.length < 190) return 1;
 
-            assembly {
-                r := calldataload(sig.offset)
-                s := calldataload(add(sig.offset, 32))
-                // Load 2 bytes for authDataLen (stored as uint16 big-endian)
-                authDataLen := shr(240, calldataload(add(sig.offset, 64)))
-            }
-
-            // Calculate offsets
-            uint256 authDataOffset = 66; // After r (32) + s (32) + len (2)
-            uint256 clientDataOffset = authDataOffset + authDataLen;
-
-            // Determine clientDataJSON length
-            uint256 clientDataLen =
-                twoFactorEnabled ? sig.length - clientDataOffset - 65 : sig.length - clientDataOffset;
-
-            // Verify minimum length for 2FA
-            if (twoFactorEnabled && sig.length < clientDataOffset + 66) {
-                return 1; // SIG_VALIDATION_FAILED
-            }
-
-            // Extract authenticatorData and clientDataJSON
-            bytes calldata authenticatorData = sig[authDataOffset:clientDataOffset];
-            bytes calldata clientDataJSON = sig[clientDataOffset:clientDataOffset + clientDataLen];
-
-            // Verify WebAuthn signature
-            // WebAuthn signs: SHA256(authenticatorData || SHA256(clientDataJSON))
-            bytes32 messageHash = sha256(abi.encodePacked(authenticatorData, sha256(clientDataJSON)));
-
-            if (!P256.verify(messageHash, r, s, qx, qy)) {
-                return 1; // SIG_VALIDATION_FAILED
-            }
+        // Extract WebAuthn signature components
+        bytes32 r;
+        bytes32 s;
+        uint16 authDataLen;
+        uint16 challengeIndex;
+        assembly {
+            r := calldataload(sig.offset)
+            s := calldataload(add(sig.offset, 32))
+            authDataLen := shr(240, calldataload(add(sig.offset, 64)))
+            challengeIndex := shr(240, calldataload(add(sig.offset, 66)))
         }
 
-        // If 2FA is enabled, also verify owner signature
-        if (twoFactorEnabled) {
-            // Recover signer from owner signature (last 65 bytes)
-            address recovered = _recoverSigner(userOpHash, sig[sig.length - 65:]);
+        // Calculate data boundaries
+        uint256 authDataOffset = 68; // After r(32) + s(32) + authLen(2) + challengeIdx(2)
+        uint256 clientDataOffset = authDataOffset + authDataLen;
+        uint256 clientDataLen = sig.length - clientDataOffset - 65; // Exclude owner signature
 
-            // Verify the signer is the owner
-            if (recovered != owner()) {
-                return 1; // SIG_VALIDATION_FAILED
-            }
+        // Verify challenge in clientDataJSON matches userOpHash
+        // Expected format: "challenge":"<base64url(userOpHash)>"
+        if (!_verifyChallenge(sig[clientDataOffset:clientDataOffset + clientDataLen], challengeIndex, userOpHash)) {
+            return 1;
         }
+
+        // Verify WebAuthn signature: SHA256(authenticatorData || SHA256(clientDataJSON))
+        bytes32 messageHash = sha256(
+            abi.encodePacked(sig[authDataOffset:clientDataOffset], sha256(sig[clientDataOffset:clientDataOffset + clientDataLen]))
+        );
+
+        if (!P256.verify(messageHash, r, s, _qx, _qy)) return 1;
+
+        // Verify owner signature (last 65 bytes)
+        if (_recoverSigner(userOpHash, sig[sig.length - 65:]) != _owner) return 1;
 
         return 0; // SIG_VALIDATION_SUCCESS
+    }
+
+    /**
+     * @notice Get account parameters (qx, qy, twoFactorEnabled, owner)
+     * During counterfactual deployment, extract from initCode; otherwise from storage
+     * @param userOp The user operation
+     * @return _qx Public key X coordinate
+     * @return _qy Public key Y coordinate
+     * @return _twoFactorEnabled Whether 2FA is enabled
+     * @return _owner Owner address
+     */
+    function _getAccountParams(PackedUserOperation calldata userOp)
+        internal
+        view
+        returns (bytes32 _qx, bytes32 _qy, bool _twoFactorEnabled, address _owner)
+    {
+        // Default to storage values
+        _qx = qx;
+        _qy = qy;
+        _twoFactorEnabled = twoFactorEnabled;
+        _owner = owner();
+
+        // Check if this is a counterfactual deployment (initCode is set in userOp)
+        // initCode format: factory (20 bytes) + factoryData
+        // factoryData format: createAccount(bytes32 qx, bytes32 qy, address owner, uint256 salt, bool enable2FA)
+        bytes calldata initCode = userOp.initCode;
+        if (initCode.length >= 184) {
+            // Extract parameters from initCode using Solady's LibBytes
+            // Skip factory address (20 bytes) and selector (4 bytes) = 24 bytes offset
+            // Load qx at offset 24
+            _qx = LibBytes.loadCalldata(initCode, 24);
+            // Load qy at offset 56 (24 + 32)
+            _qy = LibBytes.loadCalldata(initCode, 56);
+            // Load owner at offset 88 (24 + 32 + 32), shift right 96 bits to get address
+            _owner = address(uint160(uint256(LibBytes.loadCalldata(initCode, 88))));
+            // Skip salt at offset 120 (24 + 32 + 32 + 32)
+            // Load enable2FA at offset 152 (24 + 32 + 32 + 32 + 32)
+            _twoFactorEnabled = uint256(LibBytes.loadCalldata(initCode, 152)) != 0;
+        }
+    }
+
+    /**
+     * @notice Verify that the challenge in clientDataJSON matches the expected userOpHash
+     * @param clientDataJSON The client data JSON bytes
+     * @param challengeIndex The index where "challenge":"..." starts
+     * @param expectedHash The expected userOpHash
+     * @return valid True if challenge matches
+     */
+    function _verifyChallenge(bytes calldata clientDataJSON, uint256 challengeIndex, bytes32 expectedHash)
+        internal
+        pure
+        returns (bool valid)
+    {
+        // Expected format at challengeIndex: "challenge":"<base64url(expectedHash)>"
+        // Base64url encoding of 32 bytes = 43 characters (no padding)
+        // Full string: "challenge":"..." = 13 + 43 + 1 = 57 characters
+
+        if (clientDataJSON.length < challengeIndex + 57) return false;
+
+        // Verify the prefix: "challenge":"
+        bytes memory prefix = bytes('"challenge":"');
+        for (uint256 i = 0; i < 13; i++) {
+            if (clientDataJSON[challengeIndex + i] != prefix[i]) return false;
+        }
+
+        // Extract the base64url challenge (43 characters)
+        bytes memory actualChallenge = clientDataJSON[challengeIndex + 13:challengeIndex + 56];
+
+        // Encode expected hash to base64url using library
+        bytes memory expectedChallenge = Base64Url.encode(expectedHash);
+
+        // Compare
+        return keccak256(actualChallenge) == keccak256(expectedChallenge);
     }
 
     /**
@@ -449,19 +535,21 @@ contract P256Account is IAccount, IERC1271, Ownable {
     /**
      * @notice Enable two-factor authentication
      * @dev When enabled, all transactions require both P-256 passkey signature and owner ECDSA signature
-     * @dev Can only be called via UserOperation (passkey signature)
+     * @dev Can only be called via UserOperation (passkey signature or owner signature)
+     * @dev Requires a passkey to be configured (qx and qy must be non-zero)
      */
     function enableTwoFactor() external {
         if (msg.sender != address(ENTRYPOINT)) revert OnlyEntryPoint();
         require(!twoFactorEnabled, "2FA already enabled");
+        require(qx != bytes32(0) && qy != bytes32(0), "Passkey required for 2FA");
         twoFactorEnabled = true;
         emit TwoFactorEnabled(owner());
     }
 
     /**
      * @notice Disable two-factor authentication
-     * @dev When disabled, transactions only require P-256 passkey signature
-     * @dev Can only be called via UserOperation (passkey signature)
+     * @dev When disabled, transactions only require P-256 passkey signature (or owner signature if no passkey)
+     * @dev Can only be called via UserOperation (passkey signature or owner signature)
      */
     function disableTwoFactor() external {
         if (msg.sender != address(ENTRYPOINT)) revert OnlyEntryPoint();

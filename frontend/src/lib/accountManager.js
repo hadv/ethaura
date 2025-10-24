@@ -43,35 +43,41 @@ export class P256AccountManager {
    */
   async getAccountAddress(qx, qy, owner, salt = 0n) {
     try {
-      const onChain = await this.factory.getAddress(qx, qy, owner, salt)
+      console.log('🏭 Calling factory.getAddress with:', {
+        qx,
+        qy,
+        owner,
+        salt: salt.toString(),
+        factoryAddress: this.factoryAddress,
+      })
 
-      // Check if factory returned an invalid address (its own address)
-      if (
-        onChain &&
-        this.factoryAddress &&
-        onChain.toLowerCase() === this.factoryAddress.toLowerCase()
-      ) {
-        // Fallback: compute locally (factory contract may have bytecode mismatch or RPC caching issue)
-        console.log('ℹ️ Using local address computation (factory returned unexpected value)')
-        const local = await this.computeLocalAddress(qx, qy, owner, salt)
-        return local
-      }
+      // Call the factory contract's getAddress function
+      // NOTE: We must use getFunction() because getAddress() is a built-in method on Contract
+      // that returns the contract's own address, not calling the getAddress() function!
+      const getAddressFunc = this.factory.getFunction('getAddress')
+      const onChain = await getAddressFunc(qx, qy, owner, salt)
+
+      console.log('🏭 Factory returned address:', onChain)
+
+      // Return the factory's result
       return onChain
     } catch (error) {
-      // If RPC call fails, compute locally
-      console.log('ℹ️ Factory call failed, computing address locally:', error.message)
-      return await this.computeLocalAddress(qx, qy, owner, salt)
+      console.error('❌ Factory.getAddress() failed:', error)
+      throw new Error(`Failed to get account address from factory: ${error.message}`)
     }
   }
 
   /**
    * Compute CREATE2 address locally to cross-check factory.getAddress
+   * IMPORTANT: Address is calculated ONLY from owner and salt, NOT from passkey (qx, qy)
+   * This allows users to add/change passkey later without changing the account address
    */
-  async computeLocalAddress(qx, qy, owner, salt = 0n) {
-    // salt = keccak256(abi.encodePacked(qx, qy, owner, salt))
+  async computeLocalAddress(_qx, _qy, owner, salt = 0n) {
+    // IMPORTANT: Only use owner and salt for address calculation
+    // NOT including qx, qy to allow passkey changes without address changes
     const finalSalt = ethers.solidityPackedKeccak256(
-      ['bytes32', 'bytes32', 'address', 'uint256'],
-      [qx, qy, owner, salt]
+      ['address', 'uint256'],
+      [owner, salt]
     )
 
     // initCode = P256Account.creationCode ++ abi.encode(ENTRYPOINT)
@@ -94,14 +100,15 @@ export class P256AccountManager {
 
   /**
    * Get initCode for counterfactual deployment
-   * @param {string} qx - Public key X coordinate
-   * @param {string} qy - Public key Y coordinate
+   * @param {string} qx - Public key X coordinate (can be 0x0...0 for owner-only mode)
+   * @param {string} qy - Public key Y coordinate (can be 0x0...0 for owner-only mode)
    * @param {string} owner - Owner address
    * @param {bigint} salt - Salt for CREATE2
+   * @param {boolean} enable2FA - Whether to enable 2FA immediately (default: false)
    * @returns {Promise<string>} InitCode bytes
    */
-  async getInitCode(qx, qy, owner, salt = 0n) {
-    return await this.factory.getInitCode(qx, qy, owner, salt)
+  async getInitCode(qx, qy, owner, salt = 0n, enable2FA = false) {
+    return await this.factory.getInitCode(qx, qy, owner, salt, enable2FA)
   }
 
   /**
@@ -113,12 +120,18 @@ export class P256AccountManager {
     // Check cache first
     const cached = this.cache.deployedStatus.get(accountAddress)
     if (cached && Date.now() - cached.timestamp < this.cacheExpiry) {
-      console.log('📦 Using cached deployed status for', accountAddress)
+      console.log('📦 Using cached deployed status for', accountAddress, '→', cached.deployed)
       return cached.deployed
     }
 
     const code = await this.provider.getCode(accountAddress)
     const deployed = code !== '0x'
+
+    console.log('🔍 Fresh isDeployed check:', {
+      address: accountAddress,
+      codeLength: code.length,
+      deployed,
+    })
 
     // Cache the result
     this.cache.deployedStatus.set(accountAddress, {
@@ -131,16 +144,17 @@ export class P256AccountManager {
 
   /**
    * Deploy account directly (not recommended, use counterfactual instead)
-   * @param {string} qx - Public key X coordinate
-   * @param {string} qy - Public key Y coordinate
+   * @param {string} qx - Public key X coordinate (can be 0x0...0 for owner-only mode)
+   * @param {string} qy - Public key Y coordinate (can be 0x0...0 for owner-only mode)
    * @param {string} owner - Owner address
    * @param {bigint} salt - Salt for CREATE2
+   * @param {boolean} enable2FA - Whether to enable 2FA immediately (default: false)
    * @param {Object} signer - ethers signer
    * @returns {Promise<Object>} Transaction receipt
    */
-  async deployAccount(qx, qy, owner, salt = 0n, signer) {
+  async deployAccount(qx, qy, owner, salt = 0n, enable2FA = false, signer) {
     const factoryWithSigner = this.factory.connect(signer)
-    const tx = await factoryWithSigner.createAccount(qx, qy, owner, salt)
+    const tx = await factoryWithSigner.createAccount(qx, qy, owner, salt, enable2FA)
     return await tx.wait()
   }
 
@@ -184,8 +198,14 @@ export class P256AccountManager {
    * @returns {Promise<bigint>} Current nonce
    */
   async getNonce(accountAddress) {
-    const account = this.getAccountContract(accountAddress)
-    return await account.getNonce()
+    // Call EntryPoint.getNonce() directly instead of account.getNonce()
+    // This works for both old and new P256Account contracts
+    const entryPoint = new ethers.Contract(
+      ENTRYPOINT_ADDRESS,
+      ['function getNonce(address sender, uint192 key) view returns (uint256)'],
+      this.provider
+    )
+    return await entryPoint.getNonce(accountAddress, 0)
   }
 
   /**
@@ -228,9 +248,10 @@ export class P256AccountManager {
   /**
    * Get account info
    * @param {string} accountAddress - Account address
+   * @param {boolean} expectedTwoFactorEnabled - Expected 2FA state for undeployed accounts (optional)
    * @returns {Promise<Object>} Account information
    */
-  async getAccountInfo(accountAddress) {
+  async getAccountInfo(accountAddress, expectedTwoFactorEnabled = null) {
     // Guard: prevent accidentally using the factory address as the account address
     if (accountAddress && this.factoryAddress && accountAddress.toLowerCase() === this.factoryAddress.toLowerCase()) {
       throw new Error('Provided address is the factory address, not a P256Account. Please create a smart account first.')
@@ -240,20 +261,23 @@ export class P256AccountManager {
       // Check cache first
       const cached = this.cache.accountInfo.get(accountAddress)
       if (cached && Date.now() - cached.timestamp < this.cacheExpiry) {
-        console.log('📦 Using cached account info for', accountAddress)
+        console.log('📦 Using cached account info for', accountAddress, '→ deployed:', cached.info.deployed)
         return cached.info
       }
 
       const isDeployed = await this.isDeployed(accountAddress)
+      console.log('🔍 getAccountInfo: isDeployed =', isDeployed)
 
       if (!isDeployed) {
-        // NOTE: 2FA is ENABLED BY DEFAULT in P256Account.initialize()
-        // Even for counterfactual (not yet deployed) accounts, we must assume 2FA is enabled
-        // This ensures the first transaction includes the owner signature
+        // For undeployed accounts, we cannot read 2FA state from the contract
+        // Use the expected value if provided, otherwise assume false (owner-only)
+        // The actual 2FA state will be set during deployment via the enable2FA parameter
+        const twoFactorEnabled = expectedTwoFactorEnabled !== null ? expectedTwoFactorEnabled : false
+
         const accountInfo = {
           address: accountAddress,
           deployed: false,
-          twoFactorEnabled: true, // ALWAYS TRUE - 2FA is enabled by default on deployment
+          twoFactorEnabled, // Use expected value or default to false
           deposit: 0n,
           nonce: 0n,
         }
@@ -269,6 +293,7 @@ export class P256AccountManager {
       }
 
       try {
+        console.log('🔍 Fetching deployed account info...')
         const [twoFactorEnabled, deposit, nonce] = await Promise.all([
           this.isTwoFactorEnabled(accountAddress),
           this.getDeposit(accountAddress),
@@ -283,6 +308,8 @@ export class P256AccountManager {
           nonce,
         }
 
+        console.log('✅ Successfully fetched deployed account info:', accountInfo)
+
         // Cache the result
         this.cache.accountInfo.set(accountAddress, {
           info: accountInfo,
@@ -291,13 +318,17 @@ export class P256AccountManager {
 
         return accountInfo
       } catch (e) {
-        // Silently handle errors - if we can't read the account info, treat as undeployed
-        // This is expected for counterfactual accounts (not yet deployed) or if the contract is not a P256Account
-        // The account will be deployed on first transaction via initCode in the UserOperation
+        // ERROR: This should NOT happen for a deployed account!
+        console.error('❌ ERROR fetching deployed account info:', e)
+        console.error('❌ This means the contract exists but we cannot read from it!')
+        console.error('❌ Possible causes: wrong contract address, wrong ABI, or contract is not a P256Account')
+
+        const twoFactorEnabled = expectedTwoFactorEnabled !== null ? expectedTwoFactorEnabled : false
+
         const accountInfo = {
           address: accountAddress,
           deployed: false,
-          twoFactorEnabled: true,
+          twoFactorEnabled, // Use expected value or default to false
           deposit: 0n,
           nonce: 0n,
         }

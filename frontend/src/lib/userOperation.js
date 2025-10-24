@@ -281,6 +281,33 @@ export async function buildSendEthUserOp({
 }
 
 /**
+ * Sign UserOperation with owner signature only (for owner-only accounts)
+ * @param {Object} userOp - UserOperation
+ * @param {string} ownerSignature - ECDSA signature from owner (65 bytes)
+ * @returns {Object} UserOperation with signature
+ */
+export function signUserOperationOwnerOnly(userOp, ownerSignature) {
+  // Remove 0x prefix if present
+  const ownerSigClean = ownerSignature.startsWith('0x') ? ownerSignature.slice(2) : ownerSignature
+  const ownerSigLength = ownerSigClean.length / 2
+
+  console.log('📝 Owner-only signature:', {
+    ownerSignatureRaw: ownerSignature,
+    ownerSignatureClean: ownerSigClean,
+    ownerSigByteLength: ownerSigLength,
+  })
+
+  if (ownerSigLength !== 65) {
+    console.warn('⚠️ WARNING: Owner signature is', ownerSigLength, 'bytes, expected 65 bytes!')
+  }
+
+  return {
+    ...userOp,
+    signature: '0x' + ownerSigClean,
+  }
+}
+
+/**
  * Sign UserOperation with P256 passkey signature (WebAuthn format)
  * @param {Object} userOp - UserOperation
  * @param {Object} passkeySignature - { r, s, authenticatorData, clientDataJSON } from passkey
@@ -308,8 +335,16 @@ export function signUserOperation(userOp, passkeySignature, ownerSignature = nul
   const authDataLen = authenticatorData.length
   const authDataLenHex = authDataLen.toString(16).padStart(4, '0')
 
-  // Build signature: r || s || authDataLen || authenticatorData || clientDataJSON [|| ownerSig]
-  let signature = '0x' + rClean + sClean + authDataLenHex + authDataHex + clientDataHex
+  // Find the index of "challenge":" in clientDataJSON
+  // The contract expects this to point to the opening quote before "challenge"
+  const challengeIndex = clientDataJSON.indexOf('"challenge":"')
+  if (challengeIndex === -1) {
+    throw new Error('Challenge not found in clientDataJSON')
+  }
+  const challengeIndexHex = challengeIndex.toString(16).padStart(4, '0')
+
+  // Build signature: r || s || authDataLen || challengeIndex || authenticatorData || clientDataJSON [|| ownerSig]
+  let signature = '0x' + rClean + sClean + authDataLenHex + challengeIndexHex + authDataHex + clientDataHex
 
   // If 2FA is enabled, append owner signature
   let ownerSigLength = 0
@@ -328,6 +363,7 @@ export function signUserOperation(userOp, passkeySignature, ownerSignature = nul
     rLength: rClean.length / 2,
     sLength: sClean.length / 2,
     authDataLength: authDataLen,
+    challengeIndex: challengeIndex,
     clientDataLength: clientDataJSON.length,
     ownerSigLength: ownerSigLength,
     totalSignatureLength: signature.length / 2 - 1, // -1 for '0x'
