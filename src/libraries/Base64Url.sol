@@ -35,7 +35,8 @@ library Base64Url {
 
         // Process 3-byte chunks
         for (; i + 3 <= len; i += 3) {
-            uint256 n = (uint256(uint8(data[i])) << 16) | (uint256(uint8(data[i + 1])) << 8) | uint256(uint8(data[i + 2]));
+            uint256 n =
+                (uint256(uint8(data[i])) << 16) | (uint256(uint8(data[i + 1])) << 8) | uint256(uint8(data[i + 2]));
 
             result[j++] = table[(n >> 18) & 63];
             result[j++] = table[(n >> 12) & 63];

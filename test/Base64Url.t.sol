@@ -22,7 +22,7 @@ contract Base64UrlTest is Test {
     function test_EncodeEmptyBytes() public pure {
         bytes memory empty = "";
         bytes memory encoded = Base64Url.encode(empty);
-        
+
         assertEq(encoded.length, 0, "Empty bytes should encode to empty string");
     }
 
@@ -65,7 +65,7 @@ contract Base64UrlTest is Test {
         // Test that there's no padding (no '=' characters)
         bytes memory data1 = hex"ff";
         bytes memory encoded1 = Base64Url.encode(data1);
-        
+
         // Check no padding
         for (uint256 i = 0; i < encoded1.length; i++) {
             assertTrue(encoded1[i] != bytes1("="), "Should not contain padding");
@@ -73,7 +73,7 @@ contract Base64UrlTest is Test {
 
         bytes memory data2 = hex"ffff";
         bytes memory encoded2 = Base64Url.encode(data2);
-        
+
         for (uint256 i = 0; i < encoded2.length; i++) {
             assertTrue(encoded2[i] != bytes1("="), "Should not contain padding");
         }
@@ -81,7 +81,7 @@ contract Base64UrlTest is Test {
 
     function testFuzz_EncodeLength(bytes memory data) public pure {
         bytes memory encoded = Base64Url.encode(data);
-        
+
         if (data.length == 0) {
             assertEq(encoded.length, 0, "Empty input should produce empty output");
         } else {
@@ -89,7 +89,7 @@ contract Base64UrlTest is Test {
             uint256 expectedLen = 4 * ((data.length + 2) / 3);
             if (data.length % 3 == 2) expectedLen -= 1;
             else if (data.length % 3 == 1) expectedLen -= 2;
-            
+
             assertEq(encoded.length, expectedLen, "Encoded length should match expected");
         }
     }

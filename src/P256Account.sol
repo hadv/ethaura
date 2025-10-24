@@ -295,7 +295,9 @@ contract P256Account is IAccount, IERC1271, Ownable {
 
         // Verify WebAuthn signature: SHA256(authenticatorData || SHA256(clientDataJSON))
         bytes32 messageHash = sha256(
-            abi.encodePacked(sig[authDataOffset:clientDataOffset], sha256(sig[clientDataOffset:clientDataOffset + clientDataLen]))
+            abi.encodePacked(
+                sig[authDataOffset:clientDataOffset], sha256(sig[clientDataOffset:clientDataOffset + clientDataLen])
+            )
         );
 
         if (!P256.verify(messageHash, r, s, _qx, _qy)) return 1;

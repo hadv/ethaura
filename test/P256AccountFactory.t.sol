@@ -112,10 +112,14 @@ contract P256AccountFactoryTest is Test {
     /**
      * Test: Fuzz test - same owner produces same address regardless of passkey
      */
-    function testFuzz_SameOwnerSameAddress(bytes32 qx1, bytes32 qy1, bytes32 qx2, bytes32 qy2, address owner, uint256 salt)
-        public
-        view
-    {
+    function testFuzz_SameOwnerSameAddress(
+        bytes32 qx1,
+        bytes32 qy1,
+        bytes32 qx2,
+        bytes32 qy2,
+        address owner,
+        uint256 salt
+    ) public view {
         // Skip if public keys are the same (we want to test different keys)
         vm.assume(qx1 != qx2 || qy1 != qy2);
         // Skip zero address

@@ -54,7 +54,10 @@ contract P256AccountFactory {
      * @dev IMPORTANT: Account address depends ONLY on owner and salt, NOT on passkey (qx, qy)
      * @dev This allows users to add/change passkey later without changing the account address
      */
-    function createAccount(bytes32 qx, bytes32 qy, address owner, uint256 salt, bool enable2FA) public returns (P256Account account) {
+    function createAccount(bytes32 qx, bytes32 qy, address owner, uint256 salt, bool enable2FA)
+        public
+        returns (P256Account account)
+    {
         address addr = getAddress(qx, qy, owner, salt);
 
         // If account already exists, return it
