@@ -38,8 +38,8 @@ contract P256AccountTest is Test {
         // Deploy factory
         factory = new P256AccountFactory(entryPoint);
 
-        // Create account
-        account = factory.createAccount(qx, qy, owner, 0);
+        // Create account with 2FA enabled
+        account = factory.createAccount(qx, qy, owner, 0, true);
     }
 
     function test_Initialization() public view {
@@ -53,13 +53,47 @@ contract P256AccountTest is Test {
         assertEq(account.guardianList(0), owner, "Owner should be first guardian in list");
         assertEq(account.guardianThreshold(), 1, "Guardian threshold should be 1");
 
-        // Verify two-factor authentication is enabled by default
-        assertTrue(account.twoFactorEnabled(), "Two-factor should be enabled by default");
+        // Verify two-factor authentication is enabled
+        assertTrue(account.twoFactorEnabled(), "Two-factor should be enabled");
+    }
+
+    function test_InitializationWithout2FA() public {
+        // Create account without 2FA
+        P256Account account2 = factory.createAccount(qx, qy, owner, 1, false);
+
+        assertEq(account2.qx(), qx, "QX mismatch");
+        assertEq(account2.qy(), qy, "QY mismatch");
+        assertEq(account2.owner(), owner, "Owner mismatch");
+
+        // Verify two-factor authentication is disabled
+        assertFalse(account2.twoFactorEnabled(), "Two-factor should be disabled");
+    }
+
+    function test_OwnerOnlyMode() public {
+        // Create account in owner-only mode (no passkey)
+        P256Account ownerOnlyAccount = factory.createAccount(bytes32(0), bytes32(0), owner, 2, false);
+
+        assertEq(ownerOnlyAccount.qx(), bytes32(0), "QX should be zero");
+        assertEq(ownerOnlyAccount.qy(), bytes32(0), "QY should be zero");
+        assertEq(ownerOnlyAccount.owner(), owner, "Owner mismatch");
+
+        // Verify two-factor authentication is disabled
+        assertFalse(ownerOnlyAccount.twoFactorEnabled(), "Two-factor should be disabled in owner-only mode");
+    }
+
+    function test_CannotEnable2FAWithoutPasskey() public {
+        // Create account in owner-only mode
+        P256Account ownerOnlyAccount = factory.createAccount(bytes32(0), bytes32(0), owner, 3, false);
+
+        // Try to enable 2FA (should fail because no passkey)
+        vm.prank(ENTRYPOINT_ADDR);
+        vm.expectRevert("Passkey required for 2FA");
+        ownerOnlyAccount.enableTwoFactor();
     }
 
     function test_CannotReinitialize() public {
         vm.expectRevert("Already initialized");
-        account.initialize(bytes32(uint256(1)), bytes32(uint256(2)), owner);
+        account.initialize(bytes32(uint256(1)), bytes32(uint256(2)), owner, true);
     }
 
     function test_ProposePublicKeyUpdate() public {
@@ -306,18 +340,18 @@ contract P256AccountTest is Test {
 
     function test_CreateAccountIdempotent() public {
         // Creating account with same parameters should return existing account
-        P256Account account2 = factory.createAccount(qx, qy, owner, 0);
+        P256Account account2 = factory.createAccount(qx, qy, owner, 0, true);
         assertEq(address(account2), address(account), "Should return same account");
     }
 
     function test_CreateAccountWithDifferentSalt() public {
         // Creating account with different salt should create new account
-        P256Account account2 = factory.createAccount(qx, qy, owner, 1);
+        P256Account account2 = factory.createAccount(qx, qy, owner, 1, true);
         assertTrue(address(account2) != address(account), "Should create different account");
     }
 
     function test_GetInitCode() public view {
-        bytes memory initCode = factory.getInitCode(qx, qy, owner, 0);
+        bytes memory initCode = factory.getInitCode(qx, qy, owner, 0, true);
 
         // InitCode should start with factory address
         address factoryAddr;
