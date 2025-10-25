@@ -4,6 +4,7 @@ import Web3AuthLogin from './components/Web3AuthLogin'
 import PasskeyManager from './components/PasskeyManager'
 import AccountManager from './components/AccountManager'
 import GuardianManager from './components/GuardianManager'
+import RecoveryManager from './components/RecoveryManager'
 import TransactionSender from './components/TransactionSender'
 
 function App() {
@@ -155,6 +156,11 @@ function App() {
         {accountAddress && (
           <>
             <GuardianManager
+              accountAddress={accountAddress}
+              credential={passkeyCredential}
+            />
+
+            <RecoveryManager
               accountAddress={accountAddress}
               credential={passkeyCredential}
             />

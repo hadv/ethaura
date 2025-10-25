@@ -376,6 +376,77 @@ export class P256AccountManager {
   }
 
   /**
+   * Get pending recovery requests for an account
+   * @param {string} accountAddress - Account address
+   * @returns {Promise<Array>} Array of pending recovery requests
+   */
+  async getPendingRecoveries(accountAddress) {
+    const account = this.getAccountContract(accountAddress)
+
+    try {
+      const recoveryNonce = await account.recoveryNonce()
+      const pendingRecoveries = []
+
+      // Fetch all recovery requests
+      for (let i = 0; i < recoveryNonce; i++) {
+        try {
+          const request = await account.recoveryRequests(i)
+
+          // Only include non-executed, non-cancelled requests
+          if (!request.executed && !request.cancelled) {
+            pendingRecoveries.push({
+              nonce: i,
+              newQx: request.newQx,
+              newQy: request.newQy,
+              newOwner: request.newOwner,
+              approvalCount: Number(request.approvalCount),
+              executeAfter: Number(request.executeAfter),
+              executed: request.executed,
+              cancelled: request.cancelled,
+            })
+          }
+        } catch (e) {
+          // Skip if request doesn't exist
+          continue
+        }
+      }
+
+      return pendingRecoveries
+    } catch (e) {
+      console.error('Error fetching pending recoveries:', e)
+      return []
+    }
+  }
+
+  /**
+   * Get recovery request details
+   * @param {string} accountAddress - Account address
+   * @param {number} requestNonce - Recovery request nonce
+   * @returns {Promise<Object>} Recovery request details
+   */
+  async getRecoveryRequest(accountAddress, requestNonce) {
+    const account = this.getAccountContract(accountAddress)
+
+    try {
+      const request = await account.recoveryRequests(requestNonce)
+
+      return {
+        nonce: requestNonce,
+        newQx: request.newQx,
+        newQy: request.newQy,
+        newOwner: request.newOwner,
+        approvalCount: Number(request.approvalCount),
+        executeAfter: Number(request.executeAfter),
+        executed: request.executed,
+        cancelled: request.cancelled,
+      }
+    } catch (e) {
+      console.error('Error fetching recovery request:', e)
+      return null
+    }
+  }
+
+  /**
    * Get account contract instance
    * @param {string} accountAddress - Account address
    * @returns {ethers.Contract} Account contract

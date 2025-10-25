@@ -56,6 +56,13 @@ export const P256_ACCOUNT_ABI = [
   'function getGuardians() view returns (address[])',
   'function guardians(address) view returns (bool)',
   'function guardianThreshold() view returns (uint256)',
+  // Recovery functions
+  'function initiateRecovery(bytes32 newQx, bytes32 newQy, address newOwner) external',
+  'function approveRecovery(uint256 requestNonce) external',
+  'function executeRecovery(uint256 requestNonce) external',
+  'function cancelRecovery(uint256 requestNonce) external',
+  'function recoveryNonce() view returns (uint256)',
+  'function recoveryRequests(uint256) view returns (bytes32 newQx, bytes32 newQy, address newOwner, uint256 approvalCount, uint256 executeAfter, bool executed, bool cancelled)',
 ]
 
 export const ENTRYPOINT_ABI = [

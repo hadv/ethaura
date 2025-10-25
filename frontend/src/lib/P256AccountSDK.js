@@ -224,6 +224,141 @@ export class P256AccountSDK {
   }
 
   /**
+   * Get pending recovery requests for an account
+   * @param {string} accountAddress - P256Account address
+   * @returns {Promise<Array>} Array of pending recovery requests
+   */
+  async getPendingRecoveries(accountAddress) {
+    return await this.accountManager.getPendingRecoveries(accountAddress)
+  }
+
+  /**
+   * Get recovery request details
+   * @param {string} accountAddress - P256Account address
+   * @param {number} requestNonce - Recovery request nonce
+   * @returns {Promise<Object>} Recovery request details
+   */
+  async getRecoveryRequest(accountAddress, requestNonce) {
+    return await this.accountManager.getRecoveryRequest(accountAddress, requestNonce)
+  }
+
+  /**
+   * Initiate a recovery request (guardian only)
+   * @param {Object} params - Parameters
+   * @param {string} params.accountAddress - P256Account address
+   * @param {string} params.newQx - New passkey X coordinate (or 0x0 to remove)
+   * @param {string} params.newQy - New passkey Y coordinate (or 0x0 to remove)
+   * @param {string} params.newOwner - New owner address
+   * @param {Object} params.signer - Ethers signer (from Web3Auth provider)
+   * @returns {Promise<Object>} Transaction receipt
+   */
+  async initiateRecovery({
+    accountAddress,
+    newQx,
+    newQy,
+    newOwner,
+    signer,
+  }) {
+    if (!signer) {
+      throw new Error('Signer is required for recovery operations')
+    }
+
+    const accountContract = this.accountManager.getAccountContract(accountAddress)
+    const accountWithSigner = accountContract.connect(signer)
+
+    const tx = await accountWithSigner.initiateRecovery(newQx, newQy, newOwner)
+    const receipt = await tx.wait()
+
+    return receipt
+  }
+
+  /**
+   * Approve a recovery request (guardian only)
+   * @param {Object} params - Parameters
+   * @param {string} params.accountAddress - P256Account address
+   * @param {number} params.requestNonce - Recovery request nonce
+   * @param {Object} params.signer - Ethers signer (from Web3Auth provider)
+   * @returns {Promise<Object>} Transaction receipt
+   */
+  async approveRecovery({
+    accountAddress,
+    requestNonce,
+    signer,
+  }) {
+    if (!signer) {
+      throw new Error('Signer is required for recovery operations')
+    }
+
+    const accountContract = this.accountManager.getAccountContract(accountAddress)
+    const accountWithSigner = accountContract.connect(signer)
+
+    const tx = await accountWithSigner.approveRecovery(requestNonce)
+    const receipt = await tx.wait()
+
+    return receipt
+  }
+
+  /**
+   * Execute a recovery request (anyone can call after threshold met and timelock expired)
+   * @param {Object} params - Parameters
+   * @param {string} params.accountAddress - P256Account address
+   * @param {number} params.requestNonce - Recovery request nonce
+   * @param {Object} params.signer - Ethers signer (from Web3Auth provider)
+   * @returns {Promise<Object>} Transaction receipt
+   */
+  async executeRecovery({
+    accountAddress,
+    requestNonce,
+    signer,
+  }) {
+    if (!signer) {
+      throw new Error('Signer is required for recovery operations')
+    }
+
+    const accountContract = this.accountManager.getAccountContract(accountAddress)
+    const accountWithSigner = accountContract.connect(signer)
+
+    const tx = await accountWithSigner.executeRecovery(requestNonce)
+    const receipt = await tx.wait()
+
+    return receipt
+  }
+
+  /**
+   * Cancel a recovery request (owner only, via passkey signature through EntryPoint)
+   * @param {Object} params - Parameters
+   * @param {string} params.accountAddress - P256Account address
+   * @param {number} params.requestNonce - Recovery request nonce
+   * @param {Object} params.passkeyCredential - Passkey credential
+   * @param {Function} params.signWithPasskey - Function to sign with passkey
+   * @param {string} params.ownerSignature - Owner signature (for 2FA, optional)
+   * @returns {Promise<Object>} UserOperation receipt
+   */
+  async cancelRecovery({
+    accountAddress,
+    requestNonce,
+    passkeyCredential,
+    signWithPasskey,
+    ownerSignature = null,
+  }) {
+    // Encode cancelRecovery call
+    const accountContract = this.accountManager.getAccountContract(accountAddress)
+    const data = accountContract.interface.encodeFunctionData('cancelRecovery', [requestNonce])
+
+    return await this.executeCall({
+      accountAddress,
+      targetAddress: accountAddress,
+      value: 0n,
+      data,
+      passkeyCredential,
+      signWithPasskey,
+      ownerSignature,
+      needsDeployment: false,
+      initCode: '0x',
+    })
+  }
+
+  /**
    * Send ETH from P256Account
    * @param {Object} params - Parameters
    * @param {string} params.accountAddress - P256Account address
