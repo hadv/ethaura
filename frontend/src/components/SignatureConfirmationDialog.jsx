@@ -33,6 +33,8 @@ function SignatureConfirmationDialog({
     isDeployment,
     isTwoFactorAuth,
     signatureStep,
+    operationType,
+    operationDetails,
   } = signatureData || {}
 
   return (
@@ -111,12 +113,45 @@ function SignatureConfirmationDialog({
             </div>
           </div>
 
+          {operationType && (
+            <div className="detail-row" style={{ marginBottom: '1rem' }}>
+              <div style={{
+                backgroundColor: '#3a1a1a',
+                border: '1px solid #5a2a2a',
+                borderRadius: '6px',
+                padding: '0.75rem',
+                color: '#f87171',
+                fontSize: '0.9rem',
+                fontWeight: 'bold',
+              }}>
+                🔒 {operationType}
+              </div>
+            </div>
+          )}
+
+          {operationDetails && (
+            <div className="detail-row" style={{ marginBottom: '1rem' }}>
+              <strong style={{ color: '#888', fontSize: '0.85rem', display: 'block', marginBottom: '0.25rem' }}>
+                Operation:
+              </strong>
+              <div style={{
+                fontSize: '0.9rem',
+                color: '#fff',
+                padding: '0.5rem',
+                backgroundColor: '#000',
+                borderRadius: '4px',
+              }}>
+                {operationDetails}
+              </div>
+            </div>
+          )}
+
           <div className="detail-row" style={{ marginBottom: '1rem' }}>
             <strong style={{ color: '#888', fontSize: '0.85rem', display: 'block', marginBottom: '0.25rem' }}>
               To Address:
             </strong>
-            <div className="code-block" style={{ 
-              fontSize: '0.8rem', 
+            <div className="code-block" style={{
+              fontSize: '0.8rem',
               padding: '0.5rem',
               backgroundColor: '#000',
               borderRadius: '4px',
@@ -126,18 +161,20 @@ function SignatureConfirmationDialog({
             </div>
           </div>
 
-          <div className="detail-row" style={{ marginBottom: '1rem' }}>
-            <strong style={{ color: '#888', fontSize: '0.85rem', display: 'block', marginBottom: '0.25rem' }}>
-              Amount:
-            </strong>
-            <div style={{ 
-              fontSize: '1.2rem', 
-              color: '#4ade80',
-              fontWeight: 'bold',
-            }}>
-              {amount ? ethers.formatEther(amount) : '0'} ETH
+          {amount !== undefined && (
+            <div className="detail-row" style={{ marginBottom: '1rem' }}>
+              <strong style={{ color: '#888', fontSize: '0.85rem', display: 'block', marginBottom: '0.25rem' }}>
+                Amount:
+              </strong>
+              <div style={{
+                fontSize: '1.2rem',
+                color: '#4ade80',
+                fontWeight: 'bold',
+              }}>
+                {amount ? ethers.formatEther(amount) : '0'} ETH
+              </div>
             </div>
-          </div>
+          )}
 
           <div className="detail-row" style={{ marginBottom: '1rem' }}>
             <strong style={{ color: '#888', fontSize: '0.85rem', display: 'block', marginBottom: '0.25rem' }}>

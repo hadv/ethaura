@@ -3,10 +3,11 @@ import { useWeb3Auth } from '../contexts/Web3AuthContext'
 import { useP256SDK } from '../hooks/useP256SDK'
 import { signWithPasskey } from '../utils/webauthn'
 import { ethers } from 'ethers'
+import SignatureConfirmationDialog from './SignatureConfirmationDialog'
 import '../styles/RecoveryManager.css'
 
 function RecoveryManager({ accountAddress, credential }) {
-  const { isConnected, address: ownerAddress, provider: web3AuthProvider } = useWeb3Auth()
+  const { isConnected, address: ownerAddress, provider: web3AuthProvider, signRawHash } = useWeb3Auth()
   const [status, setStatus] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -18,6 +19,39 @@ function RecoveryManager({ accountAddress, credential }) {
   const [newQy, setNewQy] = useState('')
   const [newOwner, setNewOwner] = useState('')
   const [recoveryType, setRecoveryType] = useState('passkey') // 'passkey' or 'owner'
+
+  // Signature confirmation dialog state
+  const [showSignatureDialog, setShowSignatureDialog] = useState(false)
+  const [pendingSignatureData, setPendingSignatureData] = useState(null)
+  const [signatureResolver, setSignatureResolver] = useState(null)
+
+  // Helper function to request signature with user confirmation
+  const requestSignatureWithConfirmation = (signatureData) => {
+    return new Promise((resolve, reject) => {
+      setPendingSignatureData(signatureData)
+      setShowSignatureDialog(true)
+      setSignatureResolver({ resolve, reject })
+    })
+  }
+
+  // Handle signature confirmation
+  const handleSignatureConfirm = async () => {
+    try {
+      const { userOpHash } = pendingSignatureData
+      const signature = await signRawHash(userOpHash)
+      setShowSignatureDialog(false)
+      signatureResolver.resolve(signature)
+    } catch (err) {
+      setShowSignatureDialog(false)
+      signatureResolver.reject(err)
+    }
+  }
+
+  // Handle signature cancellation
+  const handleSignatureCancel = () => {
+    setShowSignatureDialog(false)
+    signatureResolver.reject(new Error('User cancelled signature'))
+  }
 
   const sdkConfig = {
     factoryAddress: import.meta.env.VITE_FACTORY_ADDRESS || '',
@@ -254,6 +288,133 @@ function RecoveryManager({ accountAddress, credential }) {
     }
   }
 
+  // Cancel recovery (owner only, via passkey signature)
+  const handleCancelRecovery = async (nonce) => {
+    if (!credential) {
+      setError('Please create a passkey first')
+      return
+    }
+
+    setLoading(true)
+    setError('')
+    setStatus(`Cancelling recovery request ${nonce}...`)
+
+    try {
+      console.log('🔐 Cancelling recovery:', { accountAddress, nonce })
+
+      // Check if account is deployed and get 2FA status
+      const isDeployed = await sdk.accountManager.isDeployed(accountAddress)
+      let ownerSignature = null
+
+      if (isDeployed) {
+        // Get 2FA status from deployed account
+        const accountInfo = await sdk.getAccountInfo(accountAddress)
+        console.log('🔐 Account 2FA status:', { twoFactorEnabled: accountInfo.twoFactorEnabled })
+
+        // Only get owner signature if 2FA is enabled
+        if (accountInfo.twoFactorEnabled) {
+          setStatus('🔐 Step 1/2: Requesting signature from your social login account...')
+
+          // We need to build the UserOperation to get the userOpHash for signing
+          const accountContract = sdk.accountManager.getAccountContract(accountAddress)
+          const data = accountContract.interface.encodeFunctionData('cancelRecovery', [nonce])
+          const accountNonce = await sdk.accountManager.getNonce(accountAddress)
+
+          // Import userOperation utilities
+          const { encodeExecute, createUserOperation, getUserOpHash } = await import('../lib/userOperation.js')
+          const callData = encodeExecute(accountAddress, 0n, data)
+
+          // Create UserOperation
+          const userOp = createUserOperation({
+            sender: accountAddress,
+            nonce: accountNonce,
+            initCode: '0x',
+            callData,
+          })
+
+          // Get UserOperation hash
+          const userOpHash = await getUserOpHash(userOp, sdk.provider, sdk.chainId)
+          console.log('🔐 UserOpHash for cancel recovery:', userOpHash)
+
+          try {
+            // Show confirmation dialog before signing with Web3Auth
+            ownerSignature = await requestSignatureWithConfirmation({
+              userOpHash,
+              targetAddress: accountAddress,
+              amount: 0n,
+              accountAddress,
+              nonce: accountNonce,
+              isDeployment: false,
+              isTwoFactorAuth: true,
+              signatureStep: '1/2',
+              operationType: 'Cancel Recovery',
+              operationDetails: `Cancel recovery request #${nonce}`,
+            })
+            console.log('✅ Owner signature obtained for 2FA')
+          } catch (err) {
+            console.error('Failed to get owner signature for 2FA:', err)
+            throw new Error('2FA is enabled but failed to get owner signature')
+          }
+        }
+      }
+
+      // Sign with passkey and execute
+      const stepLabel = ownerSignature ? 'Step 2/2' : 'Signing'
+      setStatus(`🔑 ${stepLabel}: Signing with passkey (biometric)...`)
+
+      const receipt = await sdk.cancelRecovery({
+        accountAddress,
+        requestNonce: nonce,
+        passkeyCredential: credential,
+        signWithPasskey,
+        ownerSignature,
+      })
+
+      console.log('✅ Recovery cancelled:', receipt)
+      setStatus('✅ Recovery cancelled successfully!')
+
+      // Refresh recovery info
+      await fetchRecoveryInfo()
+    } catch (err) {
+      console.error('Error cancelling recovery:', err)
+
+      // Try to extract more detailed error information
+      let errorMessage = err.message || 'Failed to cancel recovery'
+
+      // Check if there's a receipt with error details
+      if (err.data?.receipt) {
+        const receipt = err.data.receipt
+        console.log('📋 Error receipt:', receipt)
+
+        if (receipt.reason) {
+          console.log('📋 Revert reason:', receipt.reason)
+          // Try to decode the error
+          try {
+            const { ethers } = await import('ethers')
+            const errorData = receipt.reason
+
+            // Check for common errors
+            if (errorData.includes('bd07c551')) {
+              errorMessage = 'Error: OnlyEntryPoint - This function can only be called through the EntryPoint'
+            } else if (errorData.includes('8b934514')) {
+              errorMessage = 'Error: RecoveryNotFound - This recovery request does not exist'
+            } else if (errorData.includes('3c719eee')) {
+              errorMessage = 'Error: RecoveryAlreadyExecuted - This recovery has already been executed'
+            } else if (errorData.includes('9c432834')) {
+              errorMessage = 'Error: RecoveryAlreadyCancelled - This recovery has already been cancelled'
+            }
+          } catch (decodeErr) {
+            console.error('Could not decode error:', decodeErr)
+          }
+        }
+      }
+
+      setError(errorMessage)
+    } finally {
+      setLoading(false)
+    }
+  }
+
   if (!isConnected) {
     return (
       <div className="recovery-manager">
@@ -363,6 +524,12 @@ function RecoveryManager({ accountAddress, credential }) {
       <div className="recovery-section">
         <h3>Pending Recovery Requests ({pendingRecoveries.length})</h3>
 
+        {pendingRecoveries.length > 0 && credential && (
+          <div className="info-text" style={{ marginBottom: '16px', background: 'rgba(244, 67, 54, 0.1)', padding: '12px', borderRadius: '6px', border: '1px solid rgba(244, 67, 54, 0.3)' }}>
+            <strong>🔐 Security Notice:</strong> As the account owner, you can cancel any pending recovery request using your passkey signature. This protects against malicious recovery attempts.
+          </div>
+        )}
+
         {pendingRecoveries.length === 0 ? (
           <p className="info-text">No pending recovery requests</p>
         ) : (
@@ -414,6 +581,17 @@ function RecoveryManager({ accountAddress, credential }) {
                   {recovery.executeAfter > Math.floor(Date.now() / 1000) && (
                     <span className="badge badge-warning">⏳ Timelock Active</span>
                   )}
+
+                  {/* Owner can cancel any pending recovery with passkey */}
+                  {credential && (
+                    <button
+                      onClick={() => handleCancelRecovery(recovery.nonce)}
+                      disabled={loading}
+                      className="btn btn-danger"
+                    >
+                      ❌ Cancel (Owner)
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
@@ -424,6 +602,14 @@ function RecoveryManager({ accountAddress, credential }) {
       {/* Status Messages */}
       {status && <div className="status-message success">{status}</div>}
       {error && <div className="status-message error">{error}</div>}
+
+      {/* Signature Confirmation Dialog */}
+      <SignatureConfirmationDialog
+        isOpen={showSignatureDialog}
+        onConfirm={handleSignatureConfirm}
+        onCancel={handleSignatureCancel}
+        signatureData={pendingSignatureData}
+      />
     </div>
   )
 }

@@ -403,6 +403,8 @@ export class P256AccountSDK {
     const passkeySignature = {
       r: '0x' + r,
       s: '0x' + s,
+      authenticatorData: passkeySignatureRaw.authenticatorData,
+      clientDataJSON: passkeySignatureRaw.clientDataJSON,
     }
 
     // Sign UserOperation
@@ -453,7 +455,12 @@ export class P256AccountSDK {
 
     // Decode DER signature
     const { r, s } = this.derToRS(passkeySignatureRaw.signature)
-    const passkeySignature = { r: '0x' + r, s: '0x' + s }
+    const passkeySignature = {
+      r: '0x' + r,
+      s: '0x' + s,
+      authenticatorData: passkeySignatureRaw.authenticatorData,
+      clientDataJSON: passkeySignatureRaw.clientDataJSON,
+    }
 
     // Sign UserOperation
     const signedUserOp = signUserOperation(userOp, passkeySignature, ownerSignature)
@@ -503,7 +510,12 @@ export class P256AccountSDK {
 
     // Decode DER signature
     const { r, s } = this.derToRS(passkeySignatureRaw.signature)
-    const passkeySignature = { r: '0x' + r, s: '0x' + s }
+    const passkeySignature = {
+      r: '0x' + r,
+      s: '0x' + s,
+      authenticatorData: passkeySignatureRaw.authenticatorData,
+      clientDataJSON: passkeySignatureRaw.clientDataJSON,
+    }
 
     // Sign UserOperation
     const signedUserOp = signUserOperation(userOp, passkeySignature, ownerSignature)
