@@ -598,7 +598,7 @@ contract P256Account is IAccount, IERC1271, Ownable {
      * @dev Only callable via UserOperation (passkey signature) through execute()
      */
     function addGuardian(address guardian) external {
-        if (msg.sender != address(this)) revert OnlyEntryPointOrOwner();
+        if (msg.sender != address(this) && msg.sender != address(ENTRYPOINT)) revert OnlyEntryPointOrOwner();
         if (guardians[guardian]) revert GuardianAlreadyExists();
         if (guardian == address(0)) revert InvalidThreshold();
 
@@ -614,7 +614,7 @@ contract P256Account is IAccount, IERC1271, Ownable {
      * @dev Only callable via UserOperation (passkey signature) through execute()
      */
     function removeGuardian(address guardian) external {
-        if (msg.sender != address(this)) revert OnlyEntryPointOrOwner();
+        if (msg.sender != address(this) && msg.sender != address(ENTRYPOINT)) revert OnlyEntryPointOrOwner();
         if (!guardians[guardian]) revert GuardianDoesNotExist();
 
         guardians[guardian] = false;
@@ -637,7 +637,7 @@ contract P256Account is IAccount, IERC1271, Ownable {
      * @dev Only callable via UserOperation (passkey signature) through execute()
      */
     function setGuardianThreshold(uint256 threshold) external {
-        if (msg.sender != address(this)) revert OnlyEntryPointOrOwner();
+        if (msg.sender != address(this) && msg.sender != address(ENTRYPOINT)) revert OnlyEntryPointOrOwner();
         if (threshold == 0 || threshold > guardianList.length) revert InvalidThreshold();
 
         guardianThreshold = threshold;
@@ -742,7 +742,7 @@ contract P256Account is IAccount, IERC1271, Ownable {
      * @dev Only callable via UserOperation (passkey signature) through execute()
      */
     function cancelRecovery(uint256 requestNonce) external {
-        if (msg.sender != address(this)) revert OnlyEntryPointOrOwner();
+        if (msg.sender != address(this) && msg.sender != address(ENTRYPOINT)) revert OnlyEntryPointOrOwner();
 
         RecoveryRequest storage request = recoveryRequests[requestNonce];
         if (request.executeAfter == 0) revert RecoveryNotFound();

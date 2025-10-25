@@ -551,7 +551,7 @@ contract P256AccountTest is Test {
 
         // Try to add guardian from owner - should fail
         vm.prank(owner);
-        vm.expectRevert(P256Account.OnlyEntryPoint.selector);
+        vm.expectRevert(P256Account.OnlyEntryPointOrOwner.selector);
         account.addGuardian(guardian);
     }
 
