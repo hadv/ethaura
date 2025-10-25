@@ -538,9 +538,10 @@ contract P256AccountTest is Test {
         // Owner is already a guardian (count = 1)
         assertEq(account.getGuardianCount(), 1, "Should start with 1 guardian (owner)");
 
-        // Add guardian via EntryPoint
+        // Add guardian via execute() (called from EntryPoint)
+        bytes memory data = abi.encodeWithSelector(P256Account.addGuardian.selector, guardian);
         vm.prank(ENTRYPOINT_ADDR);
-        account.addGuardian(guardian);
+        account.execute(address(account), 0, data);
 
         assertTrue(account.guardians(guardian), "Guardian not added");
         assertEq(account.getGuardianCount(), 2, "Guardian count should be 2 (owner + new guardian)");
@@ -551,21 +552,23 @@ contract P256AccountTest is Test {
 
         // Try to add guardian from owner - should fail
         vm.prank(owner);
-        vm.expectRevert(P256Account.OnlyEntryPoint.selector);
+        vm.expectRevert(P256Account.OnlyEntryPointOrOwner.selector);
         account.addGuardian(guardian);
     }
 
     function test_RemoveGuardian() public {
         address guardian = makeAddr("guardian");
 
-        // Add guardian (owner is already guardian, so count will be 2)
+        // Add guardian via execute()
+        bytes memory addData = abi.encodeWithSelector(P256Account.addGuardian.selector, guardian);
         vm.prank(ENTRYPOINT_ADDR);
-        account.addGuardian(guardian);
+        account.execute(address(account), 0, addData);
         assertEq(account.getGuardianCount(), 2, "Should have 2 guardians");
 
-        // Remove guardian
+        // Remove guardian via execute()
+        bytes memory removeData = abi.encodeWithSelector(P256Account.removeGuardian.selector, guardian);
         vm.prank(ENTRYPOINT_ADDR);
-        account.removeGuardian(guardian);
+        account.execute(address(account), 0, removeData);
 
         assertFalse(account.guardians(guardian), "Guardian not removed");
         assertEq(account.getGuardianCount(), 1, "Should have 1 guardian (owner) remaining");
@@ -576,14 +579,17 @@ contract P256AccountTest is Test {
         address guardian2 = makeAddr("guardian2");
 
         // Owner is already a guardian (count = 1)
-        // Add 2 more guardians (total = 3)
+        // Add 2 more guardians (total = 3) via execute()
         vm.startPrank(ENTRYPOINT_ADDR);
-        account.addGuardian(guardian1);
-        account.addGuardian(guardian2);
+        bytes memory addData1 = abi.encodeWithSelector(P256Account.addGuardian.selector, guardian1);
+        account.execute(address(account), 0, addData1);
+        bytes memory addData2 = abi.encodeWithSelector(P256Account.addGuardian.selector, guardian2);
+        account.execute(address(account), 0, addData2);
         assertEq(account.getGuardianCount(), 3, "Should have 3 guardians");
 
-        // Set threshold to 2 (out of 3)
-        account.setGuardianThreshold(2);
+        // Set threshold to 2 (out of 3) via execute()
+        bytes memory thresholdData = abi.encodeWithSelector(P256Account.setGuardianThreshold.selector, 2);
+        account.execute(address(account), 0, thresholdData);
         vm.stopPrank();
 
         assertEq(account.guardianThreshold(), 2, "Threshold not set");
@@ -631,10 +637,12 @@ contract P256AccountTest is Test {
         bytes32 newQy = bytes32(uint256(0xBBBB));
         address newOwner = makeAddr("newOwner");
 
-        // Setup guardian
+        // Setup guardian via execute()
         vm.startPrank(ENTRYPOINT_ADDR);
-        account.addGuardian(guardian);
-        account.setGuardianThreshold(2); // Now need 2 guardians (owner + new guardian)
+        bytes memory addData = abi.encodeWithSelector(P256Account.addGuardian.selector, guardian);
+        account.execute(address(account), 0, addData);
+        bytes memory thresholdData = abi.encodeWithSelector(P256Account.setGuardianThreshold.selector, 2);
+        account.execute(address(account), 0, thresholdData);
         vm.stopPrank();
 
         // Initiate recovery
@@ -667,11 +675,14 @@ contract P256AccountTest is Test {
         bytes32 newQy = bytes32(uint256(0xBBBB));
         address newOwner = makeAddr("newOwner");
 
-        // Setup guardians
+        // Setup guardians via execute()
         vm.startPrank(ENTRYPOINT_ADDR);
-        account.addGuardian(guardian1);
-        account.addGuardian(guardian2);
-        account.setGuardianThreshold(2);
+        bytes memory addData1 = abi.encodeWithSelector(P256Account.addGuardian.selector, guardian1);
+        account.execute(address(account), 0, addData1);
+        bytes memory addData2 = abi.encodeWithSelector(P256Account.addGuardian.selector, guardian2);
+        account.execute(address(account), 0, addData2);
+        bytes memory thresholdData = abi.encodeWithSelector(P256Account.setGuardianThreshold.selector, 2);
+        account.execute(address(account), 0, thresholdData);
         vm.stopPrank();
 
         // Initiate recovery
@@ -693,10 +704,12 @@ contract P256AccountTest is Test {
         bytes32 newQy = bytes32(uint256(0xBBBB));
         address newOwner = makeAddr("newOwner");
 
-        // Setup guardian
+        // Setup guardian via execute()
         vm.startPrank(ENTRYPOINT_ADDR);
-        account.addGuardian(guardian);
-        account.setGuardianThreshold(1);
+        bytes memory addData = abi.encodeWithSelector(P256Account.addGuardian.selector, guardian);
+        account.execute(address(account), 0, addData);
+        bytes memory thresholdData = abi.encodeWithSelector(P256Account.setGuardianThreshold.selector, 1);
+        account.execute(address(account), 0, thresholdData);
         vm.stopPrank();
 
         // Initiate recovery
@@ -721,10 +734,12 @@ contract P256AccountTest is Test {
         bytes32 newQy = bytes32(uint256(0xBBBB));
         address newOwner = makeAddr("newOwner");
 
-        // Setup guardian
+        // Setup guardian via execute()
         vm.startPrank(ENTRYPOINT_ADDR);
-        account.addGuardian(guardian);
-        account.setGuardianThreshold(1);
+        bytes memory addData = abi.encodeWithSelector(P256Account.addGuardian.selector, guardian);
+        account.execute(address(account), 0, addData);
+        bytes memory thresholdData = abi.encodeWithSelector(P256Account.setGuardianThreshold.selector, 1);
+        account.execute(address(account), 0, thresholdData);
         vm.stopPrank();
 
         // Initiate recovery
@@ -742,19 +757,22 @@ contract P256AccountTest is Test {
         bytes32 newQy = bytes32(uint256(0xBBBB));
         address newOwner = makeAddr("newOwner");
 
-        // Setup guardian
+        // Setup guardian via execute()
         vm.startPrank(ENTRYPOINT_ADDR);
-        account.addGuardian(guardian);
-        account.setGuardianThreshold(1);
+        bytes memory addData = abi.encodeWithSelector(P256Account.addGuardian.selector, guardian);
+        account.execute(address(account), 0, addData);
+        bytes memory thresholdData = abi.encodeWithSelector(P256Account.setGuardianThreshold.selector, 1);
+        account.execute(address(account), 0, thresholdData);
         vm.stopPrank();
 
         // Initiate recovery
         vm.prank(guardian);
         account.initiateRecovery(newQx, newQy, newOwner);
 
-        // Cancel recovery via EntryPoint (passkey signature)
+        // Cancel recovery via execute() (called from EntryPoint with passkey signature)
+        bytes memory cancelData = abi.encodeWithSelector(P256Account.cancelRecovery.selector, 0);
         vm.prank(ENTRYPOINT_ADDR);
-        account.cancelRecovery(0);
+        account.execute(address(account), 0, cancelData);
 
         // Fast forward past timelock
         vm.warp(block.timestamp + 24 hours + 1);

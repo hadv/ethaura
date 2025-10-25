@@ -146,6 +146,17 @@
   box-shadow: 0 4px 12px rgba(76, 175, 80, 0.4);
 }
 
+.btn-danger {
+  background: #f44336;
+  color: white;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: #da190b;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(244, 67, 54, 0.4);
+}
+
 /* Badges */
 .badge {
   display: inline-block;
