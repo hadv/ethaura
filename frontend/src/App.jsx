@@ -1,13 +1,21 @@
 import { useState, useEffect } from 'react'
-import { Web3AuthProvider } from './contexts/Web3AuthContext'
-import Web3AuthLogin from './components/Web3AuthLogin'
-import PasskeyManager from './components/PasskeyManager'
-import AccountManager from './components/AccountManager'
-import GuardianManager from './components/GuardianManager'
-import RecoveryManager from './components/RecoveryManager'
-import TransactionSender from './components/TransactionSender'
+import { Web3AuthProvider, useWeb3Auth } from './contexts/Web3AuthContext'
+import LoginScreen from './components/LoginScreen'
+import HomeScreen from './screens/HomeScreen'
+import WalletDetailScreen from './screens/WalletDetailScreen'
+import WalletSettingsScreen from './screens/WalletSettingsScreen'
+import CreateWalletScreen from './screens/CreateWalletScreen'
+import NewWalletScreen from './screens/NewWalletScreen'
+import SendTransactionScreen from './screens/SendTransactionScreen'
 
-function App() {
+// Inner component that uses Web3Auth context
+function AppContent() {
+  const { isConnected, isLoading, logout } = useWeb3Auth()
+
+  // Navigation state
+  const [currentScreen, setCurrentScreen] = useState('home') // 'home', 'wallet-detail', 'wallet-settings', 'add-wallet', 'new-wallet', 'send-transaction'
+  const [selectedWallet, setSelectedWallet] = useState(null)
+
   // Helper to serialize credential (convert ArrayBuffers to base64)
   const serializeCredential = (cred) => {
     if (!cred) return null
@@ -59,10 +67,6 @@ function App() {
     return deserializeCredential(stored)
   })
 
-  const [accountAddress, setAccountAddress] = useState(() => {
-    return localStorage.getItem('ethaura_account_address') || null
-  })
-
   const [accountConfig, setAccountConfig] = useState(() => {
     const stored = localStorage.getItem('ethaura_account_config')
     return stored ? JSON.parse(stored) : null
@@ -73,116 +77,169 @@ function App() {
     if (passkeyCredential) {
       const serialized = serializeCredential(passkeyCredential)
       localStorage.setItem('ethaura_passkey_credential', JSON.stringify(serialized))
-      console.log('💾 Saved passkey credential to localStorage:', {
-        id: passkeyCredential.id,
-        hasPublicKey: !!passkeyCredential.publicKey,
-      })
+      console.log('💾 Saved passkey credential to localStorage')
     } else {
       localStorage.removeItem('ethaura_passkey_credential')
     }
   }, [passkeyCredential])
 
-  // Save account address to localStorage when it changes
-  useEffect(() => {
-    if (accountAddress) {
-      localStorage.setItem('ethaura_account_address', accountAddress)
-      console.log('💾 Saved account address to localStorage')
-    } else {
-      localStorage.removeItem('ethaura_account_address')
-    }
-  }, [accountAddress])
-
   // Save account config to localStorage when it changes
   useEffect(() => {
     if (accountConfig) {
       localStorage.setItem('ethaura_account_config', JSON.stringify(accountConfig))
-      console.log('💾 Saved account config to localStorage:', accountConfig)
+      console.log('💾 Saved account config to localStorage')
     } else {
       localStorage.removeItem('ethaura_account_config')
     }
   }, [accountConfig])
 
-  return (
-    <Web3AuthProvider>
-      <div className="container">
-        <h1>🔐 EthAura - P256 Account Abstraction</h1>
+  // Navigation handlers
+  const handleWalletClick = (wallet) => {
+    setSelectedWallet(wallet)
+    setCurrentScreen('wallet-detail')
+  }
 
-        <div className="card" style={{ backgroundColor: '#f8fafc', border: '2px solid #e2e8f0' }}>
-          <h2>About EthAura</h2>
-          <p className="text-sm">
-            EthAura is a smart contract wallet using ERC-4337 Account Abstraction with P-256/secp256r1 signatures.
-            It supports WebAuthn/Passkeys and optional Two-Factor Authentication (2FA) for enhanced security.
-          </p>
-          <div className="mt-4">
-            <h3>✨ Key Features:</h3>
-            <ul className="text-sm" style={{ marginLeft: '20px', marginTop: '8px', lineHeight: '1.8' }}>
-              <li>🔐 <strong>Social Login:</strong> Login with Google, Facebook, Twitter, or Email via Web3Auth</li>
-              <li>🎯 <strong>Flexible Security:</strong> Start simple, add 2FA when ready</li>
-              <li>🔑 <strong>Optional Passkey:</strong> Biometric authentication (Touch ID, Face ID, Windows Hello)</li>
-              <li>🔒 <strong>Optional 2FA:</strong> Require both social login AND passkey for maximum security</li>
-              <li>👥 <strong>Social Recovery:</strong> Guardian-based account recovery</li>
-              <li>⚡ <strong>Gas Efficient:</strong> Uses EIP-7951 P256VERIFY precompile on Sepolia</li>
-            </ul>
-          </div>
-          <div className="mt-4 p-3" style={{ backgroundColor: '#fff', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-            <h3 className="text-sm font-semibold mb-2">📋 Setup Flow:</h3>
-            <ol className="text-sm" style={{ marginLeft: '20px', lineHeight: '1.8' }}>
-              <li><strong>Step 1:</strong> Login with your social account (Web3Auth)</li>
-              <li><strong>Step 2:</strong> Optionally add a passkey for biometric authentication</li>
-              <li><strong>Step 3:</strong> Create your smart account (choose security level)</li>
-              <li><strong>Step 4:</strong> Fund your account and start transacting!</li>
-            </ol>
-          </div>
-        </div>
+  const handleAddWallet = () => {
+    setCurrentScreen('add-wallet')
+  }
 
-        {/* Step 1: Social Login (Primary) */}
-        <Web3AuthLogin />
+  const handleCreateWallet = () => {
+    setCurrentScreen('new-wallet')
+  }
 
-        {/* Step 2 & 3: Add Passkey (Optional) and Create Account */}
-        <PasskeyManager
-          onCredentialCreated={setPasskeyCredential}
-          credential={passkeyCredential}
-        />
+  const handleWalletCreated = (address) => {
+    // Wallet was added (imported) - just go back to home
+    // The CreateWalletScreen already added it to localStorage
+    setCurrentScreen('home')
+  }
 
-        <AccountManager
-          credential={passkeyCredential}
-          onAccountCreated={setAccountAddress}
-          accountAddress={accountAddress}
-          accountConfig={accountConfig}
-          onAccountConfigChanged={setAccountConfig}
-        />
+  const handleNewWalletCreated = (address) => {
+    // New wallet was created - add to list
+    const walletsList = JSON.parse(localStorage.getItem('ethaura_wallets_list') || '[]')
+    const newWallet = {
+      id: Date.now().toString(),
+      name: `Wallet ${walletsList.length + 1}`,
+      address: address,
+      icon: '🔐',
+      has2FA: accountConfig?.require2FA || false,
+      guardianCount: 0,
+      balance: '0'
+    }
+    walletsList.push(newWallet)
+    localStorage.setItem('ethaura_wallets_list', JSON.stringify(walletsList))
 
-        {/* Step 4: Use Your Account */}
-        {accountAddress && (
-          <>
-            <GuardianManager
-              accountAddress={accountAddress}
-              credential={passkeyCredential}
-            />
+    // Go back to home
+    setCurrentScreen('home')
+  }
 
-            <RecoveryManager
-              accountAddress={accountAddress}
-              credential={passkeyCredential}
-            />
+  const handleSettings = () => {
+    setCurrentScreen('wallet-settings')
+  }
 
-            <TransactionSender
-              accountAddress={accountAddress}
-              credential={passkeyCredential}
-              accountConfig={accountConfig}
-            />
-          </>
-        )}
+  const handleSend = () => {
+    setCurrentScreen('send-transaction')
+  }
 
-        <div className="card" style={{ backgroundColor: '#f8fafc' }}>
-          <h3>🌐 Network Information</h3>
-          <div className="text-sm">
-            <p><strong>Network:</strong> Sepolia Testnet</p>
-            <p><strong>EntryPoint v0.7:</strong> 0x0000000071727De22E5E9d8BAf0edAc6f37da032</p>
-            <p><strong>P256VERIFY Precompile:</strong> 0x0100 (EIP-7951)</p>
-            <p className="mt-2"><strong>Get Sepolia ETH:</strong> <a href="https://sepoliafaucet.com" target="_blank" rel="noopener noreferrer" style={{ color: '#4f46e5' }}>sepoliafaucet.com</a></p>
-          </div>
+  const handleBack = () => {
+    if (currentScreen === 'wallet-detail') {
+      setCurrentScreen('home')
+      setSelectedWallet(null)
+    } else if (currentScreen === 'wallet-settings' || currentScreen === 'send-transaction') {
+      setCurrentScreen('wallet-detail')
+    } else if (currentScreen === 'add-wallet' || currentScreen === 'new-wallet') {
+      setCurrentScreen('home')
+    } else {
+      setCurrentScreen('home')
+    }
+  }
+
+  const handleLogout = async () => {
+    if (confirm('Are you sure you want to logout?')) {
+      await logout()
+      setCurrentScreen('home')
+      setSelectedWallet(null)
+    }
+  }
+
+  // Show login screen if not connected
+  if (!isConnected && !isLoading) {
+    return <LoginScreen />
+  }
+
+  // Show loading state
+  if (isLoading) {
+    return (
+      <div className="container" style={{ textAlign: 'center', paddingTop: '100px' }}>
+        <div className="card">
+          <h2>Loading...</h2>
+          <p>Initializing Web3Auth...</p>
         </div>
       </div>
+    )
+  }
+
+  // Render screens based on currentScreen state
+  return (
+    <>
+      {currentScreen === 'home' && (
+        <HomeScreen
+          onWalletClick={handleWalletClick}
+          onAddWallet={handleAddWallet}
+          onCreateWallet={handleCreateWallet}
+          onLogout={handleLogout}
+        />
+      )}
+
+      {currentScreen === 'wallet-detail' && (
+        <WalletDetailScreen
+          wallet={selectedWallet}
+          onBack={handleBack}
+          onSettings={handleSettings}
+          onSend={handleSend}
+        />
+      )}
+
+      {currentScreen === 'wallet-settings' && (
+        <WalletSettingsScreen
+          wallet={selectedWallet}
+          onBack={handleBack}
+          credential={passkeyCredential}
+          onCredentialCreated={setPasskeyCredential}
+        />
+      )}
+
+      {currentScreen === 'add-wallet' && (
+        <CreateWalletScreen
+          onBack={handleBack}
+          onWalletCreated={handleWalletCreated}
+        />
+      )}
+
+      {currentScreen === 'new-wallet' && (
+        <NewWalletScreen
+          onBack={handleBack}
+          onWalletCreated={handleNewWalletCreated}
+          credential={passkeyCredential}
+        />
+      )}
+
+      {currentScreen === 'send-transaction' && (
+        <SendTransactionScreen
+          wallet={selectedWallet}
+          onBack={handleBack}
+          credential={passkeyCredential}
+          accountConfig={accountConfig}
+        />
+      )}
+    </>
+  )
+}
+
+// Main App component with Web3AuthProvider
+function App() {
+  return (
+    <Web3AuthProvider>
+      <AppContent />
     </Web3AuthProvider>
   )
 }
