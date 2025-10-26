@@ -153,6 +153,11 @@ function AppContent() {
     }
   }
 
+  const handleHome = () => {
+    setCurrentScreen('home')
+    setSelectedWallet(null)
+  }
+
   const handleLogout = async () => {
     await logout()
     setCurrentScreen('home')
@@ -192,6 +197,7 @@ function AppContent() {
         <WalletDetailScreen
           wallet={selectedWallet}
           onBack={handleBack}
+          onHome={handleHome}
           onSettings={handleSettings}
           onSend={handleSend}
         />
@@ -201,6 +207,7 @@ function AppContent() {
         <WalletSettingsScreen
           wallet={selectedWallet}
           onBack={handleBack}
+          onHome={handleHome}
           credential={passkeyCredential}
           onCredentialCreated={setPasskeyCredential}
         />
@@ -225,6 +232,7 @@ function AppContent() {
         <SendTransactionScreen
           wallet={selectedWallet}
           onBack={handleBack}
+          onHome={handleHome}
           credential={passkeyCredential}
           accountConfig={accountConfig}
         />

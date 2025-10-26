@@ -3,8 +3,9 @@ import PasskeyManager from '../components/PasskeyManager'
 import GuardianManager from '../components/GuardianManager'
 import RecoveryManager from '../components/RecoveryManager'
 import '../styles/WalletSettingsScreen.css'
+import logo from '../assets/logo.svg'
 
-function WalletSettingsScreen({ wallet, onBack, credential, onCredentialCreated }) {
+function WalletSettingsScreen({ wallet, onBack, onHome, credential, onCredentialCreated }) {
   const [activeTab, setActiveTab] = useState('2fa')
 
   if (!wallet) {
@@ -25,7 +26,7 @@ function WalletSettingsScreen({ wallet, onBack, credential, onCredentialCreated 
         <button className="back-btn" onClick={onBack}>
           <span>←</span>
         </button>
-        <h1 className="settings-title">Wallet Settings</h1>
+        <img src={logo} alt="Ethaura" className="header-logo" onClick={onHome} />
         <div style={{ width: '44px' }}></div> {/* Spacer for centering */}
       </div>
 

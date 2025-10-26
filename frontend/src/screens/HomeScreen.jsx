@@ -175,7 +175,6 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onLogout }) {
       <header className="home-header">
         <div className="brand-section">
           <img src={logo} alt="Ethaura Logo" className="brand-logo" />
-          <h1 className="brand-title">ETHAURA</h1>
         </div>
         <div className="header-right">
           {userInfo && (

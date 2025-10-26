@@ -23,18 +23,9 @@
 }
 
 .brand-logo {
-  width: 40px;
   height: 40px;
   display: block;
-}
-
-.brand-title {
-  font-size: 20px;
-  font-weight: 700;
-  color: #000;
-  margin: 0;
-  letter-spacing: 0.5px;
-  line-height: 1;
+  cursor: pointer;
 }
 
 .header-right {
