@@ -28,13 +28,12 @@ function LoginScreen() {
         </div>
 
         {/* Connect Button */}
-        <button 
+        <button
           className="connect-button"
           onClick={handleConnect}
           disabled={isLoading}
         >
-          <span className="connect-icon">📱</span>
-          {isLoading ? 'Connecting...' : 'Connect'}
+          {isLoading ? 'Connecting...' : 'Login'}
         </button>
 
         {/* Error Message */}
@@ -43,22 +42,6 @@ function LoginScreen() {
             {error}
           </div>
         )}
-
-        {/* Features */}
-        <div className="login-features">
-          <div className="feature-item">
-            <span className="feature-icon">🔐</span>
-            <span className="feature-text">Social Login</span>
-          </div>
-          <div className="feature-item">
-            <span className="feature-icon">🔑</span>
-            <span className="feature-text">Passkey Auth</span>
-          </div>
-          <div className="feature-item">
-            <span className="feature-icon">⚡</span>
-            <span className="feature-text">Gas Efficient</span>
-          </div>
-        </div>
 
         {/* Footer */}
         <div className="login-footer">

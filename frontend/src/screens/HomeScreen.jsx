@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
 import { ethers } from 'ethers'
+import { BsThreeDotsVertical, BsPlus } from 'react-icons/bs'
+import { HiArrowUp, HiArrowDown } from 'react-icons/hi'
 import '../styles/HomeScreen.css'
 import logo from '../assets/logo.svg'
 
@@ -8,6 +10,11 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onLogout }) {
   const { userInfo, address: ownerAddress } = useWeb3Auth()
   const [wallets, setWallets] = useState([])
   const [loading, setLoading] = useState(false)
+  const [showAddModal, setShowAddModal] = useState(false)
+  const [walletAddress, setWalletAddress] = useState('')
+  const [walletName, setWalletName] = useState('')
+  const [addError, setAddError] = useState('')
+  const [isAdding, setIsAdding] = useState(false)
 
   // Load wallets from localStorage
   useEffect(() => {
@@ -88,6 +95,80 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onLogout }) {
     return '+1.23'
   }
 
+  const handleAddWallet = async () => {
+    setAddError('')
+
+    // Validate wallet name
+    if (!walletName.trim()) {
+      setAddError('Please enter a wallet name')
+      return
+    }
+
+    // Validate wallet address
+    if (!walletAddress.trim()) {
+      setAddError('Please enter a wallet address')
+      return
+    }
+
+    // Check if it's a valid Ethereum address
+    if (!ethers.isAddress(walletAddress)) {
+      setAddError('Invalid Ethereum address')
+      return
+    }
+
+    setIsAdding(true)
+
+    try {
+      // Get existing wallets
+      const walletsList = JSON.parse(localStorage.getItem('ethaura_wallets_list') || '[]')
+
+      // Check if wallet already exists
+      const exists = walletsList.some(w => w.address.toLowerCase() === walletAddress.toLowerCase())
+      if (exists) {
+        setAddError('This wallet is already added')
+        setIsAdding(false)
+        return
+      }
+
+      // Fetch balance for the new wallet
+      const provider = new ethers.JsonRpcProvider(
+        import.meta.env.VITE_RPC_URL || 'https://rpc.sepolia.org'
+      )
+      const balanceWei = await provider.getBalance(walletAddress.trim())
+      const balanceEth = ethers.formatEther(balanceWei)
+      const ethPriceUSD = 2500 // Mock price
+      const balanceUSD = (parseFloat(balanceEth) * ethPriceUSD).toFixed(2)
+      const percentChange = (Math.random() * 4 - 2).toFixed(2)
+
+      // Add new wallet
+      const newWallet = {
+        id: Date.now().toString(),
+        name: walletName.trim(),
+        address: walletAddress.trim(),
+        balance: balanceEth,
+        balanceUSD,
+        percentChange,
+      }
+
+      walletsList.push(newWallet)
+      localStorage.setItem('ethaura_wallets_list', JSON.stringify(walletsList))
+
+      // Update wallets state
+      setWallets([...wallets, newWallet])
+
+      // Close modal and reset form
+      setShowAddModal(false)
+      setWalletAddress('')
+      setWalletName('')
+      setAddError('')
+    } catch (err) {
+      console.error('Error adding wallet:', err)
+      setAddError('Failed to add wallet. Please try again.')
+    } finally {
+      setIsAdding(false)
+    }
+  }
+
   return (
     <div className="home-screen">
       {/* Header */}
@@ -133,11 +214,11 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onLogout }) {
             {/* Action Buttons */}
             <div className="action-buttons">
               <button className="action-btn send-btn">
-                <span className="btn-icon">↑</span>
+                <HiArrowUp className="btn-icon" />
                 Send
               </button>
               <button className="action-btn receive-btn">
-                <span className="btn-icon">↓</span>
+                <HiArrowDown className="btn-icon" />
                 Receive
               </button>
             </div>
@@ -145,7 +226,12 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onLogout }) {
 
           {/* My Wallets Section */}
           <div className="wallets-section">
-            <h2 className="section-title">My Wallets</h2>
+            <div className="section-header">
+              <h2 className="section-title">My Wallets</h2>
+              <button className="add-wallet-btn" onClick={() => setShowAddModal(true)} title="Add Wallet">
+                <BsPlus className="add-icon" />
+              </button>
+            </div>
 
             {loading ? (
               <div className="loading-state">
@@ -169,9 +255,8 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onLogout }) {
                   <div
                     key={wallet.id}
                     className="wallet-item"
-                    onClick={() => onWalletClick(wallet)}
                   >
-                    <div className="wallet-item-left">
+                    <div className="wallet-item-left" onClick={() => onWalletClick(wallet)}>
                       <div className="wallet-avatar"></div>
                       <div className="wallet-info">
                         <div className="wallet-name">{wallet.name}</div>
@@ -179,10 +264,18 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onLogout }) {
                       </div>
                     </div>
                     <div className="wallet-item-right">
-                      <div className="wallet-balance">${formatBalance(wallet.balanceUSD)}</div>
-                      <div className={`wallet-change ${parseFloat(wallet.percentChange) >= 0 ? 'positive' : 'negative'}`}>
-                        {parseFloat(wallet.percentChange) >= 0 ? '▲' : '▼'} {Math.abs(parseFloat(wallet.percentChange)).toFixed(2)}%
+                      <div className="wallet-balance-info" onClick={() => onWalletClick(wallet)}>
+                        <div className="wallet-balance">${formatBalance(wallet.balanceUSD)}</div>
+                        <div className={`wallet-change ${parseFloat(wallet.percentChange) >= 0 ? 'positive' : 'negative'}`}>
+                          {parseFloat(wallet.percentChange) >= 0 ? '▲' : '▼'} {Math.abs(parseFloat(wallet.percentChange)).toFixed(2)}%
+                        </div>
                       </div>
+                      <button className="wallet-menu-btn" onClick={(e) => {
+                        e.stopPropagation();
+                        // TODO: Add menu functionality
+                      }}>
+                        <BsThreeDotsVertical className="menu-icon" />
+                      </button>
                     </div>
                   </div>
                 ))}
@@ -196,6 +289,76 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onLogout }) {
           {/* This can be used for charts, activity, etc. in the future */}
         </div>
       </div>
+
+      {/* Add Wallet Modal */}
+      {showAddModal && (
+        <div className="modal-overlay" onClick={() => setShowAddModal(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Add Existing Wallet</h2>
+              <button className="modal-close" onClick={() => setShowAddModal(false)}>×</button>
+            </div>
+            <div className="modal-body">
+              <p className="modal-description">
+                Add an existing smart account wallet by entering its address.
+                This allows you to track and manage multiple wallets in one place.
+              </p>
+
+              <div className="form-group">
+                <label className="form-label">Wallet Name</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="e.g., My Main Wallet"
+                  value={walletName}
+                  onChange={(e) => setWalletName(e.target.value)}
+                  maxLength={30}
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Wallet Address</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="0x..."
+                  value={walletAddress}
+                  onChange={(e) => setWalletAddress(e.target.value)}
+                />
+                <p className="form-hint">Enter the Ethereum address of your smart account</p>
+              </div>
+
+              {addError && (
+                <div className="error-message">
+                  ⚠️ {addError}
+                </div>
+              )}
+
+              <div className="modal-actions">
+                <button
+                  className="btn-secondary"
+                  onClick={() => {
+                    setShowAddModal(false)
+                    setWalletAddress('')
+                    setWalletName('')
+                    setAddError('')
+                  }}
+                  disabled={isAdding}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="btn-primary"
+                  onClick={handleAddWallet}
+                  disabled={isAdding}
+                >
+                  {isAdding ? 'Adding...' : 'Add Wallet'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
