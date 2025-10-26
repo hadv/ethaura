@@ -246,6 +246,26 @@ export class P256AccountManager {
   }
 
   /**
+   * Get public key X coordinate from account
+   * @param {string} accountAddress - Account address
+   * @returns {Promise<string>} Public key X coordinate (bytes32)
+   */
+  async getPublicKeyX(accountAddress) {
+    const account = this.getAccountContract(accountAddress)
+    return await account.qx()
+  }
+
+  /**
+   * Get public key Y coordinate from account
+   * @param {string} accountAddress - Account address
+   * @returns {Promise<string>} Public key Y coordinate (bytes32)
+   */
+  async getPublicKeyY(accountAddress) {
+    const account = this.getAccountContract(accountAddress)
+    return await account.qy()
+  }
+
+  /**
    * Get account info
    * @param {string} accountAddress - Account address
    * @param {boolean} expectedTwoFactorEnabled - Expected 2FA state for undeployed accounts (optional)
@@ -280,6 +300,9 @@ export class P256AccountManager {
           twoFactorEnabled, // Use expected value or default to false
           deposit: 0n,
           nonce: 0n,
+          qx: '0x0000000000000000000000000000000000000000000000000000000000000000',
+          qy: '0x0000000000000000000000000000000000000000000000000000000000000000',
+          hasPasskey: false, // Undeployed accounts don't have on-chain passkey yet
         }
         console.log('📋 getAccountInfo (undeployed):', accountInfo)
 
@@ -294,11 +317,17 @@ export class P256AccountManager {
 
       try {
         console.log('🔍 Fetching deployed account info...')
-        const [twoFactorEnabled, deposit, nonce] = await Promise.all([
+        const [twoFactorEnabled, deposit, nonce, qx, qy] = await Promise.all([
           this.isTwoFactorEnabled(accountAddress),
           this.getDeposit(accountAddress),
           this.getNonce(accountAddress),
+          this.getPublicKeyX(accountAddress),
+          this.getPublicKeyY(accountAddress),
         ])
+
+        // Determine if account has a passkey (qx and qy are non-zero)
+        const hasPasskey = qx !== '0x0000000000000000000000000000000000000000000000000000000000000000' &&
+                          qy !== '0x0000000000000000000000000000000000000000000000000000000000000000'
 
         const accountInfo = {
           address: accountAddress,
@@ -306,6 +335,9 @@ export class P256AccountManager {
           twoFactorEnabled,
           deposit,
           nonce,
+          qx,
+          qy,
+          hasPasskey,
         }
 
         console.log('✅ Successfully fetched deployed account info:', accountInfo)
@@ -331,6 +363,9 @@ export class P256AccountManager {
           twoFactorEnabled, // Use expected value or default to false
           deposit: 0n,
           nonce: 0n,
+          qx: '0x0000000000000000000000000000000000000000000000000000000000000000',
+          qy: '0x0000000000000000000000000000000000000000000000000000000000000000',
+          hasPasskey: false,
         }
 
         // Cache the result

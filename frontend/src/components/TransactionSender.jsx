@@ -73,44 +73,79 @@ function TransactionSender({ accountAddress, credential, accountConfig }) {
     const loadAccountInfo = async () => {
       if (accountAddress && sdk && ownerAddress) {
         try {
-          // Use the passkey that was used during account creation, not the current credential
-          // This prevents issues when user adds passkey AFTER creating owner-only account
-          let passkeyPublicKey = null
-          if (accountConfig && accountConfig.hasPasskey && credential?.publicKey) {
-            passkeyPublicKey = credential.publicKey
-          }
-
-          // Get the salt from account config (default to 0 for backwards compatibility)
-          const salt = accountConfig?.salt !== undefined ? BigInt(accountConfig.salt) : 0n
-
-          // Get the 2FA setting from account config
-          const enable2FA = accountConfig?.twoFactorEnabled || false
+          // First, check if account is deployed
+          const isDeployed = await sdk.accountManager.isDeployed(accountAddress)
 
           console.log('📋 Loading account info:', {
             accountAddress,
+            isDeployed,
             hasAccountConfig: !!accountConfig,
             accountConfigHasPasskey: accountConfig?.hasPasskey,
             accountConfigTwoFactorEnabled: accountConfig?.twoFactorEnabled,
-            accountConfigSalt: accountConfig?.salt,
             hasCredential: !!credential,
-            willUsePasskey: !!passkeyPublicKey,
-            salt: salt.toString(),
-            enable2FA,
           })
 
-          const derived = await sdk.createAccount(passkeyPublicKey, ownerAddress, salt, enable2FA)
-          if (derived.address.toLowerCase() !== accountAddress.toLowerCase()) {
-            console.warn('Provided accountAddress differs from derived address from credentials/owner', {
-              provided: accountAddress,
-              derived: derived.address,
+          if (isDeployed) {
+            // For deployed accounts, fetch actual on-chain state
+            // This is critical after recovery which may have changed the passkey to zero
+            const info = await sdk.getAccountInfo(accountAddress)
+
+            console.log('📋 Fetched deployed account info:', {
+              address: info.address,
+              deployed: info.deployed,
+              twoFactorEnabled: info.twoFactorEnabled,
+              hasPasskey: info.hasPasskey,
+              qx: info.qx,
+              qy: info.qy,
+            })
+
+            setAccountInfo({
+              ...info,
+              deployed: info.deployed,
+              isDeployed: info.deployed,
+            })
+          } else {
+            // For undeployed accounts, derive from credentials
+            // Use the passkey that was used during account creation, not the current credential
+            // This prevents issues when user adds passkey AFTER creating owner-only account
+            let passkeyPublicKey = null
+            if (accountConfig && accountConfig.hasPasskey && credential?.publicKey) {
+              passkeyPublicKey = credential.publicKey
+            }
+
+            // Get the salt from account config (default to 0 for backwards compatibility)
+            const salt = accountConfig?.salt !== undefined ? BigInt(accountConfig.salt) : 0n
+
+            // Get the 2FA setting from account config
+            const enable2FA = accountConfig?.twoFactorEnabled || false
+
+            console.log('📋 Deriving undeployed account info:', {
+              accountAddress,
+              hasAccountConfig: !!accountConfig,
+              accountConfigHasPasskey: accountConfig?.hasPasskey,
+              accountConfigTwoFactorEnabled: accountConfig?.twoFactorEnabled,
+              accountConfigSalt: accountConfig?.salt,
+              hasCredential: !!credential,
+              willUsePasskey: !!passkeyPublicKey,
               salt: salt.toString(),
+              enable2FA,
+            })
+
+            const derived = await sdk.createAccount(passkeyPublicKey, ownerAddress, salt, enable2FA)
+            if (derived.address.toLowerCase() !== accountAddress.toLowerCase()) {
+              console.warn('Provided accountAddress differs from derived address from credentials/owner', {
+                provided: accountAddress,
+                derived: derived.address,
+                salt: salt.toString(),
+              })
+            }
+            // Normalize to shape expected by this component
+            setAccountInfo({
+              ...derived,
+              deployed: derived.isDeployed,
+              hasPasskey: !!passkeyPublicKey,
             })
           }
-          // Normalize to shape expected by this component
-          setAccountInfo({
-            ...derived,
-            deployed: derived.isDeployed,
-          })
 
           // Don't load balance info here - it will be loaded when user sends transaction
           // This reduces unnecessary RPC calls
