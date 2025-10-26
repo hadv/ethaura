@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
 import { ethers } from 'ethers'
 import { BsThreeDotsVertical, BsPlus } from 'react-icons/bs'
-import { HiArrowUp, HiArrowDown } from 'react-icons/hi'
+import { HiArrowUp, HiArrowDown, HiLogout } from 'react-icons/hi'
 import '../styles/HomeScreen.css'
 import logo from '../assets/logo.svg'
 
@@ -191,6 +191,7 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onLogout }) {
             </div>
           )}
           <button className="logout-btn" onClick={onLogout}>
+            <HiLogout className="btn-icon" />
             Logout
           </button>
         </div>
