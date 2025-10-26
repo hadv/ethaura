@@ -1,0 +1,482 @@
+.wallet-detail-screen {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 20px;
+  min-height: 100vh;
+}
+
+/* Header */
+.detail-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.back-btn,
+.settings-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: none;
+  background: white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.back-btn:hover,
+.settings-btn:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+
+.detail-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: white;
+  margin: 0;
+}
+
+/* Wallet Info Card */
+.wallet-info-card {
+  background: white;
+  border-radius: 20px;
+  padding: 28px;
+  margin-bottom: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.wallet-info-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 28px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.wallet-info-icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32px;
+  flex-shrink: 0;
+}
+
+.wallet-info-details {
+  flex: 1;
+}
+
+.wallet-info-name {
+  font-size: 24px;
+  font-weight: 700;
+  color: #1a202c;
+  margin: 0 0 8px 0;
+}
+
+.wallet-info-address {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: #718096;
+  font-family: 'Courier New', monospace;
+}
+
+.copy-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 16px;
+  padding: 4px;
+  transition: all 0.2s ease;
+}
+
+.copy-btn:hover {
+  transform: scale(1.1);
+}
+
+.copy-btn.copied {
+  color: #48bb78;
+}
+
+/* Balance Section */
+.balance-section {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.balance-label {
+  font-size: 14px;
+  color: #718096;
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+
+.balance-display {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.balance-main {
+  font-size: 48px;
+  font-weight: 800;
+  color: #1a202c;
+  line-height: 1;
+}
+
+.balance-unit {
+  font-size: 24px;
+  font-weight: 600;
+  color: #718096;
+}
+
+.balance-usd {
+  font-size: 16px;
+  color: #a0aec0;
+}
+
+/* Action Buttons */
+.action-buttons-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 12px;
+}
+
+.action-btn-primary,
+.action-btn-secondary {
+  padding: 14px 20px;
+  border: none;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.action-btn-primary {
+  background: #000000;
+  color: white;
+}
+
+.action-btn-primary:hover {
+  background: #1a1a1a;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.action-btn-secondary {
+  background: #f7fafc;
+  color: #1a202c;
+  border: 2px solid #e2e8f0;
+}
+
+.action-btn-secondary:hover {
+  background: #e2e8f0;
+  transform: translateY(-2px);
+}
+
+.btn-icon {
+  font-size: 18px;
+}
+
+/* Security Card */
+.security-card {
+  background: white;
+  border-radius: 20px;
+  padding: 24px;
+  margin-bottom: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.security-warning {
+  display: flex;
+  gap: 16px;
+  padding: 20px;
+  background: #fff3cd;
+  border: 2px solid #ffc107;
+  border-radius: 12px;
+  margin-bottom: 16px;
+}
+
+.warning-icon {
+  font-size: 32px;
+  flex-shrink: 0;
+}
+
+.warning-text strong {
+  display: block;
+  font-size: 15px;
+  color: #856404;
+  margin-bottom: 6px;
+}
+
+.warning-text p {
+  font-size: 13px;
+  color: #856404;
+  margin: 0;
+  line-height: 1.5;
+}
+
+.card-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #1a202c;
+  margin: 0 0 20px 0;
+}
+
+.security-items {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.security-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  background: #f7fafc;
+  border-radius: 12px;
+}
+
+.security-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  flex-shrink: 0;
+}
+
+.security-info {
+  flex: 1;
+}
+
+.security-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1a202c;
+  margin-bottom: 4px;
+}
+
+.security-status {
+  font-size: 14px;
+  color: #718096;
+}
+
+.security-badge {
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  background: #e2e8f0;
+  color: #718096;
+}
+
+.security-badge.active {
+  background: #c6f6d5;
+  color: #22543d;
+}
+
+.security-badge.inactive {
+  background: #fed7d7;
+  color: #742a2a;
+}
+
+.manage-security-btn {
+  width: 100%;
+  padding: 14px;
+  background: #667eea;
+  color: white;
+  border: none;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.manage-security-btn:hover {
+  background: #5568d3;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+/* Transactions Card */
+.transactions-card {
+  background: white;
+  border-radius: 20px;
+  padding: 24px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.transactions-empty {
+  text-align: center;
+  padding: 40px 20px;
+  color: #a0aec0;
+}
+
+.empty-icon-small {
+  font-size: 48px;
+  margin-bottom: 12px;
+  opacity: 0.5;
+}
+
+.transactions-empty p {
+  font-size: 14px;
+  margin: 0;
+}
+
+/* Modal */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.modal-content {
+  background: white;
+  border-radius: 20px;
+  padding: 32px;
+  max-width: 500px;
+  width: 100%;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+.modal-content h2 {
+  font-size: 24px;
+  color: #1a202c;
+  margin: 0 0 12px 0;
+}
+
+.modal-description {
+  font-size: 14px;
+  color: #718096;
+  margin: 0 0 20px 0;
+}
+
+.address-display {
+  background: #f7fafc;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 20px;
+}
+
+.address-text {
+  font-family: 'Courier New', monospace;
+  font-size: 13px;
+  color: #1a202c;
+  word-break: break-all;
+  margin-bottom: 12px;
+}
+
+.copy-address-btn {
+  width: 100%;
+  padding: 10px;
+  background: #667eea;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.copy-address-btn:hover {
+  background: #5568d3;
+}
+
+.qr-code-container {
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 20px;
+  text-align: center;
+  margin-bottom: 20px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  border: 2px solid #e2e8f0;
+}
+
+.qr-code-container svg {
+  display: block;
+  border-radius: 8px;
+}
+
+.modal-close-btn {
+  width: 100%;
+  padding: 14px;
+  background: #e2e8f0;
+  color: #1a202c;
+  border: none;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.modal-close-btn:hover {
+  background: #cbd5e0;
+}
+
+/* Error State */
+.error-state {
+  text-align: center;
+  padding: 60px 20px;
+  color: #718096;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .wallet-detail-screen {
+    padding: 12px;
+  }
+
+  .action-buttons-row {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .action-btn-secondary {
+    grid-column: 1 / -1;
+  }
+
+  .balance-main {
+    font-size: 36px;
+  }
+
+  .balance-unit {
+    font-size: 18px;
+  }
+}
+

@@ -1,0 +1,193 @@
+.login-screen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  padding: 20px;
+}
+
+.login-container {
+  background: white;
+  border-radius: 24px;
+  padding: 60px 40px;
+  max-width: 480px;
+  width: 100%;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  text-align: center;
+  animation: fadeInUp 0.6s ease-out;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Brand Section */
+.login-brand {
+  margin-bottom: 48px;
+}
+
+.brand-icon {
+  font-size: 72px;
+  margin-bottom: 16px;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+}
+
+.brand-name {
+  font-size: 48px;
+  font-weight: 800;
+  color: #1a202c;
+  margin: 0 0 12px 0;
+  letter-spacing: -1px;
+}
+
+.brand-tagline {
+  font-size: 16px;
+  color: #718096;
+  margin: 0;
+  font-weight: 500;
+}
+
+/* Connect Button */
+.connect-button {
+  width: 100%;
+  padding: 18px 32px;
+  background: #000000;
+  color: white;
+  border: none;
+  border-radius: 16px;
+  font-size: 18px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 24px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+}
+
+.connect-button:hover:not(:disabled) {
+  background: #1a1a1a;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+}
+
+.connect-button:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.connect-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.connect-icon {
+  font-size: 24px;
+}
+
+/* Error Message */
+.login-error {
+  background: #fee2e2;
+  color: #991b1b;
+  padding: 12px 16px;
+  border-radius: 12px;
+  margin-bottom: 24px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+/* Features */
+.login-features {
+  display: flex;
+  justify-content: center;
+  gap: 32px;
+  margin-bottom: 40px;
+  padding-top: 24px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.feature-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.feature-icon {
+  font-size: 32px;
+  opacity: 0.9;
+}
+
+.feature-text {
+  font-size: 13px;
+  color: #718096;
+  font-weight: 600;
+}
+
+/* Footer */
+.login-footer {
+  padding-top: 24px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.login-footer p {
+  margin: 0;
+  font-size: 13px;
+  color: #a0aec0;
+  font-weight: 500;
+}
+
+/* Responsive Design */
+@media (max-width: 640px) {
+  .login-container {
+    padding: 40px 24px;
+  }
+
+  .brand-icon {
+    font-size: 56px;
+  }
+
+  .brand-name {
+    font-size: 36px;
+  }
+
+  .brand-tagline {
+    font-size: 14px;
+  }
+
+  .connect-button {
+    padding: 16px 24px;
+    font-size: 16px;
+  }
+
+  .login-features {
+    gap: 20px;
+  }
+
+  .feature-icon {
+    font-size: 28px;
+  }
+
+  .feature-text {
+    font-size: 12px;
+  }
+}
+
