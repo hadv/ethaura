@@ -134,11 +134,12 @@ function WalletDetailScreen({ wallet, onBack, onSettings, onSend }) {
             <h2 className="wallet-info-name">{wallet.name}</h2>
             <div className="wallet-info-address">
               <span>{formatAddress(wallet.address)}</span>
-              <button 
+              <button
                 className={`copy-btn ${copied ? 'copied' : ''}`}
                 onClick={copyAddress}
+                title={copied ? 'Copied!' : 'Copy address'}
               >
-                {copied ? '✓' : '📋'}
+                {copied ? '✓' : '⎘'}
               </button>
             </div>
           </div>
@@ -237,7 +238,7 @@ function WalletDetailScreen({ wallet, onBack, onSettings, onSend }) {
             <div className="address-display">
               <div className="address-text">{wallet.address}</div>
               <button className="copy-address-btn" onClick={copyAddress}>
-                {copied ? '✓ Copied' : '📋 Copy'}
+                {copied ? '✓ Copied' : '⎘ Copy'}
               </button>
             </div>
             <div className="qr-code-container">

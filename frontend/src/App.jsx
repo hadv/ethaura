@@ -154,11 +154,9 @@ function AppContent() {
   }
 
   const handleLogout = async () => {
-    if (confirm('Are you sure you want to logout?')) {
-      await logout()
-      setCurrentScreen('home')
-      setSelectedWallet(null)
-    }
+    await logout()
+    setCurrentScreen('home')
+    setSelectedWallet(null)
   }
 
   // Show login screen if not connected

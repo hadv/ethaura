@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
 import '../styles/LoginScreen.css'
+import logo from '../assets/logo.svg'
 
 function LoginScreen() {
   const { login, isLoading } = useWeb3Auth()
@@ -21,7 +22,7 @@ function LoginScreen() {
       <div className="login-container">
         {/* Logo/Brand */}
         <div className="login-brand">
-          <div className="brand-icon">🔐</div>
+          <img src={logo} alt="Ethaura Logo" className="brand-logo-large" />
           <h1 className="brand-name">ETHAURA</h1>
           <p className="brand-tagline">Your Smart Wallet with Passkey Security</p>
         </div>
