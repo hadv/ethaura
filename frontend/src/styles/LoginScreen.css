@@ -35,7 +35,6 @@
 }
 
 .brand-logo-large {
-  width: 80px;
   height: 80px;
   margin: 0 auto 20px;
   display: block;
@@ -49,14 +48,6 @@
   50% {
     transform: scale(1.05);
   }
-}
-
-.brand-name {
-  font-size: 48px;
-  font-weight: 800;
-  color: #1a202c;
-  margin: 0 0 12px 0;
-  letter-spacing: -1px;
 }
 
 .brand-tagline {

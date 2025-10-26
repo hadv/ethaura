@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import TransactionSender from '../components/TransactionSender'
 import '../styles/SendTransactionScreen.css'
+import logo from '../assets/logo.svg'
 
-function SendTransactionScreen({ wallet, onBack, credential, accountConfig }) {
+function SendTransactionScreen({ wallet, onBack, onHome, credential, accountConfig }) {
   if (!wallet) {
     return (
       <div className="send-transaction-screen">
@@ -21,7 +22,7 @@ function SendTransactionScreen({ wallet, onBack, credential, accountConfig }) {
         <button className="back-btn" onClick={onBack}>
           <span>←</span>
         </button>
-        <h1 className="send-title">Send Transaction</h1>
+        <img src={logo} alt="Ethaura" className="header-logo" onClick={onHome} />
         <div style={{ width: '44px' }}></div>
       </div>
 

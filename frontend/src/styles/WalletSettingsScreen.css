@@ -13,11 +13,14 @@
   margin-bottom: 24px;
 }
 
-.settings-title {
-  font-size: 24px;
-  font-weight: 700;
-  color: white;
-  margin: 0;
+.header-logo {
+  height: 40px;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+}
+
+.header-logo:hover {
+  opacity: 0.8;
 }
 
 /* Wallet Info */

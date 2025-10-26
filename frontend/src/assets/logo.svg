@@ -1,4 +1,10 @@
-<svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+<svg width="180" height="40" viewBox="0 0 180 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@500;600;700&amp;display=swap');
+    </style>
+  </defs>
+
   <!-- Circular background -->
   <circle cx="20" cy="20" r="20" fill="#000000"/>
 
@@ -8,5 +14,8 @@
   <!-- Inner lock detail -->
   <circle cx="20" cy="19" r="2.5" fill="#000000"/>
   <rect x="19" y="19" width="2" height="4" fill="#000000"/>
+
+  <!-- ETHAURA text with Orbitron font (Ξ for E, Λ for A) -->
+  <text x="50" y="27" font-family="'Orbitron', sans-serif" font-size="20" font-weight="600" fill="#000000" letter-spacing="1">ΞTHΛURΛ</text>
 </svg>
 

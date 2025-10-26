@@ -24,7 +24,6 @@ function LoginScreen() {
         {/* Logo/Brand */}
         <div className="login-brand">
           <img src={logo} alt="Ethaura Logo" className="brand-logo-large" />
-          <h1 className="brand-name">ETHAURA</h1>
           <p className="brand-tagline">Your Smart Wallet with Passkey Security</p>
         </div>
 

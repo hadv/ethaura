@@ -3,8 +3,9 @@ import { ethers } from 'ethers'
 import { QRCodeSVG } from 'qrcode.react'
 import { P256_ACCOUNT_ABI } from '../lib/constants'
 import '../styles/WalletDetailScreen.css'
+import logo from '../assets/logo.svg'
 
-function WalletDetailScreen({ wallet, onBack, onSettings, onSend }) {
+function WalletDetailScreen({ wallet, onBack, onHome, onSettings, onSend }) {
   const [balance, setBalance] = useState('0')
   const [loading, setLoading] = useState(false)
   const [showReceiveModal, setShowReceiveModal] = useState(false)
@@ -120,7 +121,7 @@ function WalletDetailScreen({ wallet, onBack, onSettings, onSend }) {
         <button className="back-btn" onClick={onBack}>
           <span>←</span>
         </button>
-        <h1 className="detail-title">Wallet Details</h1>
+        <img src={logo} alt="Ethaura" className="header-logo" onClick={onHome} />
         <button className="settings-btn" onClick={onSettings}>
           <span>⚙️</span>
         </button>
