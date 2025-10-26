@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
+import { HiLogin } from 'react-icons/hi'
 import '../styles/LoginScreen.css'
 import logo from '../assets/logo.svg'
 
@@ -28,13 +29,13 @@ function LoginScreen() {
         </div>
 
         {/* Connect Button */}
-        <button 
+        <button
           className="connect-button"
           onClick={handleConnect}
           disabled={isLoading}
         >
-          <span className="connect-icon">📱</span>
-          {isLoading ? 'Connecting...' : 'Connect'}
+          {!isLoading && <HiLogin className="btn-icon" />}
+          {isLoading ? 'Connecting...' : 'Login'}
         </button>
 
         {/* Error Message */}
@@ -43,22 +44,6 @@ function LoginScreen() {
             {error}
           </div>
         )}
-
-        {/* Features */}
-        <div className="login-features">
-          <div className="feature-item">
-            <span className="feature-icon">🔐</span>
-            <span className="feature-text">Social Login</span>
-          </div>
-          <div className="feature-item">
-            <span className="feature-icon">🔑</span>
-            <span className="feature-text">Passkey Auth</span>
-          </div>
-          <div className="feature-item">
-            <span className="feature-icon">⚡</span>
-            <span className="feature-text">Gas Efficient</span>
-          </div>
-        </div>
 
         {/* Footer */}
         <div className="login-footer">
