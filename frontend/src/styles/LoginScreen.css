@@ -34,9 +34,11 @@
   margin-bottom: 48px;
 }
 
-.brand-icon {
-  font-size: 72px;
-  margin-bottom: 16px;
+.brand-logo-large {
+  width: 80px;
+  height: 80px;
+  margin: 0 auto 20px;
+  display: block;
   animation: pulse 2s ease-in-out infinite;
 }
 
@@ -161,8 +163,9 @@
     padding: 40px 24px;
   }
 
-  .brand-icon {
-    font-size: 56px;
+  .brand-logo-large {
+    width: 64px;
+    height: 64px;
   }
 
   .brand-name {
