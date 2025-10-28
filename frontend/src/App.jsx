@@ -208,8 +208,6 @@ function AppContent() {
           wallet={selectedWallet}
           onBack={handleBack}
           onHome={handleHome}
-          credential={passkeyCredential}
-          onCredentialCreated={setPasskeyCredential}
         />
       )}
 

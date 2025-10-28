@@ -3,6 +3,7 @@
   margin: 0 auto;
   padding: 20px;
   min-height: 100vh;
+  background: #f5f5f5;
 }
 
 /* Header */
@@ -11,30 +12,32 @@
   justify-content: space-between;
   align-items: center;
   margin-bottom: 32px;
+  padding: 20px 0;
 }
 
 .new-title {
   font-size: 24px;
   font-weight: 700;
-  color: white;
+  color: #000;
   margin: 0;
 }
 
 /* Content */
 .new-content {
   background: white;
-  border-radius: 20px;
+  border-radius: 12px;
   padding: 28px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  border: 1px solid #e5e5e5;
 }
 
 .info-card {
   display: flex;
   gap: 16px;
   padding: 20px;
-  background: #eff6ff;
-  border: 2px solid #bfdbfe;
-  border-radius: 12px;
+  background: #dbeafe;
+  border: 1px solid #93c5fd;
+  border-radius: 8px;
   margin-bottom: 24px;
 }
 
@@ -52,7 +55,7 @@
 
 .info-text p {
   font-size: 14px;
-  color: #1e40af;
+  color: #1e3a8a;
   margin: 0;
   line-height: 1.6;
 }
