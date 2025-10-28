@@ -1,11 +1,11 @@
 import { useState } from 'react'
-import PasskeyManager from '../components/PasskeyManager'
+import PasskeySettings from '../components/PasskeySettings'
 import GuardianManager from '../components/GuardianManager'
 import RecoveryManager from '../components/RecoveryManager'
 import '../styles/WalletSettingsScreen.css'
 import logo from '../assets/logo.svg'
 
-function WalletSettingsScreen({ wallet, onBack, onHome, credential, onCredentialCreated }) {
+function WalletSettingsScreen({ wallet, onBack, onHome }) {
   const [activeTab, setActiveTab] = useState('2fa')
 
   if (!wallet) {
@@ -72,9 +72,8 @@ function WalletSettingsScreen({ wallet, onBack, onHome, credential, onCredential
               <h3>Two-Factor Authentication</h3>
               <p>Add an extra layer of security with passkey authentication</p>
             </div>
-            <PasskeyManager
-              onCredentialCreated={onCredentialCreated}
-              credential={credential}
+            <PasskeySettings
+              accountAddress={wallet.address}
             />
           </div>
         )}
@@ -87,7 +86,6 @@ function WalletSettingsScreen({ wallet, onBack, onHome, credential, onCredential
             </div>
             <GuardianManager
               accountAddress={wallet.address}
-              credential={credential}
             />
           </div>
         )}
@@ -100,7 +98,6 @@ function WalletSettingsScreen({ wallet, onBack, onHome, credential, onCredential
             </div>
             <RecoveryManager
               accountAddress={wallet.address}
-              credential={credential}
             />
           </div>
         )}

@@ -7,10 +7,11 @@
 
 .dashboard-empty {
   background: white;
-  border-radius: 16px;
+  border-radius: 12px;
   padding: 60px 40px;
   text-align: center;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  border: 1px solid #e5e5e5;
 }
 
 .dashboard-empty .empty-icon {
@@ -19,13 +20,14 @@
 }
 
 .dashboard-empty h2 {
-  color: #1a202c;
+  color: #000;
   margin-bottom: 12px;
   font-size: 24px;
+  font-weight: 700;
 }
 
 .dashboard-empty p {
-  color: #718096;
+  color: #6b7280;
   font-size: 16px;
 }
 
@@ -39,9 +41,10 @@
 /* Left Panel */
 .dashboard-left {
   background: white;
-  border-radius: 16px;
+  border-radius: 12px;
   padding: 32px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  border: 1px solid #e5e5e5;
 }
 
 .balance-section {
@@ -50,9 +53,9 @@
 
 .balance-label {
   font-size: 14px;
-  color: #718096;
+  color: #6b7280;
   margin-bottom: 12px;
-  font-weight: 500;
+  font-weight: 400;
 }
 
 .balance-amount {
@@ -65,26 +68,26 @@
 
 .balance-amount .currency {
   font-size: 32px;
-  font-weight: 700;
-  color: #1a202c;
+  font-weight: 400;
+  color: #000;
 }
 
 .balance-amount .whole {
   font-size: 48px;
-  font-weight: 700;
-  color: #1a202c;
+  font-weight: 400;
+  color: #000;
   line-height: 1;
 }
 
 .balance-amount .decimal {
   font-size: 32px;
-  font-weight: 700;
-  color: #718096;
+  font-weight: 400;
+  color: #6b7280;
 }
 
 .balance-change {
   font-size: 16px;
-  font-weight: 600;
+  font-weight: 500;
   margin-left: 12px;
   padding: 4px 8px;
   border-radius: 6px;
@@ -94,8 +97,8 @@
 }
 
 .balance-change.positive {
-  color: #22c55e;
-  background: #dcfce7;
+  color: #10b981;
+  background: #d1fae5;
 }
 
 .balance-change.negative {
@@ -110,9 +113,9 @@
 
 .action-btn {
   flex: 1;
-  padding: 14px 24px;
+  padding: 12px 24px;
   border: none;
-  border-radius: 12px;
+  border-radius: 24px;
   font-size: 16px;
   font-weight: 600;
   cursor: pointer;
@@ -129,37 +132,37 @@
 }
 
 .send-btn {
-  background: #000000;
+  background: #000;
   color: white;
 }
 
 .send-btn:hover {
-  background: #1a1a1a;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  background: #1f1f1f;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
 .receive-btn {
-  background: #000000;
+  background: #000;
   color: white;
 }
 
 .receive-btn:hover {
-  background: #1a1a1a;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  background: #1f1f1f;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
 /* Wallets Section */
 .wallets-section {
-  border-top: 1px solid #e2e8f0;
+  border-top: 1px solid #e5e5e5;
   padding-top: 24px;
 }
 
 .wallets-title {
   font-size: 18px;
   font-weight: 700;
-  color: #1a202c;
+  color: #000;
   margin-bottom: 16px;
 }
 
@@ -174,18 +177,19 @@
   align-items: center;
   justify-content: space-between;
   padding: 16px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid #e5e5e5;
   border-radius: 12px;
   transition: all 0.2s ease;
   cursor: pointer;
   position: relative;
+  background: white;
 }
 
 .wallet-item:hover {
-  border-color: #667eea;
-  background: #f7fafc;
+  border-color: #d1d5db;
+  background: #f9fafb;
   transform: translateX(4px);
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
 
 .wallet-item:active {
@@ -202,7 +206,7 @@
   width: 48px;
   height: 48px;
   border-radius: 50%;
-  background: #f7fafc;
+  background: #e5e7eb;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -218,12 +222,12 @@
 .wallet-name {
   font-size: 16px;
   font-weight: 600;
-  color: #1a202c;
+  color: #000;
 }
 
 .wallet-address {
   font-size: 13px;
-  color: #718096;
+  color: #6b7280;
   font-family: 'Courier New', monospace;
 }
 
@@ -237,7 +241,7 @@
 .wallet-amount {
   font-size: 18px;
   font-weight: 700;
-  color: #1a202c;
+  color: #000;
 }
 
 .wallet-change {
@@ -249,7 +253,7 @@
 }
 
 .wallet-change.positive {
-  color: #22c55e;
+  color: #10b981;
 }
 
 .wallet-change.negative {
@@ -258,22 +262,23 @@
 
 .wallet-arrow {
   font-size: 20px;
-  color: #cbd5e0;
+  color: #d1d5db;
   margin-left: 12px;
   transition: all 0.2s ease;
 }
 
 .wallet-item:hover .wallet-arrow {
-  color: #667eea;
+  color: #000;
   transform: translateX(4px);
 }
 
 /* Right Panel */
 .dashboard-right {
   background: white;
-  border-radius: 16px;
+  border-radius: 12px;
   padding: 32px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  border: 1px solid #e5e5e5;
   min-height: 400px;
 }
 
@@ -284,7 +289,7 @@
 .activity-title {
   font-size: 18px;
   font-weight: 700;
-  color: #1a202c;
+  color: #000;
   margin-bottom: 24px;
 }
 
@@ -294,7 +299,7 @@
   align-items: center;
   justify-content: center;
   height: 300px;
-  color: #a0aec0;
+  color: #9ca3af;
 }
 
 .activity-empty .empty-icon-small {
@@ -305,7 +310,7 @@
 
 .activity-empty p {
   font-size: 14px;
-  color: #a0aec0;
+  color: #6b7280;
 }
 
 /* Responsive Design */

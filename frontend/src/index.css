@@ -31,69 +31,75 @@ code {
   border-radius: 12px;
   padding: 24px;
   margin-bottom: 20px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  border: 1px solid #e5e5e5;
 }
 
 .button {
-  background: #667eea;
+  background: #000;
   color: white;
   border: none;
   padding: 12px 24px;
-  border-radius: 8px;
+  border-radius: 24px;
   font-size: 16px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: all 0.2s ease;
 }
 
 .button:hover {
-  background: #5568d3;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+  background: #1f1f1f;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
 .button:disabled {
-  background: #ccc;
+  background: #9ca3af;
   cursor: not-allowed;
   transform: none;
 }
 
 .button-secondary {
-  background: #48bb78;
+  background: white;
+  color: #374151;
+  border: 1px solid #e5e5e5;
 }
 
 .button-secondary:hover {
-  background: #38a169;
+  background: #f9fafb;
+  border-color: #d1d5db;
 }
 
 .button-danger {
-  background: #f56565;
+  background: #ef4444;
 }
 
 .button-danger:hover {
-  background: #e53e3e;
+  background: #dc2626;
 }
 
 .input {
   width: 100%;
-  padding: 12px;
-  border: 2px solid #e2e8f0;
+  padding: 12px 16px;
+  border: 1px solid #e5e5e5;
   border-radius: 8px;
   font-size: 14px;
   margin-bottom: 12px;
-  transition: border-color 0.3s ease;
+  transition: all 0.2s ease;
+  box-sizing: border-box;
 }
 
 .input:focus {
   outline: none;
-  border-color: #667eea;
+  border-color: #000;
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.05);
 }
 
 .label {
   display: block;
   margin-bottom: 8px;
   font-weight: 600;
-  color: #2d3748;
+  color: #374151;
 }
 
 .status {
@@ -103,40 +109,44 @@ code {
 }
 
 .status-success {
-  background: #c6f6d5;
-  color: #22543d;
+  background: #d1fae5;
+  color: #065f46;
+  border: 1px solid #a7f3d0;
 }
 
 .status-error {
-  background: #fed7d7;
-  color: #742a2a;
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
 }
 
 .status-info {
-  background: #bee3f8;
-  color: #2c5282;
+  background: #dbeafe;
+  color: #1e40af;
+  border: 1px solid #93c5fd;
 }
 
 .code-block {
-  background: #2d3748;
-  color: #e2e8f0;
+  background: #1f2937;
+  color: #f3f4f6;
   padding: 16px;
   border-radius: 8px;
   overflow-x: auto;
   font-family: 'Courier New', monospace;
   font-size: 12px;
   margin-top: 12px;
+  border: 1px solid #374151;
 }
 
 h1, h2, h3 {
-  color: #2d3748;
+  color: #000;
   margin-bottom: 16px;
+  font-weight: 700;
 }
 
 h1 {
   font-size: 32px;
   text-align: center;
-  color: white;
   margin-bottom: 32px;
 }
 
@@ -168,12 +178,12 @@ h3 {
 
 .text-sm {
   font-size: 14px;
-  color: #718096;
+  color: #6b7280;
 }
 
 .text-xs {
   font-size: 12px;
-  color: #a0aec0;
+  color: #9ca3af;
 }
 
 .mt-4 {
@@ -208,10 +218,10 @@ h3 {
 }
 
 .button-primary {
-  background: #667eea;
+  background: #000;
 }
 
 .button-primary:hover {
-  background: #5568d3;
+  background: #1f1f1f;
 }
 

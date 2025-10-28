@@ -1,57 +1,63 @@
 .recovery-manager {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: white;
   border-radius: 12px;
   padding: 24px;
   margin: 20px 0;
-  color: white;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  color: #000;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  border: 1px solid #e5e5e5;
 }
 
 .recovery-manager h2 {
   margin-top: 0;
   margin-bottom: 20px;
   font-size: 24px;
-  font-weight: 600;
+  font-weight: 700;
+  color: #000;
 }
 
 .recovery-manager h3 {
   margin-top: 20px;
   margin-bottom: 15px;
   font-size: 18px;
-  font-weight: 600;
+  font-weight: 700;
+  color: #000;
 }
 
 .recovery-manager h4 {
   margin: 0;
   font-size: 16px;
   font-weight: 600;
+  color: #000;
 }
 
 /* Guardian Status */
 .guardian-status {
-  background: rgba(255, 255, 255, 0.1);
+  background: #f9fafb;
   border-radius: 8px;
   padding: 16px;
   margin-bottom: 20px;
-  backdrop-filter: blur(10px);
+  border: 1px solid #e5e5e5;
 }
 
 .guardian-status p {
   margin: 8px 0;
   font-size: 14px;
+  color: #374151;
 }
 
 .guardian-status strong {
   font-weight: 600;
+  color: #000;
 }
 
 /* Recovery Section */
 .recovery-section {
-  background: rgba(255, 255, 255, 0.1);
+  background: #f9fafb;
   border-radius: 8px;
   padding: 20px;
   margin-bottom: 20px;
-  backdrop-filter: blur(10px);
+  border: 1px solid #e5e5e5;
 }
 
 /* Form Groups */
@@ -62,48 +68,52 @@
 .form-group label {
   display: block;
   margin-bottom: 8px;
-  font-weight: 500;
+  font-weight: 600;
   font-size: 14px;
+  color: #374151;
 }
 
 .form-group input,
 .form-group select {
   width: 100%;
-  padding: 10px 12px;
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  border-radius: 6px;
-  background: rgba(255, 255, 255, 0.1);
-  color: white;
+  padding: 12px 16px;
+  border: 1px solid #e5e5e5;
+  border-radius: 8px;
+  background: white;
+  color: #000;
   font-size: 14px;
   font-family: 'Courier New', monospace;
+  transition: all 0.2s ease;
+  box-sizing: border-box;
 }
 
 .form-group input::placeholder {
-  color: rgba(255, 255, 255, 0.5);
+  color: #9ca3af;
 }
 
 .form-group input:focus,
 .form-group select:focus {
   outline: none;
-  border-color: rgba(255, 255, 255, 0.6);
-  background: rgba(255, 255, 255, 0.15);
+  border-color: #000;
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.05);
 }
 
 .form-group input:disabled,
 .form-group select:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+  background: #f9fafb;
 }
 
 /* Buttons */
 .btn {
-  padding: 10px 16px;
+  padding: 12px 24px;
   border: none;
-  border-radius: 6px;
+  border-radius: 24px;
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: all 0.2s ease;
   margin-right: 8px;
   margin-bottom: 8px;
 }
@@ -114,72 +124,73 @@
 }
 
 .btn-primary {
-  background: #4CAF50;
+  background: #000;
   color: white;
 }
 
 .btn-primary:hover:not(:disabled) {
-  background: #45a049;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(76, 175, 80, 0.4);
+  background: #1f1f1f;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
 .btn-secondary {
-  background: #2196F3;
-  color: white;
+  background: white;
+  color: #374151;
+  border: 1px solid #e5e5e5;
 }
 
 .btn-secondary:hover:not(:disabled) {
-  background: #0b7dda;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(33, 150, 243, 0.4);
+  background: #f9fafb;
+  border-color: #d1d5db;
+  transform: translateY(-1px);
 }
 
 .btn-success {
-  background: #4CAF50;
+  background: #10b981;
   color: white;
 }
 
 .btn-success:hover:not(:disabled) {
-  background: #45a049;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(76, 175, 80, 0.4);
+  background: #059669;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
 }
 
 .btn-danger {
-  background: #f44336;
+  background: #ef4444;
   color: white;
 }
 
 .btn-danger:hover:not(:disabled) {
-  background: #da190b;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(244, 67, 54, 0.4);
+  background: #dc2626;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
 }
 
 /* Badges */
 .badge {
   display: inline-block;
   padding: 4px 12px;
-  border-radius: 20px;
+  border-radius: 12px;
   font-size: 12px;
   font-weight: 600;
   margin-right: 8px;
 }
 
 .badge-success {
-  background: rgba(76, 175, 80, 0.3);
-  color: #4CAF50;
+  background: #d1fae5;
+  color: #065f46;
 }
 
 .badge-warning {
-  background: rgba(255, 193, 7, 0.3);
-  color: #FFC107;
+  background: #fef3c7;
+  color: #92400e;
 }
 
 .badge-info {
-  background: rgba(33, 150, 243, 0.3);
-  color: #2196F3;
+  background: #dbeafe;
+  color: #1e40af;
 }
 
 /* Recovery List */
@@ -190,16 +201,17 @@
 }
 
 .recovery-card {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: white;
+  border: 1px solid #e5e5e5;
   border-radius: 8px;
   padding: 16px;
-  transition: all 0.3s ease;
+  transition: all 0.2s ease;
 }
 
 .recovery-card:hover {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: rgba(255, 255, 255, 0.4);
+  background: #f9fafb;
+  border-color: #d1d5db;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
 
 .recovery-header {
@@ -208,7 +220,7 @@
   align-items: center;
   margin-bottom: 12px;
   padding-bottom: 12px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid #e5e5e5;
 }
 
 .recovery-details {
@@ -218,15 +230,17 @@
 .recovery-details p {
   margin: 6px 0;
   font-size: 14px;
+  color: #374151;
 }
 
 .recovery-details strong {
   font-weight: 600;
+  color: #000;
 }
 
 .small-text {
   font-size: 12px;
-  opacity: 0.8;
+  color: #6b7280;
 }
 
 .recovery-actions {
@@ -239,27 +253,27 @@
 /* Status Messages */
 .status-message {
   padding: 12px 16px;
-  border-radius: 6px;
+  border-radius: 8px;
   margin-top: 16px;
   font-size: 14px;
   font-weight: 500;
 }
 
 .status-message.success {
-  background: rgba(76, 175, 80, 0.2);
-  color: #4CAF50;
-  border: 1px solid rgba(76, 175, 80, 0.4);
+  background: #d1fae5;
+  color: #065f46;
+  border: 1px solid #a7f3d0;
 }
 
 .status-message.error {
-  background: rgba(244, 67, 54, 0.2);
-  color: #f44336;
-  border: 1px solid rgba(244, 67, 54, 0.4);
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
 }
 
 /* Info Text */
 .info-text {
-  color: rgba(255, 255, 255, 0.7);
+  color: #6b7280;
   font-size: 14px;
   font-style: italic;
 }
