@@ -200,6 +200,7 @@ function AppContent() {
           onHome={handleHome}
           onSettings={handleSettings}
           onSend={handleSend}
+          onLogout={handleLogout}
         />
       )}
 

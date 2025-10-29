@@ -1,0 +1,211 @@
+/* Sub Header - Secondary navigation bar */
+.sub-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 40px;
+  background: white;
+  border-bottom: 1px solid #e5e7eb;
+  position: sticky;
+  top: 73px; /* Below main header */
+  z-index: 99;
+  gap: 16px;
+}
+
+.sub-header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+}
+
+.sub-header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* Back Button */
+.back-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  background: white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+  color: #111827;
+}
+
+.back-btn:hover {
+  background: #f3f4f6;
+  border-color: #d1d5db;
+}
+
+/* Wallet Selector */
+.wallet-selector {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 16px;
+  background: #f9fafb;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  height: 40px;
+  min-width: 280px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.wallet-selector:hover {
+  background: #f3f4f6;
+  border-color: #d1d5db;
+}
+
+.wallet-icon-small {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.wallet-info-compact {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.wallet-name-header {
+  font-size: 13px;
+  font-weight: 600;
+  color: #111827;
+  line-height: 1.2;
+}
+
+.wallet-address-header {
+  font-size: 11px;
+  color: #6b7280;
+  font-family: 'Courier New', monospace;
+  line-height: 1.2;
+}
+
+/* Network Selector */
+.network-selector {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 14px;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  height: 40px;
+  flex-shrink: 0;
+  position: relative;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.network-selector:hover {
+  background: #f9fafb;
+  border-color: #d1d5db;
+}
+
+.network-icon {
+  font-size: 16px;
+  color: #6b7280;
+  font-weight: bold;
+}
+
+.network-dropdown {
+  border: none;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 500;
+  color: #111827;
+  cursor: pointer;
+  outline: none;
+  appearance: none;
+  padding-right: 20px;
+}
+
+.dropdown-arrow {
+  position: absolute;
+  right: 12px;
+  font-size: 8px;
+  color: #6b7280;
+  pointer-events: none;
+}
+
+/* Sub Header Icon Buttons */
+.sub-header-icon-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  background: white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  color: #6b7280;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.sub-header-icon-btn:hover {
+  background: #f3f4f6;
+  color: #111827;
+  border-color: #d1d5db;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .sub-header {
+    padding: 10px 20px;
+    top: 65px; /* Adjust for smaller main header */
+  }
+
+  .wallet-selector {
+    min-width: 200px;
+    padding: 6px 12px;
+  }
+
+  .wallet-name-header {
+    font-size: 12px;
+  }
+
+  .wallet-address-header {
+    font-size: 10px;
+  }
+
+  .network-dropdown {
+    font-size: 12px;
+  }
+
+  .sub-header-icon-btn {
+    width: 36px;
+    height: 36px;
+    font-size: 16px;
+  }
+
+  .back-btn {
+    width: 36px;
+    height: 36px;
+  }
+}
+
