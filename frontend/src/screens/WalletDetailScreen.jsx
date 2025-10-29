@@ -1,15 +1,27 @@
 import { useState, useEffect } from 'react'
 import { ethers } from 'ethers'
 import { QRCodeSVG } from 'qrcode.react'
+import { HiArrowUp, HiArrowDown } from 'react-icons/hi'
+import { BiTransfer } from 'react-icons/bi'
+import { MdFlashOn } from 'react-icons/md'
 import { P256_ACCOUNT_ABI } from '../lib/constants'
+import { useWeb3Auth } from '../contexts/Web3AuthContext'
+import Header from '../components/Header'
+import SubHeader from '../components/SubHeader'
 import '../styles/WalletDetailScreen.css'
 import logo from '../assets/logo.svg'
 
-function WalletDetailScreen({ wallet, onBack, onHome, onSettings, onSend }) {
+function WalletDetailScreen({ wallet, onBack, onHome, onSettings, onSend, onLogout }) {
+  const { userInfo } = useWeb3Auth()
   const [balance, setBalance] = useState('0')
+  const [balanceUSD, setBalanceUSD] = useState('0')
+  const [balanceChange, setBalanceChange] = useState('+3.10%')
   const [loading, setLoading] = useState(false)
   const [showReceiveModal, setShowReceiveModal] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [selectedNetwork, setSelectedNetwork] = useState('Ethereum')
+  const [assets, setAssets] = useState([])
+  const [transactions, setTransactions] = useState([])
   const [securityStatus, setSecurityStatus] = useState({
     has2FA: false,
     guardianCount: 0,
@@ -33,6 +45,37 @@ function WalletDetailScreen({ wallet, onBack, onHome, onSettings, onSend }) {
       const balanceWei = await provider.getBalance(wallet.address)
       const balanceEth = ethers.formatEther(balanceWei)
       setBalance(balanceEth)
+
+      // Mock USD conversion (in production, fetch from price API)
+      const ethPriceUSD = 2500 // Mock ETH price
+      const usdValue = (parseFloat(balanceEth) * ethPriceUSD).toFixed(2)
+      setBalanceUSD(usdValue)
+
+      // Mock assets data (in production, fetch from token balance APIs)
+      setAssets([
+        {
+          id: 1,
+          name: 'Ether',
+          symbol: 'ETH',
+          icon: '⟠',
+          amount: parseFloat(balanceEth).toFixed(2),
+          amountFull: `${parseFloat(balanceEth).toFixed(2)} ETH`,
+          value: `$${(parseFloat(balanceEth) * ethPriceUSD).toFixed(2)}`
+        }
+      ])
+
+      // Mock transactions data
+      setTransactions([
+        {
+          id: 1,
+          date: 'Oct 19, 2025',
+          type: 'receive',
+          description: 'Received ETH',
+          amount: '+0.5 ETH',
+          value: '$1,250.00',
+          status: 'completed'
+        }
+      ])
 
       // Check if account is deployed
       const code = await provider.getCode(wallet.address)
@@ -93,8 +136,9 @@ function WalletDetailScreen({ wallet, onBack, onHome, onSettings, onSend }) {
 
   const formatBalance = (bal) => {
     const num = parseFloat(bal)
-    if (isNaN(num)) return '0.0000'
-    return num.toFixed(4)
+    if (isNaN(num)) return '0.00'
+    // Format with commas for thousands
+    return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
   }
 
   const copyAddress = () => {
@@ -117,114 +161,154 @@ function WalletDetailScreen({ wallet, onBack, onHome, onSettings, onSend }) {
   return (
     <div className="wallet-detail-screen">
       {/* Header */}
-      <div className="detail-header">
-        <button className="back-btn" onClick={onBack}>
-          <span>←</span>
-        </button>
-        <img src={logo} alt="Ethaura" className="header-logo" onClick={onHome} />
-        <button className="settings-btn" onClick={onSettings}>
-          <span>⚙️</span>
-        </button>
-      </div>
+      <Header
+        userInfo={userInfo}
+        onLogout={onLogout}
+      />
 
-      {/* Wallet Info Card */}
-      <div className="wallet-info-card">
-        <div className="wallet-info-header">
-          <div className="wallet-info-icon">{wallet.icon || '🔐'}</div>
-          <div className="wallet-info-details">
-            <h2 className="wallet-info-name">{wallet.name}</h2>
-            <div className="wallet-info-address">
-              <span>{formatAddress(wallet.address)}</span>
-              <button
-                className={`copy-btn ${copied ? 'copied' : ''}`}
-                onClick={copyAddress}
-                title={copied ? 'Copied!' : 'Copy address'}
-              >
-                {copied ? '✓' : '⎘'}
+      {/* Sub Header */}
+      <SubHeader
+        wallet={wallet}
+        onBack={onBack}
+        showBackButton={true}
+        onSettings={onSettings}
+      />
+
+      <div className="detail-content">
+        {/* Main Content */}
+        <div className="main-content">
+          {/* Balance and Actions Card */}
+          <div className="balance-actions-card">
+            {/* Balance Section */}
+            <div className="balance-section">
+              <div className="balance-label">Total balance</div>
+              <div className="balance-main">
+                <span className="balance-amount">${formatBalance(balanceUSD)}</span>
+                <span className={`balance-change ${balanceChange.startsWith('+') ? 'positive' : 'negative'}`}>
+                  {balanceChange.startsWith('+') ? '▲' : '▼'} {balanceChange}
+                </span>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="action-buttons-grid">
+              <button className="action-btn" onClick={() => setShowReceiveModal(true)}>
+                <div className="action-icon">
+                  <BiTransfer />
+                </div>
+                <span>Swap</span>
+              </button>
+              <button className="action-btn" onClick={onSend}>
+                <div className="action-icon">
+                  <HiArrowUp />
+                </div>
+                <span>Send</span>
+              </button>
+              <button className="action-btn" onClick={() => setShowReceiveModal(true)}>
+                <div className="action-icon">
+                  <HiArrowDown />
+                </div>
+                <span>Receive</span>
+              </button>
+              <button className="action-btn">
+                <div className="action-icon">
+                  <MdFlashOn />
+                </div>
+                <span>Transaction Builder</span>
               </button>
             </div>
           </div>
-        </div>
 
-        {/* Balance */}
-        <div className="balance-section">
-          <div className="balance-label">Balance</div>
-          <div className="balance-display">
-            <span className="balance-main">{formatBalance(balance)}</span>
-            <span className="balance-unit">ETH</span>
-          </div>
-          <div className="balance-usd">≈ $0.00 USD</div>
-        </div>
-
-        {/* Action Buttons */}
-        <div className="action-buttons-row">
-          <button className="action-btn-primary" onClick={onSend}>
-            <span className="btn-icon">↑</span>
-            Send
-          </button>
-          <button className="action-btn-primary" onClick={() => setShowReceiveModal(true)}>
-            <span className="btn-icon">↓</span>
-            Receive
-          </button>
-          <button className="action-btn-secondary" onClick={fetchWalletData}>
-            <span className="btn-icon">🔄</span>
-            Refresh
-          </button>
-        </div>
-      </div>
-
-      {/* Security Status */}
-      <div className="security-card">
-        <h3 className="card-title">Security Status</h3>
-        {!securityStatus.isDeployed ? (
-          <div className="security-warning">
-            <div className="warning-icon">⚠️</div>
-            <div className="warning-text">
-              <strong>Account Not Deployed</strong>
-              <p>This account hasn't been deployed yet. Security features will be available after the first transaction.</p>
+          {/* Top Assets */}
+          <div className="assets-section">
+            <div className="section-header">
+              <h3 className="section-title">Top assets</h3>
+              <button className="view-all-btn">
+                View all <span>→</span>
+              </button>
+            </div>
+            <div className="assets-list">
+              {assets.length > 0 ? (
+                assets.map((asset) => (
+                  <div key={asset.id} className="asset-item">
+                    <div className="asset-info">
+                      <div className="asset-icon">{asset.icon}</div>
+                      <div className="asset-details">
+                        <div className="asset-name">{asset.name}</div>
+                        <div className="asset-symbol">{asset.symbol}</div>
+                      </div>
+                    </div>
+                    <div className="asset-balance">
+                      <div className="asset-amount">{asset.amountFull}</div>
+                      <div className="asset-value">{asset.value}</div>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="empty-state">
+                  <p>No assets found</p>
+                </div>
+              )}
             </div>
           </div>
-        ) : (
-          <>
-            <div className="security-items">
-              <div className="security-item">
-                <div className="security-icon">{securityStatus.has2FA ? '🔒' : '🔓'}</div>
-                <div className="security-info">
-                  <div className="security-name">Two-Factor Auth</div>
-                  <div className="security-status">
-                    {securityStatus.has2FA ? 'Enabled' : 'Disabled'}
-                  </div>
-                </div>
-                <div className={`security-badge ${securityStatus.has2FA ? 'active' : 'inactive'}`}>
-                  {securityStatus.has2FA ? 'Active' : 'Inactive'}
-                </div>
-              </div>
-              <div className="security-item">
-                <div className="security-icon">👥</div>
-                <div className="security-info">
-                  <div className="security-name">Guardians</div>
-                  <div className="security-status">
-                    {securityStatus.guardianCount} configured
-                  </div>
-                </div>
-                <div className="security-badge">
-                  {securityStatus.guardianCount}
-                </div>
-              </div>
-            </div>
-            <button className="manage-security-btn" onClick={onSettings}>
-              Manage Security Settings
-            </button>
-          </>
-        )}
-      </div>
 
-      {/* Recent Transactions */}
-      <div className="transactions-card">
-        <h3 className="card-title">Recent Transactions</h3>
-        <div className="transactions-empty">
-          <div className="empty-icon-small">📊</div>
-          <p>No transactions yet</p>
+          {/* Latest Transactions */}
+          <div className="transactions-section">
+            <div className="section-header">
+              <h3 className="section-title">Latest transactions</h3>
+              <button className="view-all-btn">
+                View all <span>→</span>
+              </button>
+            </div>
+            {transactions.length > 0 ? (
+              <div className="transactions-list">
+                <div className="transaction-date">Oct 19, 2025</div>
+                {transactions.map((tx) => (
+                  <div key={tx.id} className="transaction-item">
+                    <div className="transaction-info">
+                      <div className="transaction-icon">
+                        {tx.type === 'receive' ? '↓' : '↑'}
+                      </div>
+                      <div className="transaction-details">
+                        <div className="transaction-description">{tx.description}</div>
+                        <div className="transaction-status">{tx.status}</div>
+                      </div>
+                    </div>
+                    <div className="transaction-amount">
+                      <div className={`transaction-value ${tx.type === 'receive' ? 'positive' : 'negative'}`}>
+                        {tx.amount}
+                      </div>
+                      <div className="transaction-usd">{tx.value}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="empty-state">
+                <div className="empty-icon">📊</div>
+                <p>No transactions yet</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Sidebar */}
+        <div className="sidebar-content">
+          {/* Pending Transactions */}
+          <div className="sidebar-card">
+            <h3 className="sidebar-title">Pending transactions</h3>
+            <div className="sidebar-empty">
+              <p>No pending transaction.</p>
+            </div>
+          </div>
+
+          {/* Queued Transactions */}
+          <div className="sidebar-card">
+            <h3 className="sidebar-title">Queued transactions</h3>
+            <div className="sidebar-empty">
+              <p>No queued transaction.</p>
+            </div>
+          </div>
         </div>
       </div>
 

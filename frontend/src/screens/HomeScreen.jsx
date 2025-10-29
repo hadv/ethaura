@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
 import { ethers } from 'ethers'
 import { BsThreeDotsVertical, BsPlus } from 'react-icons/bs'
-import { HiArrowUp, HiArrowDown, HiLogout } from 'react-icons/hi'
+import { HiArrowUp, HiArrowDown } from 'react-icons/hi'
+import Header from '../components/Header'
 import '../styles/HomeScreen.css'
 import logo from '../assets/logo.svg'
 
@@ -172,29 +173,10 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onLogout }) {
   return (
     <div className="home-screen">
       {/* Header */}
-      <header className="home-header">
-        <div className="brand-section">
-          <img src={logo} alt="Ethaura Logo" className="brand-logo" />
-        </div>
-        <div className="header-right">
-          {userInfo && (
-            <div className="user-info-compact">
-              {userInfo.profileImage ? (
-                <img src={userInfo.profileImage} alt="Profile" className="user-avatar-small" />
-              ) : (
-                <div className="user-avatar-small">
-                  {userInfo.name?.charAt(0) || userInfo.email?.charAt(0) || '?'}
-                </div>
-              )}
-              <span className="user-name-small">{userInfo.name || userInfo.email || 'User'}</span>
-            </div>
-          )}
-          <button className="logout-btn" onClick={onLogout}>
-            <HiLogout className="btn-icon" />
-            Logout
-          </button>
-        </div>
-      </header>
+      <Header
+        userInfo={userInfo}
+        onLogout={onLogout}
+      />
 
       {/* Main Content */}
       <div className="home-content">
