@@ -2,6 +2,7 @@ import { useState } from 'react'
 import PasskeySettings from '../components/PasskeySettings'
 import GuardianManager from '../components/GuardianManager'
 import RecoveryManager from '../components/RecoveryManager'
+import { Identicon } from '../utils/identicon.jsx'
 import '../styles/WalletSettingsScreen.css'
 import logo from '../assets/logo.svg'
 
@@ -32,7 +33,7 @@ function WalletSettingsScreen({ wallet, onBack, onHome }) {
 
       {/* Wallet Info */}
       <div className="settings-wallet-info">
-        <div className="wallet-icon-large">{wallet.icon || '🔐'}</div>
+        <Identicon address={wallet.address} size={80} className="wallet-icon-large" />
         <h2 className="wallet-name-large">{wallet.name}</h2>
         <p className="wallet-address-small">
           {wallet.address?.slice(0, 10)}...{wallet.address?.slice(-8)}
