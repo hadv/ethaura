@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { HiChartBar, HiBell, HiCog } from 'react-icons/hi'
+import { Identicon } from '../utils/identicon.jsx'
 import '../styles/SubHeader.css'
 
 const SubHeader = ({ 
@@ -26,7 +27,7 @@ const SubHeader = ({
         
         {wallet && (
           <div className="wallet-selector">
-            <div className="wallet-icon-small">{wallet.icon || '🔐'}</div>
+            <Identicon address={wallet.address} size={32} className="wallet-icon-small" />
             <div className="wallet-info-compact">
               <div className="wallet-name-header">{wallet.name}</div>
               <div className="wallet-address-header">{formatAddress(wallet.address)}</div>

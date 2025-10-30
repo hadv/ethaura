@@ -4,6 +4,7 @@ import { ethers } from 'ethers'
 import { BsThreeDotsVertical, BsPlus } from 'react-icons/bs'
 import { HiArrowUp, HiArrowDown } from 'react-icons/hi'
 import Header from '../components/Header'
+import { Identicon } from '../utils/identicon.jsx'
 import '../styles/HomeScreen.css'
 import logo from '../assets/logo.svg'
 
@@ -239,7 +240,7 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onLogout }) {
                     className="wallet-item"
                   >
                     <div className="wallet-item-left" onClick={() => onWalletClick(wallet)}>
-                      <div className="wallet-avatar"></div>
+                      <Identicon address={wallet.address} size={48} className="wallet-avatar" />
                       <div className="wallet-info">
                         <div className="wallet-name">{wallet.name}</div>
                         <div className="wallet-address">{formatAddress(wallet.address)}</div>

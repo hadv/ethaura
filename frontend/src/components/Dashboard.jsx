@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
 import { useP256SDK } from '../hooks/useP256SDK'
 import { ethers } from 'ethers'
+import { Identicon } from '../utils/identicon.jsx'
 import '../styles/Dashboard.css'
 
 function Dashboard({ accountAddress, accountConfig, onSendClick, onReceiveClick, onWalletClick }) {
@@ -168,9 +169,7 @@ function Dashboard({ accountAddress, accountConfig, onSendClick, onReceiveClick,
                   onClick={() => handleWalletClick(wallet)}
                 >
                   <div className="wallet-info">
-                    <div className="wallet-avatar">
-                      {wallet.icon || '🔐'}
-                    </div>
+                    <Identicon address={wallet.address} size={48} className="wallet-avatar" />
                     <div className="wallet-details">
                       <div className="wallet-name">{wallet.name}</div>
                       <div className="wallet-address">{formatAddress(wallet.address)}</div>
