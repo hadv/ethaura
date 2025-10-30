@@ -209,6 +209,7 @@ function AppContent() {
           wallet={selectedWallet}
           onBack={handleBack}
           onHome={handleHome}
+          onLogout={handleLogout}
         />
       )}
 
@@ -216,6 +217,7 @@ function AppContent() {
         <CreateWalletScreen
           onBack={handleBack}
           onWalletCreated={handleWalletCreated}
+          onLogout={handleLogout}
         />
       )}
 
@@ -224,6 +226,7 @@ function AppContent() {
           onBack={handleBack}
           onWalletCreated={handleNewWalletCreated}
           credential={passkeyCredential}
+          onLogout={handleLogout}
         />
       )}
 
@@ -234,6 +237,7 @@ function AppContent() {
           onHome={handleHome}
           credential={passkeyCredential}
           accountConfig={accountConfig}
+          onLogout={handleLogout}
         />
       )}
     </>

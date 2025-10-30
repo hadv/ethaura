@@ -1,12 +1,17 @@
 import { useState } from 'react'
 import TransactionSender from '../components/TransactionSender'
+import Header from '../components/Header'
+import SubHeader from '../components/SubHeader'
+import { useWeb3Auth } from '../contexts/Web3AuthContext'
 import '../styles/SendTransactionScreen.css'
-import logo from '../assets/logo.svg'
 
-function SendTransactionScreen({ wallet, onBack, onHome, credential, accountConfig }) {
+function SendTransactionScreen({ wallet, onBack, onHome, credential, accountConfig, onLogout }) {
+  const { userInfo } = useWeb3Auth()
+
   if (!wallet) {
     return (
       <div className="send-transaction-screen">
+        <Header userInfo={userInfo} onLogout={onLogout} />
         <div className="error-state">
           <p>Wallet not found</p>
           <button onClick={onBack}>Go Back</button>
@@ -18,32 +23,39 @@ function SendTransactionScreen({ wallet, onBack, onHome, credential, accountConf
   return (
     <div className="send-transaction-screen">
       {/* Header */}
-      <div className="send-header">
-        <button className="back-btn" onClick={onBack}>
-          <span>←</span>
-        </button>
-        <img src={logo} alt="Ethaura" className="header-logo" onClick={onHome} />
-        <div style={{ width: '44px' }}></div>
-      </div>
+      <Header userInfo={userInfo} onLogout={onLogout} />
 
-      {/* Wallet Info */}
-      <div className="send-wallet-info">
-        <div className="wallet-icon-small">{wallet.icon || '🔐'}</div>
-        <div className="wallet-details-small">
-          <div className="wallet-name-small">{wallet.name}</div>
-          <div className="wallet-address-tiny">
-            {wallet.address?.slice(0, 10)}...{wallet.address?.slice(-8)}
+      {/* SubHeader with back button */}
+      <SubHeader
+        wallet={wallet}
+        onBack={onBack}
+        showBackButton={true}
+        onSettings={() => {}}
+      />
+
+      {/* Main Content */}
+      <div className="send-content-wrapper">
+        <div className="send-main">
+          {/* Page Title */}
+          <div className="page-header">
+            <h1 className="page-title">Send Transaction</h1>
+            <p className="page-description">Send ETH or tokens from your smart account</p>
+          </div>
+
+          {/* Transaction Form */}
+          <div className="send-content">
+            <TransactionSender
+              accountAddress={wallet.address}
+              credential={credential}
+              accountConfig={accountConfig}
+            />
           </div>
         </div>
-      </div>
 
-      {/* Transaction Form */}
-      <div className="send-content">
-        <TransactionSender
-          accountAddress={wallet.address}
-          credential={credential}
-          accountConfig={accountConfig}
-        />
+        {/* Right Panel - Placeholder */}
+        <div className="send-sidebar">
+          {/* This can be used for transaction history or tips in the future */}
+        </div>
       </div>
     </div>
   )
