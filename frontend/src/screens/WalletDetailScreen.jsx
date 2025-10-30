@@ -141,6 +141,14 @@ function WalletDetailScreen({ wallet, onBack, onHome, onSettings, onSend, onLogo
     return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
   }
 
+  const formatBalanceParts = (bal) => {
+    const num = parseFloat(bal)
+    if (isNaN(num)) return { whole: '0', decimal: '00' }
+    // Format with commas and 2 decimal places
+    const [whole, decimal] = num.toFixed(2).split('.')
+    return { whole: whole.replace(/\B(?=(\d{3})+(?!\d))/g, ','), decimal }
+  }
+
   const copyAddress = () => {
     navigator.clipboard.writeText(wallet.address)
     setCopied(true)
@@ -183,7 +191,9 @@ function WalletDetailScreen({ wallet, onBack, onHome, onSettings, onSend, onLogo
             <div className="balance-section">
               <div className="balance-label">Total balance</div>
               <div className="balance-main">
-                <span className="balance-amount">${formatBalance(balanceUSD)}</span>
+                <span className="balance-currency">$</span>
+                <span className="balance-amount">{formatBalanceParts(balanceUSD).whole}</span>
+                <span className="balance-decimals">.{formatBalanceParts(balanceUSD).decimal}</span>
                 <span className={`balance-change ${balanceChange.startsWith('+') ? 'positive' : 'negative'}`}>
                   {balanceChange.startsWith('+') ? '▲' : '▼'} {balanceChange}
                 </span>

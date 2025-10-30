@@ -3,13 +3,14 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px 40px;
+  padding: 16px 40px;
   background: white;
   border-bottom: 1px solid #e5e7eb;
   position: sticky;
   top: 73px; /* Below main header */
   z-index: 99;
   gap: 16px;
+  min-height: 80px;
 }
 
 .sub-header-left {
@@ -29,8 +30,8 @@
 
 /* Back Button */
 .back-btn {
-  width: 40px;
-  height: 40px;
+  width: 52px;
+  height: 52px;
   border-radius: 8px;
   border: 1px solid #e5e7eb;
   background: white;
@@ -38,7 +39,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 18px;
+  font-size: 20px;
   transition: all 0.2s ease;
   flex-shrink: 0;
   color: #111827;
@@ -54,11 +55,11 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 6px 16px;
+  padding: 8px 16px;
   background: #f9fafb;
   border-radius: 8px;
   border: 1px solid #e5e7eb;
-  height: 40px;
+  height: 52px;
   min-width: 280px;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -70,14 +71,14 @@
 }
 
 .wallet-icon-small {
-  width: 28px;
-  height: 28px;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 14px;
+  font-size: 18px;
   flex-shrink: 0;
 }
 
@@ -108,11 +109,11 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 0 14px;
+  padding: 0 16px;
   background: white;
   border: 1px solid #e5e7eb;
   border-radius: 8px;
-  height: 40px;
+  height: 52px;
   flex-shrink: 0;
   position: relative;
   cursor: pointer;
@@ -152,8 +153,8 @@
 
 /* Sub Header Icon Buttons */
 .sub-header-icon-btn {
-  width: 40px;
-  height: 40px;
+  width: 52px;
+  height: 52px;
   border-radius: 8px;
   border: 1px solid #e5e7eb;
   background: white;
@@ -161,7 +162,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 18px;
+  font-size: 20px;
   color: #6b7280;
   transition: all 0.2s ease;
   flex-shrink: 0;
