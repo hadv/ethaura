@@ -52,10 +52,24 @@
   gap: 4px;
 }
 
+.balance-currency {
+  font-size: 40px;
+  font-weight: 400;
+  color: #111827;
+  line-height: 1;
+}
+
 .balance-amount {
   font-size: 40px;
   font-weight: 400;
   color: #111827;
+  line-height: 1;
+}
+
+.balance-decimals {
+  font-size: 28px;
+  font-weight: 400;
+  color: #9ca3af;
   line-height: 1;
 }
 
@@ -525,8 +539,16 @@
     padding: 16px 12px;
   }
 
+  .balance-currency {
+    font-size: 32px;
+  }
+
   .balance-amount {
     font-size: 32px;
+  }
+
+  .balance-decimals {
+    font-size: 22px;
   }
 
   .sidebar-content {
