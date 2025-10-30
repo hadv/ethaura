@@ -1,65 +1,28 @@
 .wallet-settings-screen {
-  max-width: 900px;
+  max-width: 1400px;
   margin: 0 auto;
-  padding: 20px;
+  padding: 0;
   min-height: 100vh;
   background: #f5f5f5;
 }
 
-/* Header */
-.settings-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 24px;
-  padding: 20px 0;
+/* Content Wrapper */
+.settings-content-wrapper {
+  display: grid;
+  grid-template-columns: 70% 1fr;
+  gap: 0;
+  min-height: calc(100vh - 153px);
 }
 
-.header-logo {
-  height: 40px;
-  cursor: pointer;
-  transition: opacity 0.2s ease;
-}
-
-.header-logo:hover {
-  opacity: 0.8;
-}
-
-/* Wallet Info */
-.settings-wallet-info {
+.settings-main {
   background: white;
-  border-radius: 12px;
   padding: 32px;
-  text-align: center;
-  margin-bottom: 24px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-  border: 1px solid #e5e5e5;
+  border-right: 1px solid #e5e5e5;
 }
 
-.wallet-icon-large {
-  width: 80px;
-  height: 80px;
-  border-radius: 50%;
-  background: #e5e7eb;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 40px;
-  margin: 0 auto 16px;
-}
-
-.wallet-name-large {
-  font-size: 28px;
-  font-weight: 700;
-  color: #000;
-  margin: 0 0 8px 0;
-}
-
-.wallet-address-small {
-  font-size: 14px;
-  color: #6b7280;
-  font-family: 'Courier New', monospace;
-  margin: 0;
+.settings-sidebar {
+  background: white;
+  padding: 32px;
 }
 
 /* Tabs */
@@ -100,7 +63,9 @@
 }
 
 .tab-icon {
-  font-size: 24px;
+  font-size: 28px;
+  width: 28px;
+  height: 28px;
 }
 
 .tab-label {
@@ -177,9 +142,24 @@
 }
 
 /* Responsive */
+@media (max-width: 1024px) {
+  .settings-content-wrapper {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-main {
+    border-right: none;
+    border-bottom: 1px solid #e5e5e5;
+  }
+
+  .settings-sidebar {
+    display: none;
+  }
+}
+
 @media (max-width: 768px) {
-  .wallet-settings-screen {
-    padding: 12px;
+  .settings-main {
+    padding: 20px;
   }
 
   .settings-tabs {

@@ -430,35 +430,81 @@
 .address-display {
   background: #f9fafb;
   border-radius: 8px;
-  padding: 16px;
+  padding: 8px 12px;
   margin-bottom: 20px;
   border: 1px solid #e5e5e5;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.address-identicon {
+  flex-shrink: 0;
 }
 
 .address-text {
   font-family: 'Courier New', monospace;
   font-size: 13px;
   color: #000;
-  word-break: break-all;
-  margin-bottom: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 0 1 auto;
+  min-width: 0;
+  cursor: pointer;
+  transition: color 0.2s ease;
 }
 
-.copy-address-btn {
-  width: 100%;
-  padding: 12px 24px;
-  background: #000;
-  color: white;
+.address-text:hover {
+  color: #4b5563;
+}
+
+.copy-icon-inline {
+  padding: 0;
+  background: transparent;
+  color: #6b7280;
   border: none;
-  border-radius: 24px;
   font-size: 14px;
-  font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  line-height: 1;
 }
 
-.copy-address-btn:hover {
-  background: #1f1f1f;
-  transform: translateY(-1px);
+.copy-icon-inline:hover {
+  color: #000;
+}
+
+.copy-icon-inline:active {
+  transform: scale(0.9);
+}
+
+.explorer-icon-inline {
+  padding: 0;
+  background: transparent;
+  color: #6b7280;
+  border: none;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  line-height: 1;
+  text-decoration: none;
+}
+
+.explorer-icon-inline:hover {
+  color: #000;
+}
+
+.explorer-icon-inline:active {
+  transform: scale(0.9);
 }
 
 .qr-code-container {

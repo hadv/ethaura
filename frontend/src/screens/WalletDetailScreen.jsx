@@ -4,8 +4,10 @@ import { QRCodeSVG } from 'qrcode.react'
 import { HiArrowUp, HiArrowDown } from 'react-icons/hi'
 import { BiTransfer } from 'react-icons/bi'
 import { MdFlashOn } from 'react-icons/md'
+import { IoCopyOutline, IoCheckmark, IoOpenOutline } from 'react-icons/io5'
 import { P256_ACCOUNT_ABI } from '../lib/constants'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
+import { Identicon } from '../utils/identicon.jsx'
 import Header from '../components/Header'
 import SubHeader from '../components/SubHeader'
 import '../styles/WalletDetailScreen.css'
@@ -331,10 +333,22 @@ function WalletDetailScreen({ wallet, onBack, onHome, onSettings, onSend, onLogo
               Send funds to this address on Sepolia testnet:
             </p>
             <div className="address-display">
-              <div className="address-text">{wallet.address}</div>
-              <button className="copy-address-btn" onClick={copyAddress}>
-                {copied ? '✓ Copied' : '⎘ Copy'}
+              <Identicon address={wallet.address} size={20} className="address-identicon" />
+              <span className="address-text" onClick={copyAddress} title={copied ? 'Copied!' : 'Click to copy address'}>
+                {wallet.address}
+              </span>
+              <button className="copy-icon-inline" onClick={copyAddress} title={copied ? 'Copied!' : 'Copy address'}>
+                {copied ? <IoCheckmark /> : <IoCopyOutline />}
               </button>
+              <a
+                href={`https://sepolia.etherscan.io/address/${wallet.address}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="explorer-icon-inline"
+                title="View on Etherscan"
+              >
+                <IoOpenOutline />
+              </a>
             </div>
             <div className="qr-code-container">
               <QRCodeSVG
