@@ -250,18 +250,108 @@ function TransactionSender({ accountAddress, credential, accountConfig }) {
     setCombinedSignature(null)
 
     try {
-      // Determine if this is an owner-only account (no passkey)
-      // Check accountInfo.hasPasskey which comes from the account config or on-chain state
-      const isOwnerOnly = !accountInfo.hasPasskey || accountInfo.qx === '0x0000000000000000000000000000000000000000000000000000000000000000'
+      // CRITICAL: Read on-chain state DIRECTLY from contract before signing
+      // This ensures we have the latest twoFactorEnabled and passkey settings
+      console.log('🚀 STARTING TRANSACTION - Reading on-chain state directly...')
+      setStatus('Reading on-chain account state...')
+
+      // Check if account is deployed by reading code directly
+      const accountCode = await sdk.provider.getCode(accountAddress)
+      const isActuallyDeployed = accountCode !== '0x'
+
+      console.log('📝 Deployment check:', {
+        accountAddress,
+        accountCode: accountCode.substring(0, 20) + '...',
+        codeLength: accountCode.length,
+        isActuallyDeployed,
+      })
+
+      let currentAccountInfo = accountInfo
+      let onChainQx = '0x0000000000000000000000000000000000000000000000000000000000000000'
+      let onChainQy = '0x0000000000000000000000000000000000000000000000000000000000000000'
+      let onChainTwoFactorEnabled = false
+
+      if (isActuallyDeployed) {
+        console.log('🔄 Reading on-chain state DIRECTLY from contract...')
+
+        // Read directly from contract - bypass all caching
+        const accountContract = new ethers.Contract(
+          accountAddress,
+          [
+            'function qx() view returns (bytes32)',
+            'function qy() view returns (bytes32)',
+            'function twoFactorEnabled() view returns (bool)',
+          ],
+          sdk.provider
+        )
+
+        const [qx, qy, twoFactorEnabled] = await Promise.all([
+          accountContract.qx(),
+          accountContract.qy(),
+          accountContract.twoFactorEnabled(),
+        ])
+
+        onChainQx = qx
+        onChainQy = qy
+        onChainTwoFactorEnabled = twoFactorEnabled
+
+        console.log('✅ On-chain state (direct from contract):', {
+          accountAddress,
+          qx: onChainQx,
+          qy: onChainQy,
+          twoFactorEnabled: onChainTwoFactorEnabled,
+        })
+
+        // Update currentAccountInfo with on-chain values
+        currentAccountInfo = {
+          ...accountInfo,
+          qx: onChainQx,
+          qy: onChainQy,
+          twoFactorEnabled: onChainTwoFactorEnabled,
+          hasPasskey: onChainQx !== '0x0000000000000000000000000000000000000000000000000000000000000000',
+          isDeployed: true,
+          deployed: true,
+        }
+      } else {
+        console.log('⚠️ Account NOT deployed yet - using accountInfo from creation config')
+        // For undeployed accounts, use the accountInfo from creation
+        // This should have the passkey and 2FA settings from when the account was created
+        onChainQx = accountInfo.qx || '0x0000000000000000000000000000000000000000000000000000000000000000'
+        onChainQy = accountInfo.qy || '0x0000000000000000000000000000000000000000000000000000000000000000'
+        onChainTwoFactorEnabled = accountInfo.twoFactorEnabled || false
+
+        console.log('📋 Using accountInfo for undeployed account:', {
+          qx: onChainQx,
+          qy: onChainQy,
+          twoFactorEnabled: onChainTwoFactorEnabled,
+        })
+      }
+
+      // Determine if this is an owner-only account (no passkey OR passkey configured but 2FA disabled)
+      // This MUST match the contract logic in P256Account.sol line 264:
+      // if (_qx == bytes32(0) || !_twoFactorEnabled) { /* owner-only mode */ }
+      const hasPasskey = onChainQx !== '0x0000000000000000000000000000000000000000000000000000000000000000'
+      const isOwnerOnly = !hasPasskey || !onChainTwoFactorEnabled
 
       // Log account and credential info for debugging
-      console.log('📋 Account Info:', {
+      console.log('🔍 SIGNATURE MODE DETERMINATION (FROM ON-CHAIN DATA):', {
+        'onChainQx': onChainQx,
+        'onChainQy': onChainQy,
+        'onChainTwoFactorEnabled': onChainTwoFactorEnabled,
+        'computed hasPasskey': hasPasskey,
+        'computed isOwnerOnly': isOwnerOnly,
+        'FINAL MODE': isOwnerOnly ? '👤 OWNER-ONLY (65 bytes)' : (onChainTwoFactorEnabled ? '🔐 PASSKEY + OWNER (WebAuthn + 65 bytes)' : '🔑 PASSKEY-ONLY (WebAuthn)'),
+      })
+
+      console.log('📋 Account Info (using on-chain data):', {
         address: accountAddress,
-        isDeployed: accountInfo.isDeployed,
-        twoFactorEnabled: accountInfo.twoFactorEnabled,
-        hasPasskey: accountInfo.hasPasskey,
+        isDeployed: isActuallyDeployed,
+        twoFactorEnabled: onChainTwoFactorEnabled,
+        hasPasskey: hasPasskey,
         isOwnerOnly,
-        qx: accountInfo.qx,
+        signatureMode: isOwnerOnly ? '👤 OWNER-ONLY (65 bytes)' : (onChainTwoFactorEnabled ? '🔐 PASSKEY + OWNER (WebAuthn + 65 bytes)' : '🔑 PASSKEY-ONLY (WebAuthn)'),
+        qx: onChainQx,
+        qy: onChainQy,
       })
 
       console.log('🔐 Credential Info:', {
@@ -270,13 +360,32 @@ function TransactionSender({ accountAddress, credential, accountConfig }) {
       })
 
       if (!isOwnerOnly) {
+        // Check if we have the passkey credential
+        if (!credential) {
+          setError(
+            `❌ PASSKEY REQUIRED BUT NOT FOUND!\n\n` +
+            `This account requires a passkey to sign transactions, but you don't have the passkey on this device/browser.\n\n` +
+            `📱 Passkeys are device-specific and stored in your device's secure enclave (Touch ID/Face ID).\n\n` +
+            `💡 Solutions:\n` +
+            `1. Switch to the device/browser where you created this wallet's passkey\n` +
+            `2. Go to Settings → Security → Initiate account recovery to set a new passkey\n` +
+            `3. Go to Settings → Security → Disable 2FA (requires 48-hour timelock)\n\n` +
+            `🔍 On-chain state:\n` +
+            `  Account: ${accountAddress}\n` +
+            `  Has passkey: Yes (qx: ${onChainQx.slice(0, 20)}...)\n` +
+            `  2FA enabled: ${onChainTwoFactorEnabled}`
+          )
+          setLoading(false)
+          return
+        }
+
         console.log('🔐 Passkey Credential:', {
           id: credential?.id,
           publicKey: credential?.publicKey,
         })
 
         // Verify public key matches what's in the contract
-        if (accountInfo.isDeployed && credential?.publicKey) {
+        if (currentAccountInfo.isDeployed && credential?.publicKey) {
           try {
             const accountContract = new ethers.Contract(
               accountAddress,
@@ -335,39 +444,21 @@ function TransactionSender({ accountAddress, credential, accountConfig }) {
       setStatus('Building UserOperation...')
 
       // Batch RPC calls to reduce rate limiting
-      // Get account code, balance, and factory code in parallel
-      const [accountCode, accountBalance, factoryCode] = await Promise.all([
-        sdk.provider.getCode(accountAddress),
+      // Get balance and factory code in parallel (we already have accountCode from earlier)
+      const [accountBalance, factoryCode] = await Promise.all([
         sdk.provider.getBalance(accountAddress),
-        !accountInfo.isDeployed ? sdk.provider.getCode(sdk.accountManager.factoryAddress) : Promise.resolve('0x'),
+        !isActuallyDeployed ? sdk.provider.getCode(sdk.accountManager.factoryAddress) : Promise.resolve('0x'),
       ])
-
-      const isActuallyDeployed = accountCode !== '0x'
-
-      console.log('📝 Account code check:', {
-        accountAddress,
-        codeLength: accountCode.length,
-        hasCode: isActuallyDeployed,
-        isDeployedFlag: accountInfo.isDeployed,
-      })
-
-      // If account is actually deployed but accountInfo says it's not, update it
-      if (isActuallyDeployed && !accountInfo.isDeployed) {
-        console.log('🔄 Account is deployed on-chain but accountInfo says it\'s not. Updating...')
-        const passkeyPublicKey = credential?.publicKey || null
-        const updatedInfo = await sdk.createAccount(passkeyPublicKey, ownerAddress, 0n)
-        setAccountInfo({ ...updatedInfo, deployed: updatedInfo.isDeployed })
-      }
 
       console.log('🏗️ Building UserOperation:', {
         accountAddress,
         isDeployed: isActuallyDeployed,
         needsDeployment: !isActuallyDeployed,
-        initCodeLength: isActuallyDeployed ? 0 : accountInfo.initCode.length,
+        initCodeLength: isActuallyDeployed ? 0 : currentAccountInfo.initCode.length,
         isOwnerOnly,
         credentialPublicKey: credential?.publicKey,
-        accountInfoQx: accountInfo.qx,
-        accountInfoQy: accountInfo.qy,
+        accountInfoQx: currentAccountInfo.qx,
+        accountInfoQy: currentAccountInfo.qy,
       })
 
       console.log('💰 Account balance:', ethers.formatEther(accountBalance), 'ETH')
@@ -389,14 +480,14 @@ function TransactionSender({ accountAddress, credential, accountConfig }) {
       // Verify public key matches (only for passkey accounts)
       if (!isOwnerOnly && credential?.publicKey) {
         const { qx: credQx, qy: credQy } = formatPublicKeyForContract(credential.publicKey)
-        const qxMatches = credQx === accountInfo.qx
-        const qyMatches = credQy === accountInfo.qy
+        const qxMatches = credQx === currentAccountInfo.qx
+        const qyMatches = credQy === currentAccountInfo.qy
 
         console.log('🔍 Public key verification:', {
           credentialQx: credQx,
           credentialQy: credQy,
-          accountQx: accountInfo.qx,
-          accountQy: accountInfo.qy,
+          accountQx: currentAccountInfo.qx,
+          accountQy: currentAccountInfo.qy,
           qxMatches,
           qyMatches,
         })
@@ -413,8 +504,8 @@ function TransactionSender({ accountAddress, credential, accountConfig }) {
             `  qx: ${credQx}\n` +
             `  qy: ${credQy}\n\n` +
             `Account Public Key (on-chain):\n` +
-            `  qx: ${accountInfo.qx}\n` +
-            `  qy: ${accountInfo.qy}`
+            `  qx: ${currentAccountInfo.qx}\n` +
+            `  qy: ${currentAccountInfo.qy}`
           )
         }
 
@@ -427,7 +518,7 @@ function TransactionSender({ accountAddress, credential, accountConfig }) {
         amount: amountWei,
         provider: sdk.provider,
         needsDeployment: !isActuallyDeployed,
-        initCode: isActuallyDeployed ? '0x' : accountInfo.initCode,
+        initCode: isActuallyDeployed ? '0x' : currentAccountInfo.initCode,
       })
 
       console.log('📋 UserOp initCode details:', {
@@ -505,7 +596,7 @@ function TransactionSender({ accountAddress, credential, accountConfig }) {
             targetAddress,
             amount: ethers.parseEther(amount),
             accountAddress,
-            nonce: accountInfo.nonce,
+            nonce: currentAccountInfo.nonce,
             isDeployment: !isActuallyDeployed,
             isTwoFactorAuth: false,
             signatureStep: 'only',
@@ -539,11 +630,11 @@ function TransactionSender({ accountAddress, credential, accountConfig }) {
         // Step 4: Check if 2FA is enabled - if so, get Web3Auth signature FIRST
         let ownerSig = null
         console.log('🔐 2FA Check:', {
-          twoFactorEnabled: accountInfo.twoFactorEnabled,
-          accountInfo: accountInfo,
+          twoFactorEnabled: currentAccountInfo.twoFactorEnabled,
+          currentAccountInfo: currentAccountInfo,
         })
 
-        if (accountInfo.twoFactorEnabled) {
+        if (currentAccountInfo.twoFactorEnabled) {
           // 2FA ENABLED: Show Web3Auth confirmation dialog FIRST
           setStatus('🔐 Step 1/2: Requesting signature from your social login account...')
           console.log('🔐 2FA ENABLED: Requesting owner signature FIRST (Step 1/2)...')
@@ -556,7 +647,7 @@ function TransactionSender({ accountAddress, credential, accountConfig }) {
               targetAddress,
               amount: ethers.parseEther(amount),
               accountAddress,
-              nonce: accountInfo.nonce,
+              nonce: currentAccountInfo.nonce,
               isDeployment: !isActuallyDeployed,
               isTwoFactorAuth: true,
               signatureStep: '1/2',
@@ -596,7 +687,7 @@ function TransactionSender({ accountAddress, credential, accountConfig }) {
         // Step 5: Sign with Passkey (P-256)
         // If 2FA enabled: This is Step 2/2 (passkey as 2FA confirmation)
         // If 2FA disabled: This is the only signature needed
-        const stepLabel = accountInfo.twoFactorEnabled ? 'Step 2/2' : 'Only step'
+        const stepLabel = currentAccountInfo.twoFactorEnabled ? 'Step 2/2' : 'Only step'
         setStatus(`🔑 ${stepLabel}: Signing with your passkey (biometric)...`)
         console.log(`🔑 Signing with passkey (${stepLabel})...`)
 

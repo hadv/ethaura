@@ -275,55 +275,7 @@ export const Web3AuthProvider = ({ children }) => {
     getPrivateKey,
   };
 
-  // Show error state if initialization failed
-  if (initError) {
-    return (
-      <Web3AuthContext.Provider value={value}>
-        <div style={{
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          minHeight: '100vh',
-          color: 'white',
-          fontSize: '18px',
-          flexDirection: 'column',
-          gap: '20px',
-          padding: '20px',
-          textAlign: 'center'
-        }}>
-          <div>❌ Web3Auth Initialization Error</div>
-          <div style={{ fontSize: '14px', opacity: 0.8, maxWidth: '600px' }}>
-            {initError}
-          </div>
-          <div style={{ fontSize: '12px', opacity: 0.6 }}>
-            Check the console for more details
-          </div>
-        </div>
-      </Web3AuthContext.Provider>
-    );
-  }
-
-  // Show loading state while initializing
-  if (isLoading) {
-    return (
-      <Web3AuthContext.Provider value={value}>
-        <div style={{
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          minHeight: '100vh',
-          color: 'white',
-          fontSize: '18px',
-          flexDirection: 'column',
-          gap: '20px'
-        }}>
-          <div>🔄 Initializing Web3Auth...</div>
-          <div style={{ fontSize: '14px', opacity: 0.8 }}>This may take a few seconds</div>
-        </div>
-      </Web3AuthContext.Provider>
-    );
-  }
-
+  // Don't block rendering - let the app handle loading states
   return (
     <Web3AuthContext.Provider value={value}>
       {children}

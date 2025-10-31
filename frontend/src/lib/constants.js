@@ -40,6 +40,10 @@ export const P256_ACCOUNT_FACTORY_ABI = [
 ]
 
 export const P256_ACCOUNT_ABI = [
+  // Core account functions
+  'function owner() view returns (address)',
+  'function qx() view returns (bytes32)',
+  'function qy() view returns (bytes32)',
   'function execute(address dest, uint256 value, bytes calldata func) external',
   'function executeBatch(address[] calldata dest, uint256[] calldata value, bytes[] calldata func) external',
   'function enableTwoFactor() external',
