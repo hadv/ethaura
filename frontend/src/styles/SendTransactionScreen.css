@@ -16,40 +16,32 @@
 
 .send-main {
   background: white;
-  padding: 32px;
+  padding: 48px 64px;
   border-right: 1px solid #e5e5e5;
 }
 
+.send-container {
+  max-width: 520px;
+  margin: 0 auto;
+}
+
 .send-sidebar {
-  background: white;
+  background: #fafafa;
   padding: 32px;
 }
 
 /* Page Header */
 .page-header {
-  margin-bottom: 32px;
+  margin-bottom: 48px;
+  text-align: left;
 }
 
 .page-title {
-  font-size: 32px;
+  font-size: 28px;
   font-weight: 700;
   color: #000;
-  margin: 0 0 8px 0;
-}
-
-.page-description {
-  font-size: 16px;
-  color: #6b7280;
   margin: 0;
-}
-
-/* Content */
-.send-content {
-  background: white;
-  border: 1px solid #e5e5e5;
-  border-radius: 12px;
-  padding: 28px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  text-align: left;
 }
 
 /* Error State */
@@ -95,15 +87,15 @@
 
 @media (max-width: 768px) {
   .send-main {
-    padding: 20px;
+    padding: 24px;
+  }
+
+  .page-header {
+    margin-bottom: 32px;
   }
 
   .page-title {
     font-size: 24px;
-  }
-
-  .page-description {
-    font-size: 14px;
   }
 }
 

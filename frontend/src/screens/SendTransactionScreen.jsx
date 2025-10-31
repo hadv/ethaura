@@ -36,14 +36,13 @@ function SendTransactionScreen({ wallet, onBack, onHome, credential, accountConf
       {/* Main Content */}
       <div className="send-content-wrapper">
         <div className="send-main">
-          {/* Page Title */}
-          <div className="page-header">
-            <h1 className="page-title">Send Transaction</h1>
-            <p className="page-description">Send ETH or tokens from your smart account</p>
-          </div>
+          <div className="send-container">
+            {/* Page Title */}
+            <div className="page-header">
+              <h1 className="page-title">Send</h1>
+            </div>
 
-          {/* Transaction Form */}
-          <div className="send-content">
+            {/* Transaction Form */}
             <TransactionSender
               accountAddress={wallet.address}
               credential={credential}
