@@ -8,6 +8,7 @@ import { buildSendEthUserOp, getUserOpHash, signUserOperation, signUserOperation
 import { getUserFriendlyMessage, getSuggestedAction, isRetryableError } from '../lib/errors'
 import { formatPublicKeyForContract } from '../lib/accountManager'
 import SignatureConfirmationDialog from './SignatureConfirmationDialog'
+import '../styles/TransactionSender.css'
 
 function TransactionSender({ accountAddress, credential, accountConfig }) {
   const { isConnected, signMessage, signRawHash, address: ownerAddress } = useWeb3Auth()
@@ -774,177 +775,154 @@ function TransactionSender({ accountAddress, credential, accountConfig }) {
     }
   }
 
+  // Load balance when component mounts
+  useEffect(() => {
+    if (accountAddress && sdk) {
+      loadBalanceInfo(accountAddress)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [accountAddress, sdk])
+
+  // Calculate USD value
+  const getUSDValue = () => {
+    if (!amount || isNaN(parseFloat(amount))) return '0.00'
+    const ethPriceUSD = 2500 // Mock price
+    return (parseFloat(amount) * ethPriceUSD).toFixed(2)
+  }
+
+  // Handle Max button
+  const handleMaxAmount = () => {
+    if (balanceInfo?.accountBalance) {
+      // Leave some ETH for gas (0.001 ETH)
+      const maxAmount = Math.max(0, parseFloat(balanceInfo.accountBalance) - 0.001)
+      setAmount(maxAmount.toFixed(6))
+    }
+  }
+
   return (
-    <div className="card">
-      <h2>4️⃣ Send Transaction</h2>
-      <p className="text-sm mb-4">
-        Send ETH using your P256Account wallet.
-        {accountInfo?.twoFactorEnabled && " You'll need to sign with your Passkey (biometric) and confirm with your Social Login account."}
-        {accountInfo && !accountInfo.hasPasskey && " You'll sign with your Social Login account only."}
-      </p>
-
-      {accountInfo && (
-        <div className="status status-info mb-4">
-          {accountInfo.isDeployed
-            ? `✅ Account deployed | Nonce: ${accountInfo.nonce?.toString() || '0'}`
-            : '⏳ Account will deploy on first transaction'
-          }
-          {accountInfo.twoFactorEnabled && ' | 🔒 2FA Enabled (Social Login + Passkey)'}
-          {accountInfo.hasPasskey === false && ' | 👤 Owner-only (Social Login)'}
-        </div>
-      )}
-
-      {/* Balance and Deposit Info */}
-      {balanceInfo && (
-        <div className="card mb-4" style={{ background: '#f8f9fa', padding: '1rem' }}>
-          <h3 style={{ fontSize: '0.9rem', marginBottom: '0.5rem' }}>💰 Balance & Deposit</h3>
-          <div style={{ fontSize: '0.85rem', lineHeight: '1.6' }}>
-            <div>
-              <strong>Account Balance:</strong> {balanceInfo.accountBalance} ETH
-              {parseFloat(balanceInfo.accountBalance) < 0.001 && (
-                <span style={{ color: '#dc3545', marginLeft: '0.5rem' }}>⚠️ Low balance</span>
-              )}
-            </div>
-            <div>
-              <strong>EntryPoint Deposit:</strong> {balanceInfo.entryPointDeposit} ETH
-              {parseFloat(balanceInfo.entryPointDeposit) < 0.001 && (
-                <span style={{ color: '#dc3545', marginLeft: '0.5rem' }}>⚠️ Low deposit</span>
-              )}
-            </div>
-          </div>
-
-          {parseFloat(balanceInfo.entryPointDeposit) < 0.01 && (
-            <div style={{ marginTop: '0.75rem' }}>
-              <p style={{ fontSize: '0.8rem', color: '#6c757d', marginBottom: '0.5rem' }}>
-                💡 Low EntryPoint deposit may cause transaction failures. Deposit from your Web3Auth wallet:
-              </p>
-              <button
-                className="button"
-                onClick={depositToEntryPoint}
-                disabled={depositLoading || !isConnected}
-                style={{ fontSize: '0.85rem', padding: '0.5rem 1rem' }}
-              >
-                {depositLoading ? 'Depositing...' : '💳 Deposit 0.02 ETH to EntryPoint'}
-              </button>
-            </div>
-          )}
-        </div>
-      )}
-
-      <div className="flex-col">
-        <div>
-          <label className="label">Target Address</label>
+    <div className="transaction-sender">
+      {/* Amount Input Section */}
+      <div className="amount-section">
+        <div className="amount-input-wrapper">
           <input
             type="text"
-            className="input"
-            placeholder="0x..."
-            value={targetAddress}
-            onChange={(e) => setTargetAddress(e.target.value)}
-            disabled={loading || !isConnected}
-          />
-        </div>
-
-        <div>
-          <label className="label">Amount (ETH)</label>
-          <input
-            type="text"
-            className="input"
-            placeholder="0.1"
+            className="amount-input"
+            placeholder="0"
             value={amount}
-            onChange={(e) => setAmount(e.target.value)}
+            onChange={(e) => {
+              // Only allow numbers and decimal point
+              const value = e.target.value
+              if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                setAmount(value)
+              }
+            }}
             disabled={loading || !isConnected}
           />
+          <button
+            className="max-button"
+            onClick={handleMaxAmount}
+            disabled={loading || !isConnected || !balanceInfo}
+          >
+            Max
+          </button>
         </div>
-
-        <button
-          className="button"
-          onClick={sendTransaction}
-          disabled={loading || !isConnected || !accountInfo}
-        >
-          {loading ? 'Sending...' : accountInfo?.twoFactorEnabled ? '🔐 Send Transaction (2FA)' : '📤 Send Transaction'}
-        </button>
+        <div className="amount-usd">${getUSDValue()}</div>
       </div>
 
-      {status && !error && (
-        <div className="status status-info mt-4">
-          {status}
+      {/* Token Selector */}
+      <div className="token-selector">
+        <div className="token-info">
+          <div className="token-icon">
+            <svg viewBox="0 0 784.37 1277.39" xmlns="http://www.w3.org/2000/svg">
+              <g fill="#343434" fillRule="nonzero">
+                <path d="m392.07 0-8.57 29.11v844.63l8.57 8.55 392.06-231.75z" fillOpacity=".6"/>
+                <path d="m392.07 0-392.07 650.54 392.07 231.75v-435.68z"/>
+                <path d="m392.07 956.52-4.83 5.89v300.87l4.83 14.1 392.3-552.49z" fillOpacity=".6"/>
+                <path d="m392.07 1277.38v-320.86l-392.07-231.75z"/>
+                <path d="m392.07 882.29 392.06-231.75-392.06-178.21z" fillOpacity=".2"/>
+                <path d="m0 650.54 392.07 231.75v-409.96z" fillOpacity=".6"/>
+              </g>
+            </svg>
+          </div>
+          <div className="token-details">
+            <div className="token-name">Ether</div>
+            <div className="token-available">
+              Available: {balanceInfo ? parseFloat(balanceInfo.accountBalance).toFixed(4) : '0.0000'} ETH
+            </div>
+          </div>
         </div>
-      )}
+        <div className="token-dropdown-icon">▼</div>
+      </div>
 
+      {/* To Address Section */}
+      <div className="to-section">
+        <label className="to-label">To</label>
+        <input
+          type="text"
+          className="to-input"
+          placeholder="Enter a public address"
+          value={targetAddress}
+          onChange={(e) => setTargetAddress(e.target.value)}
+          disabled={loading || !isConnected}
+        />
+      </div>
+
+      {/* Sign Button */}
+      <button
+        className="sign-button"
+        onClick={sendTransaction}
+        disabled={loading || !isConnected || !accountInfo || !targetAddress || !amount}
+      >
+        {loading ? (
+          <span className="button-content">
+            <span className="spinner-small"></span>
+            {status || 'Processing...'}
+          </span>
+        ) : (
+          'Sign'
+        )}
+      </button>
+
+      {/* Status Messages */}
       {error && (
-        <div className="status status-error mt-4">
+        <div className="error-message">
           ❌ {error}
         </div>
       )}
 
-      {/* Show signature details */}
-      {(passkeySignature || ownerSignature || combinedSignature) && (
-        <div className="mt-4">
-          <h3>Signature Details (2FA)</h3>
-
-          {passkeySignature && (
-            <div className="mt-2">
-              <strong>1️⃣ Passkey Signature (P-256):</strong>
-              <div className="code-block" style={{ fontSize: '0.75rem', marginTop: '0.5rem' }}>
-                <div>r: {passkeySignature.r}</div>
-                <div>s: {passkeySignature.s}</div>
-              </div>
-              <p className="text-xs mt-1" style={{ color: '#666' }}>
-                ✅ Signed with biometric authentication
-              </p>
-            </div>
-          )}
-
-          {ownerSignature && (
-            <div className="mt-3">
-              <strong>2️⃣ Owner Signature (ECDSA):</strong>
-              <div className="code-block" style={{ fontSize: '0.75rem', marginTop: '0.5rem' }}>
-                {ownerSignature}
-              </div>
-              <p className="text-xs mt-1" style={{ color: '#666' }}>
-                ✅ Signed with Web3Auth wallet
-              </p>
-            </div>
-          )}
-
-          {combinedSignature && (
-            <div className="mt-3">
-              <strong>🔐 Combined Signature (129 bytes):</strong>
-              <div className="code-block" style={{ fontSize: '0.75rem', marginTop: '0.5rem' }}>
-                {formatSignatureForDisplay(combinedSignature)}
-              </div>
-              <p className="text-xs mt-1" style={{ color: '#666' }}>
-                ✅ Ready for 2FA validation
-              </p>
-            </div>
-          )}
-        </div>
-      )}
-
       {txHash && (
-        <div className="mt-4">
-          <h3>Transaction Hash</h3>
-          <div className="code-block">
-            {txHash}
-          </div>
-          <p className="text-xs mt-4">
-            Your transaction has been submitted to the network!
-          </p>
+        <div className="success-message">
+          <div className="success-title">✅ Transaction Successful!</div>
+          <div className="tx-hash-label">Transaction Hash:</div>
+          <div className="tx-hash">{txHash}</div>
+          <a
+            href={`https://sepolia.etherscan.io/tx/${txHash}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="view-explorer"
+          >
+            View on Explorer →
+          </a>
         </div>
       )}
 
-      <div className="mt-4">
-        <h3>How it works:</h3>
-        <ol className="text-sm" style={{ marginLeft: '20px', marginTop: '8px' }}>
-          <li>Create a UserOperation with your transaction details</li>
-          <li>Compute the userOpHash</li>
-          <li>Sign the hash with your passkey (P-256 ECDSA) - 2FA</li>
-          <li>Review and confirm signature with your social login account</li>
-          <li>Decode DER signature to raw r,s components</li>
-          <li>Submit UserOperation to bundler</li>
-          <li>Bundler submits to EntryPoint, which verifies using P256VERIFY precompile</li>
-        </ol>
-      </div>
+      {/* Account Info - Collapsible */}
+      {accountInfo && !txHash && (
+        <div className="account-info">
+          <div className="info-item">
+            <span className="info-label">Status:</span>
+            <span className="info-value">
+              {accountInfo.isDeployed ? '✅ Deployed' : '⏳ Will deploy on first transaction'}
+            </span>
+          </div>
+          {accountInfo.twoFactorEnabled && (
+            <div className="info-item">
+              <span className="info-label">Security:</span>
+              <span className="info-value">🔒 2FA Enabled</span>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Signature Confirmation Dialog */}
       <SignatureConfirmationDialog
