@@ -3,13 +3,12 @@ import { ethers } from 'ethers'
 import { HiArrowUp, HiArrowDown } from 'react-icons/hi'
 import { BiTransfer } from 'react-icons/bi'
 import { MdFlashOn } from 'react-icons/md'
-import { IoCopyOutline, IoCheckmark, IoOpenOutline } from 'react-icons/io5'
 import { P256_ACCOUNT_ABI } from '../lib/constants'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
 import { Identicon } from '../utils/identicon.jsx'
 import Header from '../components/Header'
 import SubHeader from '../components/SubHeader'
-import GradientQRCode from '../components/GradientQRCode'
+import ReceiveModal from '../components/ReceiveModal'
 import '../styles/WalletDetailScreen.css'
 import logo from '../assets/logo.svg'
 
@@ -20,7 +19,6 @@ function WalletDetailScreen({ wallet, onBack, onHome, onSettings, onSend, onLogo
   const [balanceChange, setBalanceChange] = useState('+3.10%')
   const [loading, setLoading] = useState(false)
   const [showReceiveModal, setShowReceiveModal] = useState(false)
-  const [copied, setCopied] = useState(false)
   const [selectedNetwork, setSelectedNetwork] = useState('Ethereum')
   const [assets, setAssets] = useState([])
   const [transactions, setTransactions] = useState([])
@@ -149,12 +147,6 @@ function WalletDetailScreen({ wallet, onBack, onHome, onSettings, onSend, onLogo
     // Format with commas and 2 decimal places
     const [whole, decimal] = num.toFixed(2).split('.')
     return { whole: whole.replace(/\B(?=(\d{3})+(?!\d))/g, ','), decimal }
-  }
-
-  const copyAddress = () => {
-    navigator.clipboard.writeText(wallet.address)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
   }
 
   if (!wallet) {
@@ -325,43 +317,11 @@ function WalletDetailScreen({ wallet, onBack, onHome, onSettings, onSend, onLogo
       </div>
 
       {/* Receive Modal */}
-      {showReceiveModal && (
-        <div className="modal-overlay" onClick={() => setShowReceiveModal(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <h2>Receive Funds</h2>
-            <p className="modal-description">
-              Send funds to this address on Sepolia testnet:
-            </p>
-            <div className="qr-code-container">
-              <GradientQRCode
-                value={wallet.address}
-                size={280}
-              />
-            </div>
-            <div className="address-display">
-              <Identicon address={wallet.address} size={20} className="address-identicon" />
-              <span className="address-text" onClick={copyAddress} title={copied ? 'Copied!' : 'Click to copy address'}>
-                {wallet.address}
-              </span>
-              <button className="copy-icon-inline" onClick={copyAddress} title={copied ? 'Copied!' : 'Copy address'}>
-                {copied ? <IoCheckmark /> : <IoCopyOutline />}
-              </button>
-              <a
-                href={`https://sepolia.etherscan.io/address/${wallet.address}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="explorer-icon-inline"
-                title="View on Etherscan"
-              >
-                <IoOpenOutline />
-              </a>
-            </div>
-            <button className="modal-close-btn" onClick={() => setShowReceiveModal(false)}>
-              Close
-            </button>
-          </div>
-        </div>
-      )}
+      <ReceiveModal
+        isOpen={showReceiveModal}
+        onClose={() => setShowReceiveModal(false)}
+        preselectedWallet={wallet}
+      />
     </div>
   )
 }
