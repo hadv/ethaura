@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
 import { ethers } from 'ethers'
 import { BsThreeDotsVertical, BsPlus } from 'react-icons/bs'
 import { HiArrowUp, HiArrowDown } from 'react-icons/hi'
+import { HiPencil, HiTrash } from 'react-icons/hi2'
 import Header from '../components/Header'
 import { Identicon } from '../utils/identicon.jsx'
 import '../styles/HomeScreen.css'
@@ -18,9 +19,31 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onLogout }) {
   const [addError, setAddError] = useState('')
   const [isAdding, setIsAdding] = useState(false)
 
+  // Menu and modal states
+  const [openMenuId, setOpenMenuId] = useState(null)
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [selectedWallet, setSelectedWallet] = useState(null)
+  const [editName, setEditName] = useState('')
+  const menuRef = useRef(null)
+
   // Load wallets from localStorage
   useEffect(() => {
     loadWallets()
+  }, [])
+
+  // Close menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (menuRef.current && !menuRef.current.contains(event.target)) {
+        setOpenMenuId(null)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
   }, [])
 
   const loadWallets = async () => {
@@ -171,6 +194,87 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onLogout }) {
     }
   }
 
+  // Menu handlers
+  const handleMenuClick = (e, wallet) => {
+    e.stopPropagation()
+    setOpenMenuId(openMenuId === wallet.id ? null : wallet.id)
+  }
+
+  const handleRenameClick = (wallet) => {
+    setSelectedWallet(wallet)
+    setEditName(wallet.name)
+    setShowEditModal(true)
+    setOpenMenuId(null)
+  }
+
+  const handleDeleteClick = (wallet) => {
+    setSelectedWallet(wallet)
+    setShowDeleteModal(true)
+    setOpenMenuId(null)
+  }
+
+  const handleSaveRename = () => {
+    if (!editName.trim()) {
+      return
+    }
+
+    try {
+      // Get existing wallets
+      const walletsList = JSON.parse(localStorage.getItem('ethaura_wallets_list') || '[]')
+
+      // Update wallet name
+      const updatedWallets = walletsList.map(w =>
+        w.id === selectedWallet.id ? { ...w, name: editName.trim() } : w
+      )
+
+      localStorage.setItem('ethaura_wallets_list', JSON.stringify(updatedWallets))
+
+      // Update state
+      setWallets(wallets.map(w =>
+        w.id === selectedWallet.id ? { ...w, name: editName.trim() } : w
+      ))
+
+      // Close modal
+      setShowEditModal(false)
+      setSelectedWallet(null)
+      setEditName('')
+    } catch (err) {
+      console.error('Error renaming wallet:', err)
+    }
+  }
+
+  const handleConfirmDelete = () => {
+    try {
+      // Get existing wallets
+      const walletsList = JSON.parse(localStorage.getItem('ethaura_wallets_list') || '[]')
+
+      // Remove wallet
+      const updatedWallets = walletsList.filter(w => w.id !== selectedWallet.id)
+
+      localStorage.setItem('ethaura_wallets_list', JSON.stringify(updatedWallets))
+
+      // Update state
+      setWallets(wallets.filter(w => w.id !== selectedWallet.id))
+
+      // Close modal
+      setShowDeleteModal(false)
+      setSelectedWallet(null)
+    } catch (err) {
+      console.error('Error deleting wallet:', err)
+    }
+  }
+
+  const handleCancelEdit = () => {
+    setShowEditModal(false)
+    setSelectedWallet(null)
+    setEditName('')
+  }
+
+  const handleCancelDelete = () => {
+    setShowDeleteModal(false)
+    setSelectedWallet(null)
+  }
+
   return (
     <div className="home-screen">
       {/* Header */}
@@ -253,12 +357,32 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onLogout }) {
                           {parseFloat(wallet.percentChange) >= 0 ? '▲' : '▼'} {Math.abs(parseFloat(wallet.percentChange)).toFixed(2)}%
                         </div>
                       </div>
-                      <button className="wallet-menu-btn" onClick={(e) => {
-                        e.stopPropagation();
-                        // TODO: Add menu functionality
-                      }}>
-                        <BsThreeDotsVertical className="menu-icon" />
-                      </button>
+                      <div className="wallet-menu-container" ref={openMenuId === wallet.id ? menuRef : null}>
+                        <button
+                          className="wallet-menu-btn"
+                          onClick={(e) => handleMenuClick(e, wallet)}
+                        >
+                          <BsThreeDotsVertical className="menu-icon" />
+                        </button>
+                        {openMenuId === wallet.id && (
+                          <div className="wallet-menu-dropdown">
+                            <button
+                              className="menu-item rename-item"
+                              onClick={() => handleRenameClick(wallet)}
+                            >
+                              <HiPencil className="menu-item-icon" />
+                              Rename
+                            </button>
+                            <button
+                              className="menu-item delete-item"
+                              onClick={() => handleDeleteClick(wallet)}
+                            >
+                              <HiTrash className="menu-item-icon" />
+                              Remove
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -336,6 +460,98 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onLogout }) {
                   disabled={isAdding}
                 >
                   {isAdding ? 'Adding...' : 'Add Wallet'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Wallet Name Modal */}
+      {showEditModal && selectedWallet && (
+        <div className="modal-overlay" onClick={handleCancelEdit}>
+          <div className="modal-content edit-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div className="modal-icon">
+                <HiPencil />
+              </div>
+              <h2>Edit name</h2>
+              <button className="modal-close" onClick={handleCancelEdit}>×</button>
+            </div>
+            <div className="modal-body">
+              <div className="form-group">
+                <label className="form-label">Safe name</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  placeholder="Enter wallet name"
+                  autoFocus
+                />
+              </div>
+
+              <div className="wallet-info-section">
+                <div className="info-label">Network</div>
+                <div className="info-value network-info">
+                  <div className="network-icon">⬥</div>
+                  Sepolia
+                </div>
+              </div>
+
+              <div className="wallet-info-section">
+                <div className="info-label">Address</div>
+                <div className="info-value address-info">
+                  <Identicon address={selectedWallet.address} size={24} />
+                  <span>{formatAddress(selectedWallet.address)}</span>
+                </div>
+              </div>
+
+              <div className="modal-actions">
+                <button
+                  className="btn-secondary"
+                  onClick={handleCancelEdit}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="btn-primary"
+                  onClick={handleSaveRename}
+                  disabled={!editName.trim()}
+                >
+                  Save
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Wallet Confirmation Modal */}
+      {showDeleteModal && selectedWallet && (
+        <div className="modal-overlay" onClick={handleCancelDelete}>
+          <div className="modal-content delete-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="delete-modal-header">
+              <button className="modal-close" onClick={handleCancelDelete}>×</button>
+            </div>
+            <div className="modal-body">
+              <h2 className="delete-title">Are you sure you want to remove this Safe group?</h2>
+              <p className="delete-description">
+                You can always re-add it later by importing it again.
+              </p>
+
+              <div className="delete-modal-actions">
+                <button
+                  className="delete-btn-cancel"
+                  onClick={handleCancelDelete}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="delete-btn-confirm"
+                  onClick={handleConfirmDelete}
+                >
+                  Confirm
                 </button>
               </div>
             </div>
