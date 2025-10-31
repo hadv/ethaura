@@ -1,0 +1,78 @@
+version: '3.8'
+
+# Development Docker Compose configuration
+# This is a simplified setup for local development and testing
+
+services:
+  # Helios Light Client (using public beacon API for Sepolia)
+  helios-dev:
+    build:
+      context: ./docker/helios
+      dockerfile: Dockerfile
+    container_name: ethaura-helios-dev
+    restart: unless-stopped
+    networks:
+      - ethaura-dev-network
+    ports:
+      - "8545:8545"  # RPC endpoint (accessible from host)
+    volumes:
+      - helios-dev-data:/root/.helios
+      - ./helios-config.toml:/app/helios-config.toml:ro
+    environment:
+      - NETWORK=sepolia
+      - CONSENSUS_RPC=https://ethereum-sepolia-beacon-api.publicnode.com
+      - EXECUTION_RPC=${SEPOLIA_RPC_URL}
+      - CHECKPOINT=${SEPOLIA_CHECKPOINT:-0x6c68a8f2e9b2c0e5d5f5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5}
+      - RUST_LOG=info
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8545", "-X", "POST", "-H", "Content-Type: application/json", "-d", '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # Frontend Development Server
+  frontend-dev:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: ethaura-frontend-dev
+    restart: unless-stopped
+    networks:
+      - ethaura-dev-network
+    ports:
+      - "3000:3000"  # Vite dev server
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      - VITE_WEB3AUTH_CLIENT_ID=${VITE_WEB3AUTH_CLIENT_ID}
+      - VITE_CHAIN_ID=${VITE_CHAIN_ID:-11155111}
+      - VITE_RPC_URL=${VITE_RPC_URL:-http://localhost:8545}
+      - VITE_FACTORY_ADDRESS=${VITE_FACTORY_ADDRESS}
+      - VITE_ENTRYPOINT_ADDRESS=${VITE_ENTRYPOINT_ADDRESS:-0x0000000071727De22E5E9d8BAf0edAc6f37da032}
+    depends_on:
+      - helios-dev
+    command: npm run dev
+
+  # Local Anvil node (alternative to Helios for testing)
+  anvil:
+    image: ghcr.io/foundry-rs/foundry:latest
+    container_name: ethaura-anvil
+    restart: unless-stopped
+    networks:
+      - ethaura-dev-network
+    ports:
+      - "8546:8545"  # Anvil RPC on different port
+    command: anvil --host 0.0.0.0 --chain-id 31337
+    profiles:
+      - anvil  # Only start with: docker-compose --profile anvil up
+
+networks:
+  ethaura-dev-network:
+    driver: bridge
+
+volumes:
+  helios-dev-data:
+    driver: local
+
