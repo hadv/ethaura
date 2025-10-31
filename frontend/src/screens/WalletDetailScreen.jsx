@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
 import { ethers } from 'ethers'
-import { QRCodeSVG } from 'qrcode.react'
 import { HiArrowUp, HiArrowDown } from 'react-icons/hi'
 import { BiTransfer } from 'react-icons/bi'
 import { MdFlashOn } from 'react-icons/md'
@@ -10,6 +9,7 @@ import { useWeb3Auth } from '../contexts/Web3AuthContext'
 import { Identicon } from '../utils/identicon.jsx'
 import Header from '../components/Header'
 import SubHeader from '../components/SubHeader'
+import GradientQRCode from '../components/GradientQRCode'
 import '../styles/WalletDetailScreen.css'
 import logo from '../assets/logo.svg'
 
@@ -332,6 +332,12 @@ function WalletDetailScreen({ wallet, onBack, onHome, onSettings, onSend, onLogo
             <p className="modal-description">
               Send funds to this address on Sepolia testnet:
             </p>
+            <div className="qr-code-container">
+              <GradientQRCode
+                value={wallet.address}
+                size={280}
+              />
+            </div>
             <div className="address-display">
               <Identicon address={wallet.address} size={20} className="address-identicon" />
               <span className="address-text" onClick={copyAddress} title={copied ? 'Copied!' : 'Click to copy address'}>
@@ -349,16 +355,6 @@ function WalletDetailScreen({ wallet, onBack, onHome, onSettings, onSend, onLogo
               >
                 <IoOpenOutline />
               </a>
-            </div>
-            <div className="qr-code-container">
-              <QRCodeSVG
-                value={wallet.address}
-                size={200}
-                level="H"
-                includeMargin={true}
-                bgColor="#ffffff"
-                fgColor="#000000"
-              />
             </div>
             <button className="modal-close-btn" onClick={() => setShowReceiveModal(false)}>
               Close
