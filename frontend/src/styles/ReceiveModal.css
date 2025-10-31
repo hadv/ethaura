@@ -1,0 +1,222 @@
+/* Receive Modal Styles */
+.receive-modal-content {
+  background: white;
+  border-radius: 20px;
+  max-width: 400px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+.receive-modal-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 20px 24px;
+  border-bottom: 1px solid #e5e5e5;
+}
+
+.receive-modal-icon {
+  width: 40px;
+  height: 40px;
+  background: #f3f4f6;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  color: #000;
+  flex-shrink: 0;
+}
+
+.receive-modal-header h2 {
+  flex: 1;
+  font-size: 18px;
+  font-weight: 600;
+  color: #000;
+  margin: 0;
+}
+
+/* Receive Wallet List */
+.receive-wallet-list {
+  padding: 16px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.receive-wallet-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid #e5e5e5;
+  border-radius: 12px;
+  margin-bottom: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.receive-wallet-item:last-child {
+  margin-bottom: 0;
+}
+
+.receive-wallet-item:hover {
+  border-color: #000;
+  background: #f9fafb;
+}
+
+.receive-wallet-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+}
+
+.receive-wallet-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.receive-wallet-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: #000;
+}
+
+.receive-wallet-address {
+  font-size: 14px;
+  color: #6b7280;
+  font-family: 'Courier New', monospace;
+}
+
+.receive-wallet-balance {
+  font-size: 16px;
+  font-weight: 600;
+  color: #000;
+}
+
+/* Receive QR Section */
+.receive-qr-section {
+  padding: 24px;
+}
+
+.receive-selected-wallet {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: #f9fafb;
+  border-radius: 12px;
+  margin-bottom: 24px;
+}
+
+.change-wallet-btn {
+  margin-left: auto;
+  padding: 6px 12px;
+  background: white;
+  border: 1px solid #e5e5e5;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #374151;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.change-wallet-btn:hover {
+  background: #f3f4f6;
+  border-color: #d1d5db;
+}
+
+.qr-code-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
+  background: white;
+  border-radius: 12px;
+  margin-bottom: 20px;
+}
+
+.address-display {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  background: #f9fafb;
+  border: 1px solid #e5e5e5;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  overflow: hidden;
+}
+
+.address-identicon {
+  flex-shrink: 0;
+}
+
+.address-text {
+  flex: 1;
+  font-size: 13px;
+  font-family: 'Courier New', monospace;
+  color: #000;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.address-text:hover {
+  color: #059669;
+}
+
+.copy-icon-inline,
+.explorer-icon-inline {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: white;
+  border: 1px solid #e5e5e5;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+  color: #6b7280;
+  font-size: 16px;
+}
+
+.copy-icon-inline:hover,
+.explorer-icon-inline:hover {
+  background: #f3f4f6;
+  border-color: #d1d5db;
+  color: #000;
+}
+
+.modal-close-btn {
+  width: 100%;
+  padding: 12px 24px;
+  background: #000;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.modal-close-btn:hover {
+  background: #1f1f1f;
+  transform: translateY(-1px);
+}
+
+.modal-description {
+  font-size: 14px;
+  color: #6b7280;
+  margin: 0 0 24px 0;
+  line-height: 1.5;
+}
+

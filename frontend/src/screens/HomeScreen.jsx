@@ -6,6 +6,7 @@ import { HiArrowUp, HiArrowDown } from 'react-icons/hi'
 import { HiPencil, HiTrash } from 'react-icons/hi2'
 import Header from '../components/Header'
 import { Identicon } from '../utils/identicon.jsx'
+import ReceiveModal from '../components/ReceiveModal'
 import '../styles/HomeScreen.css'
 import logo from '../assets/logo.svg'
 
@@ -26,6 +27,9 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onLogout }) {
   const [selectedWallet, setSelectedWallet] = useState(null)
   const [editName, setEditName] = useState('')
   const menuRef = useRef(null)
+
+  // Receive modal state
+  const [showReceiveModal, setShowReceiveModal] = useState(false)
 
   // Load wallets from localStorage
   useEffect(() => {
@@ -275,6 +279,14 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onLogout }) {
     setSelectedWallet(null)
   }
 
+  // Receive modal handler
+  const handleReceiveClick = () => {
+    if (wallets.length === 0) {
+      return
+    }
+    setShowReceiveModal(true)
+  }
+
   return (
     <div className="home-screen">
       {/* Header */}
@@ -304,7 +316,7 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onLogout }) {
                 <HiArrowUp className="btn-icon" />
                 Send
               </button>
-              <button className="action-btn receive-btn">
+              <button className="action-btn receive-btn" onClick={handleReceiveClick}>
                 <HiArrowDown className="btn-icon" />
                 Receive
               </button>
@@ -558,6 +570,13 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onLogout }) {
           </div>
         </div>
       )}
+
+      {/* Receive Modal */}
+      <ReceiveModal
+        isOpen={showReceiveModal}
+        onClose={() => setShowReceiveModal(false)}
+        wallets={wallets}
+      />
     </div>
   )
 }
