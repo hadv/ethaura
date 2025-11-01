@@ -15,6 +15,11 @@
   display: flex;
   align-items: center;
   gap: 12px;
+  transition: opacity 0.2s ease;
+}
+
+.brand-section:hover {
+  opacity: 0.7;
 }
 
 .brand-logo {
