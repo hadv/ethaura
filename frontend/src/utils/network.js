@@ -11,7 +11,6 @@ export function getNetworkName(chainId) {
   const networks = {
     1: 'Ethereum',
     11155111: 'Sepolia',
-    17000: 'Holesky',
     137: 'Polygon',
     80001: 'Mumbai',
     42161: 'Arbitrum',
@@ -19,7 +18,7 @@ export function getNetworkName(chainId) {
     10: 'Optimism',
     11155420: 'Optimism Sepolia',
   }
-  
+
   return networks[chainId] || 'Unknown Network'
 }
 
@@ -53,7 +52,6 @@ export function getNetworkColor(chainId) {
   const colors = {
     1: '#3b82f6', // Ethereum blue
     11155111: '#3b82f6', // Sepolia blue
-    17000: '#3b82f6', // Holesky blue
     137: '#8247e5', // Polygon purple
     80001: '#8247e5', // Mumbai purple
     42161: '#28a0f0', // Arbitrum blue
@@ -61,7 +59,7 @@ export function getNetworkColor(chainId) {
     10: '#ff0420', // Optimism red
     11155420: '#ff0420', // Optimism Sepolia red
   }
-  
+
   return colors[chainId] || '#6b7280'
 }
 
@@ -89,22 +87,16 @@ export function getCurrentNetwork(chainId = null) {
 export function getAllNetworks() {
   return [
     {
-      chainId: 11155111,
-      name: 'Sepolia',
-      icon: getNetworkIcon(11155111),
-      color: getNetworkColor(11155111),
-    },
-    {
       chainId: 1,
       name: 'Ethereum',
       icon: getNetworkIcon(1),
       color: getNetworkColor(1),
     },
     {
-      chainId: 17000,
-      name: 'Holesky',
-      icon: getNetworkIcon(17000),
-      color: getNetworkColor(17000),
+      chainId: 10,
+      name: 'Optimism',
+      icon: getNetworkIcon(10),
+      color: getNetworkColor(10),
     },
     {
       chainId: 137,
@@ -119,10 +111,10 @@ export function getAllNetworks() {
       color: getNetworkColor(42161),
     },
     {
-      chainId: 10,
-      name: 'Optimism',
-      icon: getNetworkIcon(10),
-      color: getNetworkColor(10),
+      chainId: 11155111,
+      name: 'Sepolia',
+      icon: getNetworkIcon(11155111),
+      color: getNetworkColor(11155111),
     },
   ]
 }

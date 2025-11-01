@@ -2,6 +2,12 @@ import { useState, useRef, useEffect } from 'react';
 import { useNetwork } from '../contexts/NetworkContext';
 import '../styles/NetworkSelector.css';
 
+// Import network icons
+import ethereumIcon from '../assets/networks/ethereum.png';
+import optimismIcon from '../assets/networks/optimism.png';
+import polygonIcon from '../assets/networks/polygon.png';
+import arbitrumIcon from '../assets/networks/arbitrum.png';
+
 const NetworkSelector = () => {
   const { networkInfo, availableNetworks, switchNetwork } = useNetwork();
   const [isOpen, setIsOpen] = useState(false);
@@ -33,8 +39,6 @@ const NetworkSelector = () => {
         return '#627EEA'; // Ethereum blue
       case 1: // Ethereum
         return '#627EEA';
-      case 17000: // Holesky
-        return '#627EEA';
       case 137: // Polygon
         return '#8247E5';
       case 42161: // Arbitrum
@@ -51,16 +55,15 @@ const NetworkSelector = () => {
     switch (chainId) {
       case 11155111: // Sepolia
       case 1: // Ethereum
-      case 17000: // Holesky
-        return '●';
+        return ethereumIcon;
       case 137: // Polygon
-        return '◆';
+        return polygonIcon;
       case 42161: // Arbitrum
-        return '▲';
+        return arbitrumIcon;
       case 10: // Optimism
-        return '🔴';
+        return optimismIcon;
       default:
-        return '●';
+        return ethereumIcon;
     }
   };
 
@@ -70,14 +73,11 @@ const NetworkSelector = () => {
         className="network-selector"
         onClick={() => setIsOpen(!isOpen)}
       >
-        <div
-          className="network-icon-circle"
-          style={{ backgroundColor: getNetworkColor(networkInfo.chainId) }}
-        >
-          <span className="network-icon-symbol">
-            {getNetworkIcon(networkInfo.chainId)}
-          </span>
-        </div>
+        <img
+          src={getNetworkIcon(networkInfo.chainId)}
+          alt={networkInfo.name}
+          className="network-icon"
+        />
         <span className="network-name">{networkInfo.name}</span>
         <svg
           className={`dropdown-arrow ${isOpen ? 'open' : ''}`}
@@ -92,33 +92,35 @@ const NetworkSelector = () => {
 
       {isOpen && (
         <div className="network-dropdown">
-          {availableNetworks.map((network) => {
+          {availableNetworks.map((network, index) => {
             const isSelected = network.chainId === networkInfo.chainId;
+            const isTestnet = network.chainId === 11155111; // Sepolia
+            const showSeparator = isTestnet && index > 0;
+
             return (
-              <div
-                key={network.chainId}
-                className={`network-option ${isSelected ? 'selected' : ''}`}
-                onClick={() => handleNetworkChange(network.chainId)}
-              >
-                <div className="network-option-left">
-                  <div
-                    className="network-icon-circle"
-                    style={{ backgroundColor: getNetworkColor(network.chainId) }}
-                  >
-                    <span className="network-icon-symbol">
-                      {getNetworkIcon(network.chainId)}
-                    </span>
+              <div key={network.chainId}>
+                {showSeparator && <div className="network-separator" />}
+                <div
+                  className={`network-option ${isSelected ? 'selected' : ''}`}
+                  onClick={() => handleNetworkChange(network.chainId)}
+                >
+                  <div className="network-option-left">
+                    <img
+                      src={getNetworkIcon(network.chainId)}
+                      alt={network.name}
+                      className="network-icon"
+                    />
+                    <span className="network-option-name">{network.name}</span>
                   </div>
-                  <span className="network-option-name">{network.name}</span>
+                  {isSelected && (
+                    <div className="network-selected-check">
+                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                        <circle cx="8" cy="8" r="8" fill="black"/>
+                        <path d="M5 8L7 10L11 6" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    </div>
+                  )}
                 </div>
-                {isSelected && (
-                  <div className="network-selected-check">
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                      <circle cx="8" cy="8" r="8" fill="black"/>
-                      <path d="M5 8L7 10L11 6" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                  </div>
-                )}
               </div>
             );
           })}
