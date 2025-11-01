@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
 import { useNetwork } from '../contexts/NetworkContext'
+import { useP256SDK } from '../hooks/useP256SDK'
 import { ethers } from 'ethers'
 import { BsThreeDotsVertical, BsPlus } from 'react-icons/bs'
 import { HiArrowUp, HiArrowDown } from 'react-icons/hi'
@@ -14,11 +15,14 @@ import logo from '../assets/logo.svg'
 function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onLogout }) {
   const { userInfo, address: ownerAddress } = useWeb3Auth()
   const { networkInfo } = useNetwork()
+  const sdk = useP256SDK()
   const [wallets, setWallets] = useState([])
   const [loading, setLoading] = useState(false)
   const [showAddModal, setShowAddModal] = useState(false)
+  const [modalMode, setModalMode] = useState('import') // 'import' or 'create'
   const [walletAddress, setWalletAddress] = useState('')
   const [walletName, setWalletName] = useState('')
+  const [walletIndex, setWalletIndex] = useState('0')
   const [addError, setAddError] = useState('')
   const [isAdding, setIsAdding] = useState(false)
 
@@ -193,6 +197,186 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onLogo
     } catch (err) {
       console.error('Error adding wallet:', err)
       setAddError('Failed to add wallet. Please try again.')
+    } finally {
+      setIsAdding(false)
+    }
+  }
+
+  const handleCreateWallet = async () => {
+    setAddError('')
+
+    // Validate wallet name
+    if (!walletName.trim()) {
+      setAddError('Please enter a wallet name')
+      return
+    }
+
+    // Validate index
+    if (!walletIndex.trim()) {
+      setAddError('Please enter an index')
+      return
+    }
+
+    // Check if index is a valid number
+    const indexNum = parseInt(walletIndex)
+    if (isNaN(indexNum) || indexNum < 0) {
+      setAddError('Index must be a non-negative number (0, 1, 2, ...)')
+      return
+    }
+
+    // Check if user is logged in
+    if (!ownerAddress) {
+      setAddError('Please login with Web3Auth first')
+      return
+    }
+
+    // Check if SDK is ready
+    if (!sdk) {
+      setAddError('SDK not initialized. Please try again.')
+      return
+    }
+
+    // Get existing wallets to check for duplicate index
+    const walletsList = JSON.parse(localStorage.getItem('ethaura_wallets_list') || '[]')
+
+    // Check if this index has already been used by this owner
+    const existingWallet = walletsList.find(w => w.index === indexNum && w.owner === ownerAddress)
+    if (existingWallet) {
+      setAddError(`Index ${indexNum} is already used for this owner. The wallet already exists at ${existingWallet.address}. Please use a different index (e.g., ${indexNum + 1}).`)
+      return
+    }
+
+    // Note: Same index with different owner is OK (will produce different address)
+    const sameIndexDifferentOwner = walletsList.find(w => w.index === indexNum && w.owner && w.owner !== ownerAddress)
+    if (sameIndexDifferentOwner) {
+      console.log('ℹ️ Same index with different owner - this is OK, will produce different address:', {
+        existingOwner: sameIndexDifferentOwner.owner,
+        currentOwner: ownerAddress,
+        index: indexNum,
+      })
+    }
+
+    setIsAdding(true)
+    setAddError('') // Clear any previous errors
+
+    try {
+      console.log('🔧 Creating new wallet with index:', {
+        owner: ownerAddress,
+        index: indexNum,
+        name: walletName.trim(),
+      })
+
+      // Create account with owner-only mode (no passkey)
+      // User can add passkey later via settings
+      const saltBigInt = BigInt(indexNum)
+
+      console.log('🧂 Salt calculation:', {
+        indexNum,
+        saltBigInt: saltBigInt.toString(),
+        owner: ownerAddress,
+        expectedSalt: `keccak256(${ownerAddress}, ${saltBigInt.toString()})`,
+      })
+
+      console.log('⏳ Calling sdk.createAccount...')
+
+      // Add timeout to prevent indefinite hanging
+      const createAccountPromise = sdk.createAccount(
+        null, // no passkey for now
+        ownerAddress,
+        saltBigInt,
+        false // 2FA disabled
+      )
+
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Account creation timed out after 45 seconds. Please check your network connection and try again.')), 45000)
+      )
+
+      const accountData = await Promise.race([createAccountPromise, timeoutPromise])
+      console.log('✅ sdk.createAccount completed')
+
+      console.log('📍 New wallet created:', {
+        address: accountData.address,
+        isDeployed: accountData.isDeployed,
+        owner: ownerAddress,
+        salt: saltBigInt.toString(),
+        index: indexNum,
+      })
+
+      // Verify: same salt should give same address
+      console.log('✅ Address determinism check:', {
+        message: 'Same owner + same salt should ALWAYS give this address',
+        address: accountData.address,
+        formula: `CREATE2(factory, keccak256(owner=${ownerAddress}, salt=${indexNum}), initCodeHash)`,
+      })
+
+      // Double-check if wallet already exists (by address)
+      const exists = walletsList.some(w => w.address.toLowerCase() === accountData.address.toLowerCase())
+      if (exists) {
+        setAddError('This wallet already exists in your list')
+        setIsAdding(false)
+        return
+      }
+
+      // If account is already deployed on-chain, show a note
+      if (accountData.isDeployed) {
+        console.log('ℹ️ Account already deployed on-chain:', {
+          address: accountData.address,
+          message: 'This account was previously deployed (possibly from another device or session)',
+        })
+      }
+
+      // Fetch balance for the new wallet
+      console.log('⏳ Fetching balance...')
+      const provider = new ethers.JsonRpcProvider(networkInfo.rpcUrl)
+
+      const balancePromise = provider.getBalance(accountData.address)
+      const balanceTimeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Balance fetch timed out')), 15000)
+      )
+
+      let balanceEth = '0.0'
+      try {
+        const balanceWei = await Promise.race([balancePromise, balanceTimeoutPromise])
+        balanceEth = ethers.formatEther(balanceWei)
+        console.log('✅ Balance fetched:', balanceEth)
+      } catch (balanceError) {
+        console.warn('⚠️ Failed to fetch balance, using 0.0:', balanceError.message)
+        // Continue with 0 balance instead of failing the whole operation
+      }
+
+      const ethPriceUSD = 2500 // Mock price
+      const balanceUSD = (parseFloat(balanceEth) * ethPriceUSD).toFixed(2)
+      const percentChange = (Math.random() * 4 - 2).toFixed(2)
+
+      // Add new wallet
+      const newWallet = {
+        id: Date.now().toString(),
+        name: walletName.trim(),
+        address: accountData.address,
+        balance: balanceEth,
+        balanceUSD,
+        percentChange,
+        index: indexNum, // Store the index for reference
+        owner: ownerAddress, // Store the owner address used to create this wallet
+        createdAt: new Date().toISOString(),
+      }
+
+      walletsList.push(newWallet)
+      localStorage.setItem('ethaura_wallets_list', JSON.stringify(walletsList))
+
+      // Update wallets state
+      setWallets([...wallets, newWallet])
+
+      // Close modal and reset form
+      setShowAddModal(false)
+      setWalletAddress('')
+      setWalletName('')
+      setWalletIndex('0')
+      setAddError('')
+      setModalMode('import')
+    } catch (err) {
+      console.error('Error creating wallet:', err)
+      setAddError(err.message || 'Failed to create wallet. Please try again.')
     } finally {
       setIsAdding(false)
     }
@@ -425,41 +609,170 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onLogo
 
       {/* Add Wallet Modal */}
       {showAddModal && (
-        <div className="modal-overlay" onClick={() => setShowAddModal(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-overlay" onClick={() => {
+          setShowAddModal(false)
+          setModalMode('import')
+          setWalletAddress('')
+          setWalletName('')
+          setWalletIndex('0')
+          setAddError('')
+        }}>
+          <div className="modal-content add-wallet-modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h2>Add Existing Wallet</h2>
-              <button className="modal-close" onClick={() => setShowAddModal(false)}>×</button>
+              <h2>Add Wallet</h2>
+              <button className="modal-close" onClick={() => {
+                setShowAddModal(false)
+                setModalMode('import')
+                setWalletAddress('')
+                setWalletName('')
+                setWalletIndex('0')
+                setAddError('')
+              }}>×</button>
             </div>
             <div className="modal-body">
-              <p className="modal-description">
-                Add an existing smart account wallet by entering its address.
-                This allows you to track and manage multiple wallets in one place.
-              </p>
-
-              <div className="form-group">
-                <label className="form-label">Wallet Name</label>
-                <input
-                  type="text"
-                  className="form-input"
-                  placeholder="e.g., My Main Wallet"
-                  value={walletName}
-                  onChange={(e) => setWalletName(e.target.value)}
-                  maxLength={30}
-                />
+              {/* Mode Tabs */}
+              <div className="modal-tabs">
+                <button
+                  className={`modal-tab ${modalMode === 'import' ? 'active' : ''}`}
+                  onClick={() => {
+                    setModalMode('import')
+                    setAddError('')
+                  }}
+                >
+                  Import Existing
+                </button>
+                <button
+                  className={`modal-tab ${modalMode === 'create' ? 'active' : ''}`}
+                  onClick={() => {
+                    setModalMode('create')
+                    setAddError('')
+                  }}
+                >
+                  Create New
+                </button>
               </div>
 
-              <div className="form-group">
-                <label className="form-label">Wallet Address</label>
-                <input
-                  type="text"
-                  className="form-input"
-                  placeholder="0x..."
-                  value={walletAddress}
-                  onChange={(e) => setWalletAddress(e.target.value)}
-                />
-                <p className="form-hint">Enter the Ethereum address of your smart account</p>
-              </div>
+              {/* Import Mode */}
+              {modalMode === 'import' && (
+                <>
+                  <p className="modal-description">
+                    Add an existing smart account wallet by entering its address.
+                    This allows you to track and manage multiple wallets in one place.
+                  </p>
+
+                  <div className="form-group">
+                    <label className="form-label">Wallet Name</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      placeholder="e.g., My Main Wallet"
+                      value={walletName}
+                      onChange={(e) => setWalletName(e.target.value)}
+                      maxLength={30}
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Wallet Address</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      placeholder="0x..."
+                      value={walletAddress}
+                      onChange={(e) => setWalletAddress(e.target.value)}
+                    />
+                    <p className="form-hint">Enter the Ethereum address of your smart account</p>
+                  </div>
+                </>
+              )}
+
+              {/* Create Mode */}
+              {modalMode === 'create' && (
+                <>
+                  <p className="modal-description">
+                    Create a new smart account wallet using your Web3Auth social login.
+                    Use different indices to create multiple wallets.
+                  </p>
+
+                  <div className="info-box">
+                    <div className="info-icon">ℹ️</div>
+                    <div className="info-text">
+                      <strong>Your Owner Address:</strong>
+                      <div className="owner-address">{ownerAddress || 'Not logged in'}</div>
+                      <p className="info-hint">
+                        Each index creates a unique wallet address. Use index 0 for your first wallet,
+                        1 for your second, and so on.
+                        <br />
+                        <strong>Important:</strong> Same owner + same index = same address (always deterministic)
+                      </p>
+                      {(() => {
+                        const walletsList = JSON.parse(localStorage.getItem('ethaura_wallets_list') || '[]')
+
+                        // Get indices used by current owner
+                        const currentOwnerIndices = walletsList
+                          .filter(w => w.index !== undefined && w.owner === ownerAddress)
+                          .map(w => w.index)
+                          .sort((a, b) => a - b)
+
+                        // Get indices used by other owners
+                        const otherOwnerIndices = walletsList
+                          .filter(w => w.index !== undefined && w.owner && w.owner !== ownerAddress)
+                          .map(w => w.index)
+                          .sort((a, b) => a - b)
+
+                        return (
+                          <>
+                            {currentOwnerIndices.length > 0 && (
+                              <p className="info-hint" style={{ marginTop: '8px', color: '#f59e0b' }}>
+                                <strong>Your used indices:</strong> {currentOwnerIndices.join(', ')}
+                              </p>
+                            )}
+                            {otherOwnerIndices.length > 0 && (
+                              <p className="info-hint" style={{ marginTop: '4px', color: '#9ca3af', fontSize: '11px' }}>
+                                (Indices {otherOwnerIndices.join(', ')} used by other accounts)
+                              </p>
+                            )}
+                            <p className="info-hint" style={{ marginTop: '8px', fontSize: '11px', color: '#6b7280' }}>
+                              💡 Tip: If you previously created wallets on another device or session,
+                              use "Import Existing" tab to add them to this list.
+                            </p>
+                          </>
+                        )
+                      })()}
+                    </div>
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Wallet Name</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      placeholder="e.g., My Main Wallet"
+                      value={walletName}
+                      onChange={(e) => setWalletName(e.target.value)}
+                      maxLength={30}
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">
+                      Index (Salt)
+                    </label>
+                    <input
+                      type="number"
+                      className="form-input"
+                      placeholder="0"
+                      value={walletIndex}
+                      onChange={(e) => setWalletIndex(e.target.value)}
+                      min="0"
+                      step="1"
+                    />
+                    <p className="form-hint">
+                      Use 0 for your first wallet, 1 for second, etc. Each index creates a different address.
+                    </p>
+                  </div>
+                </>
+              )}
 
               {addError && (
                 <div className="error-message">
@@ -472,8 +785,10 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onLogo
                   className="btn-secondary"
                   onClick={() => {
                     setShowAddModal(false)
+                    setModalMode('import')
                     setWalletAddress('')
                     setWalletName('')
+                    setWalletIndex('0')
                     setAddError('')
                   }}
                   disabled={isAdding}
@@ -482,10 +797,10 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onLogo
                 </button>
                 <button
                   className="btn-primary"
-                  onClick={handleAddWallet}
+                  onClick={modalMode === 'import' ? handleAddWallet : handleCreateWallet}
                   disabled={isAdding}
                 >
-                  {isAdding ? 'Adding...' : 'Add Wallet'}
+                  {isAdding ? (modalMode === 'import' ? 'Adding...' : 'Creating...') : (modalMode === 'import' ? 'Add Wallet' : 'Create Wallet')}
                 </button>
               </div>
             </div>

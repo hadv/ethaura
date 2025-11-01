@@ -61,11 +61,20 @@ export class P256AccountManager {
         factoryAddress: this.factoryAddress,
       })
 
-      // Call the factory contract's getAddress function
+      // Call the factory contract's getAddress function with timeout
       // NOTE: We must use getFunction() because getAddress() is a built-in method on Contract
       // that returns the contract's own address, not calling the getAddress() function!
       const getAddressFunc = this.factory.getFunction('getAddress')
-      const onChain = await getAddressFunc(qx, qy, owner, salt)
+
+      // Add timeout to prevent hanging
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('RPC call timeout after 30 seconds')), 30000)
+      )
+
+      const onChain = await Promise.race([
+        getAddressFunc(qx, qy, owner, salt),
+        timeoutPromise
+      ])
 
       console.log('🏭 Factory returned address:', onChain)
 
@@ -73,7 +82,15 @@ export class P256AccountManager {
       return onChain
     } catch (error) {
       console.error('❌ Factory.getAddress() failed:', error)
-      throw new Error(`Failed to get account address from factory: ${error.message}`)
+
+      // Provide more helpful error messages
+      if (error.message.includes('timeout')) {
+        throw new Error('RPC request timed out. Please check your network connection and try again.')
+      } else if (error.code === 'CALL_EXCEPTION') {
+        throw new Error('Factory contract call failed. The contract may not support these parameters.')
+      } else {
+        throw new Error(`Failed to get account address from factory: ${error.message}`)
+      }
     }
   }
 
