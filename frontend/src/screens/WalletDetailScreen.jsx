@@ -11,6 +11,7 @@ import Header from '../components/Header'
 import SubHeader from '../components/SubHeader'
 import ReceiveModal from '../components/ReceiveModal'
 import NetworkSelector from '../components/NetworkSelector'
+import WalletDropdown from '../components/WalletDropdown'
 import '../styles/WalletDetailScreen.css'
 import logo from '../assets/logo.svg'
 
@@ -48,9 +49,7 @@ function WalletDetailScreen({ wallet, onBack, onHome, onSettings, onSend, onLogo
     }
   }, [wallet])
 
-  const handleWalletChange = (e) => {
-    const walletId = e.target.value
-    const newWallet = wallets.find(w => w.id === walletId)
+  const handleWalletChange = (newWallet) => {
     if (newWallet) {
       setSelectedWallet(newWallet)
       // Notify parent component if callback is provided
@@ -226,21 +225,12 @@ function WalletDetailScreen({ wallet, onBack, onHome, onSettings, onSend, onLogo
           </button>
 
           {/* Wallet Selector Dropdown */}
-          <div className="wallet-selector-dropdown">
-            <Identicon address={selectedWallet.address} size={32} className="wallet-icon-small" />
-            <select
-              value={selectedWallet.id}
-              onChange={handleWalletChange}
-              className="wallet-dropdown"
-            >
-              {wallets.map((w) => (
-                <option key={w.id} value={w.id}>
-                  {w.name} ({formatAddress(w.address)})
-                </option>
-              ))}
-            </select>
-            <span className="dropdown-arrow">▼</span>
-          </div>
+          <WalletDropdown
+            wallets={wallets}
+            selectedWallet={selectedWallet}
+            onWalletChange={handleWalletChange}
+            formatAddress={formatAddress}
+          />
 
           <NetworkSelector />
         </div>
