@@ -29,21 +29,13 @@
   background: #F5F5F5;
 }
 
-/* Network Icon Circle */
-.network-icon-circle {
+/* Network Icon */
+.network-icon {
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   flex-shrink: 0;
-}
-
-.network-icon-symbol {
-  font-size: 16px;
-  color: white;
-  line-height: 1;
+  object-fit: cover;
 }
 
 .network-name {
@@ -90,6 +82,13 @@
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+/* Network Separator */
+.network-separator {
+  height: 1px;
+  background: #E5E5E5;
+  margin: 8px 0;
 }
 
 /* Network Option */
@@ -143,13 +142,9 @@
     height: 52px;
   }
 
-  .network-icon-circle {
+  .network-icon {
     width: 28px;
     height: 28px;
-  }
-
-  .network-icon-symbol {
-    font-size: 14px;
   }
 
   .network-name {

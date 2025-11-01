@@ -12,18 +12,9 @@ export const useNetwork = () => {
 };
 
 // Available networks configuration
-// NOTE: Factory contracts are only deployed on testnets (Sepolia, Holesky)
+// NOTE: Factory contracts are only deployed on testnets (Sepolia)
 // Other networks are shown for future expansion but will show "Network not supported" error
 export const AVAILABLE_NETWORKS = [
-  {
-    chainId: 11155111,
-    name: 'Sepolia',
-    rpcUrl: import.meta.env.VITE_RPC_URL || 'https://eth-sepolia.g.alchemy.com/v2/demo',
-    bundlerUrl: import.meta.env.VITE_BUNDLER_URL || 'https://api.pimlico.io/v2/sepolia/rpc?apikey=YOUR_API_KEY',
-    explorerUrl: 'https://sepolia.etherscan.io',
-    factoryAddress: import.meta.env.VITE_FACTORY_ADDRESS,
-    supported: true, // Factory is deployed on Sepolia
-  },
   {
     chainId: 1,
     name: 'Ethereum',
@@ -34,13 +25,13 @@ export const AVAILABLE_NETWORKS = [
     supported: false, // Factory not yet deployed on mainnet
   },
   {
-    chainId: 17000,
-    name: 'Holesky',
-    rpcUrl: 'https://ethereum-holesky-rpc.publicnode.com',
-    bundlerUrl: 'https://api.pimlico.io/v2/holesky/rpc?apikey=YOUR_API_KEY',
-    explorerUrl: 'https://holesky.etherscan.io',
+    chainId: 10,
+    name: 'Optimism',
+    rpcUrl: 'https://mainnet.optimism.io',
+    bundlerUrl: 'https://api.pimlico.io/v2/optimism/rpc?apikey=YOUR_API_KEY',
+    explorerUrl: 'https://optimistic.etherscan.io',
     factoryAddress: import.meta.env.VITE_FACTORY_ADDRESS,
-    supported: false, // Factory not yet deployed on Holesky
+    supported: false, // Factory not yet deployed on Optimism
   },
   {
     chainId: 137,
@@ -61,13 +52,13 @@ export const AVAILABLE_NETWORKS = [
     supported: false, // Factory not yet deployed on Arbitrum
   },
   {
-    chainId: 10,
-    name: 'Optimism',
-    rpcUrl: 'https://mainnet.optimism.io',
-    bundlerUrl: 'https://api.pimlico.io/v2/optimism/rpc?apikey=YOUR_API_KEY',
-    explorerUrl: 'https://optimistic.etherscan.io',
+    chainId: 11155111,
+    name: 'Sepolia',
+    rpcUrl: import.meta.env.VITE_RPC_URL || 'https://eth-sepolia.g.alchemy.com/v2/demo',
+    bundlerUrl: import.meta.env.VITE_BUNDLER_URL || 'https://api.pimlico.io/v2/sepolia/rpc?apikey=YOUR_API_KEY',
+    explorerUrl: 'https://sepolia.etherscan.io',
     factoryAddress: import.meta.env.VITE_FACTORY_ADDRESS,
-    supported: false, // Factory not yet deployed on Optimism
+    supported: true, // Factory is deployed on Sepolia
   },
 ];
 
