@@ -1,17 +1,50 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import TransactionSender from '../components/TransactionSender'
 import Header from '../components/Header'
-import SubHeader from '../components/SubHeader'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
+import { Identicon } from '../utils/identicon.jsx'
+import { getCurrentNetwork } from '../utils/network'
 import '../styles/SendTransactionScreen.css'
 
 function SendTransactionScreen({ wallet, onBack, onHome, credential, accountConfig, onLogout }) {
   const { userInfo } = useWeb3Auth()
+  const [wallets, setWallets] = useState([])
+  const [selectedWallet, setSelectedWallet] = useState(wallet)
+  const network = getCurrentNetwork()
 
-  if (!wallet) {
+  // Load all wallets from localStorage
+  useEffect(() => {
+    const storedWallets = localStorage.getItem('ethaura_wallets_list')
+    if (storedWallets) {
+      const walletsList = JSON.parse(storedWallets)
+      setWallets(walletsList)
+    }
+  }, [])
+
+  // Update selected wallet when prop changes
+  useEffect(() => {
+    if (wallet) {
+      setSelectedWallet(wallet)
+    }
+  }, [wallet])
+
+  const handleWalletChange = (e) => {
+    const walletId = e.target.value
+    const newWallet = wallets.find(w => w.id === walletId)
+    if (newWallet) {
+      setSelectedWallet(newWallet)
+    }
+  }
+
+  const formatAddress = (address) => {
+    if (!address) return ''
+    return `${address.slice(0, 6)}...${address.slice(-4)}`
+  }
+
+  if (!selectedWallet) {
     return (
       <div className="send-transaction-screen">
-        <Header userInfo={userInfo} onLogout={onLogout} />
+        <Header userInfo={userInfo} onLogout={onLogout} onHome={onHome} />
         <div className="error-state">
           <p>Wallet not found</p>
           <button onClick={onBack}>Go Back</button>
@@ -23,15 +56,39 @@ function SendTransactionScreen({ wallet, onBack, onHome, credential, accountConf
   return (
     <div className="send-transaction-screen">
       {/* Header */}
-      <Header userInfo={userInfo} onLogout={onLogout} />
+      <Header userInfo={userInfo} onLogout={onLogout} onHome={onHome} />
 
-      {/* SubHeader with back button */}
-      <SubHeader
-        wallet={wallet}
-        onBack={onBack}
-        showBackButton={true}
-        onSettings={() => {}}
-      />
+      {/* Custom SubHeader with wallet selector */}
+      <div className="sub-header">
+        <div className="sub-header-left">
+          <button className="back-btn" onClick={onBack}>
+            <span>←</span>
+          </button>
+
+          {/* Wallet Selector Dropdown */}
+          <div className="wallet-selector-dropdown">
+            <Identicon address={selectedWallet.address} size={32} className="wallet-icon-small" />
+            <select
+              value={selectedWallet.id}
+              onChange={handleWalletChange}
+              className="wallet-dropdown"
+            >
+              {wallets.map((w) => (
+                <option key={w.id} value={w.id}>
+                  {w.name} ({formatAddress(w.address)})
+                </option>
+              ))}
+            </select>
+            <span className="dropdown-arrow">▼</span>
+          </div>
+
+          <div className="network-selector">
+            <div className="network-icon" style={{ color: network.color }}>{network.icon}</div>
+            <span className="network-name">{network.name}</span>
+            <span className="dropdown-arrow">▼</span>
+          </div>
+        </div>
+      </div>
 
       {/* Main Content */}
       <div className="send-content-wrapper">
@@ -44,7 +101,7 @@ function SendTransactionScreen({ wallet, onBack, onHome, credential, accountConf
 
             {/* Transaction Form */}
             <TransactionSender
-              accountAddress={wallet.address}
+              accountAddress={selectedWallet.address}
               credential={credential}
               accountConfig={accountConfig}
             />

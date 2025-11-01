@@ -1,15 +1,17 @@
 import { useState } from 'react'
 import { HiChartBar, HiBell, HiCog } from 'react-icons/hi'
 import { Identicon } from '../utils/identicon.jsx'
+import { getCurrentNetwork } from '../utils/network'
 import '../styles/SubHeader.css'
 
-const SubHeader = ({ 
+const SubHeader = ({
   wallet,
   onBack,
   showBackButton = false,
-  onSettings
+  onSettings,
+  hideActions = false
 }) => {
-  const [selectedNetwork, setSelectedNetwork] = useState('Ethereum')
+  const network = getCurrentNetwork()
 
   const formatAddress = (address) => {
     if (!address) return ''
@@ -24,7 +26,7 @@ const SubHeader = ({
             <span>←</span>
           </button>
         )}
-        
+
         {wallet && (
           <div className="wallet-selector">
             <Identicon address={wallet.address} size={32} className="wallet-icon-small" />
@@ -34,33 +36,27 @@ const SubHeader = ({
             </div>
           </div>
         )}
-        
+
         <div className="network-selector">
-          <div className="network-icon">≡</div>
-          <select 
-            value={selectedNetwork} 
-            onChange={(e) => setSelectedNetwork(e.target.value)} 
-            className="network-dropdown"
-          >
-            <option value="Ethereum">Ethereum</option>
-            <option value="Sepolia">Sepolia</option>
-            <option value="Polygon">Polygon</option>
-          </select>
+          <div className="network-icon" style={{ color: network.color }}>{network.icon}</div>
+          <span className="network-name">{network.name}</span>
           <span className="dropdown-arrow">▼</span>
         </div>
       </div>
-      
-      <div className="sub-header-right">
-        <button className="sub-header-icon-btn" title="Analytics">
-          <HiChartBar />
-        </button>
-        <button className="sub-header-icon-btn" title="Notifications">
-          <HiBell />
-        </button>
-        <button className="sub-header-icon-btn" onClick={onSettings} title="Settings">
-          <HiCog />
-        </button>
-      </div>
+
+      {!hideActions && (
+        <div className="sub-header-right">
+          <button className="sub-header-icon-btn" title="Analytics">
+            <HiChartBar />
+          </button>
+          <button className="sub-header-icon-btn" title="Notifications">
+            <HiBell />
+          </button>
+          <button className="sub-header-icon-btn" onClick={onSettings} title="Settings">
+            <HiCog />
+          </button>
+        </div>
+      )}
     </div>
   )
 }

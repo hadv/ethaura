@@ -4,7 +4,7 @@ import Header from '../components/Header'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
 import '../styles/NewWalletScreen.css'
 
-function NewWalletScreen({ onBack, onWalletCreated, credential, onLogout }) {
+function NewWalletScreen({ onBack, onWalletCreated, credential, onLogout, onHome }) {
   const { userInfo } = useWeb3Auth()
 
   const handleAccountCreated = (address) => {
@@ -17,7 +17,7 @@ function NewWalletScreen({ onBack, onWalletCreated, credential, onLogout }) {
   return (
     <div className="new-wallet-screen">
       {/* Header */}
-      <Header userInfo={userInfo} onLogout={onLogout} />
+      <Header userInfo={userInfo} onLogout={onLogout} onHome={onHome} />
 
       {/* Main Content */}
       <div className="new-content-wrapper">

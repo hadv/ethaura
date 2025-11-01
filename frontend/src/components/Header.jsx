@@ -4,11 +4,12 @@ import logo from '../assets/logo.svg'
 
 const Header = ({
   userInfo,
-  onLogout
+  onLogout,
+  onHome
 }) => {
   return (
     <header className="app-header">
-      <div className="brand-section">
+      <div className="brand-section" onClick={onHome} style={{ cursor: 'pointer' }}>
         <img src={logo} alt="Ethaura Logo" className="brand-logo" />
       </div>
       <div className="header-right">

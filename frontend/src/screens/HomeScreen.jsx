@@ -10,7 +10,7 @@ import ReceiveModal from '../components/ReceiveModal'
 import '../styles/HomeScreen.css'
 import logo from '../assets/logo.svg'
 
-function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onLogout }) {
+function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onLogout }) {
   const { userInfo, address: ownerAddress } = useWeb3Auth()
   const [wallets, setWallets] = useState([])
   const [loading, setLoading] = useState(false)
@@ -287,12 +287,22 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onLogout }) {
     setShowReceiveModal(true)
   }
 
+  // Send handler - use first wallet
+  const handleSendClick = () => {
+    if (wallets.length === 0) {
+      return
+    }
+    // Use the first wallet as the selected one
+    onSend(wallets[0])
+  }
+
   return (
     <div className="home-screen">
       {/* Header */}
       <Header
         userInfo={userInfo}
         onLogout={onLogout}
+        onHome={() => {}} // On home screen, clicking logo does nothing (already home)
       />
 
       {/* Main Content */}
@@ -312,7 +322,11 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onLogout }) {
 
             {/* Action Buttons */}
             <div className="action-buttons">
-              <button className="action-btn send-btn">
+              <button
+                className="action-btn send-btn"
+                onClick={handleSendClick}
+                disabled={wallets.length === 0}
+              >
                 <HiArrowUp className="btn-icon" />
                 Send
               </button>

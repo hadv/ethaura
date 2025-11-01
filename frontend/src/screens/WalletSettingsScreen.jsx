@@ -15,7 +15,7 @@ function WalletSettingsScreen({ wallet, onBack, onHome, onLogout }) {
   if (!wallet) {
     return (
       <div className="wallet-settings-screen">
-        <Header userInfo={userInfo} onLogout={onLogout} />
+        <Header userInfo={userInfo} onLogout={onLogout} onHome={onHome} />
         <div className="error-state">
           <p>Wallet not found</p>
           <button onClick={onBack}>Go Back</button>
@@ -27,7 +27,7 @@ function WalletSettingsScreen({ wallet, onBack, onHome, onLogout }) {
   return (
     <div className="wallet-settings-screen">
       {/* Header */}
-      <Header userInfo={userInfo} onLogout={onLogout} />
+      <Header userInfo={userInfo} onLogout={onLogout} onHome={onHome} />
 
       {/* SubHeader with back button */}
       <SubHeader
@@ -35,6 +35,7 @@ function WalletSettingsScreen({ wallet, onBack, onHome, onLogout }) {
         onBack={onBack}
         showBackButton={true}
         onSettings={() => {}}
+        hideActions={true}
       />
 
       {/* Main Content */}
