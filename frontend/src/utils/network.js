@@ -66,18 +66,64 @@ export function getNetworkColor(chainId) {
 }
 
 /**
- * Get current network configuration from environment
+ * Get current network configuration from environment (deprecated - use NetworkContext instead)
+ * @param {number} chainId - Optional chain ID, defaults to env variable
  * @returns {Object} Network configuration
  */
-export function getCurrentNetwork() {
-  const chainId = parseInt(import.meta.env.VITE_CHAIN_ID || '11155111')
-  
+export function getCurrentNetwork(chainId = null) {
+  const selectedChainId = chainId || parseInt(import.meta.env.VITE_CHAIN_ID || '11155111')
+
   return {
-    chainId,
-    name: getNetworkName(chainId),
-    icon: getNetworkIcon(chainId),
-    color: getNetworkColor(chainId),
+    chainId: selectedChainId,
+    name: getNetworkName(selectedChainId),
+    icon: getNetworkIcon(selectedChainId),
+    color: getNetworkColor(selectedChainId),
     rpcUrl: import.meta.env.VITE_RPC_URL || 'https://rpc.sepolia.org',
   }
+}
+
+/**
+ * Get all available networks
+ * @returns {Array} List of all supported networks
+ */
+export function getAllNetworks() {
+  return [
+    {
+      chainId: 11155111,
+      name: 'Sepolia',
+      icon: getNetworkIcon(11155111),
+      color: getNetworkColor(11155111),
+    },
+    {
+      chainId: 1,
+      name: 'Ethereum',
+      icon: getNetworkIcon(1),
+      color: getNetworkColor(1),
+    },
+    {
+      chainId: 17000,
+      name: 'Holesky',
+      icon: getNetworkIcon(17000),
+      color: getNetworkColor(17000),
+    },
+    {
+      chainId: 137,
+      name: 'Polygon',
+      icon: getNetworkIcon(137),
+      color: getNetworkColor(137),
+    },
+    {
+      chainId: 42161,
+      name: 'Arbitrum',
+      icon: getNetworkIcon(42161),
+      color: getNetworkColor(42161),
+    },
+    {
+      chainId: 10,
+      name: 'Optimism',
+      icon: getNetworkIcon(10),
+      color: getNetworkColor(10),
+    },
+  ]
 }
 

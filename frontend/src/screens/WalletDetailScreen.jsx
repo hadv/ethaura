@@ -1,20 +1,22 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { ethers } from 'ethers'
 import { HiArrowUp, HiArrowDown } from 'react-icons/hi'
 import { BiTransfer } from 'react-icons/bi'
 import { MdFlashOn } from 'react-icons/md'
 import { P256_ACCOUNT_ABI } from '../lib/constants'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
+import { useNetwork } from '../contexts/NetworkContext'
 import { Identicon } from '../utils/identicon.jsx'
-import { getCurrentNetwork } from '../utils/network'
 import Header from '../components/Header'
 import SubHeader from '../components/SubHeader'
 import ReceiveModal from '../components/ReceiveModal'
+import NetworkSelector from '../components/NetworkSelector'
 import '../styles/WalletDetailScreen.css'
 import logo from '../assets/logo.svg'
 
 function WalletDetailScreen({ wallet, onBack, onHome, onSettings, onSend, onLogout, onWalletChange }) {
   const { userInfo } = useWeb3Auth()
+  const { networkInfo } = useNetwork()
   const [wallets, setWallets] = useState([])
   const [selectedWallet, setSelectedWallet] = useState(wallet)
   const [balance, setBalance] = useState('0')
@@ -22,7 +24,6 @@ function WalletDetailScreen({ wallet, onBack, onHome, onSettings, onSend, onLogo
   const [balanceChange, setBalanceChange] = useState('+3.10%')
   const [loading, setLoading] = useState(false)
   const [showReceiveModal, setShowReceiveModal] = useState(false)
-  const network = getCurrentNetwork()
   const [assets, setAssets] = useState([])
   const [transactions, setTransactions] = useState([])
   const [securityStatus, setSecurityStatus] = useState({
@@ -47,12 +48,6 @@ function WalletDetailScreen({ wallet, onBack, onHome, onSettings, onSend, onLogo
     }
   }, [wallet])
 
-  useEffect(() => {
-    if (selectedWallet?.address) {
-      fetchWalletData()
-    }
-  }, [selectedWallet])
-
   const handleWalletChange = (e) => {
     const walletId = e.target.value
     const newWallet = wallets.find(w => w.id === walletId)
@@ -65,12 +60,19 @@ function WalletDetailScreen({ wallet, onBack, onHome, onSettings, onSend, onLogo
     }
   }
 
-  const fetchWalletData = async () => {
+  const fetchWalletData = useCallback(async () => {
+    if (!selectedWallet?.address) return
+
+    // Immediately reset state when network changes to show loading
+    setLoading(true)
+    setSecurityStatus({
+      has2FA: false,
+      guardianCount: 0,
+      isDeployed: false
+    })
+
     try {
-      setLoading(true)
-      const provider = new ethers.JsonRpcProvider(
-        import.meta.env.VITE_RPC_URL || 'https://rpc.sepolia.org'
-      )
+      const provider = new ethers.JsonRpcProvider(networkInfo.rpcUrl)
 
       // Fetch balance
       const balanceWei = await provider.getBalance(selectedWallet.address)
@@ -155,10 +157,26 @@ function WalletDetailScreen({ wallet, onBack, onHome, onSettings, onSend, onLogo
       }
     } catch (error) {
       console.error('Failed to fetch wallet data:', error)
+
+      // Check if it's a network compatibility error
+      if (error.message && (error.message.includes('Factory contract not deployed') ||
+                            error.message.includes('Factory address not configured'))) {
+        // Set error state for unsupported network
+        setSecurityStatus({
+          has2FA: false,
+          guardianCount: 0,
+          isDeployed: false,
+          error: 'Network not supported - Factory contract not deployed'
+        })
+      }
     } finally {
       setLoading(false)
     }
-  }
+  }, [selectedWallet, networkInfo.rpcUrl, networkInfo.chainId])
+
+  useEffect(() => {
+    fetchWalletData()
+  }, [fetchWalletData])
 
   const formatAddress = (address) => {
     if (!address) return ''
@@ -224,11 +242,7 @@ function WalletDetailScreen({ wallet, onBack, onHome, onSettings, onSend, onLogo
             <span className="dropdown-arrow">▼</span>
           </div>
 
-          <div className="network-selector">
-            <div className="network-icon" style={{ color: network.color }}>{network.icon}</div>
-            <span className="network-name">{network.name}</span>
-            <span className="dropdown-arrow">▼</span>
-          </div>
+          <NetworkSelector />
         </div>
 
         <div className="sub-header-right">
@@ -363,6 +377,50 @@ function WalletDetailScreen({ wallet, onBack, onHome, onSettings, onSend, onLogo
 
         {/* Sidebar */}
         <div className="sidebar-content">
+          {/* Security Status */}
+          <div className="sidebar-card">
+            <h3 className="sidebar-title">Security Status</h3>
+            <div className="security-status-content">
+              {securityStatus.error ? (
+                <div className="status-item">
+                  <span className="status-label">⚠️ Network:</span>
+                  <span className="status-value" style={{ color: '#ff6b6b', fontSize: '0.9em' }}>
+                    {securityStatus.error}
+                  </span>
+                </div>
+              ) : (
+                <>
+                  <div className="status-item">
+                    <span className="status-label">Status:</span>
+                    <span className={`status-value ${securityStatus.isDeployed ? 'deployed' : 'not-deployed'}`}>
+                      {securityStatus.isDeployed ? '✅ Deployed' : '⏳ Not Deployed'}
+                    </span>
+                  </div>
+                  <div className="status-item">
+                    <span className="status-label">Security:</span>
+                    <span className={`status-value ${securityStatus.has2FA ? 'enabled' : 'disabled'}`}>
+                      {securityStatus.has2FA ? '🔒 2FA Enabled' : '🔓 2FA Disabled'}
+                    </span>
+                  </div>
+                  {securityStatus.guardianCount > 0 && (
+                    <div className="status-item">
+                      <span className="status-label">Guardians:</span>
+                      <span className="status-value">
+                        👥 {securityStatus.guardianCount} Guardian{securityStatus.guardianCount !== 1 ? 's' : ''}
+                      </span>
+                    </div>
+                  )}
+                </>
+              )}
+              <div className="status-item">
+                <span className="status-label">Network:</span>
+                <span className="status-value network-name">
+                  {networkInfo.icon} {networkInfo.name}
+                </span>
+              </div>
+            </div>
+          </div>
+
           {/* Pending Transactions */}
           <div className="sidebar-card">
             <h3 className="sidebar-title">Pending transactions</h3>

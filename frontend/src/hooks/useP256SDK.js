@@ -4,7 +4,7 @@
 
 import { useMemo, useState, useCallback } from 'react'
 import { createSDK } from '../lib/P256AccountSDK.js'
-import { NETWORKS } from '../lib/constants.js'
+import { useNetwork } from '../contexts/NetworkContext'
 
 /**
  * Hook to use P256Account SDK
@@ -12,18 +12,23 @@ import { NETWORKS } from '../lib/constants.js'
  * @returns {Object} SDK instance and helper functions
  */
 export function useP256SDK(config = null) {
+  const { networkInfo } = useNetwork()
+
   const sdk = useMemo(() => {
-    const defaultConfig = {
-      factoryAddress: import.meta.env.VITE_FACTORY_ADDRESS,
-      rpcUrl: import.meta.env.VITE_RPC_URL || NETWORKS.sepolia.rpcUrl,
-      bundlerUrl: import.meta.env.VITE_BUNDLER_URL || NETWORKS.sepolia.bundlerUrl,
-      chainId: parseInt(import.meta.env.VITE_CHAIN_ID || NETWORKS.sepolia.chainId),
+    if (config) {
+      return createSDK(config)
     }
 
-    const finalConfig = config || defaultConfig
+    // Use network from context
+    const defaultConfig = {
+      factoryAddress: networkInfo.factoryAddress,
+      rpcUrl: networkInfo.rpcUrl,
+      bundlerUrl: networkInfo.bundlerUrl,
+      chainId: networkInfo.chainId,
+    }
 
-    return createSDK(finalConfig)
-  }, [config])
+    return createSDK(defaultConfig)
+  }, [config, networkInfo])
 
   return sdk
 }

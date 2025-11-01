@@ -1,7 +1,6 @@
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
 import { useP256SDK } from '../hooks/useP256SDK'
-import { NETWORKS } from '../lib/constants'
 import { signWithPasskey } from '../utils/webauthn'
 
 function GuardianManager({ accountAddress, credential, onGuardiansUpdated }) {
@@ -14,15 +13,8 @@ function GuardianManager({ accountAddress, credential, onGuardiansUpdated }) {
   const [newThreshold, setNewThreshold] = useState('')
   const [guardianInfo, setGuardianInfo] = useState(null)
 
-  // Memoize SDK config to prevent recreating SDK on every render
-  const sdkConfig = useMemo(() => ({
-    factoryAddress: import.meta.env.VITE_FACTORY_ADDRESS,
-    rpcUrl: import.meta.env.VITE_RPC_URL || NETWORKS.sepolia.rpcUrl,
-    bundlerUrl: import.meta.env.VITE_BUNDLER_URL || NETWORKS.sepolia.bundlerUrl,
-    chainId: parseInt(import.meta.env.VITE_CHAIN_ID || NETWORKS.sepolia.chainId)
-  }), [])
-
-  const sdk = useP256SDK(sdkConfig)
+  // Use SDK from hook (will use network from context)
+  const sdk = useP256SDK()
 
   // Use ref to track if we've already loaded guardian info for this address
   const loadedAddressRef = useRef(null)
