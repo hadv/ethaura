@@ -43,6 +43,16 @@ export class P256AccountManager {
    */
   async getAccountAddress(qx, qy, owner, salt = 0n) {
     try {
+      // First check if factory is deployed on this network
+      if (!this.factoryAddress || this.factoryAddress === ethers.ZeroAddress) {
+        throw new Error('Factory address not configured for this network')
+      }
+
+      const factoryCode = await this.provider.getCode(this.factoryAddress)
+      if (factoryCode === '0x') {
+        throw new Error(`Factory contract not deployed on this network at ${this.factoryAddress}`)
+      }
+
       console.log('🏭 Calling factory.getAddress with:', {
         qx,
         qy,

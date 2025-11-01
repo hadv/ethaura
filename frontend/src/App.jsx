@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Web3AuthProvider, useWeb3Auth } from './contexts/Web3AuthContext'
+import { NetworkProvider } from './contexts/NetworkContext'
 import LoginScreen from './components/LoginScreen'
 import HomeScreen from './screens/HomeScreen'
 import WalletDetailScreen from './screens/WalletDetailScreen'
@@ -281,11 +282,13 @@ function AppContent() {
   )
 }
 
-// Main App component with Web3AuthProvider
+// Main App component with Web3AuthProvider and NetworkProvider
 function App() {
   return (
     <Web3AuthProvider>
-      <AppContent />
+      <NetworkProvider>
+        <AppContent />
+      </NetworkProvider>
     </Web3AuthProvider>
   )
 }

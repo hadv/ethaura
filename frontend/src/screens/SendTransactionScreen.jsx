@@ -2,15 +2,16 @@ import { useState, useEffect } from 'react'
 import TransactionSender from '../components/TransactionSender'
 import Header from '../components/Header'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
+import { useNetwork } from '../contexts/NetworkContext'
 import { Identicon } from '../utils/identicon.jsx'
-import { getCurrentNetwork } from '../utils/network'
+import NetworkSelector from '../components/NetworkSelector'
 import '../styles/SendTransactionScreen.css'
 
 function SendTransactionScreen({ wallet, onBack, onHome, credential, accountConfig, onLogout }) {
   const { userInfo } = useWeb3Auth()
+  const { networkInfo } = useNetwork()
   const [wallets, setWallets] = useState([])
   const [selectedWallet, setSelectedWallet] = useState(wallet)
-  const network = getCurrentNetwork()
 
   // Load all wallets from localStorage
   useEffect(() => {
@@ -82,11 +83,7 @@ function SendTransactionScreen({ wallet, onBack, onHome, credential, accountConf
             <span className="dropdown-arrow">▼</span>
           </div>
 
-          <div className="network-selector">
-            <div className="network-icon" style={{ color: network.color }}>{network.icon}</div>
-            <span className="network-name">{network.name}</span>
-            <span className="dropdown-arrow">▼</span>
-          </div>
+          <NetworkSelector />
         </div>
       </div>
 

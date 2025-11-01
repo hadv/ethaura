@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
+import { useNetwork } from '../contexts/NetworkContext'
 import { signWithPasskey } from '../utils/webauthn'
 import { formatSignatureForDisplay } from '../utils/signatureUtils'
 import { useP256SDK } from '../hooks/useP256SDK'
@@ -12,6 +13,7 @@ import '../styles/TransactionSender.css'
 
 function TransactionSender({ accountAddress, credential, accountConfig }) {
   const { isConnected, signMessage, signRawHash, address: ownerAddress } = useWeb3Auth()
+  const { networkInfo } = useNetwork()
   const sdk = useP256SDK()
   const [status, setStatus] = useState('')
   const [error, setError] = useState('')
@@ -73,6 +75,9 @@ function TransactionSender({ accountAddress, credential, accountConfig }) {
   useEffect(() => {
     const loadAccountInfo = async () => {
       if (accountAddress && sdk && ownerAddress) {
+        // Immediately reset state when network changes
+        setAccountInfo(null)
+
         try {
           // First, check if account is deployed
           const isDeployed = await sdk.accountManager.isDeployed(accountAddress)
@@ -152,11 +157,32 @@ function TransactionSender({ accountAddress, credential, accountConfig }) {
           // This reduces unnecessary RPC calls
         } catch (err) {
           console.error('Error loading account info:', err)
+
+          // Check if it's a factory not deployed error
+          if (err.message && err.message.includes('Factory contract not deployed')) {
+            setAccountInfo({
+              address: accountAddress,
+              deployed: false,
+              isDeployed: false,
+              twoFactorEnabled: false,
+              hasPasskey: false,
+              error: 'Factory not deployed on this network',
+            })
+          } else if (err.message && err.message.includes('Factory address not configured')) {
+            setAccountInfo({
+              address: accountAddress,
+              deployed: false,
+              isDeployed: false,
+              twoFactorEnabled: false,
+              hasPasskey: false,
+              error: 'Network not supported',
+            })
+          }
         }
       }
     }
     loadAccountInfo()
-  }, [accountAddress, sdk, credential, ownerAddress, accountConfig])
+  }, [accountAddress, sdk, credential, ownerAddress, accountConfig, networkInfo.chainId])
 
   // Load balance and deposit info
   const loadBalanceInfo = async (address) => {
@@ -775,13 +801,13 @@ function TransactionSender({ accountAddress, credential, accountConfig }) {
     }
   }
 
-  // Load balance when component mounts
+  // Load balance when component mounts or network changes
   useEffect(() => {
     if (accountAddress && sdk) {
       loadBalanceInfo(accountAddress)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [accountAddress, sdk])
+  }, [accountAddress, sdk, networkInfo.chainId])
 
   // Calculate USD value
   const getUSDValue = () => {
@@ -896,7 +922,7 @@ function TransactionSender({ accountAddress, credential, accountConfig }) {
           <div className="tx-hash-label">Transaction Hash:</div>
           <div className="tx-hash">{txHash}</div>
           <a
-            href={`https://sepolia.etherscan.io/tx/${txHash}`}
+            href={`${networkInfo.explorerUrl}/tx/${txHash}`}
             target="_blank"
             rel="noopener noreferrer"
             className="view-explorer"
@@ -909,17 +935,28 @@ function TransactionSender({ accountAddress, credential, accountConfig }) {
       {/* Account Info - Collapsible */}
       {accountInfo && !txHash && (
         <div className="account-info">
-          <div className="info-item">
-            <span className="info-label">Status:</span>
-            <span className="info-value">
-              {accountInfo.isDeployed ? '✅ Deployed' : '⏳ Will deploy on first transaction'}
-            </span>
-          </div>
-          {accountInfo.twoFactorEnabled && (
+          {accountInfo.error ? (
             <div className="info-item">
-              <span className="info-label">Security:</span>
-              <span className="info-value">🔒 2FA Enabled</span>
+              <span className="info-label">⚠️ Network Status:</span>
+              <span className="info-value" style={{ color: '#ff6b6b' }}>
+                {accountInfo.error}
+              </span>
             </div>
+          ) : (
+            <>
+              <div className="info-item">
+                <span className="info-label">Status:</span>
+                <span className="info-value">
+                  {accountInfo.isDeployed ? '✅ Deployed' : '⏳ Will deploy on first transaction'}
+                </span>
+              </div>
+              {accountInfo.twoFactorEnabled && (
+                <div className="info-item">
+                  <span className="info-label">Security:</span>
+                  <span className="info-value">🔒 2FA Enabled</span>
+                </div>
+              )}
+            </>
           )}
         </div>
       )}

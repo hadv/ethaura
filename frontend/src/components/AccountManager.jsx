@@ -1,16 +1,16 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
+import { useNetwork } from '../contexts/NetworkContext'
 import { useP256SDK } from '../hooks/useP256SDK'
-import { NETWORKS } from '../lib/constants'
 import { formatPublicKeyForContract } from '../lib/accountManager'
 
 function AccountManager({ credential, onAccountCreated, accountAddress, accountConfig, onAccountConfigChanged }) {
   const { isConnected, address: ownerAddress } = useWeb3Auth()
+  const { networkInfo } = useNetwork()
   const [status, setStatus] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
-  const [factoryAddress, setFactoryAddress] = useState(import.meta.env.VITE_FACTORY_ADDRESS || '')
   const [accountInfo, setAccountInfo] = useState(null)
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(false)
   const [guardianInfo, setGuardianInfo] = useState(null)
@@ -20,23 +20,8 @@ function AccountManager({ credential, onAccountCreated, accountAddress, accountC
   // Use ref to track if we've already loaded account info for this address
   const loadedAddressRef = useRef(null)
 
-  // Memoize SDK config to prevent recreating SDK on every render
-  const sdkConfig = useMemo(() => ({
-    factoryAddress,
-    rpcUrl: import.meta.env.VITE_RPC_URL || NETWORKS.sepolia.rpcUrl,
-    bundlerUrl: import.meta.env.VITE_BUNDLER_URL || NETWORKS.sepolia.bundlerUrl,
-    chainId: parseInt(import.meta.env.VITE_CHAIN_ID || NETWORKS.sepolia.chainId)
-  }), [factoryAddress])
-
-  const sdk = useP256SDK(sdkConfig)
-
-  // Load factory address from env
-  useEffect(() => {
-    const envFactoryAddress = import.meta.env.VITE_FACTORY_ADDRESS
-    if (envFactoryAddress) {
-      setFactoryAddress(envFactoryAddress)
-    }
-  }, [])
+  // Use SDK from hook (will use network from context)
+  const sdk = useP256SDK()
 
   // Function to refresh account info with debouncing to prevent rate limiting
   const refreshAccountInfo = useCallback(async () => {
@@ -131,8 +116,8 @@ function AccountManager({ credential, onAccountCreated, accountAddress, accountC
       return
     }
 
-    if (!factoryAddress) {
-      setError('Please enter factory address')
+    if (!networkInfo.factoryAddress) {
+      setError('Factory address not configured for this network')
       return
     }
 
@@ -203,8 +188,8 @@ function AccountManager({ credential, onAccountCreated, accountAddress, accountC
       return
     }
 
-    if (!factoryAddress) {
-      setError('Please enter factory address')
+    if (!networkInfo.factoryAddress) {
+      setError('Factory address not configured for this network')
       return
     }
 
@@ -293,9 +278,9 @@ function AccountManager({ credential, onAccountCreated, accountAddress, accountC
               type="text"
               className="input"
               placeholder="0x..."
-              value={factoryAddress}
-              onChange={(e) => setFactoryAddress(e.target.value)}
-              disabled={!isConnected}
+              value={networkInfo.factoryAddress || ''}
+              disabled={true}
+              title="Factory address is configured per network"
             />
           </div>
 

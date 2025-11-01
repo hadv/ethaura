@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { HiChartBar, HiBell, HiCog } from 'react-icons/hi'
 import { Identicon } from '../utils/identicon.jsx'
-import { getCurrentNetwork } from '../utils/network'
+import NetworkSelector from './NetworkSelector'
 import '../styles/SubHeader.css'
 
 const SubHeader = ({
@@ -11,8 +11,6 @@ const SubHeader = ({
   onSettings,
   hideActions = false
 }) => {
-  const network = getCurrentNetwork()
-
   const formatAddress = (address) => {
     if (!address) return ''
     return `${address.slice(0, 6)}...${address.slice(-4)}`
@@ -37,11 +35,7 @@ const SubHeader = ({
           </div>
         )}
 
-        <div className="network-selector">
-          <div className="network-icon" style={{ color: network.color }}>{network.icon}</div>
-          <span className="network-name">{network.name}</span>
-          <span className="dropdown-arrow">▼</span>
-        </div>
+        <NetworkSelector />
       </div>
 
       {!hideActions && (

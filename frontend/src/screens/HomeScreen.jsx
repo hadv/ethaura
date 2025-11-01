@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
+import { useNetwork } from '../contexts/NetworkContext'
 import { ethers } from 'ethers'
 import { BsThreeDotsVertical, BsPlus } from 'react-icons/bs'
 import { HiArrowUp, HiArrowDown } from 'react-icons/hi'
@@ -12,6 +13,7 @@ import logo from '../assets/logo.svg'
 
 function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onLogout }) {
   const { userInfo, address: ownerAddress } = useWeb3Auth()
+  const { networkInfo } = useNetwork()
   const [wallets, setWallets] = useState([])
   const [loading, setLoading] = useState(false)
   const [showAddModal, setShowAddModal] = useState(false)
@@ -34,7 +36,7 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onLogo
   // Load wallets from localStorage
   useEffect(() => {
     loadWallets()
-  }, [])
+  }, [networkInfo.chainId])
 
   // Close menu when clicking outside
   useEffect(() => {
@@ -58,9 +60,7 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onLogo
         const walletsList = JSON.parse(storedWallets)
 
         // Fetch balances for each wallet
-        const provider = new ethers.JsonRpcProvider(
-          import.meta.env.VITE_RPC_URL || 'https://rpc.sepolia.org'
-        )
+        const provider = new ethers.JsonRpcProvider(networkInfo.rpcUrl)
 
         // Mock ETH price (in real app, fetch from API)
         const ethPriceUSD = 2500

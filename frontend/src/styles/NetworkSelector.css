@@ -1,0 +1,168 @@
+/* Network Selector Container */
+.network-selector-container {
+  position: relative;
+}
+
+/* Network Selector Button */
+.network-selector {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 20px;
+  background: white;
+  border: 1px solid #E5E5E5;
+  border-radius: 12px;
+  height: 56px;
+  min-width: 200px;
+  flex-shrink: 0;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.network-selector:hover {
+  background: #FAFAFA;
+  border-color: #D1D5DB;
+}
+
+.network-selector:active {
+  background: #F5F5F5;
+}
+
+/* Network Icon Circle */
+.network-icon-circle {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.network-icon-symbol {
+  font-size: 16px;
+  color: white;
+  line-height: 1;
+}
+
+.network-name {
+  font-size: 15px;
+  font-weight: 500;
+  color: #000000;
+  flex: 1;
+  white-space: nowrap;
+}
+
+.dropdown-arrow {
+  color: #6B7280;
+  transition: transform 0.2s ease;
+  flex-shrink: 0;
+}
+
+.dropdown-arrow.open {
+  transform: rotate(180deg);
+}
+
+/* Network Dropdown */
+.network-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  min-width: 220px;
+  background: white;
+  border: 1px solid #E5E5E5;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  z-index: 1000;
+  overflow: hidden;
+  animation: slideDown 0.2s ease;
+  padding: 8px 0;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Network Option */
+.network-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+  min-height: 52px;
+}
+
+.network-option:hover {
+  background: #F5F5F5;
+}
+
+.network-option.selected {
+  background: #F5F5F5;
+}
+
+.network-option.selected:hover {
+  background: #ECECEC;
+}
+
+.network-option-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.network-option-name {
+  font-size: 15px;
+  font-weight: 500;
+  color: #000000;
+  white-space: nowrap;
+}
+
+.network-selected-check {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .network-selector {
+    min-width: 180px;
+    padding: 10px 16px;
+    height: 52px;
+  }
+
+  .network-icon-circle {
+    width: 28px;
+    height: 28px;
+  }
+
+  .network-icon-symbol {
+    font-size: 14px;
+  }
+
+  .network-name {
+    font-size: 14px;
+  }
+
+  .network-option {
+    padding: 10px 16px;
+    min-height: 48px;
+  }
+
+  .network-option-name {
+    font-size: 14px;
+  }
+}
+
