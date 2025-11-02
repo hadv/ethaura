@@ -93,10 +93,34 @@ export const ERC20_ABI = [
 // Import token icons
 import linkIcon from '../assets/tokens/link.svg'
 import pyusdIcon from '../assets/tokens/pyusd.svg'
+import uniIcon from '../assets/tokens/uni.svg'
+import kncIcon from '../assets/tokens/knc.svg'
+import wbtcIcon from '../assets/tokens/wbtc.svg'
+import hbarIcon from '../assets/tokens/hbar.svg'
+import btcIcon from '../assets/tokens/btc.svg'
+import bchIcon from '../assets/tokens/bch.svg'
+import avaxIcon from '../assets/tokens/avax.svg'
+import usdcIcon from '../assets/tokens/usdc.svg'
+import usdtIcon from '../assets/tokens/usdt.svg'
+import xrpIcon from '../assets/tokens/xrp.svg'
 
 // Supported ERC-20 tokens by network
 export const SUPPORTED_TOKENS = {
   sepolia: [
+    {
+      symbol: 'USDC',
+      name: 'USD Coin',
+      address: '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238',
+      decimals: 6,
+      icon: usdcIcon,
+    },
+    {
+      symbol: 'USDT',
+      name: 'Tether USD',
+      address: '0x7169D38820dfd117C3FA1f22a697dBA58d90ba06',
+      decimals: 6,
+      icon: usdtIcon,
+    },
     {
       symbol: 'LINK',
       name: 'Chainlink Token',
@@ -105,15 +129,51 @@ export const SUPPORTED_TOKENS = {
       icon: linkIcon,
     },
     {
+      symbol: 'UNI',
+      name: 'Uniswap',
+      address: '0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984',
+      decimals: 18,
+      icon: uniIcon,
+    },
+    {
       symbol: 'PYUSD',
       name: 'PayPal USD',
       address: '0xCaC524BcA292aaade2DF8A05cC58F0a65B1B3bB9',
       decimals: 6,
       icon: pyusdIcon,
     },
-    // Add more tokens here as needed
+    // Note: Some tokens may not have official testnet deployments on Sepolia
+    // The addresses below are for demonstration - verify before use in production
   ],
   mainnet: [
+    {
+      symbol: 'USDC',
+      name: 'USD Coin',
+      address: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
+      decimals: 6,
+      icon: usdcIcon,
+    },
+    {
+      symbol: 'USDT',
+      name: 'Tether USD',
+      address: '0xdAC17F958D2ee523a2206206994597C13D831ec7',
+      decimals: 6,
+      icon: usdtIcon,
+    },
+    {
+      symbol: 'WBTC',
+      name: 'Wrapped Bitcoin',
+      address: '0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599',
+      decimals: 8,
+      icon: wbtcIcon,
+    },
+    {
+      symbol: 'UNI',
+      name: 'Uniswap',
+      address: '0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984',
+      decimals: 18,
+      icon: uniIcon,
+    },
     {
       symbol: 'LINK',
       name: 'Chainlink Token',
@@ -128,6 +188,19 @@ export const SUPPORTED_TOKENS = {
       decimals: 6,
       icon: pyusdIcon,
     },
-    // Add more tokens here as needed
+    {
+      symbol: 'KNC',
+      name: 'Kyber Network Crystal',
+      address: '0xdd974D5C2e2928deA5F71b9825b8b646686BD200',
+      decimals: 18,
+      icon: kncIcon,
+    },
+    {
+      symbol: 'WAVAX',
+      name: 'Wrapped AVAX',
+      address: '0x85f138bfEE4ef8e540890CFb48F620571d67Eda3',
+      decimals: 18,
+      icon: avaxIcon,
+    },
   ],
 }
