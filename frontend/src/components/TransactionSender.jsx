@@ -5,9 +5,10 @@ import { signWithPasskey } from '../utils/webauthn'
 import { formatSignatureForDisplay } from '../utils/signatureUtils'
 import { useP256SDK } from '../hooks/useP256SDK'
 import { ethers } from 'ethers'
-import { buildSendEthUserOp, getUserOpHash, signUserOperation, signUserOperationOwnerOnly, packAccountGasLimits, packGasFees } from '../lib/userOperation'
+import { buildSendEthUserOp, getUserOpHash, signUserOperation, signUserOperationOwnerOnly, packAccountGasLimits, packGasFees, encodeExecute } from '../lib/userOperation'
 import { getUserFriendlyMessage, getSuggestedAction, isRetryableError } from '../lib/errors'
 import { formatPublicKeyForContract } from '../lib/accountManager'
+import { SUPPORTED_TOKENS, ERC20_ABI } from '../lib/constants'
 import SignatureConfirmationDialog from './SignatureConfirmationDialog'
 import '../styles/TransactionSender.css'
 
@@ -27,6 +28,12 @@ function TransactionSender({ accountAddress, credential, accountConfig }) {
   const [accountInfo, setAccountInfo] = useState(null)
   const [balanceInfo, setBalanceInfo] = useState(null)
   const [depositLoading, setDepositLoading] = useState(false)
+
+  // Token-related state
+  const [selectedToken, setSelectedToken] = useState(null) // null = ETH, otherwise token object
+  const [tokenBalances, setTokenBalances] = useState({}) // Map of token address -> balance
+  const [showTokenDropdown, setShowTokenDropdown] = useState(false)
+  const [availableTokens, setAvailableTokens] = useState([])
 
   // Signature confirmation dialog state
   const [showSignatureDialog, setShowSignatureDialog] = useState(false)
@@ -184,6 +191,13 @@ function TransactionSender({ accountAddress, credential, accountConfig }) {
     loadAccountInfo()
   }, [accountAddress, sdk, credential, ownerAddress, accountConfig, networkInfo.chainId])
 
+  // Load available tokens based on network
+  useEffect(() => {
+    const networkName = networkInfo.chainId === 11155111 ? 'sepolia' : 'mainnet'
+    const tokens = SUPPORTED_TOKENS[networkName] || []
+    setAvailableTokens(tokens)
+  }, [networkInfo.chainId])
+
   // Load balance and deposit info
   const loadBalanceInfo = async (address) => {
     if (!sdk || !address) return
@@ -210,6 +224,41 @@ function TransactionSender({ accountAddress, credential, accountConfig }) {
       })
     } catch (err) {
       console.error('Error loading balance info:', err)
+    }
+  }
+
+  // Load token balances and decimals
+  const loadTokenBalances = async (address) => {
+    if (!sdk || !address || availableTokens.length === 0) return
+
+    try {
+      const balances = {}
+
+      // Fetch all token balances and decimals in parallel
+      await Promise.all(
+        availableTokens.map(async (token) => {
+          try {
+            const tokenContract = new ethers.Contract(token.address, ERC20_ABI, sdk.provider)
+
+            // Fetch decimals from contract if not already cached
+            if (!token.decimalsFromChain) {
+              const decimals = await tokenContract.decimals()
+              token.decimalsFromChain = Number(decimals)
+              console.log(`📊 Fetched decimals for ${token.symbol}:`, token.decimalsFromChain)
+            }
+
+            const balance = await tokenContract.balanceOf(address)
+            balances[token.address] = ethers.formatUnits(balance, token.decimalsFromChain || token.decimals)
+          } catch (err) {
+            console.error(`Error loading balance for ${token.symbol}:`, err)
+            balances[token.address] = '0'
+          }
+        })
+      )
+
+      setTokenBalances(balances)
+    } catch (err) {
+      console.error('Error loading token balances:', err)
     }
   }
 
@@ -539,14 +588,58 @@ function TransactionSender({ accountAddress, credential, accountConfig }) {
         console.log('✅ Public key matches! Proceeding with signature...')
       }
 
-      const userOp = await buildSendEthUserOp({
-        accountAddress,
-        targetAddress,
-        amount: amountWei,
-        provider: sdk.provider,
-        needsDeployment: !isActuallyDeployed,
-        initCode: isActuallyDeployed ? '0x' : currentAccountInfo.initCode,
-      })
+      // Build UserOp based on whether we're sending ETH or ERC-20 token
+      let userOp
+      if (selectedToken) {
+        // Fetch decimals from contract if not already cached
+        if (!selectedToken.decimalsFromChain) {
+          const tokenContract = new ethers.Contract(selectedToken.address, ERC20_ABI, sdk.provider)
+          const decimals = await tokenContract.decimals()
+          selectedToken.decimalsFromChain = Number(decimals)
+          console.log(`📊 Fetched decimals for ${selectedToken.symbol}:`, selectedToken.decimalsFromChain)
+        }
+
+        const tokenDecimals = selectedToken.decimalsFromChain || selectedToken.decimals
+
+        // Sending ERC-20 token
+        console.log('📤 Building UserOp for ERC-20 transfer:', {
+          token: selectedToken.symbol,
+          tokenAddress: selectedToken.address,
+          amount: amount,
+          decimals: tokenDecimals,
+          to: targetAddress,
+        })
+
+        // Encode ERC-20 transfer call
+        const tokenInterface = new ethers.Interface(ERC20_ABI)
+        const tokenAmount = ethers.parseUnits(amount, tokenDecimals)
+        const transferData = tokenInterface.encodeFunctionData('transfer', [targetAddress, tokenAmount])
+
+        // Build UserOp with execute call to token contract
+        const { getNonce, getGasPrices, createUserOperation } = await import('../lib/userOperation.js')
+        const nonce = await getNonce(accountAddress, sdk.provider)
+        const { maxFeePerGas, maxPriorityFeePerGas } = await getGasPrices(sdk.provider)
+        const callData = encodeExecute(selectedToken.address, 0n, transferData)
+
+        userOp = createUserOperation({
+          sender: accountAddress,
+          nonce,
+          initCode: !isActuallyDeployed ? currentAccountInfo.initCode : '0x',
+          callData,
+          maxFeePerGas,
+          maxPriorityFeePerGas,
+        })
+      } else {
+        // Sending ETH
+        userOp = await buildSendEthUserOp({
+          accountAddress,
+          targetAddress,
+          amount: amountWei,
+          provider: sdk.provider,
+          needsDeployment: !isActuallyDeployed,
+          initCode: isActuallyDeployed ? '0x' : currentAccountInfo.initCode,
+        })
+      }
 
       console.log('📋 UserOp initCode details:', {
         isDeployed: isActuallyDeployed,
@@ -618,15 +711,17 @@ function TransactionSender({ accountAddress, credential, accountConfig }) {
 
         try {
           // Show confirmation dialog before signing
+          const tokenDecimals = selectedToken?.decimalsFromChain || selectedToken?.decimals
           const ownerSig = await requestSignatureWithConfirmation({
             userOpHash,
             targetAddress,
-            amount: ethers.parseEther(amount),
+            amount: selectedToken ? ethers.parseUnits(amount, tokenDecimals) : ethers.parseEther(amount),
             accountAddress,
             nonce: currentAccountInfo.nonce,
             isDeployment: !isActuallyDeployed,
             isTwoFactorAuth: false,
             signatureStep: 'only',
+            token: selectedToken, // Pass token info for display
           })
 
           console.log('🔐 Owner signature received:', ownerSig)
@@ -669,15 +764,17 @@ function TransactionSender({ accountAddress, credential, accountConfig }) {
           console.log('🔐 UserOpHash bytes:', userOpHashBytes)
           try {
             // Show confirmation dialog before signing with Web3Auth
+            const tokenDecimals = selectedToken?.decimalsFromChain || selectedToken?.decimals
             ownerSig = await requestSignatureWithConfirmation({
               userOpHash,
               targetAddress,
-              amount: ethers.parseEther(amount),
+              amount: selectedToken ? ethers.parseUnits(amount, tokenDecimals) : ethers.parseEther(amount),
               accountAddress,
               nonce: currentAccountInfo.nonce,
               isDeployment: !isActuallyDeployed,
               isTwoFactorAuth: true,
               signatureStep: '1/2',
+              token: selectedToken, // Pass token info for display
             })
 
             console.log('🔐 Owner signature received:', ownerSig)
@@ -774,12 +871,19 @@ function TransactionSender({ accountAddress, credential, accountConfig }) {
       const receipt = await sdk.bundler.sendUserOperationAndWait(signedUserOp)
 
       setTxHash(receipt.transactionHash)
-      setStatus(`✅ Transaction confirmed! ${isActuallyDeployed ? '' : 'Account deployed + '}Transaction executed`)
+      const txType = selectedToken ? `${selectedToken.symbol} transfer` : 'ETH transfer'
+      setStatus(`✅ Transaction confirmed! ${isActuallyDeployed ? '' : 'Account deployed + '}${txType} executed`)
 
       // Clear cache and refresh account info
       sdk.accountManager.clearCache(accountAddress)
       const updatedInfo = await sdk.getAccountInfo(accountAddress)
       setAccountInfo({ ...updatedInfo, deployed: updatedInfo.deployed })
+
+      // Reload balances
+      await loadBalanceInfo(accountAddress)
+      if (selectedToken) {
+        await loadTokenBalances(accountAddress)
+      }
 
     } catch (err) {
       console.error('Error sending transaction:', err)
@@ -818,12 +922,30 @@ function TransactionSender({ accountAddress, credential, accountConfig }) {
 
   // Handle Max button
   const handleMaxAmount = () => {
-    if (balanceInfo?.accountBalance) {
-      // Leave some ETH for gas (0.001 ETH)
+    if (selectedToken) {
+      // For ERC-20 tokens, use full balance
+      const tokenBalance = tokenBalances[selectedToken.address] || '0'
+      setAmount(tokenBalance)
+    } else if (balanceInfo?.accountBalance) {
+      // For ETH, leave some for gas (0.001 ETH)
       const maxAmount = Math.max(0, parseFloat(balanceInfo.accountBalance) - 0.001)
       setAmount(maxAmount.toFixed(6))
     }
   }
+
+  // Handle token selection
+  const handleTokenSelect = (token) => {
+    setSelectedToken(token)
+    setShowTokenDropdown(false)
+    setAmount('') // Clear amount when switching tokens
+  }
+
+  // Load token balances when account address or available tokens change
+  useEffect(() => {
+    if (accountAddress && availableTokens.length > 0) {
+      loadTokenBalances(accountAddress)
+    }
+  }, [accountAddress, availableTokens])
 
   return (
     <div className="transaction-sender">
@@ -856,28 +978,100 @@ function TransactionSender({ accountAddress, credential, accountConfig }) {
       </div>
 
       {/* Token Selector */}
-      <div className="token-selector">
+      <div className="token-selector" onClick={() => setShowTokenDropdown(!showTokenDropdown)}>
         <div className="token-info">
-          <div className="token-icon">
-            <svg viewBox="0 0 784.37 1277.39" xmlns="http://www.w3.org/2000/svg">
-              <g fill="#343434" fillRule="nonzero">
-                <path d="m392.07 0-8.57 29.11v844.63l8.57 8.55 392.06-231.75z" fillOpacity=".6"/>
-                <path d="m392.07 0-392.07 650.54 392.07 231.75v-435.68z"/>
-                <path d="m392.07 956.52-4.83 5.89v300.87l4.83 14.1 392.3-552.49z" fillOpacity=".6"/>
-                <path d="m392.07 1277.38v-320.86l-392.07-231.75z"/>
-                <path d="m392.07 882.29 392.06-231.75-392.06-178.21z" fillOpacity=".2"/>
-                <path d="m0 650.54 392.07 231.75v-409.96z" fillOpacity=".6"/>
-              </g>
-            </svg>
-          </div>
-          <div className="token-details">
-            <div className="token-name">Ether</div>
-            <div className="token-available">
-              Available: {balanceInfo ? parseFloat(balanceInfo.accountBalance).toFixed(4) : '0.0000'} ETH
-            </div>
-          </div>
+          {selectedToken ? (
+            <>
+              <div className="token-icon">
+                <img src={selectedToken.icon} alt={selectedToken.symbol} />
+              </div>
+              <div className="token-details">
+                <div className="token-name">{selectedToken.name}</div>
+                <div className="token-available">
+                  Available: {tokenBalances[selectedToken.address] || '0.0000'} {selectedToken.symbol}
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="token-icon">
+                <svg viewBox="0 0 784.37 1277.39" xmlns="http://www.w3.org/2000/svg">
+                  <g fill="#343434" fillRule="nonzero">
+                    <path d="m392.07 0-8.57 29.11v844.63l8.57 8.55 392.06-231.75z" fillOpacity=".6"/>
+                    <path d="m392.07 0-392.07 650.54 392.07 231.75v-435.68z"/>
+                    <path d="m392.07 956.52-4.83 5.89v300.87l4.83 14.1 392.3-552.49z" fillOpacity=".6"/>
+                    <path d="m392.07 1277.38v-320.86l-392.07-231.75z"/>
+                    <path d="m392.07 882.29 392.06-231.75-392.06-178.21z" fillOpacity=".2"/>
+                    <path d="m0 650.54 392.07 231.75v-409.96z" fillOpacity=".6"/>
+                  </g>
+                </svg>
+              </div>
+              <div className="token-details">
+                <div className="token-name">Ether</div>
+                <div className="token-available">
+                  Available: {balanceInfo ? parseFloat(balanceInfo.accountBalance).toFixed(4) : '0.0000'} ETH
+                </div>
+              </div>
+            </>
+          )}
         </div>
         <div className="token-dropdown-icon">▼</div>
+
+        {/* Token Dropdown */}
+        {showTokenDropdown && (
+          <div className="token-dropdown" onClick={(e) => e.stopPropagation()}>
+            {/* ETH Option */}
+            <div
+              className={`token-dropdown-item ${!selectedToken ? 'selected' : ''}`}
+              onClick={() => handleTokenSelect(null)}
+            >
+              <div className="token-icon">
+                <svg viewBox="0 0 784.37 1277.39" xmlns="http://www.w3.org/2000/svg" width="24" height="24">
+                  <g fill="#343434" fillRule="nonzero">
+                    <path d="m392.07 0-8.57 29.11v844.63l8.57 8.55 392.06-231.75z" fillOpacity=".6"/>
+                    <path d="m392.07 0-392.07 650.54 392.07 231.75v-435.68z"/>
+                    <path d="m392.07 956.52-4.83 5.89v300.87l4.83 14.1 392.3-552.49z" fillOpacity=".6"/>
+                    <path d="m392.07 1277.38v-320.86l-392.07-231.75z"/>
+                    <path d="m392.07 882.29 392.06-231.75-392.06-178.21z" fillOpacity=".2"/>
+                    <path d="m0 650.54 392.07 231.75v-409.96z" fillOpacity=".6"/>
+                  </g>
+                </svg>
+              </div>
+              <div className="token-dropdown-details">
+                <div className="token-dropdown-name">Ether</div>
+                <div className="token-dropdown-symbol">ETH</div>
+              </div>
+              <div className="token-dropdown-balance">
+                {balanceInfo ? parseFloat(balanceInfo.accountBalance).toFixed(4) : '0.0000'}
+              </div>
+            </div>
+
+            {/* ERC-20 Token Options - Only show tokens with balance > 0 */}
+            {availableTokens
+              .filter((token) => {
+                const balance = parseFloat(tokenBalances[token.address] || '0')
+                return balance > 0
+              })
+              .map((token) => (
+                <div
+                  key={token.address}
+                  className={`token-dropdown-item ${selectedToken?.address === token.address ? 'selected' : ''}`}
+                  onClick={() => handleTokenSelect(token)}
+                >
+                  <div className="token-icon">
+                    <img src={token.icon} alt={token.symbol} />
+                  </div>
+                  <div className="token-dropdown-details">
+                    <div className="token-dropdown-name">{token.name}</div>
+                    <div className="token-dropdown-symbol">{token.symbol}</div>
+                  </div>
+                  <div className="token-dropdown-balance">
+                    {tokenBalances[token.address] || '0.0000'}
+                  </div>
+                </div>
+              ))}
+          </div>
+        )}
       </div>
 
       {/* To Address Section */}
