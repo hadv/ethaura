@@ -1,0 +1,569 @@
+/* SignatureConfirmationScreen.css */
+
+.signature-confirmation-screen {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0;
+  min-height: 100vh;
+  background: #f9fafb;
+}
+
+/* SubHeader */
+.signature-sub-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 40px;
+  background: white;
+  border-bottom: 1px solid #e5e7eb;
+  position: sticky;
+  top: 73px;
+  z-index: 99;
+  gap: 16px;
+  min-height: 80px;
+}
+
+.signature-sub-header-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex: 1;
+  min-width: 0;
+}
+
+.back-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: 1px solid #e5e7eb;
+  background: white;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 20px;
+  color: #374151;
+}
+
+.back-btn:hover:not(:disabled) {
+  background: #f9fafb;
+  border-color: #d1d5db;
+}
+
+.back-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Wallet Selector in Sub Header */
+.signature-sub-header .wallet-selector {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  background: #f9fafb;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  height: 52px;
+  min-width: 280px;
+}
+
+.signature-sub-header .wallet-icon-small {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.signature-sub-header .wallet-info-compact {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.signature-sub-header .wallet-name-header {
+  font-size: 13px;
+  font-weight: 600;
+  color: #111827;
+  line-height: 1.2;
+}
+
+.signature-sub-header .wallet-address-header {
+  font-size: 11px;
+  color: #6b7280;
+  font-family: 'Courier New', monospace;
+  line-height: 1.2;
+}
+
+/* Main Content */
+.signature-content-wrapper {
+  display: grid;
+  grid-template-columns: 70% 1fr;
+  gap: 0;
+  min-height: calc(100vh - 153px);
+}
+
+.signature-main {
+  background: white;
+  padding: 40px;
+  border-right: 1px solid #e5e7eb;
+}
+
+.signature-container {
+  max-width: 700px;
+  margin: 0 auto;
+}
+
+/* Details Card */
+.signature-details-card {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  padding: 28px;
+  margin-bottom: 24px;
+}
+
+.signature-card-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #111827;
+  margin: 0 0 24px 0;
+}
+
+/* Badges */
+.signature-deployment-badge,
+.signature-operation-badge {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 12px;
+  margin-bottom: 20px;
+}
+
+.signature-deployment-badge {
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+}
+
+.signature-operation-badge {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+}
+
+.badge-icon {
+  font-size: 24px;
+  line-height: 1;
+}
+
+.badge-content {
+  flex: 1;
+}
+
+.badge-title {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0 0 4px 0;
+}
+
+.signature-deployment-badge .badge-title {
+  color: #059669;
+}
+
+.signature-operation-badge .badge-title {
+  color: #dc2626;
+}
+
+.badge-description {
+  font-size: 13px;
+  color: #6b7280;
+  margin: 0;
+}
+
+/* Detail Items */
+.signature-detail-item {
+  margin-bottom: 20px;
+}
+
+.signature-detail-item:last-child {
+  margin-bottom: 0;
+}
+
+.detail-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+}
+
+.detail-value {
+  font-size: 15px;
+  color: #111827;
+  font-weight: 500;
+}
+
+.detail-value-box {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 12px;
+  font-size: 14px;
+  color: #111827;
+}
+
+.detail-address,
+.detail-hash {
+  font-family: 'Courier New', monospace;
+  font-size: 13px;
+  color: #111827;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 12px;
+  word-break: break-all;
+  line-height: 1.5;
+}
+
+.detail-address-with-icon {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.detail-address-with-icon .detail-address {
+  flex: 1;
+  padding-right: 48px; /* Make room for the icon */
+}
+
+.explorer-icon-btn {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: #6b7280;
+  padding: 0;
+}
+
+.explorer-icon-btn:hover {
+  background: #f3f4f6;
+  border-color: #d1d5db;
+  color: #111827;
+}
+
+.explorer-icon-btn svg {
+  flex-shrink: 0;
+}
+
+.detail-token-info {
+  font-size: 12px;
+  color: #6b7280;
+  margin-top: 6px;
+}
+
+.detail-hint {
+  font-size: 12px;
+  color: #9ca3af;
+  margin-top: 8px;
+  margin-bottom: 0;
+  line-height: 1.4;
+}
+
+/* Amount Section - Highlighted */
+.signature-amount-section {
+  background: white;
+  border: 2px solid #111827;
+  border-radius: 12px;
+  padding: 20px;
+  margin: 24px 0;
+}
+
+.amount-display {
+  font-size: 32px;
+  font-weight: 600;
+  color: #111827;
+  margin-top: 8px;
+}
+
+/* Warning Card */
+.signature-warning-card {
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 32px;
+  display: flex;
+  gap: 12px;
+}
+
+.warning-icon {
+  font-size: 24px;
+  line-height: 1;
+}
+
+.warning-content {
+  flex: 1;
+}
+
+.warning-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #92400e;
+  margin: 0 0 6px 0;
+}
+
+.warning-text {
+  font-size: 14px;
+  color: #92400e;
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* Action Buttons */
+.signature-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+.signature-btn {
+  padding: 14px 32px;
+  border: none;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: 140px;
+}
+
+.signature-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.signature-btn-cancel {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.signature-btn-cancel:hover:not(:disabled) {
+  background: #e5e7eb;
+}
+
+.signature-btn-confirm {
+  background: #000;
+  color: white;
+}
+
+.signature-btn-confirm:hover:not(:disabled) {
+  background: #1f1f1f;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.signature-btn-confirm:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+/* Button Spinner */
+.btn-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Right Sidebar */
+.signature-sidebar {
+  background: #fafafa;
+  padding: 40px;
+}
+
+/* Signature Info Card */
+.signature-info-card {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  padding: 32px;
+  margin-bottom: 24px;
+  text-align: center;
+}
+
+.signature-icon-large {
+  font-size: 64px;
+  margin-bottom: 20px;
+}
+
+.signature-info-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: #111827;
+  margin: 0 0 12px 0;
+}
+
+.signature-step-badge-large {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 20px;
+  background: #f3f4f6;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #6b7280;
+  margin-bottom: 20px;
+}
+
+.signature-info-description {
+  font-size: 14px;
+  color: #6b7280;
+  line-height: 1.6;
+  margin: 16px 0 0 0;
+}
+
+/* Security Tips Card */
+.signature-tips-card {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  padding: 24px;
+}
+
+.tips-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #111827;
+  margin: 0 0 16px 0;
+}
+
+.tips-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.tips-list li {
+  font-size: 14px;
+  color: #6b7280;
+  line-height: 1.6;
+  padding: 8px 0;
+  padding-left: 24px;
+  position: relative;
+}
+
+.tips-list li:before {
+  content: '✓';
+  position: absolute;
+  left: 0;
+  color: #10b981;
+  font-weight: bold;
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+  .signature-content-wrapper {
+    grid-template-columns: 1fr;
+  }
+
+  .signature-main {
+    border-right: none;
+  }
+
+  .signature-sidebar {
+    border-top: 1px solid #e5e7eb;
+    padding: 32px 40px;
+  }
+
+  .signature-info-card,
+  .signature-tips-card {
+    max-width: 500px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+}
+
+@media (max-width: 768px) {
+  .signature-sub-header {
+    padding: 16px 20px;
+  }
+
+  .signature-sub-header .wallet-selector {
+    min-width: 200px;
+    padding: 6px 12px;
+  }
+
+  .signature-sub-header .wallet-name-header {
+    font-size: 12px;
+  }
+
+  .signature-sub-header .wallet-address-header {
+    font-size: 10px;
+  }
+
+  .back-btn {
+    width: 36px;
+    height: 36px;
+  }
+
+  .signature-main {
+    padding: 24px 20px;
+  }
+
+  .signature-sidebar {
+    padding: 24px 20px;
+  }
+
+  .signature-details-card {
+    padding: 20px;
+  }
+
+  .signature-info-card {
+    padding: 24px;
+  }
+
+  .signature-icon-large {
+    font-size: 48px;
+  }
+
+  .signature-info-title {
+    font-size: 20px;
+  }
+
+  .amount-display {
+    font-size: 28px;
+  }
+
+  .signature-actions {
+    flex-direction: column-reverse;
+  }
+
+  .signature-btn {
+    width: 100%;
+  }
+}
+
