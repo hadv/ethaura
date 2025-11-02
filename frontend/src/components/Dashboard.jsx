@@ -115,7 +115,7 @@ function Dashboard({ accountAddress, accountConfig, onSendClick, onReceiveClick,
       <div className="dashboard-container">
         <div className="dashboard-empty">
           <div className="empty-icon">🚀</div>
-          <h2>Welcome to EthAura!</h2>
+          <h2>Welcome to ΞTHΛURΛ!</h2>
           <p>You're connected! Now create your smart account to get started.</p>
           <p className="text-sm" style={{ marginTop: '12px', color: '#a0aec0' }}>
             Switch to the Setup tab to create your account

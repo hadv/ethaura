@@ -1,6 +1,6 @@
-# EthAura Architecture Diagrams
+# ΞTHΛURΛ Architecture Diagrams
 
-This document contains visual diagrams to help understand the EthAura system.
+This document contains visual diagrams to help understand the ΞTHΛURΛ system.
 
 ## System Overview
 
@@ -322,5 +322,5 @@ This document contains visual diagrams to help understand the EthAura system.
 
 ---
 
-These diagrams provide a visual understanding of how EthAura works. For more details, see [ARCHITECTURE.md](../ARCHITECTURE.md).
+These diagrams provide a visual understanding of how ΞTHΛURΛ works. For more details, see [ARCHITECTURE.md](../ARCHITECTURE.md).
 

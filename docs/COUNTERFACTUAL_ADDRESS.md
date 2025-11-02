@@ -2,7 +2,7 @@
 
 ## Overview
 
-EthAura uses CREATE2 for deterministic address calculation, allowing users to receive funds **before** deploying their smart contract wallet. This document explains how addresses are calculated and why it's safe to change passkeys later.
+ΞTHΛURΛ uses CREATE2 for deterministic address calculation, allowing users to receive funds **before** deploying their smart contract wallet. This document explains how addresses are calculated and why it's safe to change passkeys later.
 
 ## Key Principle
 

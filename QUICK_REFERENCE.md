@@ -1,4 +1,4 @@
-# EthAura Quick Reference Card
+# ΞTHΛURΛ Quick Reference Card
 
 ## 🚀 Quick Start Commands
 

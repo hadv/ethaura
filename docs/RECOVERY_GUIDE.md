@@ -1,10 +1,10 @@
-# EthAura Account Recovery Guide
+# ΞTHΛURΛ Account Recovery Guide
 
-This guide explains how to recover access to your EthAura account in various scenarios.
+This guide explains how to recover access to your ΞTHΛURΛ account in various scenarios.
 
 ## Overview
 
-EthAura provides multiple recovery mechanisms depending on what you've lost:
+ΞTHΛURΛ provides multiple recovery mechanisms depending on what you've lost:
 
 1. **Address Recovery** - Recalculate your account address
 2. **Fund Access Recovery** - Regain ability to sign transactions

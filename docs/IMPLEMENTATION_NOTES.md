@@ -1,4 +1,4 @@
-# EthAura Implementation Notes
+# ΞTHΛURΛ Implementation Notes
 
 This document consolidates key implementation details, bug fixes, and optimizations from the development process.
 
@@ -148,7 +148,7 @@ All ERC-4337 error codes (AA10-AA34) mapped to user-friendly messages:
 
 ### Architecture
 ```
-EthAura App → Helios (127.0.0.1:8545) → Execution RPC → Consensus RPC
+ΞTHΛURΛ App → Helios (127.0.0.1:8545) → Execution RPC → Consensus RPC
               ↑ Cryptographic Verification
 ```
 

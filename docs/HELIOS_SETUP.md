@@ -1,8 +1,8 @@
-# Helios Light Client Setup for EthAura
+# Helios Light Client Setup for ΞTHΛURΛ
 
 ## Overview
 
-Helios is a trustless, efficient Ethereum light client that converts an untrusted centralized RPC endpoint into a safe, unmanipulable local RPC. This guide explains how to integrate Helios with EthAura for enhanced security and decentralization.
+Helios is a trustless, efficient Ethereum light client that converts an untrusted centralized RPC endpoint into a safe, unmanipulable local RPC. This guide explains how to integrate Helios with ΞTHΛURΛ for enhanced security and decentralization.
 
 ## Why Use Helios?
 
@@ -19,7 +19,7 @@ Helios is a trustless, efficient Ethereum light client that converts an untruste
 
 ```
 Untrusted RPC Provider → Helios Light Client → Verified Local RPC → Your DApp
-     (Alchemy, Infura)      (Cryptographic        (127.0.0.1:8545)   (EthAura)
+     (Alchemy, Infura)      (Cryptographic        (127.0.0.1:8545)   (ΞTHΛURΛ)
                              Verification)
 ```
 
@@ -141,7 +141,7 @@ helios ethereum \
     --checkpoint 0x85e6151a246e8fdba36db27a0c7678a575346272fe978c9281e13a8b26cdfa68
 ```
 
-### Using Helios with EthAura
+### Using Helios with ΞTHΛURΛ
 
 Once Helios is running, update your configuration to use the local RPC:
 
@@ -273,7 +273,7 @@ helios ethereum --network sepolia --execution-rpc $SEPOLIA_RPC_URL --rpc-port 85
 4. **Backup Configuration**: Keep your `helios-config.toml` backed up
 5. **Test Before Production**: Always test with Sepolia before using on mainnet
 
-## Integration with EthAura Workflow
+## Integration with ΞTHΛURΛ Workflow
 
 ### Development Workflow
 

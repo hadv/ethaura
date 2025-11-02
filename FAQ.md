@@ -2,9 +2,9 @@
 
 ## General Questions
 
-### What is EthAura?
+### What is ΞTHΛURΛ?
 
-EthAura is an implementation of ERC-4337 Account Abstraction that uses P-256/secp256r1 signatures instead of the traditional secp256k1. This enables users to control their Ethereum accounts using WebAuthn/Passkeys (Touch ID, Face ID, Windows Hello, etc.).
+ΞTHΛURΛ is an implementation of ERC-4337 Account Abstraction that uses P-256/secp256r1 signatures instead of the traditional secp256k1. This enables users to control their Ethereum accounts using WebAuthn/Passkeys (Touch ID, Face ID, Windows Hello, etc.).
 
 ### Why P-256 instead of secp256k1?
 
@@ -53,7 +53,7 @@ Currently:
 
 ### Can I use this with MetaMask?
 
-No, MetaMask uses secp256k1 keys. EthAura accounts use P-256 keys from passkeys. However, you can:
+No, MetaMask uses secp256k1 keys. ΞTHΛURΛ accounts use P-256 keys from passkeys. However, you can:
 - Use MetaMask to deploy the factory
 - Use MetaMask as the owner address
 - Sign transactions with passkeys
@@ -73,7 +73,7 @@ Same public key + salt = same address across all networks.
 
 ### What happens if I lose my passkey?
 
-**EthAura has multiple recovery options:**
+**ΞTHΛURΛ has multiple recovery options:**
 
 **Option 1: Owner-initiated recovery (48 hours)**
 1. Login to Web3Auth from a new device
@@ -130,7 +130,7 @@ The current implementation supports one public key per account. However, you can
 
 ### Is this secure?
 
-**EthAura implements defense-in-depth security:**
+**ΞTHΛURΛ implements defense-in-depth security:**
 
 - ✅ **Passkey-first**: All transactions require passkey signature
 - ✅ **No owner bypass**: Owner cannot execute transactions directly
@@ -396,9 +396,9 @@ Verify:
 
 ## Comparison Questions
 
-### EthAura vs Traditional EOA?
+### ΞTHΛURΛ vs Traditional EOA?
 
-| Feature | EthAura | EOA |
+| Feature | ΞTHΛURΛ | EOA |
 |---------|---------|-----|
 | Key management | Passkey | Private key |
 | Signature | P-256 | secp256k1 |
@@ -406,9 +406,9 @@ Verify:
 | User experience | Better | Worse |
 | Recovery | Possible | Difficult |
 
-### EthAura vs Safe (Gnosis Safe)?
+### ΞTHΛURΛ vs Safe (Gnosis Safe)?
 
-| Feature | EthAura | Safe |
+| Feature | ΞTHΛURΛ | Safe |
 |---------|---------|------|
 | Deployment | ERC-4337 | Traditional |
 | Signatures | P-256 | secp256k1 |
@@ -416,9 +416,9 @@ Verify:
 | Modules | No | Yes |
 | Maturity | Experimental | Production |
 
-### EthAura vs other AA wallets?
+### ΞTHΛURΛ vs other AA wallets?
 
-EthAura's unique features:
+ΞTHΛURΛ's unique features:
 - P-256 signature support
 - Native passkey integration
 - Hardware security module support

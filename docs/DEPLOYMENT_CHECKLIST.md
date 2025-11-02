@@ -1,6 +1,6 @@
 # Deployment Checklist
 
-Use this checklist to ensure a smooth deployment of EthAura.
+Use this checklist to ensure a smooth deployment of ΞTHΛURΛ.
 
 ## Pre-Deployment
 

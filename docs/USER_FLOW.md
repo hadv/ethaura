@@ -1,10 +1,10 @@
-# EthAura User Flow
+# ΞTHΛURΛ User Flow
 
-This document describes the complete user flow for creating and using an EthAura smart contract wallet.
+This document describes the complete user flow for creating and using an ΞTHΛURΛ smart contract wallet.
 
 ## Overview
 
-EthAura provides a flexible, progressive security model where users can start simple and add more security features as needed. The flow follows these steps:
+ΞTHΛURΛ provides a flexible, progressive security model where users can start simple and add more security features as needed. The flow follows these steps:
 
 1. **Social Login** (Required)
 2. **Add Passkey** (Optional)
@@ -237,7 +237,7 @@ twoFactorEnabled = true
 
 ## Progressive Security Enhancement
 
-EthAura supports progressive security enhancement:
+ΞTHΛURΛ supports progressive security enhancement:
 
 ### Path 1: Start Simple (Cannot Add 2FA Later)
 1. Create "Social Login Only" account (qx=0, qy=0)

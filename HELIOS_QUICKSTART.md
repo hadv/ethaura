@@ -1,4 +1,4 @@
-# Helios Quick Start Guide for EthAura
+# Helios Quick Start Guide for ΞTHΛURΛ
 
 Get started with Helios light client in 5 minutes!
 
@@ -76,7 +76,7 @@ curl -X POST -H "Content-Type: application/json" \
   http://127.0.0.1:8545
 ```
 
-### Step 5: Use with EthAura (1 minute)
+### Step 5: Use with ΞTHΛURΛ (1 minute)
 
 #### Option A: Update .env to use Helios
 

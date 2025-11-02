@@ -1,4 +1,4 @@
-# EthAura Frontend Integration Guide
+# ΞTHΛURΛ Frontend Integration Guide
 
 Complete guide for integrating P256Account with your frontend application.
 
@@ -107,7 +107,7 @@ const createPasskey = async () => {
   const credential = await navigator.credentials.create({
     publicKey: {
       challenge,
-      rp: { name: 'EthAura', id: window.location.hostname },
+      rp: { name: 'ΞTHΛURΛ', id: window.location.hostname },
       user: {
         id: new Uint8Array(16),
         name: 'user@ethaura.wallet',

@@ -1,6 +1,6 @@
-# EthAura Design Decisions
+# ΞTHΛURΛ Design Decisions
 
-This document explains key design decisions made in the EthAura project.
+This document explains key design decisions made in the ΞTHΛURΛ project.
 
 ## 1. Counterfactual Address Calculation
 

@@ -2,13 +2,13 @@
 
 ## Overview
 
-This document provides a deep dive into how Helios integrates with EthAura to provide trustless RPC access.
+This document provides a deep dive into how Helios integrates with ΞTHΛURΛ to provide trustless RPC access.
 
 ## Architecture Diagram
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                        EthAura Application                       │
+│                        ΞTHΛURΛ Application                       │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                  │
 │  ┌──────────────────┐              ┌──────────────────┐        │
@@ -63,7 +63,7 @@ This document provides a deep dive into how Helios integrates with EthAura to pr
 ### 1. Request Flow
 
 ```
-User Action → EthAura App → Helios (127.0.0.1:8545) → Execution RPC → Ethereum
+User Action → ΞTHΛURΛ App → Helios (127.0.0.1:8545) → Execution RPC → Ethereum
 ```
 
 ### 2. Verification Flow
@@ -75,7 +75,7 @@ Ethereum → Consensus RPC → Helios Verification Engine
                               ↓
                     ✓ Valid / ✗ Invalid
                               ↓
-                         EthAura App
+                         ΞTHΛURΛ App
 ```
 
 ## Components
@@ -404,5 +404,5 @@ App → Helios → Centralized RPC → Ethereum
 
 ## Conclusion
 
-Helios provides a trustless, efficient way to access Ethereum data. By integrating it with EthAura, we ensure that all RPC data is cryptographically verified, protecting against malicious or compromised RPC providers while maintaining the convenience of a local RPC endpoint.
+Helios provides a trustless, efficient way to access Ethereum data. By integrating it with ΞTHΛURΛ, we ensure that all RPC data is cryptographically verified, protecting against malicious or compromised RPC providers while maintaining the convenience of a local RPC endpoint.
 

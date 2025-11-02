@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Production Consensus Node Setup Script for EthAura
+# Production Consensus Node Setup Script for ΞTHΛURΛ
 # This script sets up Nimbus consensus node for mainnet production on Linux
 
 set -e
@@ -13,7 +13,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 echo -e "${BLUE}========================================${NC}"
-echo -e "${BLUE}EthAura Production Consensus Node Setup${NC}"
+echo -e "${BLUE}ΞTHΛURΛ Production Consensus Node Setup${NC}"
 echo -e "${BLUE}========================================${NC}"
 echo ""
 

@@ -2,7 +2,7 @@
 
 ## 🎉 Overview
 
-Successfully integrated **Web3Auth** for social login with **Two-Factor Authentication (2FA)** in EthAura P256Account system.
+Successfully integrated **Web3Auth** for social login with **Two-Factor Authentication (2FA)** in ΞTHΛURΛ P256Account system.
 
 **Date**: 2025-10-15  
 **Commits**: 5 commits (from bb64a3c to bc86b63)  

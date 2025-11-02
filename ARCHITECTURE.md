@@ -2,7 +2,7 @@
 
 ## Overview
 
-EthAura implements ERC-4337 Account Abstraction with P-256/secp256r1 signature support, enabling users to use WebAuthn/Passkeys (Touch ID, Face ID, Windows Hello) to control their Ethereum accounts.
+ΞTHΛURΛ implements ERC-4337 Account Abstraction with P-256/secp256r1 signature support, enabling users to use WebAuthn/Passkeys (Touch ID, Face ID, Windows Hello) to control their Ethereum accounts.
 
 ## System Components
 

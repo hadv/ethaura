@@ -2,7 +2,7 @@
 
 # Default target
 help:
-	@echo "EthAura - P256 Account Abstraction"
+	@echo "ΞTHΛURΛ - P256 Account Abstraction"
 	@echo ""
 	@echo "Available commands:"
 	@echo "  make install        - Install all dependencies"

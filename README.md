@@ -1,6 +1,6 @@
-# 🔐 EthAura - P256 Account Abstraction with Passkeys & Web3Auth
+# 🔐 ΞTHΛURΛ - P256 Account Abstraction with Passkeys & Web3Auth
 
-EthAura là một implementation hoàn chỉnh của ERC-4337 Account Abstraction sử dụng chữ ký P-256/secp256r1 và WebAuthn/Passkeys, kết hợp với Web3Auth cho social login. Dự án tận dụng EIP-7951 precompile có sẵn trên Sepolia testnet sau Fusaka upgrade để verify chữ ký P-256 một cách hiệu quả.
+ΞTHΛURΛ là một implementation hoàn chỉnh của ERC-4337 Account Abstraction sử dụng chữ ký P-256/secp256r1 và WebAuthn/Passkeys, kết hợp với Web3Auth cho social login. Dự án tận dụng EIP-7951 precompile có sẵn trên Sepolia testnet sau Fusaka upgrade để verify chữ ký P-256 một cách hiệu quả.
 
 **🆕 Now with Helios Light Client support for trustless RPC access!**
 
@@ -93,7 +93,7 @@ npm install
 2. Create a new project
 3. Select "Plug and Play" → "Web"
 4. Configure:
-   - **Project Name**: EthAura
+   - **Project Name**: ΞTHΛURΛ
    - **Network**: Sapphire Devnet (testing) or Mainnet (production)
    - **Whitelist URLs**: `http://localhost:5173` (and your production domain)
 5. Copy the **Client ID**
