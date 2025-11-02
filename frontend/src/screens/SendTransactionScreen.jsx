@@ -8,7 +8,7 @@ import NetworkSelector from '../components/NetworkSelector'
 import WalletDropdown from '../components/WalletDropdown'
 import '../styles/SendTransactionScreen.css'
 
-function SendTransactionScreen({ wallet, onBack, onHome, credential, accountConfig, onLogout }) {
+function SendTransactionScreen({ wallet, onBack, onHome, credential, accountConfig, onLogout, onSignatureRequest }) {
   const { userInfo } = useWeb3Auth()
   const { networkInfo } = useNetwork()
   const [wallets, setWallets] = useState([])
@@ -91,6 +91,7 @@ function SendTransactionScreen({ wallet, onBack, onHome, credential, accountConf
               accountAddress={selectedWallet.address}
               credential={credential}
               accountConfig={accountConfig}
+              onSignatureRequest={onSignatureRequest}
             />
           </div>
         </div>

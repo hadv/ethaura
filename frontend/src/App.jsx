@@ -8,15 +8,18 @@ import WalletSettingsScreen from './screens/WalletSettingsScreen'
 import CreateWalletScreen from './screens/CreateWalletScreen'
 import NewWalletScreen from './screens/NewWalletScreen'
 import SendTransactionScreen from './screens/SendTransactionScreen'
+import SignatureConfirmationScreen from './screens/SignatureConfirmationScreen'
 
 // Inner component that uses Web3Auth context
 function AppContent() {
   const { isConnected, isLoading, logout } = useWeb3Auth()
 
   // Navigation state
-  const [currentScreen, setCurrentScreen] = useState('home') // 'home', 'wallet-detail', 'wallet-settings', 'add-wallet', 'new-wallet', 'send-transaction'
+  const [currentScreen, setCurrentScreen] = useState('home') // 'home', 'wallet-detail', 'wallet-settings', 'add-wallet', 'new-wallet', 'send-transaction', 'signature-confirmation'
   const [selectedWallet, setSelectedWallet] = useState(null)
   const [previousScreen, setPreviousScreen] = useState(null) // Track previous screen for proper back navigation
+  const [signatureData, setSignatureData] = useState(null) // Data for signature confirmation screen
+  const [signatureCallbacks, setSignatureCallbacks] = useState(null) // Callbacks for signature confirmation
 
   // Helper to serialize credential (convert ArrayBuffers to base64)
   const serializeCredential = (cred) => {
@@ -159,6 +162,36 @@ function AppContent() {
     setSelectedWallet(wallet)
   }
 
+  // Handle signature confirmation navigation
+  const handleSignatureRequest = (data, onConfirm, onCancel) => {
+    setSignatureData(data)
+    setSignatureCallbacks({ onConfirm, onCancel })
+    setPreviousScreen(currentScreen)
+    setCurrentScreen('signature-confirmation')
+  }
+
+  const handleSignatureConfirm = async () => {
+    if (signatureCallbacks?.onConfirm) {
+      await signatureCallbacks.onConfirm()
+    }
+    // Return to previous screen
+    setCurrentScreen(previousScreen || 'send-transaction')
+    setSignatureData(null)
+    setSignatureCallbacks(null)
+    setPreviousScreen(null)
+  }
+
+  const handleSignatureCancel = () => {
+    if (signatureCallbacks?.onCancel) {
+      signatureCallbacks.onCancel()
+    }
+    // Return to previous screen
+    setCurrentScreen(previousScreen || 'send-transaction')
+    setSignatureData(null)
+    setSignatureCallbacks(null)
+    setPreviousScreen(null)
+  }
+
   const handleBack = () => {
     if (currentScreen === 'wallet-detail') {
       setCurrentScreen('home')
@@ -176,6 +209,9 @@ function AppContent() {
         setCurrentScreen('wallet-detail')
       }
       setPreviousScreen(null)
+    } else if (currentScreen === 'signature-confirmation') {
+      // Cancel signature and go back
+      handleSignatureCancel()
     } else if (currentScreen === 'add-wallet' || currentScreen === 'new-wallet') {
       setCurrentScreen('home')
       setPreviousScreen(null)
@@ -189,6 +225,8 @@ function AppContent() {
     setCurrentScreen('home')
     setSelectedWallet(null)
     setPreviousScreen(null)
+    setSignatureData(null)
+    setSignatureCallbacks(null)
   }
 
   const handleLogout = async () => {
@@ -196,6 +234,8 @@ function AppContent() {
     setCurrentScreen('home')
     setSelectedWallet(null)
     setPreviousScreen(null)
+    setSignatureData(null)
+    setSignatureCallbacks(null)
   }
 
   // Show login screen if not connected
@@ -276,6 +316,18 @@ function AppContent() {
           credential={passkeyCredential}
           accountConfig={accountConfig}
           onLogout={handleLogout}
+          onSignatureRequest={handleSignatureRequest}
+        />
+      )}
+
+      {currentScreen === 'signature-confirmation' && (
+        <SignatureConfirmationScreen
+          signatureData={signatureData}
+          wallet={selectedWallet}
+          onConfirm={handleSignatureConfirm}
+          onCancel={handleSignatureCancel}
+          onLogout={handleLogout}
+          onHome={handleHome}
         />
       )}
     </>

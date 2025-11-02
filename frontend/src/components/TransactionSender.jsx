@@ -9,10 +9,9 @@ import { buildSendEthUserOp, getUserOpHash, signUserOperation, signUserOperation
 import { getUserFriendlyMessage, getSuggestedAction, isRetryableError } from '../lib/errors'
 import { formatPublicKeyForContract } from '../lib/accountManager'
 import { SUPPORTED_TOKENS, ERC20_ABI } from '../lib/constants'
-import SignatureConfirmationDialog from './SignatureConfirmationDialog'
 import '../styles/TransactionSender.css'
 
-function TransactionSender({ accountAddress, credential, accountConfig }) {
+function TransactionSender({ accountAddress, credential, accountConfig, onSignatureRequest }) {
   const { isConnected, signMessage, signRawHash, address: ownerAddress } = useWeb3Auth()
   const { networkInfo } = useNetwork()
   const sdk = useP256SDK()
@@ -35,47 +34,31 @@ function TransactionSender({ accountAddress, credential, accountConfig }) {
   const [showTokenDropdown, setShowTokenDropdown] = useState(false)
   const [availableTokens, setAvailableTokens] = useState([])
 
-  // Signature confirmation dialog state
-  const [showSignatureDialog, setShowSignatureDialog] = useState(false)
-  const [pendingSignatureData, setPendingSignatureData] = useState(null)
-  const [signatureResolver, setSignatureResolver] = useState(null)
-
-  // Helper function to request signature with user confirmation
+  // Helper function to request signature with user confirmation via screen navigation
   const requestSignatureWithConfirmation = (signatureData) => {
     return new Promise((resolve, reject) => {
-      setPendingSignatureData(signatureData)
-      setShowSignatureDialog(true)
-      setSignatureResolver({ resolve, reject })
+      if (onSignatureRequest) {
+        // Use screen navigation
+        onSignatureRequest(
+          signatureData,
+          async () => {
+            try {
+              const ownerSig = await signRawHash(signatureData.userOpHash)
+              resolve(ownerSig)
+            } catch (err) {
+              reject(err)
+            }
+          },
+          () => {
+            reject(new Error('User cancelled signature'))
+          }
+        )
+      } else {
+        // Fallback: sign directly without confirmation (shouldn't happen in normal flow)
+        console.warn('No onSignatureRequest handler provided, signing directly')
+        signRawHash(signatureData.userOpHash).then(resolve).catch(reject)
+      }
     })
-  }
-
-  const handleSignatureConfirm = async () => {
-    try {
-      // Actually sign the hash
-      const ownerSig = await signRawHash(pendingSignatureData.userOpHash)
-      setShowSignatureDialog(false)
-      setPendingSignatureData(null)
-      if (signatureResolver) {
-        signatureResolver.resolve(ownerSig)
-        setSignatureResolver(null)
-      }
-    } catch (err) {
-      setShowSignatureDialog(false)
-      setPendingSignatureData(null)
-      if (signatureResolver) {
-        signatureResolver.reject(err)
-        setSignatureResolver(null)
-      }
-    }
-  }
-
-  const handleSignatureCancel = () => {
-    setShowSignatureDialog(false)
-    setPendingSignatureData(null)
-    if (signatureResolver) {
-      signatureResolver.reject(new Error('User cancelled signature'))
-      setSignatureResolver(null)
-    }
   }
 
   // Load account info (derive from SDK using passkey + owner OR owner-only)
@@ -1154,14 +1137,6 @@ function TransactionSender({ accountAddress, credential, accountConfig }) {
           )}
         </div>
       )}
-
-      {/* Signature Confirmation Dialog */}
-      <SignatureConfirmationDialog
-        isOpen={showSignatureDialog}
-        onConfirm={handleSignatureConfirm}
-        onCancel={handleSignatureCancel}
-        signatureData={pendingSignatureData}
-      />
     </div>
   )
 }
