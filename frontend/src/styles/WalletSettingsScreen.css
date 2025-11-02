@@ -21,7 +21,7 @@
 }
 
 .settings-sidebar {
-  background: white;
+  background: #fafafa;
   padding: 32px;
 }
 
@@ -30,55 +30,60 @@
   display: flex;
   gap: 12px;
   margin-bottom: 24px;
-  background: white;
-  padding: 8px;
-  border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-  border: 1px solid #e5e5e5;
+  background: transparent;
+  padding: 0;
+  border-radius: 0;
+  box-shadow: none;
+  border: none;
+  border-bottom: 2px solid #e5e5e5;
 }
 
 .tab-btn {
   flex: 1;
-  padding: 14px 16px;
+  padding: 16px 20px;
   background: transparent;
   border: none;
-  border-radius: 8px;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
   cursor: pointer;
   transition: all 0.2s ease;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   color: #6b7280;
   font-weight: 600;
+  border-radius: 0;
 }
 
 .tab-btn:hover {
   background: #f9fafb;
+  color: #111827;
 }
 
 .tab-btn.active {
-  background: #000;
-  color: white;
+  background: transparent;
+  color: #000;
+  border-bottom-color: #000;
 }
 
 .tab-icon {
-  font-size: 28px;
-  width: 28px;
-  height: 28px;
+  font-size: 24px;
+  width: 24px;
+  height: 24px;
 }
 
 .tab-label {
-  font-size: 13px;
+  font-size: 14px;
 }
 
 /* Settings Content */
 .settings-content {
-  background: white;
-  border-radius: 12px;
-  padding: 28px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-  border: 1px solid #e5e5e5;
+  background: transparent;
+  border-radius: 0;
+  padding: 0;
+  box-shadow: none;
+  border: none;
 }
 
 .tab-panel {
@@ -97,20 +102,20 @@
 }
 
 .panel-header {
-  margin-bottom: 24px;
-  padding-bottom: 20px;
-  border-bottom: 1px solid #e5e5e5;
+  margin-bottom: 32px;
+  padding-bottom: 0;
+  border-bottom: none;
 }
 
 .panel-header h3 {
-  font-size: 22px;
+  font-size: 24px;
   font-weight: 700;
   color: #000;
   margin: 0 0 8px 0;
 }
 
 .panel-header p {
-  font-size: 15px;
+  font-size: 16px;
   color: #6b7280;
   margin: 0;
   line-height: 1.5;
@@ -129,8 +134,8 @@
   background: #000;
   color: white;
   border: none;
-  border-radius: 24px;
-  font-size: 16px;
+  border-radius: 8px;
+  font-size: 14px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;

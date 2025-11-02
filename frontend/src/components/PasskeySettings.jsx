@@ -286,8 +286,6 @@ function PasskeySettings({ accountAddress }) {
 
   return (
     <div className="card">
-      <h3>Passkey Status</h3>
-      
       {accountInfo.hasPasskey ? (
         <div className="status status-success mb-4">
           ✅ Passkey is configured for this account
