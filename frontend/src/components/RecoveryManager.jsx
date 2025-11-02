@@ -418,8 +418,9 @@ function RecoveryManager({ accountAddress, credential }) {
   if (!isConnected) {
     return (
       <div className="recovery-manager">
-        <h2>🔐 Recovery Manager</h2>
-        <p>Please connect with Web3Auth to access recovery features.</p>
+        <div className="status status-info">
+          ℹ️ Please connect with Web3Auth to access recovery features.
+        </div>
       </div>
     )
   }
@@ -427,16 +428,15 @@ function RecoveryManager({ accountAddress, credential }) {
   if (!accountAddress) {
     return (
       <div className="recovery-manager">
-        <h2>🔐 Recovery Manager</h2>
-        <p>Please create an account first.</p>
+        <div className="status status-info">
+          ℹ️ Please create an account first.
+        </div>
       </div>
     )
   }
 
   return (
     <div className="recovery-manager">
-      <h2>🔐 Recovery Manager</h2>
-
       {/* Guardian Status */}
       {guardianInfo && (
         <div className="guardian-status">

@@ -235,7 +235,6 @@ function GuardianManager({ accountAddress, credential, onGuardiansUpdated }) {
   if (!accountAddress) {
     return (
       <div className="card">
-        <h2>👥 Guardian Management</h2>
         <div className="status status-info">
           ℹ️ Please deploy your account first
         </div>
@@ -245,14 +244,9 @@ function GuardianManager({ accountAddress, credential, onGuardiansUpdated }) {
 
   return (
     <div className="card">
-      <h2>👥 Guardian Management</h2>
-      <p className="text-sm mb-4">
-        Manage guardians who can help you recover your account if you lose access to your passkey.
-      </p>
-
       {guardianInfo && (
         <div className="status status-info mb-4">
-          <strong>Current Status:</strong> {guardianInfo.guardians.length} guardian{guardianInfo.guardians.length !== 1 ? 's' : ''}, 
+          <strong>Current Status:</strong> {guardianInfo.guardians.length} guardian{guardianInfo.guardians.length !== 1 ? 's' : ''},
           threshold: {guardianInfo.threshold}
         </div>
       )}
