@@ -77,3 +77,57 @@ export const ENTRYPOINT_ABI = [
   'function depositTo(address account) payable',
 ]
 
+// ERC-20 Token ABI
+export const ERC20_ABI = [
+  'function name() view returns (string)',
+  'function symbol() view returns (string)',
+  'function decimals() view returns (uint8)',
+  'function totalSupply() view returns (uint256)',
+  'function balanceOf(address account) view returns (uint256)',
+  'function transfer(address to, uint256 amount) returns (bool)',
+  'function allowance(address owner, address spender) view returns (uint256)',
+  'function approve(address spender, uint256 amount) returns (bool)',
+  'function transferFrom(address from, address to, uint256 amount) returns (bool)',
+]
+
+// Import token icons
+import linkIcon from '../assets/tokens/link.svg'
+import pyusdIcon from '../assets/tokens/pyusd.svg'
+
+// Supported ERC-20 tokens by network
+export const SUPPORTED_TOKENS = {
+  sepolia: [
+    {
+      symbol: 'LINK',
+      name: 'Chainlink Token',
+      address: '0x779877A7B0D9E8603169DdbD7836e478b4624789',
+      decimals: 18,
+      icon: linkIcon,
+    },
+    {
+      symbol: 'PYUSD',
+      name: 'PayPal USD',
+      address: '0xCaC524BcA292aaade2DF8A05cC58F0a65B1B3bB9',
+      decimals: 6,
+      icon: pyusdIcon,
+    },
+    // Add more tokens here as needed
+  ],
+  mainnet: [
+    {
+      symbol: 'LINK',
+      name: 'Chainlink Token',
+      address: '0x514910771AF9Ca656af840dff83E8264EcF986CA',
+      decimals: 18,
+      icon: linkIcon,
+    },
+    {
+      symbol: 'PYUSD',
+      name: 'PayPal USD',
+      address: '0x2b591e99afE9f32eAA6214f7B7629768c40Eeb39',
+      decimals: 6,
+      icon: pyusdIcon,
+    },
+    // Add more tokens here as needed
+  ],
+}

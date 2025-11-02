@@ -35,6 +35,7 @@ function SignatureConfirmationDialog({
     signatureStep,
     operationType,
     operationDetails,
+    token, // Token info for ERC-20 transfers
   } = signatureData || {}
 
   return (
@@ -148,7 +149,7 @@ function SignatureConfirmationDialog({
 
           <div className="detail-row" style={{ marginBottom: '1rem' }}>
             <strong style={{ color: '#888', fontSize: '0.85rem', display: 'block', marginBottom: '0.25rem' }}>
-              To Address:
+              {token ? 'Recipient Address:' : 'To Address:'}
             </strong>
             <div className="code-block" style={{
               fontSize: '0.8rem',
@@ -161,6 +162,26 @@ function SignatureConfirmationDialog({
             </div>
           </div>
 
+          {token && (
+            <div className="detail-row" style={{ marginBottom: '1rem' }}>
+              <strong style={{ color: '#888', fontSize: '0.85rem', display: 'block', marginBottom: '0.25rem' }}>
+                Token Contract:
+              </strong>
+              <div className="code-block" style={{
+                fontSize: '0.8rem',
+                padding: '0.5rem',
+                backgroundColor: '#000',
+                borderRadius: '4px',
+                wordBreak: 'break-all',
+              }}>
+                {token.address}
+              </div>
+              <div style={{ fontSize: '0.75rem', color: '#888', marginTop: '0.25rem' }}>
+                {token.name} ({token.symbol})
+              </div>
+            </div>
+          )}
+
           {amount !== undefined && (
             <div className="detail-row" style={{ marginBottom: '1rem' }}>
               <strong style={{ color: '#888', fontSize: '0.85rem', display: 'block', marginBottom: '0.25rem' }}>
@@ -171,7 +192,10 @@ function SignatureConfirmationDialog({
                 color: '#4ade80',
                 fontWeight: 'bold',
               }}>
-                {amount ? ethers.formatEther(amount) : '0'} ETH
+                {token
+                  ? `${amount ? ethers.formatUnits(amount, token.decimalsFromChain || token.decimals) : '0'} ${token.symbol}`
+                  : `${amount ? ethers.formatEther(amount) : '0'} ETH`
+                }
               </div>
             </div>
           )}
