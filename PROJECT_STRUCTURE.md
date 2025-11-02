@@ -1,6 +1,6 @@
 # Project Structure
 
-This document provides an overview of the EthAura project structure.
+This document provides an overview of the ΞTHΛURΛ project structure.
 
 ## Directory Tree
 

@@ -19,7 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.1.0] - 2025-10-15
 
 ### Added
-- Initial release of EthAura
+- Initial release of ΞTHΛURΛ
 - P256 signature verification library using EIP-7951 precompile
 - P256Account contract implementing ERC-4337
 - P256AccountFactory for deterministic account deployment
@@ -96,13 +96,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### v0.1.0 - Initial Release
 
-This is the first public release of EthAura, a P-256 Account Abstraction implementation.
+This is the first public release of ΞTHΛURΛ, a P-256 Account Abstraction implementation.
 
 **⚠️ WARNING: This is experimental software. Not audited. Do not use with real funds.**
 
 #### What's New
 
-EthAura enables Ethereum users to control their accounts using WebAuthn/Passkeys (Touch ID, Face ID, Windows Hello) instead of traditional private keys. This is made possible by:
+ΞTHΛURΛ enables Ethereum users to control their accounts using WebAuthn/Passkeys (Touch ID, Face ID, Windows Hello) instead of traditional private keys. This is made possible by:
 
 1. **EIP-7951 Precompile**: Efficient P-256 signature verification (~6,900 gas)
 2. **ERC-4337 Integration**: Full Account Abstraction support
@@ -152,7 +152,7 @@ N/A (initial release)
 
 #### Contributors
 
-- EthAura Team
+- ΞTHΛURΛ Team
 
 #### Acknowledgments
 

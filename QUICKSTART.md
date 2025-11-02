@@ -1,6 +1,6 @@
 # Quick Start Guide
 
-Get up and running with EthAura in 5 minutes!
+Get up and running with ΞTHΛURΛ in 5 minutes!
 
 ## Prerequisites
 
@@ -317,7 +317,7 @@ After completing this guide, you should have:
 2. **Learn**: Read the documentation
 3. **Build**: Create your own dApp
 4. **Contribute**: Submit improvements
-5. **Share**: Tell others about EthAura!
+5. **Share**: Tell others about ΞTHΛURΛ!
 
 ## Resources
 
@@ -329,7 +329,7 @@ After completing this guide, you should have:
 
 ---
 
-**Congratulations!** 🎉 You're now ready to build with EthAura!
+**Congratulations!** 🎉 You're now ready to build with ΞTHΛURΛ!
 
 If you found this helpful, please ⭐ star the repo on GitHub!
 

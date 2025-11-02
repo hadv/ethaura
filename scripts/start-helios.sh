@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Start Helios Light Client for EthAura
+# Start Helios Light Client for ΞTHΛURΛ
 # This script starts a local Helios RPC endpoint that provides trustless access to Ethereum
 
 set -e

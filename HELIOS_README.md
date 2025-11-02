@@ -1,4 +1,4 @@
-# 🌐 Helios Light Client Integration for EthAura
+# 🌐 Helios Light Client Integration for ΞTHΛURΛ
 
 ## Quick Links
 
@@ -32,7 +32,7 @@ Helios verifies all data cryptographically:
 ```
 ┌─────────────┐
 │ Your App    │
-│  (EthAura)  │
+│  (ΞTHΛURΛ)  │
 └──────┬──────┘
        │ RPC Call
        ▼
@@ -75,7 +75,7 @@ make helios-sepolia
 make helios-test
 ```
 
-### 4. Use with EthAura
+### 4. Use with ΞTHΛURΛ
 
 Update your `.env`:
 ```bash

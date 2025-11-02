@@ -1,6 +1,6 @@
 # Deployment History
 
-This file tracks all production and testnet deployments of the EthAura contracts.
+This file tracks all production and testnet deployments of the ΞTHΛURΛ contracts.
 
 ## Sepolia Testnet
 

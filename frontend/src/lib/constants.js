@@ -1,5 +1,5 @@
 /**
- * Constants for EthAura P256 Account Abstraction
+ * Constants for ΞTHΛURΛ P256 Account Abstraction
  */
 
 // EntryPoint v0.7 address (same on all chains)

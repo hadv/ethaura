@@ -1,8 +1,8 @@
-# EthAura Production Setup Guide
+# ΞTHΛURΛ Production Setup Guide
 
 ## Overview
 
-This guide explains the recommended setup for EthAura in different environments:
+This guide explains the recommended setup for ΞTHΛURΛ in different environments:
 
 - **Development (Sepolia)**: Use public beacon APIs
 - **Production (Mainnet)**: Run your own consensus node on Linux
@@ -85,7 +85,7 @@ See detailed instructions in [docs/CONSENSUS_NODE_SETUP.md](docs/CONSENSUS_NODE_
 ├─────────────────────────────────────────────────────────┤
 │                                                          │
 │  ┌──────────────┐         ┌──────────────────┐         │
-│  │   EthAura    │────────▶│     Helios       │         │
+│  │   ΞTHΛURΛ    │────────▶│     Helios       │         │
 │  │     App      │         │  (Light Client)  │         │
 │  └──────────────┘         └────────┬─────────┘         │
 │                                    │                     │

@@ -51,7 +51,7 @@ export const Web3AuthProvider = ({ children }) => {
           privateKeyProvider,
           uxMode: 'redirect', // Use redirect mode instead of popup to avoid COOP issues
           uiConfig: {
-            appName: 'EthAura - P256 Account Abstraction',
+            appName: 'ΞTHΛURΛ - P256 Account Abstraction',
             mode: 'light',
             loginMethodsOrder: ['google', 'facebook', 'twitter', 'email_passwordless'],
             logoLight: 'https://web3auth.io/images/web3authlog.png',

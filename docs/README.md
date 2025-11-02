@@ -1,6 +1,6 @@
-# EthAura Documentation
+# ΞTHΛURΛ Documentation
 
-Welcome to the EthAura documentation! This directory contains additional resources to help you understand and use EthAura.
+Welcome to the ΞTHΛURΛ documentation! This directory contains additional resources to help you understand and use ΞTHΛURΛ.
 
 ## 📚 Documentation Index
 

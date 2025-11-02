@@ -1,4 +1,4 @@
-# EthAura Frontend
+# ΞTHΛURΛ Frontend
 
 React frontend for P256Account ERC-4337 wallet with passkey authentication and optional 2FA.
 

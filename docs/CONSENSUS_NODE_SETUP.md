@@ -33,7 +33,7 @@ When you run your own consensus (beacon chain) node in production, you:
 ├─────────────────────────────────────────────────────────────┤
 │                                                              │
 │  ┌──────────────┐         ┌──────────────────┐             │
-│  │   EthAura    │────────▶│     Helios       │             │
+│  │   ΞTHΛURΛ    │────────▶│     Helios       │             │
 │  │     App      │         │  (Light Client)  │             │
 │  └──────────────┘         └────────┬─────────┘             │
 │                                    │                         │

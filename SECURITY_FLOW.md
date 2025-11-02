@@ -1,4 +1,4 @@
-# Security Flow Diagrams - EthAura P256Account
+# Security Flow Diagrams - ΞTHΛURΛ P256Account
 
 ## 🔄 Normal Transaction Flow
 

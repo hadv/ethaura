@@ -1,6 +1,6 @@
-# Contributing to EthAura
+# Contributing to ΞTHΛURΛ
 
-Thank you for your interest in contributing to EthAura! This document provides guidelines and instructions for contributing.
+Thank you for your interest in contributing to ΞTHΛURΛ! This document provides guidelines and instructions for contributing.
 
 ## Code of Conduct
 
@@ -295,5 +295,5 @@ Feel free to reach out:
 - Join our Discord
 - Email: contribute@ethaura.example.com
 
-Thank you for contributing to EthAura! 🚀
+Thank you for contributing to ΞTHΛURΛ! 🚀
 

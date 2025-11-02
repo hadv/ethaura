@@ -19,13 +19,13 @@ export async function exampleCompleteFlow() {
     publicKey: {
       challenge,
       rp: {
-        name: 'EthAura P256 Wallet',
+        name: 'ΞTHΛURΛ P256 Wallet',
         id: window.location.hostname,
       },
       user: {
         id: new Uint8Array(16),
         name: 'user@ethaura.wallet',
-        displayName: 'EthAura User',
+        displayName: 'ΞTHΛURΛ User',
       },
       pubKeyCredParams: [{ type: 'public-key', alg: -7 }], // ES256 (P-256)
       authenticatorSelection: {

@@ -1,11 +1,11 @@
 #!/bin/bash
 
-# EthAura Setup Script
+# ΞTHΛURΛ Setup Script
 # This script helps you set up the development environment
 
 set -e
 
-echo "🔐 EthAura - P256 Account Abstraction Setup"
+echo "🔐 ΞTHΛURΛ - P256 Account Abstraction Setup"
 echo "==========================================="
 echo ""
 

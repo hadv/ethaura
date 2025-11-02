@@ -90,7 +90,7 @@ This document describes the integration of Web3Auth for social login with P256Ac
 2. Create a new project
 3. Select "Plug and Play" → "Web"
 4. Configure:
-   - **Project Name**: EthAura
+   - **Project Name**: ΞTHΛURΛ
    - **Network**: Sapphire Devnet (for testing) or Mainnet (for production)
    - **Whitelist URLs**: 
      - `http://localhost:5173` (development)

@@ -1,6 +1,6 @@
-# 🚀 Get Started with EthAura
+# 🚀 Get Started with ΞTHΛURΛ
 
-Welcome to EthAura! This guide will help you get started in just a few minutes.
+Welcome to ΞTHΛURΛ! This guide will help you get started in just a few minutes.
 
 ## 📋 What You'll Need
 
@@ -276,7 +276,7 @@ After setup, you should be able to:
 
 ## 🎊 Welcome!
 
-You're now ready to start building with EthAura!
+You're now ready to start building with ΞTHΛURΛ!
 
 **Next step**: Choose your path above and get started! 🚀
 
@@ -290,5 +290,5 @@ You're now ready to start building with EthAura!
 
 ---
 
-Built with ❤️ by the EthAura team
+Built with ❤️ by the ΞTHΛURΛ team
 
