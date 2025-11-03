@@ -103,6 +103,10 @@ import avaxIcon from '../assets/tokens/avax.svg'
 import usdcIcon from '../assets/tokens/usdc.svg'
 import usdtIcon from '../assets/tokens/usdt.svg'
 import xrpIcon from '../assets/tokens/xrp.svg'
+import enaIcon from '../assets/tokens/ena.svg'
+import usdeIcon from '../assets/tokens/usde.svg'
+import xautIcon from '../assets/tokens/xaut.svg'
+import paxgIcon from '../assets/tokens/paxg.svg'
 
 // Supported ERC-20 tokens by network
 export const SUPPORTED_TOKENS = {
@@ -201,6 +205,34 @@ export const SUPPORTED_TOKENS = {
       address: '0x85f138bfEE4ef8e540890CFb48F620571d67Eda3',
       decimals: 18,
       icon: avaxIcon,
+    },
+    {
+      symbol: 'ENA',
+      name: 'Ethena',
+      address: '0x57e114B691Db790C35207b2e685D4A43181e6061',
+      decimals: 18,
+      icon: enaIcon,
+    },
+    {
+      symbol: 'USDe',
+      name: 'Ethena USDe',
+      address: '0x4c9EDD5852cd905f086C759E8383e09bff1E68B3',
+      decimals: 18,
+      icon: usdeIcon,
+    },
+    {
+      symbol: 'XAUt',
+      name: 'Tether Gold',
+      address: '0x68749665FF8D2d112Fa859AA293F07A622782F38',
+      decimals: 6,
+      icon: xautIcon,
+    },
+    {
+      symbol: 'PAXG',
+      name: 'Pax Gold',
+      address: '0x45804880De22913dAFE09f4980848ECE6EcbAf78',
+      decimals: 18,
+      icon: paxgIcon,
     },
   ],
 }
