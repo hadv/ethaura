@@ -8,7 +8,7 @@ import { ethers } from 'ethers'
 import { buildSendEthUserOp, getUserOpHash, signUserOperation, signUserOperationOwnerOnly, packAccountGasLimits, packGasFees, encodeExecute } from '../lib/userOperation'
 import { getUserFriendlyMessage, getSuggestedAction, isRetryableError } from '../lib/errors'
 import { formatPublicKeyForContract } from '../lib/accountManager'
-import { SUPPORTED_TOKENS, ERC20_ABI } from '../lib/constants'
+import { SUPPORTED_TOKENS, ERC20_ABI, ethIcon } from '../lib/constants'
 import '../styles/TransactionSender.css'
 
 function TransactionSender({ accountAddress, credential, accountConfig, onSignatureRequest }) {
@@ -980,16 +980,7 @@ function TransactionSender({ accountAddress, credential, accountConfig, onSignat
           ) : (
             <>
               <div className="token-icon">
-                <svg viewBox="0 0 784.37 1277.39" xmlns="http://www.w3.org/2000/svg">
-                  <g fill="#343434" fillRule="nonzero">
-                    <path d="m392.07 0-8.57 29.11v844.63l8.57 8.55 392.06-231.75z" fillOpacity=".6"/>
-                    <path d="m392.07 0-392.07 650.54 392.07 231.75v-435.68z"/>
-                    <path d="m392.07 956.52-4.83 5.89v300.87l4.83 14.1 392.3-552.49z" fillOpacity=".6"/>
-                    <path d="m392.07 1277.38v-320.86l-392.07-231.75z"/>
-                    <path d="m392.07 882.29 392.06-231.75-392.06-178.21z" fillOpacity=".2"/>
-                    <path d="m0 650.54 392.07 231.75v-409.96z" fillOpacity=".6"/>
-                  </g>
-                </svg>
+                <img src={ethIcon} alt="ETH" />
               </div>
               <div className="token-details">
                 <div className="token-name">Ether</div>
@@ -1011,16 +1002,7 @@ function TransactionSender({ accountAddress, credential, accountConfig, onSignat
               onClick={() => handleTokenSelect(null)}
             >
               <div className="token-icon">
-                <svg viewBox="0 0 784.37 1277.39" xmlns="http://www.w3.org/2000/svg" width="24" height="24">
-                  <g fill="#343434" fillRule="nonzero">
-                    <path d="m392.07 0-8.57 29.11v844.63l8.57 8.55 392.06-231.75z" fillOpacity=".6"/>
-                    <path d="m392.07 0-392.07 650.54 392.07 231.75v-435.68z"/>
-                    <path d="m392.07 956.52-4.83 5.89v300.87l4.83 14.1 392.3-552.49z" fillOpacity=".6"/>
-                    <path d="m392.07 1277.38v-320.86l-392.07-231.75z"/>
-                    <path d="m392.07 882.29 392.06-231.75-392.06-178.21z" fillOpacity=".2"/>
-                    <path d="m0 650.54 392.07 231.75v-409.96z" fillOpacity=".6"/>
-                  </g>
-                </svg>
+                <img src={ethIcon} alt="ETH" />
               </div>
               <div className="token-dropdown-details">
                 <div className="token-dropdown-name">Ether</div>
