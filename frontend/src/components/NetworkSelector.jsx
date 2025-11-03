@@ -4,6 +4,7 @@ import '../styles/NetworkSelector.css';
 
 // Import network icons
 import ethereumIcon from '../assets/networks/ethereum.png';
+import sepoliaIcon from '../assets/networks/sepolia.png';
 import optimismIcon from '../assets/networks/optimism.png';
 import polygonIcon from '../assets/networks/polygon.png';
 import arbitrumIcon from '../assets/networks/arbitrum.png';
@@ -54,6 +55,7 @@ const NetworkSelector = () => {
   const getNetworkIcon = (chainId) => {
     switch (chainId) {
       case 11155111: // Sepolia
+        return sepoliaIcon;
       case 1: // Ethereum
         return ethereumIcon;
       case 137: // Polygon
