@@ -41,6 +41,7 @@ function SignatureConfirmationScreen({
     operationType,
     operationDetails,
     token,
+    userOp,
   } = signatureData || {}
 
   const formatAddress = (address) => {
@@ -55,6 +56,78 @@ function SignatureConfirmationScreen({
 
   const openExplorer = (address) => {
     window.open(getExplorerUrl(address), '_blank', 'noopener,noreferrer')
+  }
+
+  // Decode callData to show human-readable operation
+  const decodeCallData = (callData) => {
+    if (!callData || callData === '0x') return null
+
+    try {
+      // Check if it's an execute() call (0xb61d27f6)
+      const executeSelector = '0xb61d27f6'
+      if (callData.startsWith(executeSelector)) {
+        // Decode execute(address dest, uint256 value, bytes calldata func)
+        const abiCoder = ethers.AbiCoder.defaultAbiCoder()
+        const params = abiCoder.decode(
+          ['address', 'uint256', 'bytes'],
+          '0x' + callData.slice(10) // Remove function selector
+        )
+
+        const [dest, value, func] = params
+
+        // Try to decode the inner function call
+        let innerCall = null
+        if (func && func !== '0x' && func.length >= 10) {
+          const funcSelector = func.slice(0, 10)
+
+          // ERC-20 transfer (0xa9059cbb)
+          if (funcSelector === '0xa9059cbb') {
+            try {
+              const transferParams = abiCoder.decode(
+                ['address', 'uint256'],
+                '0x' + func.slice(10)
+              )
+              innerCall = {
+                type: 'ERC20 Transfer',
+                to: transferParams[0],
+                amount: transferParams[1].toString(),
+              }
+            } catch (e) {
+              console.error('Failed to decode transfer:', e)
+            }
+          }
+          // ERC-20 approve (0x095ea7b3)
+          else if (funcSelector === '0x095ea7b3') {
+            try {
+              const approveParams = abiCoder.decode(
+                ['address', 'uint256'],
+                '0x' + func.slice(10)
+              )
+              innerCall = {
+                type: 'ERC20 Approve',
+                spender: approveParams[0],
+                amount: approveParams[1].toString(),
+              }
+            } catch (e) {
+              console.error('Failed to decode approve:', e)
+            }
+          }
+        }
+
+        return {
+          function: 'execute',
+          dest,
+          value: value.toString(),
+          innerCall,
+          rawFunc: func,
+        }
+      }
+
+      return null
+    } catch (e) {
+      console.error('Failed to decode callData:', e)
+      return null
+    }
   }
 
   return (
@@ -147,29 +220,63 @@ function SignatureConfirmationScreen({
                 </div>
               </div>
 
-              {/* Token Contract */}
-              {token && (
-                <div className="signature-detail-item">
-                  <label className="detail-label">Token Contract</label>
-                  <div className="detail-address">
-                    {token.address}
-                  </div>
-                  <div className="detail-token-info">
-                    {token.name} ({token.symbol})
-                  </div>
-                </div>
-              )}
-
               {/* Amount - Highlighted */}
               {amount !== undefined && (
                 <div className="signature-amount-section">
                   <label className="detail-label">Amount</label>
                   <div className="amount-display">
                     {token
-                      ? `${amount ? ethers.formatUnits(amount, token.decimalsFromChain || token.decimals) : '0'} ${token.symbol}`
+                      ? amount ? ethers.formatUnits(amount, token.decimalsFromChain || token.decimals) : '0'
                       : `${amount ? ethers.formatEther(amount) : '0'} ETH`
                     }
                   </div>
+                  {token && (
+                    <div style={{ marginTop: '8px', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '14px', color: '#6b7280' }}>
+                        {token.icon && (
+                          <img
+                            src={token.icon}
+                            alt={token.symbol}
+                            style={{ width: '18px', height: '18px', borderRadius: '50%' }}
+                          />
+                        )}
+                        <span>{token.name} ({token.symbol})</span>
+                      </div>
+
+                      {/* Token Contract Address - Creative Badge Style */}
+                      <div
+                        onClick={() => openExplorer(token.address)}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          padding: '4px 8px',
+                          background: '#f3f4f6',
+                          border: '1px solid #e5e7eb',
+                          borderRadius: '6px',
+                          fontSize: '11px',
+                          fontFamily: 'monospace',
+                          color: '#6b7280',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s ease',
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.background = '#e5e7eb'
+                          e.currentTarget.style.borderColor = '#d1d5db'
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = '#f3f4f6'
+                          e.currentTarget.style.borderColor = '#e5e7eb'
+                        }}
+                        title="Click to view on block explorer"
+                      >
+                        <span>{token.address}</span>
+                        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0 }}>
+                          <path d="M12 8.66667V12.6667C12 13.0203 11.8595 13.3594 11.6095 13.6095C11.3594 13.8595 11.0203 14 10.6667 14H3.33333C2.97971 14 2.64057 13.8595 2.39052 13.6095C2.14048 13.3594 2 13.0203 2 12.6667V5.33333C2 4.97971 2.14048 4.64057 2.39052 4.39052C2.64057 4.14048 2.97971 4 3.33333 4H7.33333M10 2H14M14 2V6M14 2L6.66667 9.33333" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -180,6 +287,35 @@ function SignatureConfirmationScreen({
                   {nonce?.toString() || '0'}
                 </div>
               </div>
+
+              {/* Operation Type - Decoded from CallData */}
+              {userOp && (() => {
+                const decoded = decodeCallData(userOp.callData)
+                if (decoded && decoded.innerCall) {
+                  return (
+                    <div className="signature-detail-item">
+                      <label className="detail-label">Operation Type</label>
+                      <div className="operation-type-value">
+                        {decoded.innerCall.type}
+                      </div>
+                    </div>
+                  )
+                }
+                return null
+              })()}
+
+              {/* Raw CallData */}
+              {userOp && (
+                <div className="signature-detail-item">
+                  <label className="detail-label">Raw CallData</label>
+                  <div className="detail-hash">
+                    {userOp.callData}
+                  </div>
+                  <p className="detail-hint">
+                    The encoded function call data for this operation
+                  </p>
+                </div>
+              )}
 
               {/* UserOperation Hash */}
               <div className="signature-detail-item">
@@ -255,6 +391,7 @@ function SignatureConfirmationScreen({
             <h4 className="tips-title">Security Tips</h4>
             <ul className="tips-list">
               <li>Always verify the recipient address</li>
+              {token && <li>Verify the token contract address on block explorer</li>}
               <li>Double-check the amount before signing</li>
               <li>Never sign transactions you don't understand</li>
               <li>Keep your passkey secure</li>

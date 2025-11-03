@@ -284,6 +284,100 @@
   line-height: 1.4;
 }
 
+/* Operation Type - Special styling */
+.operation-type-value {
+  font-size: 16px;
+  font-weight: 600;
+  color: #10b981;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  border-radius: 8px;
+  padding: 12px 16px;
+  display: inline-block;
+}
+
+/* UserOperation Details */
+.userOp-toggle-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  color: #374151;
+  width: 100%;
+  transition: all 0.2s ease;
+  margin-top: 8px;
+}
+
+.userOp-toggle-btn:hover {
+  background: #f3f4f6;
+  border-color: #d1d5db;
+}
+
+.userOp-toggle-btn span:first-child {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.userOp-details-container {
+  margin-top: 12px;
+  padding: 16px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+}
+
+.userOp-detail-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 8px 0;
+  border-bottom: 1px solid #e5e7eb;
+  gap: 16px;
+}
+
+.userOp-detail-row:last-child {
+  border-bottom: none;
+}
+
+.userOp-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #6b7280;
+  min-width: 160px;
+  flex-shrink: 0;
+}
+
+.userOp-value {
+  font-size: 12px;
+  color: #111827;
+  font-family: 'Courier New', monospace;
+  word-break: break-all;
+  text-align: right;
+}
+
+.userOp-value-long {
+  max-width: 300px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.userOp-address {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 400px;
+}
+
+.userOp-detail-section {
+  margin-bottom: 8px;
+}
+
 /* Amount Section - Highlighted */
 .signature-amount-section {
   background: white;
