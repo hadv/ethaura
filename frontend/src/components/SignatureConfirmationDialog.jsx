@@ -1,17 +1,20 @@
 import { useState } from 'react'
 import { ethers } from 'ethers'
+import { useNetwork } from '../contexts/NetworkContext'
+import { decodeCallData } from '../utils/callDataDecoder'
 
 /**
  * SignatureConfirmationDialog - Shows users what they're signing before requesting signature
  * This replaces silent signing with transparent user consent
  */
-function SignatureConfirmationDialog({ 
-  isOpen, 
-  onConfirm, 
-  onCancel, 
-  signatureData 
+function SignatureConfirmationDialog({
+  isOpen,
+  onConfirm,
+  onCancel,
+  signatureData
 }) {
   const [isLoading, setIsLoading] = useState(false)
+  const { networkInfo } = useNetwork()
 
   if (!isOpen) return null
 
@@ -22,6 +25,15 @@ function SignatureConfirmationDialog({
     } finally {
       setIsLoading(false)
     }
+  }
+
+  const getExplorerUrl = (address) => {
+    const baseUrl = networkInfo.blockExplorer || 'https://sepolia.etherscan.io'
+    return `${baseUrl}/address/${address}`
+  }
+
+  const openExplorer = (address) => {
+    window.open(getExplorerUrl(address), '_blank', 'noopener,noreferrer')
   }
 
   const {
@@ -36,6 +48,7 @@ function SignatureConfirmationDialog({
     operationType,
     operationDetails,
     token, // Token info for ERC-20 transfers
+    userOp,
   } = signatureData || {}
 
   return (
@@ -151,36 +164,52 @@ function SignatureConfirmationDialog({
             <strong style={{ color: '#888', fontSize: '0.85rem', display: 'block', marginBottom: '0.25rem' }}>
               {token ? 'Recipient Address:' : 'To Address:'}
             </strong>
-            <div className="code-block" style={{
-              fontSize: '0.8rem',
-              padding: '0.5rem',
-              backgroundColor: '#000',
-              borderRadius: '4px',
-              wordBreak: 'break-all',
-            }}>
-              {targetAddress}
-            </div>
-          </div>
-
-          {token && (
-            <div className="detail-row" style={{ marginBottom: '1rem' }}>
-              <strong style={{ color: '#888', fontSize: '0.85rem', display: 'block', marginBottom: '0.25rem' }}>
-                Token Contract:
-              </strong>
+            <div style={{ position: 'relative' }}>
               <div className="code-block" style={{
                 fontSize: '0.8rem',
                 padding: '0.5rem',
+                paddingRight: '2.5rem',
                 backgroundColor: '#000',
                 borderRadius: '4px',
                 wordBreak: 'break-all',
               }}>
-                {token.address}
+                {targetAddress}
               </div>
-              <div style={{ fontSize: '0.75rem', color: '#888', marginTop: '0.25rem' }}>
-                {token.name} ({token.symbol})
-              </div>
+              <button
+                onClick={() => openExplorer(targetAddress)}
+                title="View on Explorer"
+                type="button"
+                style={{
+                  position: 'absolute',
+                  right: '0.5rem',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: '#1a1a1a',
+                  border: '1px solid #333',
+                  borderRadius: '4px',
+                  padding: '0.25rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#888',
+                  transition: 'all 0.2s ease',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = '#2a2a2a'
+                  e.currentTarget.style.color = '#fff'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = '#1a1a1a'
+                  e.currentTarget.style.color = '#888'
+                }}
+              >
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                  <path d="M12 8.66667V12.6667C12 13.0203 11.8595 13.3594 11.6095 13.6095C11.3594 13.8595 11.0203 14 10.6667 14H3.33333C2.97971 14 2.64057 13.8595 2.39052 13.6095C2.14048 13.3594 2 13.0203 2 12.6667V5.33333C2 4.97971 2.14048 4.64057 2.39052 4.39052C2.64057 4.14048 2.97971 4 3.33333 4H7.33333M10 2H14M14 2V6M14 2L6.66667 9.33333" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </button>
             </div>
-          )}
+          </div>
 
           {amount !== undefined && (
             <div className="detail-row" style={{ marginBottom: '1rem' }}>
@@ -193,10 +222,59 @@ function SignatureConfirmationDialog({
                 fontWeight: 'bold',
               }}>
                 {token
-                  ? `${amount ? ethers.formatUnits(amount, token.decimalsFromChain || token.decimals) : '0'} ${token.symbol}`
+                  ? amount ? ethers.formatUnits(amount, token.decimalsFromChain || token.decimals) : '0'
                   : `${amount ? ethers.formatEther(amount) : '0'} ETH`
                 }
               </div>
+              {token && (
+                <div style={{ marginTop: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.8rem', color: '#aaa' }}>
+                    {token.icon && (
+                      <img
+                        src={token.icon}
+                        alt={token.symbol}
+                        style={{ width: '16px', height: '16px', borderRadius: '50%' }}
+                      />
+                    )}
+                    <span>{token.name} ({token.symbol})</span>
+                  </div>
+
+                  {/* Token Contract Address - Creative Badge Style */}
+                  <div
+                    onClick={() => openExplorer(token.address)}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.4rem',
+                      padding: '0.3rem 0.5rem',
+                      background: '#1a1a1a',
+                      border: '1px solid #333',
+                      borderRadius: '6px',
+                      fontSize: '0.65rem',
+                      fontFamily: 'monospace',
+                      color: '#888',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = '#2a2a2a'
+                      e.currentTarget.style.borderColor = '#444'
+                      e.currentTarget.style.color = '#aaa'
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = '#1a1a1a'
+                      e.currentTarget.style.borderColor = '#333'
+                      e.currentTarget.style.color = '#888'
+                    }}
+                    title="Click to view on block explorer"
+                  >
+                    <span>{token.address}</span>
+                    <svg width="10" height="10" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0 }}>
+                      <path d="M12 8.66667V12.6667C12 13.0203 11.8595 13.3594 11.6095 13.6095C11.3594 13.8595 11.0203 14 10.6667 14H3.33333C2.97971 14 2.64057 13.8595 2.39052 13.6095C2.14048 13.3594 2 13.0203 2 12.6667V5.33333C2 4.97971 2.14048 4.64057 2.39052 4.39052C2.64057 4.14048 2.97971 4 3.33333 4H7.33333M10 2H14M14 2V6M14 2L6.66667 9.33333" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -209,12 +287,60 @@ function SignatureConfirmationDialog({
             </div>
           </div>
 
+          {/* Operation Type - Decoded from CallData */}
+          {userOp && (() => {
+            const decoded = decodeCallData(userOp.callData)
+            if (decoded && decoded.innerCall) {
+              return (
+                <div className="detail-row" style={{ marginBottom: '1rem' }}>
+                  <strong style={{ color: '#888', fontSize: '0.85rem', display: 'block', marginBottom: '0.5rem' }}>
+                    Operation Type:
+                  </strong>
+                  <div style={{
+                    fontSize: '1rem',
+                    fontWeight: '600',
+                    color: '#10b981',
+                    background: '#064e3b',
+                    border: '1px solid #065f46',
+                    borderRadius: '8px',
+                    padding: '12px 16px',
+                    display: 'inline-block'
+                  }}>
+                    {decoded.innerCall.type}
+                  </div>
+                </div>
+              )
+            }
+            return null
+          })()}
+
+          {/* Raw CallData */}
+          {userOp && (
+            <div className="detail-row" style={{ marginBottom: '1rem' }}>
+              <strong style={{ color: '#888', fontSize: '0.85rem', display: 'block', marginBottom: '0.25rem' }}>
+                Raw CallData:
+              </strong>
+              <div className="code-block" style={{
+                fontSize: '0.75rem',
+                padding: '0.5rem',
+                backgroundColor: '#000',
+                borderRadius: '4px',
+                wordBreak: 'break-all',
+              }}>
+                {userOp.callData}
+              </div>
+              <p style={{ fontSize: '0.75rem', color: '#666', marginTop: '0.5rem', marginBottom: 0 }}>
+                The encoded function call data for this operation
+              </p>
+            </div>
+          )}
+
           <div className="detail-row">
             <strong style={{ color: '#888', fontSize: '0.85rem', display: 'block', marginBottom: '0.25rem' }}>
               UserOperation Hash:
             </strong>
-            <div className="code-block" style={{ 
-              fontSize: '0.75rem', 
+            <div className="code-block" style={{
+              fontSize: '0.75rem',
               padding: '0.5rem',
               backgroundColor: '#000',
               borderRadius: '4px',
