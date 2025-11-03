@@ -91,6 +91,7 @@ export const ERC20_ABI = [
 ]
 
 // Import token icons
+import ethIcon from '../assets/tokens/eth.svg'
 import linkIcon from '../assets/tokens/link.svg'
 import pyusdIcon from '../assets/tokens/pyusd.svg'
 import uniIcon from '../assets/tokens/uni.svg'
@@ -107,6 +108,9 @@ import enaIcon from '../assets/tokens/ena.svg'
 import usdeIcon from '../assets/tokens/usde.svg'
 import xautIcon from '../assets/tokens/xaut.svg'
 import paxgIcon from '../assets/tokens/paxg.svg'
+
+// Export ETH icon for use in components
+export { ethIcon }
 
 // Supported ERC-20 tokens by network
 export const SUPPORTED_TOKENS = {
