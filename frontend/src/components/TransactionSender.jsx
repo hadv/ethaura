@@ -705,6 +705,7 @@ function TransactionSender({ accountAddress, credential, accountConfig, onSignat
             isTwoFactorAuth: false,
             signatureStep: 'only',
             token: selectedToken, // Pass token info for display
+            userOp, // Pass full UserOperation for display
           })
 
           console.log('🔐 Owner signature received:', ownerSig)
@@ -758,6 +759,7 @@ function TransactionSender({ accountAddress, credential, accountConfig, onSignat
               isTwoFactorAuth: true,
               signatureStep: '1/2',
               token: selectedToken, // Pass token info for display
+              userOp, // Pass full UserOperation for display
             })
 
             console.log('🔐 Owner signature received:', ownerSig)

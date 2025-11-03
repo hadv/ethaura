@@ -121,7 +121,7 @@ export const SUPPORTED_TOKENS = {
     {
       symbol: 'USDT',
       name: 'Tether USD',
-      address: '0x7169D38820dfd117C3FA1f22a697dBA58d90ba06',
+      address: '0x7169D38820dfd117C3FA1f22a697dBA58d90BA06', // Correct checksummed address
       decimals: 6,
       icon: usdtIcon,
     },
