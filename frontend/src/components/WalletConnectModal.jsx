@@ -1,14 +1,15 @@
-import React, { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useWalletConnect } from '../contexts/WalletConnectContext'
-import { QRCodeSVG } from 'qrcode.react'
+import { SiWalletconnect } from 'react-icons/si'
 import '../styles/WalletConnectModal.css'
 
-export const WalletConnectModal = ({ isOpen, onClose, accountAddress, chainId }) => {
-  const { pair } = useWalletConnect()
+export const WalletConnectModal = ({ isOpen, onClose, accountAddress, chainId, buttonRef }) => {
+  const { pair, sessions, disconnectSession } = useWalletConnect()
   const [uri, setUri] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [mode, setMode] = useState('input') // 'input' or 'qr'
+  const [position, setPosition] = useState({ top: 0, right: 0 })
+  const dropdownRef = useRef(null)
 
   const handlePair = async () => {
     if (!uri.trim()) {
@@ -27,7 +28,7 @@ export const WalletConnectModal = ({ isOpen, onClose, accountAddress, chainId })
     try {
       await pair(uri)
       setUri('')
-      onClose()
+      // Don't close modal - show success and connected dApps
     } catch (err) {
       console.error('Failed to pair:', err)
       setError(err.message || 'Failed to connect to dApp')
@@ -36,99 +37,161 @@ export const WalletConnectModal = ({ isOpen, onClose, accountAddress, chainId })
     }
   }
 
-  const handleScanQR = () => {
-    setMode('qr')
-    // In a real implementation, you would use the device camera to scan QR codes
-    // For now, we'll just show instructions
+  const handlePaste = async () => {
+    try {
+      const text = await navigator.clipboard.readText()
+      setUri(text)
+    } catch (err) {
+      console.error('Failed to read clipboard:', err)
+    }
   }
+
+  const handleDisconnect = async (topic) => {
+    try {
+      await disconnectSession(topic)
+    } catch (err) {
+      console.error('Failed to disconnect:', err)
+    }
+  }
+
+  // Calculate position based on button
+  useEffect(() => {
+    if (isOpen && buttonRef?.current) {
+      const rect = buttonRef.current.getBoundingClientRect()
+      setPosition({
+        top: rect.bottom + 8,
+        right: window.innerWidth - rect.right
+      })
+    }
+  }, [isOpen, buttonRef])
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        // Also check if click is not on the button that opens this
+        if (buttonRef?.current && !buttonRef.current.contains(event.target)) {
+          onClose()
+        }
+      }
+    }
+
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside)
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside)
+      }
+    }
+  }, [isOpen, onClose, buttonRef])
 
   if (!isOpen) return null
 
+  const activeSessions = Object.values(sessions || {})
+
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content walletconnect-modal" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <h2>🔗 Connect to dApp</h2>
-          <button className="close-button" onClick={onClose}>×</button>
+    <>
+      {/* Backdrop overlay */}
+      <div className="wc-backdrop" onClick={onClose}></div>
+
+      {/* Dropdown */}
+      <div className="wc-dropdown-container" style={{ top: `${position.top}px`, right: `${position.right}px` }}>
+        <div className="wc-dropdown-content" ref={dropdownRef}>
+        {/* Header */}
+        <div className="wc-modal-header">
+          <button className="wc-info-btn" title="WalletConnect Info">
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+              <circle cx="10" cy="10" r="8" stroke="currentColor" strokeWidth="1.5"/>
+              <path d="M10 14V10M10 6H10.01" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+            </svg>
+          </button>
+          <button className="wc-close-btn" onClick={onClose}>×</button>
         </div>
 
-        <div className="modal-body">
-          {mode === 'input' ? (
-            <>
-              <p className="modal-description">
-                Enter the WalletConnect URI from the dApp you want to connect to.
-              </p>
+        {/* WalletConnect Logo */}
+        <div className="wc-logo">
+          <SiWalletconnect size={48} color="#111827" />
+        </div>
 
-              <div className="input-group">
-                <label>WalletConnect URI</label>
-                <textarea
-                  value={uri}
-                  onChange={(e) => setUri(e.target.value)}
-                  placeholder="wc:..."
-                  rows={4}
-                  className="uri-input"
-                  disabled={loading}
-                />
-              </div>
+        {/* Subtitle */}
+        <p className="wc-subtitle">
+          Paste the pairing code below to connect to your wallet via WalletConnect
+        </p>
 
-              {error && (
-                <div className="error-message">
-                  ⚠️ {error}
-                </div>
-              )}
-
-              <div className="button-group">
-                <button
-                  onClick={handlePair}
-                  disabled={loading || !uri.trim()}
-                  className="primary-button"
-                >
-                  {loading ? 'Connecting...' : 'Connect'}
-                </button>
-                <button
-                  onClick={handleScanQR}
-                  disabled={loading}
-                  className="secondary-button"
-                >
-                  📷 Scan QR Code
-                </button>
-              </div>
-            </>
-          ) : (
-            <>
-              <p className="modal-description">
-                Scan the QR code from the dApp you want to connect to.
-              </p>
-
-              <div className="qr-scanner-placeholder">
-                <p>📷 QR Code Scanner</p>
-                <p className="small-text">
-                  Camera access would be implemented here using a library like react-qr-reader
-                </p>
-              </div>
-
-              <button
-                onClick={() => setMode('input')}
-                className="secondary-button"
-              >
-                ← Back to Manual Input
-              </button>
-            </>
-          )}
-
-          <div className="info-box">
-            <p className="small-text">
-              <strong>How to get WalletConnect URI:</strong>
-            </p>
-            <ol className="small-text">
-              <li>Open the dApp you want to connect to</li>
-              <li>Click "Connect Wallet" or "WalletConnect"</li>
-              <li>Copy the URI or scan the QR code</li>
-            </ol>
+        {/* Pairing Code Input */}
+        <div className="wc-input-section">
+          <label className="wc-input-label">Pairing code</label>
+          <div className="wc-input-wrapper">
+            <input
+              type="text"
+              value={uri}
+              onChange={(e) => setUri(e.target.value)}
+              placeholder="wc:"
+              className="wc-input"
+              disabled={loading}
+            />
+            <button
+              className="wc-paste-btn"
+              onClick={handlePaste}
+              disabled={loading}
+            >
+              Paste
+            </button>
           </div>
+          {error && (
+            <div className="wc-error-message">
+              {error}
+            </div>
+          )}
         </div>
+
+        {/* Connected dApps Section */}
+        {activeSessions.length > 0 ? (
+          <div className="wc-sessions-section">
+            <h3 className="wc-sessions-title">Connected dApps</h3>
+            <div className="wc-sessions-list">
+              {activeSessions.map((session) => {
+                const { peer } = session
+                const dappName = peer?.metadata?.name || 'Unknown dApp'
+                const dappUrl = peer?.metadata?.url || ''
+                const dappIcon = peer?.metadata?.icons?.[0] || ''
+
+                return (
+                  <div key={session.topic} className="wc-session-item">
+                    <div className="wc-session-info">
+                      {dappIcon ? (
+                        <img src={dappIcon} alt={dappName} className="wc-session-icon" />
+                      ) : (
+                        <div className="wc-session-icon-placeholder">
+                          <SiWalletconnect size={20} />
+                        </div>
+                      )}
+                      <div className="wc-session-details">
+                        <div className="wc-session-name">{dappName}</div>
+                        {dappUrl && (
+                          <div className="wc-session-url">{dappUrl}</div>
+                        )}
+                      </div>
+                    </div>
+                    <button
+                      className="wc-disconnect-btn"
+                      onClick={() => handleDisconnect(session.topic)}
+                      title="Disconnect"
+                    >
+                      ×
+                    </button>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        ) : (
+          <div className="wc-no-sessions">
+            No dApps are connected yet.
+          </div>
+        )}
       </div>
     </div>
+    </>
   )
 }
 

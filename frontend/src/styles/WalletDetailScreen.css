@@ -98,6 +98,16 @@
   min-width: 0;
 }
 
+/* WalletConnect Button in Header */
+.walletconnect-btn {
+  color: #111827 !important;
+}
+
+.walletconnect-btn:hover {
+  background: #f3f4f6 !important;
+  color: #000000 !important;
+}
+
 /* WalletConnect Sidebar Section */
 .sidebar-header {
   display: flex;

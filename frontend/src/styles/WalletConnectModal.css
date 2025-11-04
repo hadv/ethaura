@@ -1,5 +1,301 @@
-/* WalletConnect Modal Styles */
+/* WalletConnect Modal Styles - Dropdown Design */
 
+/* Backdrop overlay */
+.wc-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.3);
+  z-index: 999;
+  backdrop-filter: blur(2px);
+}
+
+/* Dropdown Container */
+.wc-dropdown-container {
+  position: fixed;
+  z-index: 1000;
+}
+
+.wc-dropdown-content {
+  background: white;
+  border-radius: 16px;
+  width: 420px;
+  max-height: 600px;
+  overflow-y: auto;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(0, 0, 0, 0.05);
+  padding: 1.5rem;
+  position: relative;
+  animation: slideDown 0.2s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Header */
+.wc-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+.wc-info-btn,
+.wc-close-btn {
+  background: none;
+  border: none;
+  color: #9ca3af;
+  cursor: pointer;
+  padding: 0.25rem;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  transition: all 0.2s;
+}
+
+.wc-info-btn:hover,
+.wc-close-btn:hover {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.wc-close-btn {
+  font-size: 1.75rem;
+  line-height: 1;
+}
+
+/* Logo */
+.wc-logo {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 1.5rem;
+}
+
+/* Title */
+.wc-title {
+  margin: 0 0 0.5rem 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #111827;
+  text-align: center;
+}
+
+.wc-subtitle {
+  margin: 0 0 2rem 0;
+  color: #6b7280;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  text-align: center;
+}
+
+/* Input Section */
+.wc-input-section {
+  margin-bottom: 2rem;
+}
+
+.wc-input-label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+  color: #374151;
+  font-size: 0.875rem;
+}
+
+.wc-input-wrapper {
+  display: flex;
+  gap: 0.5rem;
+  align-items: stretch;
+}
+
+.wc-input {
+  flex: 1;
+  padding: 0.75rem 1rem;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-family: 'Monaco', 'Courier New', monospace;
+  transition: all 0.2s;
+  background: white;
+}
+
+.wc-input:focus {
+  outline: none;
+  border-color: #3B99FC;
+  box-shadow: 0 0 0 3px rgba(59, 153, 252, 0.1);
+}
+
+.wc-input:disabled {
+  background: #f3f4f6;
+  cursor: not-allowed;
+}
+
+.wc-input::placeholder {
+  color: #9ca3af;
+}
+
+.wc-paste-btn {
+  padding: 0.75rem 1.5rem;
+  background: white;
+  color: #374151;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.wc-paste-btn:hover:not(:disabled) {
+  background: #f9fafb;
+  border-color: #9ca3af;
+}
+
+.wc-paste-btn:disabled {
+  background: #f3f4f6;
+  color: #9ca3af;
+  cursor: not-allowed;
+}
+
+.wc-error-message {
+  margin-top: 0.5rem;
+  padding: 0.75rem;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  color: #dc2626;
+  font-size: 0.85rem;
+}
+
+/* Sessions Section */
+.wc-sessions-section {
+  margin-top: 2rem;
+  padding-top: 2rem;
+  border-top: 1px solid #e5e7eb;
+}
+
+.wc-sessions-title {
+  margin: 0 0 1rem 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #374151;
+}
+
+.wc-sessions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.wc-session-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  transition: all 0.2s;
+}
+
+.wc-session-item:hover {
+  background: #f3f4f6;
+  border-color: #d1d5db;
+}
+
+.wc-session-info {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.wc-session-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.wc-session-icon-placeholder {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  background: #e5e7eb;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #6b7280;
+  flex-shrink: 0;
+}
+
+.wc-session-details {
+  flex: 1;
+  min-width: 0;
+}
+
+.wc-session-name {
+  font-weight: 600;
+  color: #111827;
+  font-size: 0.9rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wc-session-url {
+  color: #6b7280;
+  font-size: 0.8rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wc-disconnect-btn {
+  background: none;
+  border: none;
+  color: #9ca3af;
+  cursor: pointer;
+  padding: 0.25rem;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  font-size: 1.5rem;
+  line-height: 1;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.wc-disconnect-btn:hover {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.wc-no-sessions {
+  text-align: center;
+  padding: 2rem 1rem;
+  color: #9ca3af;
+  font-size: 0.9rem;
+}
+
+/* Old styles for other modals */
 .walletconnect-modal {
   max-width: 500px;
   width: 90%;

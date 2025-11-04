@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react'
 import { parsePublicKey } from '../utils/webauthn'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
+import { useNetwork } from '../contexts/NetworkContext'
 import { ethers } from 'ethers'
 import { NETWORKS } from '../lib/constants'
 import '../styles/PasskeySettings.css'
 
 function PasskeySettings({ accountAddress }) {
   const { address: ownerAddress, provider: web3AuthProvider } = useWeb3Auth()
+  const { networkInfo } = useNetwork()
   const [status, setStatus] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -26,21 +28,48 @@ function PasskeySettings({ accountAddress }) {
     'function disableTwoFactor()',
   ]
 
-  // Load account info
+  // Load account info when address, provider, or network changes
   useEffect(() => {
+    // Reset ALL state when network changes to avoid showing stale data
+    setAccountInfo(null)
+    setPendingActions([])
+    setNewPasskey(null)
+    setError('')
+    setStatus('')
+    setLoading(false)
+
+    // Load new data
     loadAccountInfo()
-  }, [accountAddress, web3AuthProvider])
+  }, [accountAddress, web3AuthProvider, networkInfo.chainId])
 
   const loadAccountInfo = async () => {
     if (!accountAddress) return
 
+    // Clear any previous errors
+    setError('')
+
     try {
-      // Use public RPC for read-only operations
-      const rpcUrl = import.meta.env.VITE_RPC_URL || NETWORKS.sepolia.rpcUrl
+      // Use network-specific RPC for read-only operations
+      const rpcUrl = networkInfo.rpcUrl
       const provider = new ethers.JsonRpcProvider(rpcUrl)
 
+      // Check if account is deployed on this network
+      const code = await provider.getCode(accountAddress)
+      if (code === '0x') {
+        console.log('⏭️ Account not deployed on this network')
+        setAccountInfo({
+          hasPasskey: false,
+          qx: ethers.ZeroHash,
+          qy: ethers.ZeroHash,
+          twoFactorEnabled: false,
+        })
+        setPendingActions([])
+        setError('') // Clear error since this is expected
+        return
+      }
+
       const contract = new ethers.Contract(accountAddress, accountABI, provider)
-      
+
       const [qx, qy, twoFactorEnabled, pendingData] = await Promise.all([
         contract.qx(),
         contract.qy(),
@@ -69,9 +98,12 @@ function PasskeySettings({ accountAddress }) {
       }
       setPendingActions(actions)
 
+      // Clear error on success
+      setError('')
+
     } catch (err) {
       console.error('Error loading account info:', err)
-      setError('Failed to load account information')
+      setError(`Failed to load account information: ${err.message}`)
     }
   }
 

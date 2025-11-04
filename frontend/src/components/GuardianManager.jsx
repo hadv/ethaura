@@ -24,11 +24,16 @@ function GuardianManager({ accountAddress, credential, onGuardiansUpdated }) {
   const fetchGuardianInfo = useCallback(async () => {
     if (!accountAddress || !sdk) return
 
+    // Clear any previous errors
+    setError('')
+
     try {
       // Check if account is deployed first
       const isDeployed = await sdk.accountManager.isDeployed(accountAddress)
       if (!isDeployed) {
         console.log('⏭️ Account not deployed yet, skipping guardian fetch')
+        setGuardianInfo(null)
+        setError('') // Clear error since this is expected
         return
       }
 
@@ -37,20 +42,33 @@ function GuardianManager({ accountAddress, credential, onGuardiansUpdated }) {
       if (onGuardiansUpdated) {
         onGuardiansUpdated(info)
       }
+
+      // Clear error on success
+      setError('')
     } catch (err) {
       console.error('Error fetching guardian info:', err)
+      setError(`Failed to load guardian information: ${err.message}`)
     }
   }, [accountAddress, sdk, onGuardiansUpdated])
 
   // Load guardian info on mount or when address changes
   useEffect(() => {
-    // Only fetch if address changed or first load
-    if (accountAddress && accountAddress !== loadedAddressRef.current) {
+    // Reset ALL state when network changes to avoid showing stale data
+    setGuardianInfo(null)
+    setGuardianAddress('')
+    setRemoveGuardianAddress('')
+    setNewThreshold('')
+    setError('')
+    setStatus('')
+    setLoading(false)
+
+    // Fetch when address or SDK changes (SDK changes when network changes)
+    if (accountAddress && sdk) {
       loadedAddressRef.current = accountAddress
       fetchGuardianInfo()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [accountAddress])
+  }, [accountAddress, sdk])
 
   const handleAddGuardian = async () => {
     if (!guardianAddress) {

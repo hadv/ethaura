@@ -60,10 +60,28 @@ export const Web3AuthProvider = ({ children }) => {
             theme: {
               primary: '#768729',
             },
+            modalConfig: {
+              modalZIndex: '2147483647',
+            },
           },
+          sessionTime: 86400, // 1 day
+          enableLogging: false,
         });
 
-        await web3authInstance.initModal();
+        console.log('Web3Auth instance created, checking available methods...');
+        console.log('initModal:', typeof web3authInstance.initModal);
+        console.log('init:', typeof web3authInstance.init);
+
+        // Try both possible method names
+        if (typeof web3authInstance.initModal === 'function') {
+          await web3authInstance.initModal();
+        } else if (typeof web3authInstance.init === 'function') {
+          await web3authInstance.init();
+        } else {
+          throw new Error('No initialization method found on Web3Auth instance');
+        }
+
+        console.log('Web3Auth initialized successfully');
         setWeb3auth(web3authInstance);
 
         // Check if already connected

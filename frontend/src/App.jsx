@@ -288,6 +288,8 @@ function AppContent() {
           onHome={handleHome}
           onLogout={handleLogout}
           credential={passkeyCredential}
+          onWalletChange={handleWalletChange}
+          onSettings={handleSettings}
         />
       )}
 
@@ -315,6 +317,7 @@ function AppContent() {
           wallet={selectedWallet}
           onBack={handleBack}
           onHome={handleHome}
+          onSettings={handleSettings}
           credential={passkeyCredential}
           accountConfig={accountConfig}
           onLogout={handleLogout}

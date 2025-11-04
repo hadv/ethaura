@@ -1,18 +1,19 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import TransactionSender from '../components/TransactionSender'
 import Header from '../components/Header'
+import SubHeader from '../components/SubHeader'
+import { WalletConnectModal } from '../components/WalletConnectModal'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
 import { useNetwork } from '../contexts/NetworkContext'
-import { Identicon } from '../utils/identicon.jsx'
-import NetworkSelector from '../components/NetworkSelector'
-import WalletDropdown from '../components/WalletDropdown'
 import '../styles/SendTransactionScreen.css'
 
-function SendTransactionScreen({ wallet, onBack, onHome, credential, accountConfig, onLogout, onSignatureRequest }) {
+function SendTransactionScreen({ wallet, onBack, onHome, onSettings, credential, accountConfig, onLogout, onSignatureRequest }) {
   const { userInfo } = useWeb3Auth()
   const { networkInfo } = useNetwork()
   const [wallets, setWallets] = useState([])
   const [selectedWallet, setSelectedWallet] = useState(wallet)
+  const [showWalletConnectModal, setShowWalletConnectModal] = useState(false)
+  const walletConnectButtonRef = useRef(null)
 
   // Load all wallets from localStorage
   useEffect(() => {
@@ -36,11 +37,6 @@ function SendTransactionScreen({ wallet, onBack, onHome, credential, accountConf
     }
   }
 
-  const formatAddress = (address) => {
-    if (!address) return ''
-    return `${address.slice(0, 6)}...${address.slice(-4)}`
-  }
-
   if (!selectedWallet) {
     return (
       <div className="send-transaction-screen">
@@ -58,24 +54,19 @@ function SendTransactionScreen({ wallet, onBack, onHome, credential, accountConf
       {/* Header */}
       <Header userInfo={userInfo} onLogout={onLogout} onHome={onHome} />
 
-      {/* Custom SubHeader with wallet selector */}
-      <div className="sub-header">
-        <div className="sub-header-left">
-          <button className="back-btn" onClick={onBack}>
-            <span>←</span>
-          </button>
-
-          {/* Wallet Selector Dropdown */}
-          <WalletDropdown
-            wallets={wallets}
-            selectedWallet={selectedWallet}
-            onWalletChange={handleWalletChange}
-            formatAddress={formatAddress}
-          />
-
-          <NetworkSelector />
-        </div>
-      </div>
+      {/* SubHeader with wallet dropdown, network selector, and WalletConnect */}
+      <SubHeader
+        wallet={selectedWallet}
+        onBack={onBack}
+        showBackButton={true}
+        onSettings={onSettings}
+        showWalletDropdown={true}
+        wallets={wallets}
+        onWalletChange={handleWalletChange}
+        showWalletConnect={true}
+        onWalletConnectClick={() => setShowWalletConnectModal(true)}
+        walletConnectButtonRef={walletConnectButtonRef}
+      />
 
       {/* Main Content */}
       <div className="send-content-wrapper">
@@ -101,6 +92,15 @@ function SendTransactionScreen({ wallet, onBack, onHome, credential, accountConf
           {/* This can be used for transaction history or tips in the future */}
         </div>
       </div>
+
+      {/* WalletConnect Modal */}
+      <WalletConnectModal
+        isOpen={showWalletConnectModal}
+        onClose={() => setShowWalletConnectModal(false)}
+        accountAddress={selectedWallet?.address}
+        chainId={networkInfo.chainId}
+        buttonRef={walletConnectButtonRef}
+      />
     </div>
   )
 }

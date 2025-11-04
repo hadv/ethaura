@@ -33,12 +33,14 @@ export const WalletConnectProvider = ({ children }) => {
       try {
         console.log('🔗 Initializing WalletConnect...')
 
-        // Get project ID from environment or use a default for testing
-        const projectId = import.meta.env.VITE_WALLETCONNECT_PROJECT_ID || 'YOUR_PROJECT_ID'
-        
-        if (projectId === 'YOUR_PROJECT_ID') {
-          console.warn('⚠️ WalletConnect Project ID not set. Please set VITE_WALLETCONNECT_PROJECT_ID in .env')
+        // Get project ID from environment
+        const projectId = import.meta.env.VITE_WALLETCONNECT_PROJECT_ID
+
+        if (!projectId || projectId === 'YOUR_PROJECT_ID') {
+          console.warn('⚠️ WalletConnect Project ID not set. Skipping WalletConnect initialization.')
           console.warn('⚠️ Get your project ID from https://cloud.walletconnect.com')
+          setIsInitializing(false)
+          return
         }
 
         // Initialize Core

@@ -64,24 +64,25 @@ function RecoveryManager({ accountAddress, credential }) {
     signatureResolver.reject(new Error('User cancelled signature'))
   }
 
-  const sdkConfig = {
-    factoryAddress: import.meta.env.VITE_FACTORY_ADDRESS || '',
-    rpcUrl: import.meta.env.VITE_RPC_URL || '',
-    bundlerUrl: import.meta.env.VITE_BUNDLER_URL || '',
-    chainId: parseInt(import.meta.env.VITE_CHAIN_ID || '11155111'),
-  }
-
-  const sdk = useP256SDK(sdkConfig)
+  // Use SDK from hook (will use network from context)
+  const sdk = useP256SDK()
   const loadedAddressRef = useRef(null)
 
   // Fetch guardian info and pending recoveries
   const fetchRecoveryInfo = useCallback(async () => {
     if (!accountAddress || !sdk) return
 
+    // Clear any previous errors
+    setError('')
+
     try {
       const isDeployed = await sdk.accountManager.isDeployed(accountAddress)
       if (!isDeployed) {
         console.log('⏭️ Account not deployed yet, skipping recovery fetch')
+        setGuardianInfo(null)
+        setPendingRecoveries([])
+        setIsGuardian(false)
+        setError('') // Clear error since this is expected
         return
       }
 
@@ -105,18 +106,35 @@ function RecoveryManager({ accountAddress, credential }) {
         pendingRecoveries: recoveries.length,
         isGuardian: isCurrentUserGuardian,
       })
+
+      // Clear error on success
+      setError('')
     } catch (err) {
       console.error('Error fetching recovery info:', err)
+      setError(`Failed to load recovery information: ${err.message}`)
     }
   }, [accountAddress, sdk, ownerAddress])
 
-  // Load recovery info on mount and when account changes
+  // Load recovery info on mount and when account or SDK changes (SDK changes when network changes)
   useEffect(() => {
-    if (loadedAddressRef.current !== accountAddress) {
+    // Reset ALL state when network changes to avoid showing stale data
+    setGuardianInfo(null)
+    setPendingRecoveries([])
+    setIsGuardian(false)
+    setSelectedRecovery(null)
+    setNewQx('')
+    setNewQy('')
+    setNewOwner('')
+    setRecoveryType('passkey')
+    setError('')
+    setStatus('')
+    setLoading(false)
+
+    if (accountAddress && sdk) {
       loadedAddressRef.current = accountAddress
       fetchRecoveryInfo()
     }
-  }, [accountAddress, fetchRecoveryInfo])
+  }, [accountAddress, sdk, fetchRecoveryInfo])
 
   // Format timestamp to readable date
   const formatDate = (timestamp) => {
