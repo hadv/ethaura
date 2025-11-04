@@ -6,18 +6,24 @@ import { MdFlashOn } from 'react-icons/md'
 import { P256_ACCOUNT_ABI } from '../lib/constants'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
 import { useNetwork } from '../contexts/NetworkContext'
+import { useWalletConnect } from '../contexts/WalletConnectContext'
 import { Identicon } from '../utils/identicon.jsx'
 import Header from '../components/Header'
 import SubHeader from '../components/SubHeader'
 import ReceiveModal from '../components/ReceiveModal'
 import NetworkSelector from '../components/NetworkSelector'
 import WalletDropdown from '../components/WalletDropdown'
+import { WalletConnectModal } from '../components/WalletConnectModal'
+import { SessionProposalModal } from '../components/SessionProposalModal'
+import { SessionRequestModal } from '../components/SessionRequestModal'
+import { WalletConnectSessions } from '../components/WalletConnectSessions'
 import '../styles/WalletDetailScreen.css'
 import logo from '../assets/logo.svg'
 
 function WalletDetailScreen({ wallet, onBack, onHome, onSettings, onSend, onLogout, onWalletChange }) {
-  const { userInfo } = useWeb3Auth()
+  const { userInfo, provider: web3authProvider } = useWeb3Auth()
   const { networkInfo } = useNetwork()
+  const { pendingProposal, pendingRequest, isInitialized: wcInitialized } = useWalletConnect()
   const [wallets, setWallets] = useState([])
   const [selectedWallet, setSelectedWallet] = useState(wallet)
   const [balance, setBalance] = useState('0')
@@ -25,6 +31,7 @@ function WalletDetailScreen({ wallet, onBack, onHome, onSettings, onSend, onLogo
   const [balanceChange, setBalanceChange] = useState('+3.10%')
   const [loading, setLoading] = useState(false)
   const [showReceiveModal, setShowReceiveModal] = useState(false)
+  const [showWalletConnectModal, setShowWalletConnectModal] = useState(false)
   const [assets, setAssets] = useState([])
   const [transactions, setTransactions] = useState([])
   const [securityStatus, setSecurityStatus] = useState({
@@ -32,6 +39,49 @@ function WalletDetailScreen({ wallet, onBack, onHome, onSettings, onSend, onLogo
     guardianCount: 0,
     isDeployed: false
   })
+
+  // Get passkey credential and owner signer for WalletConnect
+  const [passkeyCredential, setPasskeyCredential] = useState(() => {
+    const stored = localStorage.getItem('ethaura_passkey_credential')
+    if (!stored) return null
+    try {
+      const parsed = JSON.parse(stored)
+      return {
+        id: parsed.id,
+        rawId: parsed.rawId ? Uint8Array.from(atob(parsed.rawId), c => c.charCodeAt(0)).buffer : null,
+        publicKey: parsed.publicKey,
+        response: parsed.response ? {
+          attestationObject: parsed.response.attestationObject
+            ? Uint8Array.from(atob(parsed.response.attestationObject), c => c.charCodeAt(0)).buffer
+            : null,
+          clientDataJSON: parsed.response.clientDataJSON
+            ? Uint8Array.from(atob(parsed.response.clientDataJSON), c => c.charCodeAt(0)).buffer
+            : null,
+        } : null,
+      }
+    } catch (e) {
+      console.error('Failed to deserialize credential:', e)
+      return null
+    }
+  })
+
+  const [ownerSigner, setOwnerSigner] = useState(null)
+
+  // Create owner signer from Web3Auth provider
+  useEffect(() => {
+    const createSigner = async () => {
+      if (web3authProvider) {
+        try {
+          const ethersProvider = new ethers.BrowserProvider(web3authProvider)
+          const signer = await ethersProvider.getSigner()
+          setOwnerSigner(signer)
+        } catch (err) {
+          console.error('Failed to create signer:', err)
+        }
+      }
+    }
+    createSigner()
+  }, [web3authProvider])
 
   // Load all wallets from localStorage
   useEffect(() => {
@@ -426,6 +476,22 @@ function WalletDetailScreen({ wallet, onBack, onHome, onSettings, onSend, onLogo
               <p>No queued transaction.</p>
             </div>
           </div>
+
+          {/* WalletConnect Section */}
+          <div className="sidebar-card">
+            <div className="sidebar-header">
+              <h3 className="sidebar-title">🔗 WalletConnect</h3>
+              <button
+                className="connect-dapp-btn"
+                onClick={() => setShowWalletConnectModal(true)}
+                disabled={!wcInitialized}
+                title={!wcInitialized ? 'WalletConnect is initializing...' : 'Connect to a dApp'}
+              >
+                + Connect
+              </button>
+            </div>
+            <WalletConnectSessions />
+          </div>
         </div>
       </div>
 
@@ -435,6 +501,37 @@ function WalletDetailScreen({ wallet, onBack, onHome, onSettings, onSend, onLogo
         onClose={() => setShowReceiveModal(false)}
         preselectedWallet={wallet}
       />
+
+      {/* WalletConnect Modal */}
+      <WalletConnectModal
+        isOpen={showWalletConnectModal}
+        onClose={() => setShowWalletConnectModal(false)}
+        accountAddress={selectedWallet?.address}
+        chainId={networkInfo.chainId}
+      />
+
+      {/* Session Proposal Modal */}
+      {pendingProposal && (
+        <SessionProposalModal
+          proposal={pendingProposal}
+          accountAddress={selectedWallet?.address}
+          chainId={networkInfo.chainId}
+          onApprove={() => {}}
+          onReject={() => {}}
+        />
+      )}
+
+      {/* Session Request Modal */}
+      {pendingRequest && (
+        <SessionRequestModal
+          request={pendingRequest}
+          accountAddress={selectedWallet?.address}
+          passkeyCredential={passkeyCredential}
+          ownerSigner={ownerSigner}
+          twoFactorEnabled={securityStatus.has2FA}
+          onComplete={() => {}}
+        />
+      )}
     </div>
   )
 }
