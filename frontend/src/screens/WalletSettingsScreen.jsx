@@ -40,8 +40,8 @@ function WalletSettingsScreen({ wallet, onBack, onHome, onLogout }) {
 
       {/* Main Content */}
       <div className="settings-content-wrapper">
-        <div className="settings-main">
-          {/* Tabs */}
+        {/* Left Sidebar - Tabs */}
+        <div className="settings-sidebar">
           <div className="settings-tabs">
             <button
               className={`tab-btn ${activeTab === '2fa' ? 'active' : ''}`}
@@ -65,8 +65,10 @@ function WalletSettingsScreen({ wallet, onBack, onHome, onLogout }) {
               <span className="tab-label">Recovery</span>
             </button>
           </div>
+        </div>
 
-          {/* Tab Content */}
+        {/* Right Panel - Tab Content */}
+        <div className="settings-main">
           <div className="settings-content">
             {activeTab === '2fa' && (
               <div className="tab-panel">
@@ -104,11 +106,6 @@ function WalletSettingsScreen({ wallet, onBack, onHome, onLogout }) {
               </div>
             )}
           </div>
-        </div>
-
-        {/* Right Panel - Placeholder */}
-        <div className="settings-sidebar">
-          {/* This can be used for additional info in the future */}
         </div>
       </div>
     </div>

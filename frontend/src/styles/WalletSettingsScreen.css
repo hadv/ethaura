@@ -2,98 +2,109 @@
   max-width: 1400px;
   margin: 0 auto;
   padding: 0;
-  min-height: 100vh;
+  height: 100vh;
   background: #f5f5f5;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 /* Content Wrapper */
 .settings-content-wrapper {
   display: grid;
-  grid-template-columns: 70% 1fr;
+  grid-template-columns: 280px 1fr;
   gap: 0;
-  min-height: calc(100vh - 153px);
-}
-
-.settings-main {
+  flex: 1;
   background: white;
-  padding: 32px;
-  border-right: 1px solid #e5e5e5;
+  overflow: hidden;
 }
 
+/* Left Sidebar - Tabs */
 .settings-sidebar {
-  background: #fafafa;
-  padding: 32px;
+  background: white;
+  padding: 0;
+  border-right: 1px solid #e5e7eb;
+  overflow-y: auto;
 }
 
-/* Tabs */
 .settings-tabs {
   display: flex;
-  gap: 12px;
-  margin-bottom: 24px;
-  background: transparent;
+  flex-direction: column;
+  gap: 0;
   padding: 0;
-  border-radius: 0;
-  box-shadow: none;
-  border: none;
-  border-bottom: 2px solid #e5e5e5;
+  margin: 0;
 }
 
 .tab-btn {
-  flex: 1;
-  padding: 16px 20px;
+  width: 100%;
+  padding: 18px 24px;
+  margin: 0;
   background: transparent;
   border: none;
-  border-bottom: 2px solid transparent;
-  margin-bottom: -2px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  color: #6b7280;
-  font-weight: 600;
   border-radius: 0;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  color: #6b7280;
+  font-weight: 500;
+  text-align: left;
+  position: relative;
+  border-left: 3px solid transparent;
 }
 
 .tab-btn:hover {
   background: #f9fafb;
   color: #111827;
+  border-left-color: #e5e7eb;
 }
 
 .tab-btn.active {
-  background: transparent;
+  background: #f9fafb;
   color: #000;
-  border-bottom-color: #000;
+  font-weight: 600;
+  border-left-color: #000;
 }
 
 .tab-icon {
-  font-size: 24px;
-  width: 24px;
-  height: 24px;
+  font-size: 20px;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
 }
 
 .tab-label {
-  font-size: 14px;
+  font-size: 15px;
+  line-height: 1.4;
+}
+
+/* Right Panel - Content */
+.settings-main {
+  background: white;
+  padding: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 /* Settings Content */
 .settings-content {
   background: transparent;
   border-radius: 0;
-  padding: 0;
+  padding: 40px 48px;
   box-shadow: none;
   border: none;
 }
 
 .tab-panel {
-  animation: fadeIn 0.3s ease;
+  animation: fadeIn 0.25s ease;
 }
 
 @keyframes fadeIn {
   from {
     opacity: 0;
-    transform: translateY(10px);
+    transform: translateY(8px);
   }
   to {
     opacity: 1;
@@ -103,22 +114,23 @@
 
 .panel-header {
   margin-bottom: 32px;
-  padding-bottom: 0;
-  border-bottom: none;
+  padding-bottom: 20px;
+  border-bottom: 1px solid #f3f4f6;
 }
 
 .panel-header h3 {
-  font-size: 24px;
+  font-size: 28px;
   font-weight: 700;
-  color: #000;
+  color: #111827;
   margin: 0 0 8px 0;
+  letter-spacing: -0.02em;
 }
 
 .panel-header p {
-  font-size: 16px;
+  font-size: 15px;
   color: #6b7280;
   margin: 0;
-  line-height: 1.5;
+  line-height: 1.6;
 }
 
 /* Error State */
@@ -149,45 +161,62 @@
 /* Responsive */
 @media (max-width: 1024px) {
   .settings-content-wrapper {
-    grid-template-columns: 1fr;
+    grid-template-columns: 240px 1fr;
   }
 
-  .settings-main {
-    border-right: none;
-    border-bottom: 1px solid #e5e5e5;
-  }
-
-  .settings-sidebar {
-    display: none;
+  .settings-content {
+    padding: 32px 40px;
   }
 }
 
 @media (max-width: 768px) {
-  .settings-main {
-    padding: 20px;
+  .wallet-settings-screen {
+    height: auto;
+    min-height: 100vh;
+  }
+
+  .settings-content-wrapper {
+    grid-template-columns: 1fr;
+    overflow: visible;
+  }
+
+  .settings-sidebar {
+    border-right: none;
+    border-bottom: 1px solid #e5e5e5;
+    overflow-y: visible;
   }
 
   .settings-tabs {
-    flex-direction: column;
+    flex-direction: row;
+    overflow-x: auto;
+    gap: 8px;
+    padding: 0 16px;
   }
 
   .tab-btn {
-    flex-direction: row;
-    justify-content: center;
+    flex-shrink: 0;
+    min-width: 140px;
+    padding: 12px 16px;
   }
 
   .tab-label {
     font-size: 14px;
   }
 
-  .wallet-icon-large {
-    width: 64px;
-    height: 64px;
-    font-size: 32px;
+  .settings-main {
+    overflow-y: visible;
   }
 
-  .wallet-name-large {
-    font-size: 22px;
+  .settings-content {
+    padding: 24px 16px;
+  }
+
+  .panel-header h3 {
+    font-size: 20px;
+  }
+
+  .panel-header p {
+    font-size: 14px;
   }
 }
 
