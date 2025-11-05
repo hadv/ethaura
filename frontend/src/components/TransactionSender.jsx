@@ -446,6 +446,20 @@ function TransactionSender({ accountAddress, credential, accountConfig, onSignat
         qy: onChainQy,
       })
 
+      console.log('🚨 IMPORTANT - Signature Requirements:', {
+        isDeployed: isActuallyDeployed,
+        twoFactorEnabled: onChainTwoFactorEnabled,
+        hasPasskey: hasPasskey,
+        willRequirePasskey: !isOwnerOnly,
+        willRequireOwner: isOwnerOnly || onChainTwoFactorEnabled,
+        totalSignaturesNeeded: isOwnerOnly ? 1 : (onChainTwoFactorEnabled ? 2 : 1),
+        signatureFlow: isOwnerOnly
+          ? '1️⃣ Owner signature only'
+          : (onChainTwoFactorEnabled
+            ? '1️⃣ Owner signature → 2️⃣ Passkey signature (2FA)'
+            : '1️⃣ Passkey signature only'),
+      })
+
       console.log('🔐 Credential Info:', {
         hasCredential: !!credential,
         credentialId: credential?.id,
