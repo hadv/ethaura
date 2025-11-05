@@ -20,6 +20,17 @@ function RecoveryManager({ accountAddress, credential }) {
   const [newOwner, setNewOwner] = useState('')
   const [recoveryType, setRecoveryType] = useState('passkey') // 'passkey' or 'owner'
 
+  // Debug: Log credential status
+  useEffect(() => {
+    console.log('🔍 RecoveryManager credential:', credential ? 'EXISTS' : 'NULL')
+    if (credential) {
+      console.log('🔍 Credential details:', {
+        id: credential.id,
+        hasPublicKey: !!credential.publicKey,
+      })
+    }
+  }, [credential])
+
   // Signature confirmation dialog state
   const [showSignatureDialog, setShowSignatureDialog] = useState(false)
   const [pendingSignatureData, setPendingSignatureData] = useState(null)
@@ -437,171 +448,203 @@ function RecoveryManager({ accountAddress, credential }) {
 
   return (
     <div className="recovery-manager">
-      {/* Guardian Status */}
-      {guardianInfo && (
-        <div className="guardian-status">
-          <h3>Guardian Status</h3>
-          <p>
-            <strong>Total Guardians:</strong> {guardianInfo.guardians.length}
-          </p>
-          <p>
-            <strong>Threshold:</strong> {guardianInfo.threshold} of {guardianInfo.guardians.length}
-          </p>
-          <p>
-            <strong>Your Status:</strong>{' '}
-            {isGuardian ? (
-              <span className="badge badge-success">✅ Guardian</span>
-            ) : (
-              <span className="badge badge-warning">⚠️ Not a Guardian</span>
-            )}
-          </p>
-        </div>
-      )}
+      <div className="recovery-layout">
+        {/* Main Content - Left Column */}
+        <div className="recovery-main">
+          {/* Account Recovery (Guardian Only) */}
+          {isGuardian ? (
+            <div className="recovery-section">
+              <h3>Account Recovery</h3>
+              <p className="section-description">
+                As a guardian, you can initiate a recovery process to update the account's passkey or owner address.
+              </p>
 
-      {/* Initiate Recovery (Guardian Only) */}
-      {isGuardian && (
-        <div className="recovery-section">
-          <h3>Propose Recovery</h3>
-          <div className="form-group">
-            <label>Recovery Type:</label>
-            <select
-              value={recoveryType}
-              onChange={(e) => setRecoveryType(e.target.value)}
-              disabled={loading}
-            >
-              <option value="passkey">Update Passkey</option>
-              <option value="owner">Update Owner</option>
-            </select>
-          </div>
-
-          {recoveryType === 'passkey' && (
-            <>
               <div className="form-group">
-                <label>New Passkey X (qx):</label>
+                <label>Recovery Type:</label>
+                <select
+                  value={recoveryType}
+                  onChange={(e) => setRecoveryType(e.target.value)}
+                  disabled={loading}
+                >
+                  <option value="passkey">Update Passkey</option>
+                  <option value="owner">Update Owner</option>
+                </select>
+              </div>
+
+              {recoveryType === 'passkey' && (
+                <>
+                  <div className="form-group">
+                    <label>New Passkey X (qx):</label>
+                    <input
+                      type="text"
+                      value={newQx}
+                      onChange={(e) => setNewQx(e.target.value)}
+                      placeholder="0x..."
+                      disabled={loading}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>New Passkey Y (qy):</label>
+                    <input
+                      type="text"
+                      value={newQy}
+                      onChange={(e) => setNewQy(e.target.value)}
+                      placeholder="0x..."
+                      disabled={loading}
+                    />
+                  </div>
+                </>
+              )}
+
+              <div className="form-group">
+                <label>New Owner Address:</label>
                 <input
                   type="text"
-                  value={newQx}
-                  onChange={(e) => setNewQx(e.target.value)}
+                  value={newOwner}
+                  onChange={(e) => setNewOwner(e.target.value)}
                   placeholder="0x..."
                   disabled={loading}
                 />
               </div>
-              <div className="form-group">
-                <label>New Passkey Y (qy):</label>
-                <input
-                  type="text"
-                  value={newQy}
-                  onChange={(e) => setNewQy(e.target.value)}
-                  placeholder="0x..."
-                  disabled={loading}
-                />
+
+              <button
+                onClick={handleInitiateRecovery}
+                disabled={loading}
+                className="btn btn-primary"
+              >
+                {loading ? 'Processing...' : 'Propose Recovery'}
+              </button>
+            </div>
+          ) : (
+            <div className="recovery-section">
+              <h3>Account Recovery</h3>
+              <div className="info-box info-box-warning">
+                <p>
+                  <strong>⚠️ Not a Guardian</strong>
+                </p>
+                <p>
+                  You need to be a guardian to propose recovery. Only guardians can initiate the recovery process.
+                </p>
               </div>
-            </>
+            </div>
           )}
 
-          <div className="form-group">
-            <label>New Owner Address:</label>
-            <input
-              type="text"
-              value={newOwner}
-              onChange={(e) => setNewOwner(e.target.value)}
-              placeholder="0x..."
-              disabled={loading}
-            />
-          </div>
-
-          <button
-            onClick={handleInitiateRecovery}
-            disabled={loading}
-            className="btn btn-primary"
-          >
-            {loading ? 'Processing...' : '📝 Propose Recovery'}
-          </button>
+          {/* Status Messages */}
+          {status && <div className="status-message success">{status}</div>}
+          {error && <div className="status-message error">{error}</div>}
         </div>
-      )}
 
-      {/* Pending Recoveries */}
-      <div className="recovery-section">
-        <h3>Pending Recovery Requests ({pendingRecoveries.length})</h3>
-
-        {pendingRecoveries.length > 0 && credential && (
-          <div className="info-text" style={{ marginBottom: '16px', background: 'rgba(244, 67, 54, 0.1)', padding: '12px', borderRadius: '6px', border: '1px solid rgba(244, 67, 54, 0.3)' }}>
-            <strong>🔐 Security Notice:</strong> As the account owner, you can cancel any pending recovery request using your passkey signature. This protects against malicious recovery attempts.
-          </div>
-        )}
-
-        {pendingRecoveries.length === 0 ? (
-          <p className="info-text">No pending recovery requests</p>
-        ) : (
-          <div className="recovery-list">
-            {pendingRecoveries.map((recovery) => (
-              <div key={recovery.nonce} className="recovery-card">
-                <div className="recovery-header">
-                  <h4>Recovery #{recovery.nonce}</h4>
-                  <span className="badge badge-info">
-                    {recovery.approvalCount}/{guardianInfo?.threshold} Approvals
+        {/* Sidebar - Right Column */}
+        <div className="recovery-sidebar">
+          {/* Guardian Status */}
+          {guardianInfo && (
+            <div className="guardian-status">
+              <h3>Guardian Status</h3>
+              <div className="status-grid">
+                <div className="status-item">
+                  <span className="status-label">Total Guardians</span>
+                  <span className="status-value">{guardianInfo.guardians.length}</span>
+                </div>
+                <div className="status-item">
+                  <span className="status-label">Threshold</span>
+                  <span className="status-value">{guardianInfo.threshold} of {guardianInfo.guardians.length}</span>
+                </div>
+                <div className="status-item">
+                  <span className="status-label">Your Status</span>
+                  <span className={`status-badge ${isGuardian ? 'badge-success' : 'badge-neutral'}`}>
+                    {isGuardian ? '🛡️ Guardian' : 'Not a Guardian'}
                   </span>
                 </div>
-
-                <div className="recovery-details">
-                  <p>
-                    <strong>New Owner:</strong>{' '}
-                    {recovery.newOwner.slice(0, 6)}...{recovery.newOwner.slice(-4)}
-                  </p>
-                  <p>
-                    <strong>Timelock:</strong> {getTimeRemaining(recovery.executeAfter)}
-                  </p>
-                  <p className="small-text">
-                    Executable at: {formatDate(recovery.executeAfter)}
-                  </p>
-                </div>
-
-                <div className="recovery-actions">
-                  {isGuardian && recovery.approvalCount < guardianInfo?.threshold && (
-                    <button
-                      onClick={() => handleApproveRecovery(recovery.nonce)}
-                      disabled={loading}
-                      className="btn btn-secondary"
-                    >
-                      ✅ Approve
-                    </button>
-                  )}
-
-                  {recovery.approvalCount >= guardianInfo?.threshold &&
-                    recovery.executeAfter <= Math.floor(Date.now() / 1000) && (
-                      <button
-                        onClick={() => handleExecuteRecovery(recovery.nonce)}
-                        disabled={loading}
-                        className="btn btn-success"
-                      >
-                        🚀 Execute
-                      </button>
-                    )}
-
-                  {recovery.executeAfter > Math.floor(Date.now() / 1000) && (
-                    <span className="badge badge-warning">⏳ Timelock Active</span>
-                  )}
-
-                  {/* Owner can cancel any pending recovery with passkey */}
-                  {credential && (
-                    <button
-                      onClick={() => handleCancelRecovery(recovery.nonce)}
-                      disabled={loading}
-                      className="btn btn-danger"
-                    >
-                      ❌ Cancel (Owner)
-                    </button>
-                  )}
-                </div>
               </div>
-            ))}
-          </div>
-        )}
-      </div>
+            </div>
+          )}
 
-      {/* Status Messages */}
-      {status && <div className="status-message success">{status}</div>}
-      {error && <div className="status-message error">{error}</div>}
+          {/* Pending Recoveries */}
+          <div className="recovery-section">
+            <h3>Pending Recovery Requests ({pendingRecoveries.length})</h3>
+
+            {pendingRecoveries.length > 0 && credential && (
+              <div className="info-box info-box-danger">
+                <strong>🔐 Security Notice:</strong> As the account owner, you can cancel any pending recovery request using your passkey signature. This protects against malicious recovery attempts.
+              </div>
+            )}
+
+            {pendingRecoveries.length === 0 ? (
+              <p className="info-text">No pending recovery requests</p>
+            ) : (
+              <div className="recovery-list">
+                {pendingRecoveries.map((recovery) => (
+                  <div key={recovery.nonce} className="recovery-card">
+                    <div className="recovery-header">
+                      <h4>Recovery #{recovery.nonce}</h4>
+                      <span className="status-badge badge-info">
+                        {recovery.approvalCount}/{guardianInfo?.threshold} Approvals
+                      </span>
+                    </div>
+
+                    <div className="recovery-details">
+                      <p>
+                        <strong>New Owner:</strong>{' '}
+                        {recovery.newOwner.slice(0, 6)}...{recovery.newOwner.slice(-4)}
+                      </p>
+                      <p>
+                        <strong>Timelock:</strong> {getTimeRemaining(recovery.executeAfter)}
+                      </p>
+                      <p className="small-text">
+                        Executable at: {formatDate(recovery.executeAfter)}
+                      </p>
+                    </div>
+
+                    <div className="recovery-actions">
+                      {console.log('🔍 Rendering recovery actions, credential:', credential ? 'EXISTS' : 'NULL')}
+
+                      {isGuardian && recovery.approvalCount < guardianInfo?.threshold && (
+                        <button
+                          onClick={() => handleApproveRecovery(recovery.nonce)}
+                          disabled={loading}
+                          className="btn btn-secondary"
+                        >
+                          ✅ Approve
+                        </button>
+                      )}
+
+                      {recovery.approvalCount >= guardianInfo?.threshold &&
+                        recovery.executeAfter <= Math.floor(Date.now() / 1000) && (
+                          <button
+                            onClick={() => handleExecuteRecovery(recovery.nonce)}
+                            disabled={loading}
+                            className="btn btn-success"
+                          >
+                            🚀 Execute
+                          </button>
+                        )}
+
+                      {recovery.executeAfter > Math.floor(Date.now() / 1000) && (
+                        <span className="status-badge badge-warning">⏳ Locked</span>
+                      )}
+
+                      {/* Owner can cancel any pending recovery with passkey */}
+                      {credential ? (
+                        <button
+                          onClick={() => handleCancelRecovery(recovery.nonce)}
+                          disabled={loading}
+                          className="btn btn-danger"
+                        >
+                          ❌ Cancel (Owner)
+                        </button>
+                      ) : (
+                        <div style={{ fontSize: '12px', color: '#999', marginTop: '8px' }}>
+                          ℹ️ No passkey credential found on this device
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
 
       {/* Signature Confirmation Dialog */}
       <SignatureConfirmationDialog

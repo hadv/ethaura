@@ -286,6 +286,7 @@ function AppContent() {
           onBack={handleBack}
           onHome={handleHome}
           onLogout={handleLogout}
+          credential={passkeyCredential}
         />
       )}
 

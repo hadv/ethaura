@@ -5,10 +5,10 @@ import RecoveryManager from '../components/RecoveryManager'
 import Header from '../components/Header'
 import SubHeader from '../components/SubHeader'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
-import { HiKey, HiUserGroup, HiRefresh } from 'react-icons/hi'
+import { HiKey, HiShieldCheck, HiLockOpen } from 'react-icons/hi'
 import '../styles/WalletSettingsScreen.css'
 
-function WalletSettingsScreen({ wallet, onBack, onHome, onLogout }) {
+function WalletSettingsScreen({ wallet, onBack, onHome, onLogout, credential }) {
   const { userInfo } = useWeb3Auth()
   const [activeTab, setActiveTab] = useState('2fa')
 
@@ -54,14 +54,14 @@ function WalletSettingsScreen({ wallet, onBack, onHome, onLogout }) {
               className={`tab-btn ${activeTab === 'guardians' ? 'active' : ''}`}
               onClick={() => setActiveTab('guardians')}
             >
-              <HiUserGroup className="tab-icon" />
+              <HiShieldCheck className="tab-icon" />
               <span className="tab-label">Guardians</span>
             </button>
             <button
               className={`tab-btn ${activeTab === 'recovery' ? 'active' : ''}`}
               onClick={() => setActiveTab('recovery')}
             >
-              <HiRefresh className="tab-icon" />
+              <HiLockOpen className="tab-icon" />
               <span className="tab-label">Recovery</span>
             </button>
           </div>
@@ -72,10 +72,6 @@ function WalletSettingsScreen({ wallet, onBack, onHome, onLogout }) {
           <div className="settings-content">
             {activeTab === '2fa' && (
               <div className="tab-panel">
-                <div className="panel-header">
-                  <h3>Two-Factor Authentication</h3>
-                  <p>Add an extra layer of security with passkey authentication</p>
-                </div>
                 <PasskeySettings
                   accountAddress={wallet.address}
                 />
@@ -84,10 +80,6 @@ function WalletSettingsScreen({ wallet, onBack, onHome, onLogout }) {
 
             {activeTab === 'guardians' && (
               <div className="tab-panel">
-                <div className="panel-header">
-                  <h3>Guardian Management</h3>
-                  <p>Add trusted guardians to help recover your account</p>
-                </div>
                 <GuardianManager
                   accountAddress={wallet.address}
                 />
@@ -96,12 +88,9 @@ function WalletSettingsScreen({ wallet, onBack, onHome, onLogout }) {
 
             {activeTab === 'recovery' && (
               <div className="tab-panel">
-                <div className="panel-header">
-                  <h3>Account Recovery</h3>
-                  <p>Recover your account with guardian signatures</p>
-                </div>
                 <RecoveryManager
                   accountAddress={wallet.address}
+                  credential={credential}
                 />
               </div>
             )}
