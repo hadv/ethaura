@@ -10,10 +10,11 @@ import CreateWalletScreen from './screens/CreateWalletScreen'
 import NewWalletScreen from './screens/NewWalletScreen'
 import SendTransactionScreen from './screens/SendTransactionScreen'
 import SignatureConfirmationScreen from './screens/SignatureConfirmationScreen'
+import { retrievePasskeyCredential, storePasskeyCredential } from './lib/passkeyStorage'
 
 // Inner component that uses Web3Auth context
 function AppContent() {
-  const { isConnected, isLoading, logout } = useWeb3Auth()
+  const { isConnected, isLoading, logout, signMessage, address } = useWeb3Auth()
 
   // Navigation state
   const [currentScreen, setCurrentScreen] = useState('home') // 'home', 'wallet-detail', 'wallet-settings', 'add-wallet', 'new-wallet', 'send-transaction', 'signature-confirmation'
@@ -67,27 +68,63 @@ function AppContent() {
     }
   }
 
-  // Load credential from localStorage on mount
-  const [passkeyCredential, setPasskeyCredential] = useState(() => {
-    const stored = localStorage.getItem('ethaura_passkey_credential')
-    return deserializeCredential(stored)
-  })
-
+  // State for passkey credential and account config
+  const [passkeyCredential, setPasskeyCredential] = useState(null)
   const [accountConfig, setAccountConfig] = useState(() => {
     const stored = localStorage.getItem('ethaura_account_config')
     return stored ? JSON.parse(stored) : null
   })
+  const [credentialLoading, setCredentialLoading] = useState(false)
 
-  // Save credential to localStorage when it changes
+  // Load credential from server when user is connected
   useEffect(() => {
-    if (passkeyCredential) {
-      const serialized = serializeCredential(passkeyCredential)
-      localStorage.setItem('ethaura_passkey_credential', JSON.stringify(serialized))
-      console.log('💾 Saved passkey credential to localStorage')
-    } else {
-      localStorage.removeItem('ethaura_passkey_credential')
+    async function loadCredentialFromServer() {
+      if (!isConnected || !address || !signMessage) {
+        return
+      }
+
+      try {
+        setCredentialLoading(true)
+        console.log('🔄 Loading passkey credential from server...')
+
+        const credential = await retrievePasskeyCredential(signMessage, address)
+
+        if (credential) {
+          // Deserialize the credential (convert base64 strings back to ArrayBuffers)
+          const deserialized = {
+            id: credential.id,
+            rawId: credential.rawId ? Uint8Array.from(atob(credential.rawId), c => c.charCodeAt(0)).buffer : null,
+            publicKey: credential.publicKey,
+            response: credential.response ? {
+              attestationObject: credential.response.attestationObject
+                ? Uint8Array.from(atob(credential.response.attestationObject), c => c.charCodeAt(0)).buffer
+                : null,
+              clientDataJSON: credential.response.clientDataJSON
+                ? Uint8Array.from(atob(credential.response.clientDataJSON), c => c.charCodeAt(0)).buffer
+                : null,
+            } : null,
+          }
+
+          setPasskeyCredential(deserialized)
+          console.log('✅ Loaded passkey credential from server')
+        } else {
+          console.log('ℹ️  No passkey credential found on server')
+        }
+      } catch (error) {
+        console.error('❌ Failed to load credential from server:', error)
+        // Fallback to localStorage if server fails
+        const stored = localStorage.getItem('ethaura_passkey_credential')
+        if (stored) {
+          console.log('⚠️  Falling back to localStorage credential')
+          setPasskeyCredential(deserializeCredential(stored))
+        }
+      } finally {
+        setCredentialLoading(false)
+      }
     }
-  }, [passkeyCredential])
+
+    loadCredentialFromServer()
+  }, [isConnected, address, signMessage])
 
   // Save account config to localStorage when it changes
   useEffect(() => {
@@ -98,6 +135,40 @@ function AppContent() {
       localStorage.removeItem('ethaura_account_config')
     }
   }, [accountConfig])
+
+  // Handler to save passkey credential (both to server and state)
+  const handleCredentialCreated = async (credential) => {
+    if (!credential) {
+      setPasskeyCredential(null)
+      return
+    }
+
+    // Update state immediately
+    setPasskeyCredential(credential)
+
+    // Save to server in background
+    if (isConnected && address && signMessage) {
+      try {
+        // Serialize credential for storage
+        const serialized = serializeCredential(credential)
+        await storePasskeyCredential(signMessage, address, serialized)
+        console.log('✅ Passkey credential saved to server')
+
+        // Also save to localStorage as backup
+        localStorage.setItem('ethaura_passkey_credential', JSON.stringify(serialized))
+      } catch (error) {
+        console.error('❌ Failed to save credential to server:', error)
+        // Still save to localStorage as fallback
+        const serialized = serializeCredential(credential)
+        localStorage.setItem('ethaura_passkey_credential', JSON.stringify(serialized))
+        console.log('⚠️  Saved to localStorage as fallback')
+      }
+    } else {
+      // If not connected, just save to localStorage
+      const serialized = serializeCredential(credential)
+      localStorage.setItem('ethaura_passkey_credential', JSON.stringify(serialized))
+    }
+  }
 
   // Navigation handlers
   const handleWalletClick = (wallet) => {
@@ -307,6 +378,7 @@ function AppContent() {
           onBack={handleBack}
           onWalletCreated={handleNewWalletCreated}
           credential={passkeyCredential}
+          onCredentialCreated={handleCredentialCreated}
           onLogout={handleLogout}
           onHome={handleHome}
         />

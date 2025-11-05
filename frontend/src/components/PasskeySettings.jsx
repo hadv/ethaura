@@ -4,10 +4,11 @@ import { useWeb3Auth } from '../contexts/Web3AuthContext'
 import { useNetwork } from '../contexts/NetworkContext'
 import { ethers } from 'ethers'
 import { NETWORKS } from '../lib/constants'
+import { storePasskeyCredential } from '../lib/passkeyStorage'
 import '../styles/PasskeySettings.css'
 
 function PasskeySettings({ accountAddress }) {
-  const { address: ownerAddress, provider: web3AuthProvider } = useWeb3Auth()
+  const { address: ownerAddress, provider: web3AuthProvider, signMessage } = useWeb3Auth()
   const { networkInfo } = useNetwork()
   const [status, setStatus] = useState('')
   const [error, setError] = useState('')
@@ -179,6 +180,40 @@ function PasskeySettings({ accountAddress }) {
         },
       })
 
+      // Store credential info for server storage
+      const credentialInfo = {
+        id: credential.id,
+        rawId: credential.rawId,
+        publicKey: publicKey,
+        response: {
+          attestationObject: credential.response.attestationObject,
+          clientDataJSON: credential.response.clientDataJSON,
+        },
+      }
+
+      // Save to server
+      try {
+        if (signMessage && ownerAddress) {
+          await storePasskeyCredential(signMessage, ownerAddress, credentialInfo)
+          console.log('✅ Passkey credential saved to server')
+        }
+      } catch (serverError) {
+        console.error('⚠️  Failed to save to server:', serverError)
+        // Continue anyway - we'll save to localStorage as fallback
+      }
+
+      // Save to localStorage as backup
+      localStorage.setItem('ethaura_passkey_credential', JSON.stringify({
+        id: credentialInfo.id,
+        rawId: btoa(String.fromCharCode(...new Uint8Array(credentialInfo.rawId))),
+        publicKey: credentialInfo.publicKey,
+        response: {
+          attestationObject: btoa(String.fromCharCode(...new Uint8Array(credentialInfo.response.attestationObject))),
+          clientDataJSON: btoa(String.fromCharCode(...new Uint8Array(credentialInfo.response.clientDataJSON))),
+        },
+      }))
+      console.log('✅ Passkey credential saved to localStorage')
+
       setNewPasskey(publicKey)
       setStatus('Passkey created! Now proposing update to smart contract...')
 
@@ -339,21 +374,46 @@ function PasskeySettings({ accountAddress }) {
               </button>
             </div>
           ) : (
-            <div className="settings-section">
-              <h3>Two-Factor Authentication</h3>
-              <p className="section-description">
-                {accountInfo.twoFactorEnabled
-                  ? 'All transactions require both passkey and social login signatures. This provides maximum security for your account.'
-                  : 'Enable 2FA to require both passkey and social login for all transactions. This adds an extra layer of security.'}
-              </p>
-              <button
-                className={`btn ${accountInfo.twoFactorEnabled ? 'btn-danger' : 'btn-success'}`}
-                onClick={() => toggle2FA(!accountInfo.twoFactorEnabled)}
-                disabled={loading}
-              >
-                {accountInfo.twoFactorEnabled ? 'Disable 2FA' : 'Enable 2FA'}
-              </button>
-            </div>
+            <>
+              <div className="settings-section">
+                <h3>Two-Factor Authentication</h3>
+                <p className="section-description">
+                  {accountInfo.twoFactorEnabled
+                    ? 'All transactions require both passkey and social login signatures. This provides maximum security for your account.'
+                    : 'Enable 2FA to require both passkey and social login for all transactions. This adds an extra layer of security.'}
+                </p>
+                <button
+                  className={`btn ${accountInfo.twoFactorEnabled ? 'btn-danger' : 'btn-success'}`}
+                  onClick={() => toggle2FA(!accountInfo.twoFactorEnabled)}
+                  disabled={loading}
+                >
+                  {accountInfo.twoFactorEnabled ? 'Disable 2FA' : 'Enable 2FA'}
+                </button>
+              </div>
+
+              <div className="settings-section" style={{ marginTop: '24px' }}>
+                <h3>Update Passkey</h3>
+                <p className="section-description">
+                  Replace your current passkey with a new one on this device. This is useful if:
+                </p>
+                <ul className="section-description" style={{ marginLeft: '20px', marginTop: '8px', marginBottom: '12px' }}>
+                  <li>You're using a new device and need to register a passkey here</li>
+                  <li>You lost access to your previous passkey</li>
+                  <li>You want to update your biometric authentication</li>
+                </ul>
+                <p className="section-description" style={{ fontSize: '0.85rem', color: '#666', marginBottom: '12px' }}>
+                  ⏱️ <strong>Note:</strong> The update requires a 48-hour timelock before the new passkey becomes active.
+                  Your old passkey will continue to work until the new one is activated.
+                </p>
+                <button
+                  className="btn btn-secondary"
+                  onClick={createPasskey}
+                  disabled={loading || !ownerAddress}
+                >
+                  {loading ? 'Creating...' : '🔑 Create & Propose New Passkey'}
+                </button>
+              </div>
+            </>
           )}
 
           {/* Status Messages */}
