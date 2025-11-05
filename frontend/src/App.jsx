@@ -76,55 +76,23 @@ function AppContent() {
   })
   const [credentialLoading, setCredentialLoading] = useState(false)
 
-  // Load credential from server when user is connected
+  // Note: Credential loading is now handled per-account in individual components
+  // (PasskeySettings, RecoveryManager) since each smart account has its own passkey.
+  // For wallet creation flow (PasskeyManager), credentials are created fresh.
   useEffect(() => {
-    async function loadCredentialFromServer() {
-      if (!isConnected || !address || !signMessage) {
-        return
-      }
-
-      try {
-        setCredentialLoading(true)
-        console.log('🔄 Loading passkey credential from server...')
-
-        const credential = await retrievePasskeyCredential(signMessage, address)
-
-        if (credential) {
-          // Deserialize the credential (convert base64 strings back to ArrayBuffers)
-          const deserialized = {
-            id: credential.id,
-            rawId: credential.rawId ? Uint8Array.from(atob(credential.rawId), c => c.charCodeAt(0)).buffer : null,
-            publicKey: credential.publicKey,
-            response: credential.response ? {
-              attestationObject: credential.response.attestationObject
-                ? Uint8Array.from(atob(credential.response.attestationObject), c => c.charCodeAt(0)).buffer
-                : null,
-              clientDataJSON: credential.response.clientDataJSON
-                ? Uint8Array.from(atob(credential.response.clientDataJSON), c => c.charCodeAt(0)).buffer
-                : null,
-            } : null,
-          }
-
-          setPasskeyCredential(deserialized)
-          console.log('✅ Loaded passkey credential from server')
-        } else {
-          console.log('ℹ️  No passkey credential found on server')
-        }
-      } catch (error) {
-        console.error('❌ Failed to load credential from server:', error)
-        // Fallback to localStorage if server fails
-        const stored = localStorage.getItem('ethaura_passkey_credential')
-        if (stored) {
-          console.log('⚠️  Falling back to localStorage credential')
+    // Try to load legacy credential from localStorage for backward compatibility
+    if (isConnected) {
+      const stored = localStorage.getItem('ethaura_passkey_credential')
+      if (stored) {
+        try {
           setPasskeyCredential(deserializeCredential(stored))
+          console.log('ℹ️  Loaded legacy passkey credential from localStorage')
+        } catch (error) {
+          console.error('Failed to deserialize legacy credential:', error)
         }
-      } finally {
-        setCredentialLoading(false)
       }
     }
-
-    loadCredentialFromServer()
-  }, [isConnected, address, signMessage])
+  }, [isConnected])
 
   // Save account config to localStorage when it changes
   useEffect(() => {
@@ -137,7 +105,8 @@ function AppContent() {
   }, [accountConfig])
 
   // Handler to save passkey credential (both to server and state)
-  const handleCredentialCreated = async (credential) => {
+  // accountAddress: the smart account address this credential belongs to
+  const handleCredentialCreated = async (credential, accountAddress) => {
     if (!credential) {
       setPasskeyCredential(null)
       return
@@ -147,26 +116,29 @@ function AppContent() {
     setPasskeyCredential(credential)
 
     // Save to server in background
-    if (isConnected && address && signMessage) {
+    if (isConnected && address && signMessage && accountAddress) {
       try {
         // Serialize credential for storage
         const serialized = serializeCredential(credential)
-        await storePasskeyCredential(signMessage, address, serialized)
-        console.log('✅ Passkey credential saved to server')
+        await storePasskeyCredential(signMessage, address, accountAddress, serialized)
+        console.log(`✅ Passkey credential saved to server for account: ${accountAddress}`)
 
-        // Also save to localStorage as backup
-        localStorage.setItem('ethaura_passkey_credential', JSON.stringify(serialized))
+        // Also save to localStorage as backup (with account-specific key)
+        localStorage.setItem(`ethaura_passkey_credential_${accountAddress.toLowerCase()}`, JSON.stringify(serialized))
       } catch (error) {
         console.error('❌ Failed to save credential to server:', error)
         // Still save to localStorage as fallback
         const serialized = serializeCredential(credential)
-        localStorage.setItem('ethaura_passkey_credential', JSON.stringify(serialized))
+        localStorage.setItem(`ethaura_passkey_credential_${accountAddress.toLowerCase()}`, JSON.stringify(serialized))
         console.log('⚠️  Saved to localStorage as fallback')
       }
     } else {
-      // If not connected, just save to localStorage
+      // If not connected or no account address, save to legacy localStorage key
       const serialized = serializeCredential(credential)
-      localStorage.setItem('ethaura_passkey_credential', JSON.stringify(serialized))
+      const key = accountAddress
+        ? `ethaura_passkey_credential_${accountAddress.toLowerCase()}`
+        : 'ethaura_passkey_credential'
+      localStorage.setItem(key, JSON.stringify(serialized))
     }
   }
 

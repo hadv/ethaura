@@ -8,14 +8,15 @@ const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001'
 /**
  * Create authentication signature for API requests
  * @param {Function} signMessageFn - Sign message function from Web3Auth context
- * @param {string} userId - User address
+ * @param {string} ownerAddress - Owner address (Web3Auth social login address)
+ * @param {string} accountAddress - Smart account address
  * @param {string} action - Action type ('storage' or 'retrieval')
  * @returns {Promise<Object>} Authentication data
  */
-async function createAuthSignature(signMessageFn, userId, action = 'storage') {
+async function createAuthSignature(signMessageFn, ownerAddress, accountAddress, action = 'storage') {
   const timestamp = Date.now()
   const actionText = action === 'retrieval' ? 'Passkey Retrieval' : 'Passkey Storage'
-  const message = `EthAura ${actionText}\nTimestamp: ${timestamp}\nUser: ${userId}`
+  const message = `EthAura ${actionText}\nTimestamp: ${timestamp}\nOwner: ${ownerAddress}\nAccount: ${accountAddress}`
 
   const signature = await signMessageFn(message)
 
@@ -29,20 +30,22 @@ async function createAuthSignature(signMessageFn, userId, action = 'storage') {
 /**
  * Store passkey credential on server
  * @param {Function} signMessageFn - Sign message function from Web3Auth context
- * @param {string} userId - User address (owner address)
+ * @param {string} ownerAddress - Owner address (Web3Auth social login address)
+ * @param {string} accountAddress - Smart account address
  * @param {Object} credential - Passkey credential to store
  * @returns {Promise<Object>} Response from server
  */
-export async function storePasskeyCredential(signMessageFn, userId, credential) {
+export async function storePasskeyCredential(signMessageFn, ownerAddress, accountAddress, credential) {
   try {
-    console.log('🔐 Storing passkey credential on server for user:', userId)
+    console.log('🔐 Storing passkey credential on server for account:', accountAddress)
 
     // Create authentication signature
-    const auth = await createAuthSignature(signMessageFn, userId, 'storage')
+    const auth = await createAuthSignature(signMessageFn, ownerAddress, accountAddress, 'storage')
 
     // Prepare request body
     const requestBody = {
-      userId,
+      userId: accountAddress, // Use smart account address as the key
+      ownerAddress,
       signature: auth.signature,
       message: auth.message,
       timestamp: auth.timestamp,
@@ -77,24 +80,26 @@ export async function storePasskeyCredential(signMessageFn, userId, credential) 
 /**
  * Retrieve passkey credential from server
  * @param {Function} signMessageFn - Sign message function from Web3Auth context
- * @param {string} userId - User address (owner address)
+ * @param {string} ownerAddress - Owner address (Web3Auth social login address)
+ * @param {string} accountAddress - Smart account address
  * @returns {Promise<Object|null>} Credential or null if not found
  */
-export async function retrievePasskeyCredential(signMessageFn, userId) {
+export async function retrievePasskeyCredential(signMessageFn, ownerAddress, accountAddress) {
   try {
-    console.log('🔍 Retrieving passkey credential from server for user:', userId)
+    console.log('🔍 Retrieving passkey credential from server for account:', accountAddress)
 
     // Create authentication signature
-    const auth = await createAuthSignature(signMessageFn, userId, 'retrieval')
+    const auth = await createAuthSignature(signMessageFn, ownerAddress, accountAddress, 'retrieval')
 
     // Build query parameters
     const params = new URLSearchParams({
       signature: auth.signature,
       message: auth.message,
       timestamp: auth.timestamp.toString(),
+      ownerAddress: ownerAddress,
     })
 
-    const url = `${BACKEND_URL}/api/passkeys/${userId}?${params}`
+    const url = `${BACKEND_URL}/api/passkeys/${accountAddress}?${params}`
     console.log('📥 Fetching from backend:', url)
 
     const response = await fetch(url, {
@@ -127,19 +132,21 @@ export async function retrievePasskeyCredential(signMessageFn, userId) {
 /**
  * Delete passkey credential from server
  * @param {Function} signMessageFn - Sign message function from Web3Auth context
- * @param {string} userId - User address (owner address)
+ * @param {string} ownerAddress - Owner address (Web3Auth social login address)
+ * @param {string} accountAddress - Smart account address
  * @returns {Promise<Object>} Response from server
  */
-export async function deletePasskeyCredential(signMessageFn, userId) {
+export async function deletePasskeyCredential(signMessageFn, ownerAddress, accountAddress) {
   try {
-    console.log('🗑️  Deleting passkey credential from server for user:', userId)
+    console.log('🗑️  Deleting passkey credential from server for account:', accountAddress)
 
     // Create authentication signature
-    const auth = await createAuthSignature(signMessageFn, userId, 'storage')
+    const auth = await createAuthSignature(signMessageFn, ownerAddress, accountAddress, 'storage')
 
     // Prepare request body
     const requestBody = {
-      userId,
+      userId: accountAddress, // Use smart account address as the key
+      ownerAddress,
       signature: auth.signature,
       message: auth.message,
       timestamp: auth.timestamp,

@@ -191,19 +191,20 @@ function PasskeySettings({ accountAddress }) {
         },
       }
 
-      // Save to server
+      // Save to server (account-specific)
       try {
-        if (signMessage && ownerAddress) {
-          await storePasskeyCredential(signMessage, ownerAddress, credentialInfo)
-          console.log('✅ Passkey credential saved to server')
+        if (signMessage && ownerAddress && accountAddress) {
+          await storePasskeyCredential(signMessage, ownerAddress, accountAddress, credentialInfo)
+          console.log(`✅ Passkey credential saved to server for account: ${accountAddress}`)
         }
       } catch (serverError) {
         console.error('⚠️  Failed to save to server:', serverError)
         // Continue anyway - we'll save to localStorage as fallback
       }
 
-      // Save to localStorage as backup
-      localStorage.setItem('ethaura_passkey_credential', JSON.stringify({
+      // Save to localStorage as backup (account-specific key)
+      const storageKey = `ethaura_passkey_credential_${accountAddress.toLowerCase()}`
+      localStorage.setItem(storageKey, JSON.stringify({
         id: credentialInfo.id,
         rawId: btoa(String.fromCharCode(...new Uint8Array(credentialInfo.rawId))),
         publicKey: credentialInfo.publicKey,
@@ -212,7 +213,7 @@ function PasskeySettings({ accountAddress }) {
           clientDataJSON: btoa(String.fromCharCode(...new Uint8Array(credentialInfo.response.clientDataJSON))),
         },
       }))
-      console.log('✅ Passkey credential saved to localStorage')
+      console.log(`✅ Passkey credential saved to localStorage for account: ${accountAddress}`)
 
       setNewPasskey(publicKey)
       setStatus('Passkey created! Now proposing update to smart contract...')

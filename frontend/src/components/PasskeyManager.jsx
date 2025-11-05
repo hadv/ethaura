@@ -173,8 +173,8 @@ function PasskeyManager({ onCredentialCreated, credential }) {
   const clearPasskey = async () => {
     try {
       // Delete from server if connected
-      if (ownerAddress && signMessage) {
-        await deletePasskeyCredential(signMessage, ownerAddress)
+      if (ownerAddress && signMessage && existingAccountAddress) {
+        await deletePasskeyCredential(signMessage, ownerAddress, existingAccountAddress)
         console.log('✅ Deleted passkey from server')
       }
     } catch (error) {
@@ -182,8 +182,11 @@ function PasskeyManager({ onCredentialCreated, credential }) {
       // Continue anyway to clear local storage
     }
 
-    // Clear local storage
+    // Clear local storage (both legacy and account-specific keys)
     localStorage.removeItem('ethaura_passkey_credential')
+    if (existingAccountAddress) {
+      localStorage.removeItem(`ethaura_passkey_credential_${existingAccountAddress.toLowerCase()}`)
+    }
     localStorage.removeItem('ethaura_account_address')
     localStorage.removeItem('ethaura_account_config')
     onCredentialCreated(null)

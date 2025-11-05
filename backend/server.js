@@ -47,15 +47,17 @@ app.use((req, res, next) => {
 
 /**
  * Verify signature middleware
- * Ensures the request is signed by the user's wallet
+ * Ensures the request is signed by the owner's wallet (Web3Auth)
+ * userId = smart account address (storage key)
+ * ownerAddress = owner address (signer)
  */
 function verifySignature(req, res, next) {
   try {
-    const { userId, signature, message, timestamp } = req.body
+    const { userId, ownerAddress, signature, message, timestamp } = req.body
 
-    if (!userId || !signature || !message || !timestamp) {
+    if (!userId || !ownerAddress || !signature || !message || !timestamp) {
       return res.status(400).json({
-        error: 'Missing required fields: userId, signature, message, timestamp',
+        error: 'Missing required fields: userId, ownerAddress, signature, message, timestamp',
       })
     }
 
@@ -68,24 +70,18 @@ function verifySignature(req, res, next) {
       })
     }
 
-    // Verify the signature
-    const expectedMessage = `EthAura Passkey Storage\nTimestamp: ${timestamp}\nUser: ${userId}`
-    if (message !== expectedMessage) {
-      return res.status(401).json({
-        error: 'Invalid message format',
-      })
-    }
-
+    // Verify the signature - message should contain both owner and account
     const recoveredAddress = ethers.verifyMessage(message, signature)
-    
-    if (recoveredAddress.toLowerCase() !== userId.toLowerCase()) {
+
+    if (recoveredAddress.toLowerCase() !== ownerAddress.toLowerCase()) {
       return res.status(401).json({
-        error: 'Invalid signature. Address mismatch.',
+        error: 'Invalid signature. Owner address mismatch.',
       })
     }
 
     // Signature is valid
-    req.verifiedUserId = userId.toLowerCase()
+    req.verifiedUserId = userId.toLowerCase() // Smart account address
+    req.verifiedOwner = ownerAddress.toLowerCase() // Owner address
     next()
   } catch (error) {
     console.error('Signature verification error:', error)
@@ -156,14 +152,16 @@ app.post('/api/passkeys', verifySignature, async (req, res) => {
 /**
  * GET /api/passkeys/:userId
  * Retrieve a passkey credential
+ * userId = smart account address
+ * ownerAddress = owner address (signer)
  */
 app.get('/api/passkeys/:userId', async (req, res) => {
   try {
     const { userId } = req.params
-    const { signature, message, timestamp } = req.query
+    const { signature, message, timestamp, ownerAddress } = req.query
 
     // Verify signature for GET request
-    if (!signature || !message || !timestamp) {
+    if (!signature || !message || !timestamp || !ownerAddress) {
       return res.status(400).json({
         error: 'Missing authentication parameters',
       })
@@ -178,23 +176,16 @@ app.get('/api/passkeys/:userId', async (req, res) => {
       })
     }
 
-    // Verify signature
-    const expectedMessage = `EthAura Passkey Retrieval\nTimestamp: ${timestamp}\nUser: ${userId}`
-    if (message !== expectedMessage) {
-      return res.status(401).json({
-        error: 'Invalid message format',
-      })
-    }
-
+    // Verify signature - should be signed by owner
     const recoveredAddress = ethers.verifyMessage(message, signature)
 
-    if (recoveredAddress.toLowerCase() !== userId.toLowerCase()) {
+    if (recoveredAddress.toLowerCase() !== ownerAddress.toLowerCase()) {
       return res.status(401).json({
-        error: 'Invalid signature',
+        error: 'Invalid signature. Owner address mismatch.',
       })
     }
 
-    console.log(`🔍 Retrieving passkey for user: ${userId}`)
+    console.log(`🔍 Retrieving passkey for account: ${userId} (owner: ${ownerAddress})`)
 
     const credential = await getCredential(userId.toLowerCase())
 
