@@ -102,40 +102,55 @@ function TransactionSender({ accountAddress, credential, accountConfig, onSignat
             })
           } else {
             // For undeployed accounts, derive from credentials
+            console.log('🔍 Checking for passkey credential:', {
+              hasCredential: !!credential,
+              credentialType: typeof credential,
+              hasPublicKey: !!credential?.publicKey,
+              publicKeyType: typeof credential?.publicKey,
+              publicKeyKeys: credential?.publicKey ? Object.keys(credential.publicKey) : null,
+            })
+
             // Check if there's a passkey credential available (either from accountConfig or loaded credential)
             let passkeyPublicKey = null
             if (credential?.publicKey) {
               // Use the loaded credential if available
               passkeyPublicKey = credential.publicKey
-              console.log('✅ Using passkey from loaded credential for deployment')
-            } else if (accountConfig && accountConfig.hasPasskey) {
-              // Fallback to accountConfig (shouldn't happen if credential loading works)
-              console.warn('⚠️  accountConfig says hasPasskey but no credential loaded!')
+              console.log('✅ Using passkey from loaded credential for deployment:', {
+                x: passkeyPublicKey.x?.slice(0, 20) + '...',
+                y: passkeyPublicKey.y?.slice(0, 20) + '...',
+              })
+            } else {
+              console.warn('❌ No credential.publicKey found! Account will deploy in OWNER-ONLY mode')
+              if (accountConfig && accountConfig.hasPasskey) {
+                console.warn('⚠️  accountConfig says hasPasskey but no credential loaded!')
+              }
             }
 
             // Get the salt from account config (default to 0 for backwards compatibility)
             const salt = accountConfig?.salt !== undefined ? BigInt(accountConfig.salt) : 0n
 
-            // Get the 2FA setting from account config
-            const enable2FA = accountConfig?.twoFactorEnabled || false
+            // IMPORTANT: If deploying with a passkey, enable 2FA by default
+            // This is the recommended security setting - require both passkey + owner for all transactions
+            // If deploying without a passkey (owner-only), 2FA is not applicable
+            const enable2FA = !!passkeyPublicKey
 
             console.log('📋 Deriving undeployed account info:', {
               accountAddress,
               hasAccountConfig: !!accountConfig,
-              accountConfigHasPasskey: accountConfig?.hasPasskey,
-              accountConfigTwoFactorEnabled: accountConfig?.twoFactorEnabled,
               accountConfigSalt: accountConfig?.salt,
               hasCredential: !!credential,
               credentialPublicKey: credential?.publicKey,
               willUsePasskey: !!passkeyPublicKey,
               passkeyPublicKey: passkeyPublicKey ? { x: passkeyPublicKey.x?.slice(0, 10) + '...', y: passkeyPublicKey.y?.slice(0, 10) + '...' } : null,
               salt: salt.toString(),
-              enable2FA,
+              enable2FA: enable2FA,
+              note: passkeyPublicKey ? '2FA will be ENABLED (passkey + owner required)' : '2FA not applicable (owner-only mode)',
             })
 
             console.log('🚀 IMPORTANT: Account will be deployed with:', {
-              mode: passkeyPublicKey ? '🔐 PASSKEY MODE' : '👤 OWNER-ONLY MODE',
+              mode: passkeyPublicKey ? '🔐 PASSKEY MODE (2FA ENABLED)' : '👤 OWNER-ONLY MODE',
               hasPasskey: !!passkeyPublicKey,
+              twoFactorEnabled: enable2FA,
               passkeyX: passkeyPublicKey?.x?.slice(0, 20) + '...',
               passkeyY: passkeyPublicKey?.y?.slice(0, 20) + '...',
             })
