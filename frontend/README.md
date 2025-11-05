@@ -10,6 +10,7 @@ React frontend for P256Account ERC-4337 wallet with passkey authentication and o
 - ✅ **Two-Factor Authentication** - Optional dual signatures
 - ✅ **ERC-4337 Integration** - Full UserOperation support
 - ✅ **Bundler Support** - Pimlico, Alchemy, Stackup
+- ✅ **WalletConnect** - Connect to any dApp via WalletConnect v2
 
 ## Quick Start
 
@@ -32,6 +33,9 @@ Edit `.env`:
 ```env
 # Web3Auth (get from https://dashboard.web3auth.io/)
 VITE_WEB3AUTH_CLIENT_ID=your_client_id
+
+# WalletConnect (get from https://cloud.walletconnect.com/)
+VITE_WALLETCONNECT_PROJECT_ID=your_project_id
 
 # Network
 VITE_CHAIN_ID=11155111

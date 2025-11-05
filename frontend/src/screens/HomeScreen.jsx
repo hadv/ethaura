@@ -833,14 +833,6 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onLogo
               </div>
 
               <div className="wallet-info-section">
-                <div className="info-label">Network</div>
-                <div className="info-value network-info">
-                  <div className="network-icon">⬥</div>
-                  Sepolia
-                </div>
-              </div>
-
-              <div className="wallet-info-section">
                 <div className="info-label">Address</div>
                 <div className="info-value address-info">
                   <Identicon address={selectedWallet.address} size={24} />

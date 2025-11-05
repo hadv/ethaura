@@ -11,6 +11,9 @@
   },
   "dependencies": {
     "@tanstack/react-query": "^5.59.0",
+    "@walletconnect/core": "2.21.0",
+    "@walletconnect/utils": "2.21.0",
+    "@walletconnect/web3wallet": "1.16.1",
     "@web3auth/base": "^9.7.0",
     "@web3auth/ethereum-provider": "^9.7.0",
     "@web3auth/modal": "^9.7.0",

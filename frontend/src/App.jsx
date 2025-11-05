@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Web3AuthProvider, useWeb3Auth } from './contexts/Web3AuthContext'
 import { NetworkProvider } from './contexts/NetworkContext'
+import { WalletConnectProvider } from './contexts/WalletConnectContext'
 import LoginScreen from './components/LoginScreen'
 import HomeScreen from './screens/HomeScreen'
 import WalletDetailScreen from './screens/WalletDetailScreen'
@@ -287,6 +288,8 @@ function AppContent() {
           onHome={handleHome}
           onLogout={handleLogout}
           credential={passkeyCredential}
+          onWalletChange={handleWalletChange}
+          onSettings={handleSettings}
         />
       )}
 
@@ -314,6 +317,7 @@ function AppContent() {
           wallet={selectedWallet}
           onBack={handleBack}
           onHome={handleHome}
+          onSettings={handleSettings}
           credential={passkeyCredential}
           accountConfig={accountConfig}
           onLogout={handleLogout}
@@ -335,12 +339,14 @@ function AppContent() {
   )
 }
 
-// Main App component with Web3AuthProvider and NetworkProvider
+// Main App component with Web3AuthProvider, NetworkProvider, and WalletConnectProvider
 function App() {
   return (
     <Web3AuthProvider>
       <NetworkProvider>
-        <AppContent />
+        <WalletConnectProvider>
+          <AppContent />
+        </WalletConnectProvider>
       </NetworkProvider>
     </Web3AuthProvider>
   )

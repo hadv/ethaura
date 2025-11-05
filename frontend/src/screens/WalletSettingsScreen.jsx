@@ -1,18 +1,58 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import PasskeySettings from '../components/PasskeySettings'
 import GuardianManager from '../components/GuardianManager'
 import RecoveryManager from '../components/RecoveryManager'
 import Header from '../components/Header'
 import SubHeader from '../components/SubHeader'
+import { WalletConnectModal } from '../components/WalletConnectModal'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
+import { useNetwork } from '../contexts/NetworkContext'
 import { HiKey, HiShieldCheck, HiLockOpen } from 'react-icons/hi'
 import '../styles/WalletSettingsScreen.css'
 
-function WalletSettingsScreen({ wallet, onBack, onHome, onLogout, credential }) {
+function WalletSettingsScreen({ wallet, onBack, onHome, onLogout, credential, onWalletChange, onSettings }) {
   const { userInfo } = useWeb3Auth()
+  const { networkInfo } = useNetwork()
   const [activeTab, setActiveTab] = useState('2fa')
+  const [wallets, setWallets] = useState([])
+  const [selectedWallet, setSelectedWallet] = useState(wallet)
+  const [showWalletConnectModal, setShowWalletConnectModal] = useState(false)
+  const walletConnectButtonRef = useRef(null)
 
-  if (!wallet) {
+  // Load wallets from localStorage
+  useEffect(() => {
+    const loadWallets = () => {
+      try {
+        const savedWallets = localStorage.getItem('ethaura_wallets_list')
+        if (savedWallets) {
+          const parsedWallets = JSON.parse(savedWallets)
+          setWallets(parsedWallets)
+        }
+      } catch (error) {
+        console.error('Error loading wallets:', error)
+      }
+    }
+    loadWallets()
+  }, [])
+
+  // Update selected wallet when prop changes
+  useEffect(() => {
+    if (wallet) {
+      setSelectedWallet(wallet)
+    }
+  }, [wallet])
+
+  const handleWalletChange = (newWallet) => {
+    if (newWallet) {
+      setSelectedWallet(newWallet)
+      // Notify parent component if callback is provided
+      if (onWalletChange) {
+        onWalletChange(newWallet)
+      }
+    }
+  }
+
+  if (!selectedWallet) {
     return (
       <div className="wallet-settings-screen">
         <Header userInfo={userInfo} onLogout={onLogout} onHome={onHome} />
@@ -29,13 +69,19 @@ function WalletSettingsScreen({ wallet, onBack, onHome, onLogout, credential }) 
       {/* Header */}
       <Header userInfo={userInfo} onLogout={onLogout} onHome={onHome} />
 
-      {/* SubHeader with back button */}
+      {/* SubHeader with wallet dropdown, network selector, and WalletConnect */}
       <SubHeader
-        wallet={wallet}
+        wallet={selectedWallet}
         onBack={onBack}
         showBackButton={true}
+        showWalletDropdown={true}
+        wallets={wallets}
+        onWalletChange={handleWalletChange}
+        showWalletConnect={true}
+        onWalletConnectClick={() => setShowWalletConnectModal(true)}
+        walletConnectButtonRef={walletConnectButtonRef}
+        hideActions={false}
         onSettings={() => {}}
-        hideActions={true}
       />
 
       {/* Main Content */}
@@ -73,7 +119,7 @@ function WalletSettingsScreen({ wallet, onBack, onHome, onLogout, credential }) 
             {activeTab === '2fa' && (
               <div className="tab-panel">
                 <PasskeySettings
-                  accountAddress={wallet.address}
+                  accountAddress={selectedWallet.address}
                 />
               </div>
             )}
@@ -81,7 +127,7 @@ function WalletSettingsScreen({ wallet, onBack, onHome, onLogout, credential }) 
             {activeTab === 'guardians' && (
               <div className="tab-panel">
                 <GuardianManager
-                  accountAddress={wallet.address}
+                  accountAddress={selectedWallet.address}
                 />
               </div>
             )}
@@ -89,7 +135,7 @@ function WalletSettingsScreen({ wallet, onBack, onHome, onLogout, credential }) 
             {activeTab === 'recovery' && (
               <div className="tab-panel">
                 <RecoveryManager
-                  accountAddress={wallet.address}
+                  accountAddress={selectedWallet.address}
                   credential={credential}
                 />
               </div>
@@ -97,6 +143,15 @@ function WalletSettingsScreen({ wallet, onBack, onHome, onLogout, credential }) 
           </div>
         </div>
       </div>
+
+      {/* WalletConnect Modal */}
+      <WalletConnectModal
+        isOpen={showWalletConnectModal}
+        onClose={() => setShowWalletConnectModal(false)}
+        accountAddress={selectedWallet?.address}
+        chainId={networkInfo.chainId}
+        buttonRef={walletConnectButtonRef}
+      />
     </div>
   )
 }

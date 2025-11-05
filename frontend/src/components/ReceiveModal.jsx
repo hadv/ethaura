@@ -3,6 +3,7 @@ import { HiArrowDown } from 'react-icons/hi'
 import { IoCopyOutline, IoCheckmark, IoOpenOutline } from 'react-icons/io5'
 import { Identicon } from '../utils/identicon.jsx'
 import GradientQRCode from './GradientQRCode'
+import { useNetwork } from '../contexts/NetworkContext'
 import '../styles/ReceiveModal.css'
 
 /**
@@ -15,6 +16,7 @@ import '../styles/ReceiveModal.css'
  * @param {object} preselectedWallet - Optional wallet to preselect (for single wallet view)
  */
 function ReceiveModal({ isOpen, onClose, wallets = [], preselectedWallet = null }) {
+  const { networkInfo } = useNetwork()
   const [selectedWallet, setSelectedWallet] = useState(preselectedWallet)
   const [copied, setCopied] = useState(false)
 
@@ -120,7 +122,7 @@ function ReceiveModal({ isOpen, onClose, wallets = [], preselectedWallet = null 
 
             {preselectedWallet && (
               <p className="modal-description">
-                Send funds to this address on Sepolia testnet:
+                Send funds to this address on {networkInfo.name}:
               </p>
             )}
 
@@ -140,11 +142,11 @@ function ReceiveModal({ isOpen, onClose, wallets = [], preselectedWallet = null 
                 {copied ? <IoCheckmark /> : <IoCopyOutline />}
               </button>
               <a
-                href={`https://sepolia.etherscan.io/address/${effectiveWallet.address}`}
+                href={`${networkInfo.explorerUrl}/address/${effectiveWallet.address}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="explorer-icon-inline"
-                title="View on Etherscan"
+                title="View on Explorer"
               >
                 <IoOpenOutline />
               </a>

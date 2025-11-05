@@ -29,6 +29,8 @@ export default defineConfig({
     alias: {
       stream: 'stream-browserify',
       util: 'util',
+      // DO NOT polyfill 'events' - it breaks WalletConnect
+      // events: 'events',
       '@contracts': path.resolve(__dirname, '..', 'out'), // Foundry artifacts
     },
   },
@@ -46,13 +48,16 @@ export default defineConfig({
           buffer: true,
           process: true,
         }),
-        NodeModulesPolyfillPlugin(),
+        // DO NOT use NodeModulesPolyfillPlugin - it polyfills 'events' which breaks WalletConnect
+        // See: https://github.com/WalletConnect/walletconnect-monorepo/issues/4064
+        // NodeModulesPolyfillPlugin(),
       ],
     },
   },
   build: {
     rollupOptions: {
-      plugins: [rollupNodePolyFill()],
+      // DO NOT use rollupNodePolyFill - it polyfills 'events' which breaks WalletConnect
+      // plugins: [rollupNodePolyFill()],
     },
   },
 })

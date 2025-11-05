@@ -98,6 +98,45 @@
   min-width: 0;
 }
 
+/* WalletConnect Button in Header */
+.walletconnect-btn {
+  color: #111827 !important;
+}
+
+.walletconnect-btn:hover {
+  background: #f3f4f6 !important;
+  color: #000000 !important;
+}
+
+/* WalletConnect Sidebar Section */
+.sidebar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.connect-dapp-btn {
+  padding: 0.5rem 1rem;
+  background: #768729;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 600;
+  transition: background 0.2s;
+}
+
+.connect-dapp-btn:hover:not(:disabled) {
+  background: #5a6820;
+}
+
+.connect-dapp-btn:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+
 .wallet-detail-screen .wallet-dropdown option {
   font-size: 13px;
   padding: 8px;
