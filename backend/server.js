@@ -187,14 +187,19 @@ app.get('/api/passkeys/:userId', async (req, res) => {
 
     console.log(`🔍 Retrieving passkey for account: ${userId} (owner: ${ownerAddress})`)
 
-    const credential = await getCredential(userId.toLowerCase())
+    const normalizedUserId = userId.toLowerCase()
+    console.log(`🔍 Normalized userId: ${normalizedUserId}`)
+
+    const credential = await getCredential(normalizedUserId)
 
     if (!credential) {
+      console.log(`❌ Credential not found for userId: ${normalizedUserId}`)
       return res.status(404).json({
         error: 'Credential not found',
       })
     }
 
+    console.log(`✅ Credential found for userId: ${normalizedUserId}`)
     res.json({
       success: true,
       credential,

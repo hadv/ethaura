@@ -132,11 +132,19 @@ export async function storeCredential(userId, credential) {
  * @returns {Object|null} Credential data or null if not found
  */
 export async function getCredential(userId) {
+  console.log(`🔍 DB: Querying for userId: ${userId}`)
   const row = await getAsync(`SELECT * FROM passkey_credentials WHERE user_id = ?`, [userId])
 
   if (!row) {
+    console.log(`❌ DB: No row found for userId: ${userId}`)
     return null
   }
+
+  console.log(`✅ DB: Found credential for userId: ${userId}`, {
+    credential_id: row.credential_id,
+    has_public_key_x: !!row.public_key_x,
+    has_public_key_y: !!row.public_key_y,
+  })
 
   return {
     id: row.credential_id,
