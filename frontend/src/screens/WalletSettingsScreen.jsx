@@ -7,7 +7,7 @@ import SubHeader from '../components/SubHeader'
 import { WalletConnectModal } from '../components/WalletConnectModal'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
 import { useNetwork } from '../contexts/NetworkContext'
-import { HiKey, HiUserGroup, HiRefresh } from 'react-icons/hi'
+import { HiKey, HiShieldCheck, HiLockOpen } from 'react-icons/hi'
 import '../styles/WalletSettingsScreen.css'
 
 function WalletSettingsScreen({ wallet, onBack, onHome, onLogout, credential, onWalletChange, onSettings }) {
