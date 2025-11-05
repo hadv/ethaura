@@ -94,6 +94,55 @@ function AppContent() {
     }
   }, [isConnected])
 
+  // Load account-specific credential when wallet is selected
+  useEffect(() => {
+    const loadAccountCredential = async () => {
+      if (!selectedWallet || !isConnected || !address || !signMessage) {
+        return
+      }
+
+      const accountAddress = selectedWallet.address
+      setCredentialLoading(true)
+
+      try {
+        // Try to load from server first
+        console.log(`🔍 Loading passkey credential for account: ${accountAddress}`)
+        const serverCredential = await retrievePasskeyCredential(signMessage, address, accountAddress)
+
+        if (serverCredential) {
+          console.log(`✅ Loaded passkey credential from server for account: ${accountAddress}`)
+          setPasskeyCredential(serverCredential)
+          setCredentialLoading(false)
+          return
+        }
+      } catch (error) {
+        console.log('⚠️  Failed to load from server, trying localStorage:', error.message)
+      }
+
+      // Fallback to localStorage
+      try {
+        const storageKey = `ethaura_passkey_credential_${accountAddress.toLowerCase()}`
+        const stored = localStorage.getItem(storageKey)
+
+        if (stored) {
+          const credential = deserializeCredential(stored)
+          console.log(`✅ Loaded passkey credential from localStorage for account: ${accountAddress}`)
+          setPasskeyCredential(credential)
+        } else {
+          console.log(`ℹ️  No passkey credential found for account: ${accountAddress}`)
+          setPasskeyCredential(null)
+        }
+      } catch (error) {
+        console.error('Failed to load credential from localStorage:', error)
+        setPasskeyCredential(null)
+      }
+
+      setCredentialLoading(false)
+    }
+
+    loadAccountCredential()
+  }, [selectedWallet, isConnected, address, signMessage])
+
   // Save account config to localStorage when it changes
   useEffect(() => {
     if (accountConfig) {
