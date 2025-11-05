@@ -54,8 +54,16 @@ function PasskeySettings({ accountAddress }) {
       const rpcUrl = networkInfo.rpcUrl
       const provider = new ethers.JsonRpcProvider(rpcUrl)
 
+      console.log('🔍 Loading account info:', {
+        accountAddress,
+        network: networkInfo.name,
+        rpcUrl,
+      })
+
       // Check if account is deployed on this network
       const code = await provider.getCode(accountAddress)
+      console.log('🔍 Account code length:', code.length, 'bytes:', code.slice(0, 20) + '...')
+
       if (code === '0x') {
         console.log('⏭️ Account not deployed on this network')
         setAccountInfo({
@@ -68,6 +76,8 @@ function PasskeySettings({ accountAddress }) {
         setError('') // Clear error since this is expected
         return
       }
+
+      console.log('✅ Account is deployed, loading contract data...')
 
       const contract = new ethers.Contract(accountAddress, accountABI, provider)
 
@@ -259,8 +269,10 @@ function PasskeySettings({ accountAddress }) {
 
       setStatus('Passkey update proposed! You must wait 48 hours before it can be executed.')
 
-      // Reload account info to show pending action
-      await loadAccountInfo()
+      // Wait a bit for the transaction to be indexed, then reload account info
+      setTimeout(async () => {
+        await loadAccountInfo()
+      }, 2000) // 2 second delay
 
     } catch (err) {
       console.error('Error proposing passkey update:', err)
