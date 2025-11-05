@@ -82,50 +82,54 @@ export const SessionProposalModal = ({ proposal, accountAddress, chainId, onAppr
         </div>
 
         <div className="modal-body">
-          <div className="dapp-info">
+          {/* dApp Info - Compact */}
+          <div className="dapp-info-compact">
             {proposer.metadata.icons?.[0] && (
-              <img 
-                src={proposer.metadata.icons[0]} 
+              <img
+                src={proposer.metadata.icons[0]}
                 alt={proposer.metadata.name}
-                className="dapp-icon"
+                className="dapp-icon-compact"
               />
             )}
-            <h3>{proposer.metadata.name}</h3>
-            <p className="dapp-url">{proposer.metadata.url}</p>
-            {proposer.metadata.description && (
-              <p className="dapp-description">{proposer.metadata.description}</p>
-            )}
+            <div className="dapp-text">
+              <h3>{proposer.metadata.name}</h3>
+              <p className="dapp-url">{proposer.metadata.url}</p>
+            </div>
           </div>
 
-          <div className="connection-details">
-            <div className="detail-section">
-              <h4>Account</h4>
-              <p className="account-address">{accountAddress}</p>
-            </div>
+          {/* Account - Compact */}
+          <div className="detail-section-compact">
+            <h4>ACCOUNT</h4>
+            <p className="account-address-compact">{accountAddress}</p>
+          </div>
 
-            <div className="detail-section">
-              <h4>Requested Permissions</h4>
-              <ul className="permissions-list">
-                <li>✅ View your wallet address</li>
-                <li>✅ Request transaction signatures</li>
-                <li>✅ Request message signatures</li>
-              </ul>
+          {/* Permissions - Compact inline */}
+          <div className="detail-section-compact">
+            <h4>REQUESTED PERMISSIONS</h4>
+            <div className="permissions-compact">
+              <span className="permission-badge">✅ View address</span>
+              <span className="permission-badge">✅ Sign transactions</span>
+              <span className="permission-badge">✅ Sign messages</span>
             </div>
+          </div>
 
+          {/* Methods and Chains - Combined in one row */}
+          <div className="detail-row">
             {methods.length > 0 && (
-              <div className="detail-section">
-                <h4>Methods</h4>
+              <div className="detail-section-compact">
+                <h4>METHODS</h4>
                 <div className="methods-list">
-                  {methods.map((method, i) => (
+                  {methods.slice(0, 2).map((method, i) => (
                     <span key={i} className="method-tag">{method}</span>
                   ))}
+                  {methods.length > 2 && <span className="method-tag">+{methods.length - 2}</span>}
                 </div>
               </div>
             )}
 
             {chains.length > 0 && (
-              <div className="detail-section">
-                <h4>Chains</h4>
+              <div className="detail-section-compact">
+                <h4>CHAINS</h4>
                 <div className="chains-list">
                   {chains.map((chain, i) => (
                     <span key={i} className="chain-tag">{chain}</span>
@@ -135,21 +139,18 @@ export const SessionProposalModal = ({ proposal, accountAddress, chainId, onAppr
             )}
           </div>
 
+          {/* Warning - Compact */}
+          <div className="warning-box-compact">
+            ⚠️ <strong>Only connect to dApps you trust.</strong> You can reject any request.
+          </div>
+
           {error && (
             <div className="error-message">
               ⚠️ {error}
             </div>
           )}
 
-          <div className="warning-box">
-            <p>⚠️ Only connect to dApps you trust. This will allow the dApp to:</p>
-            <ul>
-              <li>See your wallet address and balance</li>
-              <li>Request you to sign transactions (you can always reject)</li>
-              <li>Request you to sign messages</li>
-            </ul>
-          </div>
-
+          {/* Buttons */}
           <div className="button-group">
             <button
               onClick={handleReject}

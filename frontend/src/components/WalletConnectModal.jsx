@@ -4,7 +4,7 @@ import { SiWalletconnect } from 'react-icons/si'
 import '../styles/WalletConnectModal.css'
 
 export const WalletConnectModal = ({ isOpen, onClose, accountAddress, chainId, buttonRef }) => {
-  const { pair, sessions, disconnectSession } = useWalletConnect()
+  const { pair, sessions, disconnectSession, pendingProposal, approveSession, rejectSession } = useWalletConnect()
   const [uri, setUri] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -51,6 +51,43 @@ export const WalletConnectModal = ({ isOpen, onClose, accountAddress, chainId, b
       await disconnectSession(topic)
     } catch (err) {
       console.error('Failed to disconnect:', err)
+    }
+  }
+
+  const handleApproveSession = async () => {
+    if (!pendingProposal || !accountAddress || !chainId) {
+      console.error('Missing required data for session approval')
+      return
+    }
+
+    setLoading(true)
+    setError('')
+
+    try {
+      await approveSession(pendingProposal, accountAddress, chainId)
+      console.log('✅ Session approved successfully')
+    } catch (err) {
+      console.error('Failed to approve session:', err)
+      setError(err.message || 'Failed to approve session')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleRejectSession = async () => {
+    if (!pendingProposal) {
+      return
+    }
+
+    setLoading(true)
+
+    try {
+      await rejectSession(pendingProposal)
+      console.log('✅ Session rejected successfully')
+    } catch (err) {
+      console.error('Failed to reject session:', err)
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -117,32 +154,143 @@ export const WalletConnectModal = ({ isOpen, onClose, accountAddress, chainId, b
           Paste the pairing code below to connect to your wallet via WalletConnect
         </p>
 
-        {/* Pairing Code Input */}
-        <div className="wc-input-section">
-          <label className="wc-input-label">Pairing code</label>
-          <div className="wc-input-wrapper">
-            <input
-              type="text"
-              value={uri}
-              onChange={(e) => setUri(e.target.value)}
-              placeholder="wc:"
-              className="wc-input"
-              disabled={loading}
-            />
-            <button
-              className="wc-paste-btn"
-              onClick={handlePaste}
-              disabled={loading}
-            >
-              Paste
-            </button>
-          </div>
-          {error && (
-            <div className="wc-error-message">
-              {error}
+        {/* Session Proposal - Show if there's a pending proposal */}
+        {pendingProposal ? (
+          <div className="wc-proposal-section">
+            <h3 className="wc-proposal-title">Connection Request</h3>
+
+            {/* dApp Info */}
+            <div className="wc-proposal-dapp-card">
+              {pendingProposal.params?.proposer?.metadata?.icons?.[0] && (
+                <img
+                  src={pendingProposal.params.proposer.metadata.icons[0]}
+                  alt="dApp icon"
+                  className="wc-proposal-icon"
+                />
+              )}
+              <div className="wc-proposal-dapp-info">
+                <div className="wc-proposal-name">
+                  {pendingProposal.params?.proposer?.metadata?.name || 'Unknown dApp'}
+                </div>
+                <div className="wc-proposal-url">
+                  {pendingProposal.params?.proposer?.metadata?.url || ''}
+                </div>
+              </div>
             </div>
-          )}
-        </div>
+
+            {/* Description */}
+            {pendingProposal.params?.proposer?.metadata?.description && (
+              <p className="wc-proposal-description">
+                {pendingProposal.params.proposer.metadata.description}
+              </p>
+            )}
+
+            {/* Account */}
+            <div className="wc-proposal-detail">
+              <div className="wc-proposal-detail-label">ACCOUNT</div>
+              <div className="wc-proposal-detail-value">{accountAddress}</div>
+            </div>
+
+            {/* Requested Permissions */}
+            <div className="wc-proposal-detail">
+              <div className="wc-proposal-detail-label">REQUESTED PERMISSIONS</div>
+              <div className="wc-proposal-permissions">
+                <div className="wc-proposal-permission">✅ View your wallet address</div>
+                <div className="wc-proposal-permission">✅ Request transaction signatures</div>
+                <div className="wc-proposal-permission">✅ Request message signatures</div>
+              </div>
+            </div>
+
+            {/* Methods */}
+            <div className="wc-proposal-detail">
+              <div className="wc-proposal-detail-label">METHODS</div>
+              <div className="wc-proposal-methods">
+                <span className="wc-proposal-method">eth_sendTransaction</span>
+                <span className="wc-proposal-method">personal_sign</span>
+              </div>
+            </div>
+
+            {/* Chains */}
+            <div className="wc-proposal-detail">
+              <div className="wc-proposal-detail-label">CHAINS</div>
+              <div className="wc-proposal-methods">
+                <span className="wc-proposal-method">eip155:{chainId}</span>
+              </div>
+            </div>
+
+            {/* Warning */}
+            <div className="wc-proposal-warning">
+              <div className="wc-proposal-warning-icon">⚠️</div>
+              <div className="wc-proposal-warning-content">
+                <strong>Only connect to dApps you trust.</strong> This will allow the dApp to:
+                <ul>
+                  <li>See your wallet address and balance</li>
+                  <li>Request you to sign transactions (you can always reject)</li>
+                  <li>Request you to sign messages</li>
+                </ul>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="wc-proposal-actions">
+              <button
+                className="wc-reject-btn"
+                onClick={handleRejectSession}
+                disabled={loading}
+              >
+                Reject
+              </button>
+              <button
+                className="wc-approve-btn"
+                onClick={handleApproveSession}
+                disabled={loading}
+              >
+                {loading ? 'Approving...' : 'Connect'}
+              </button>
+            </div>
+          </div>
+        ) : (
+          /* Pairing Code Input - Show only if no pending proposal */
+          <form onSubmit={(e) => { e.preventDefault(); handlePair(); }} className="wc-input-section">
+            <label className="wc-input-label">Pairing code</label>
+            <div className="wc-input-wrapper">
+              <input
+                type="text"
+                value={uri}
+                onChange={(e) => setUri(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handlePair();
+                  }
+                }}
+                placeholder="wc:"
+                className="wc-input"
+                disabled={loading}
+              />
+              <button
+                type="button"
+                className="wc-paste-btn"
+                onClick={handlePaste}
+                disabled={loading}
+              >
+                Paste
+              </button>
+            </div>
+            {error && (
+              <div className="wc-error-message">
+                {error}
+              </div>
+            )}
+            <button
+              type="submit"
+              className="wc-connect-btn"
+              disabled={loading || !uri.trim()}
+            >
+              {loading ? 'Connecting...' : 'Connect'}
+            </button>
+          </form>
+        )}
 
         {/* Connected dApps Section */}
         {activeSessions.length > 0 ? (

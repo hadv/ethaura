@@ -1,7 +1,6 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react'
-import { Core } from '@walletconnect/core'
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
 import { Web3Wallet } from '@walletconnect/web3wallet'
-import { buildApprovedNamespaces, getSdkError } from '@walletconnect/utils'
+import { Core } from '@walletconnect/core'
 
 const WalletConnectContext = createContext()
 
@@ -16,18 +15,23 @@ export const useWalletConnect = () => {
 export const WalletConnectProvider = ({ children }) => {
   const [web3wallet, setWeb3wallet] = useState(null)
   const [isInitialized, setIsInitialized] = useState(false)
-  const [isInitializing, setIsInitializing] = useState(false)
   const [sessions, setSessions] = useState([])
   const [pendingProposal, setPendingProposal] = useState(null)
   const [pendingRequest, setPendingRequest] = useState(null)
   const [error, setError] = useState(null)
+  const initializingRef = useRef(false)
+  const initializedRef = useRef(false)
 
   // Initialize WalletConnect
   useEffect(() => {
     const initWalletConnect = async () => {
-      if (isInitialized || isInitializing) return
+      // Use ref to prevent multiple initializations
+      if (initializedRef.current || initializingRef.current) {
+        console.log('⏭️ WalletConnect already initialized or initializing, skipping...')
+        return
+      }
 
-      setIsInitializing(true)
+      initializingRef.current = true
       setError(null)
 
       try {
@@ -39,17 +43,16 @@ export const WalletConnectProvider = ({ children }) => {
         if (!projectId || projectId === 'YOUR_PROJECT_ID') {
           console.warn('⚠️ WalletConnect Project ID not set. Skipping WalletConnect initialization.')
           console.warn('⚠️ Get your project ID from https://cloud.walletconnect.com')
-          setIsInitializing(false)
+          initializingRef.current = false
           return
         }
 
-        // Initialize Core
+        // Initialize Core first
         const core = new Core({
           projectId,
-          relayUrl: 'wss://relay.walletconnect.com',
         })
 
-        // Initialize Web3Wallet
+        // Initialize Web3Wallet with Core
         const wallet = await Web3Wallet.init({
           core,
           metadata: {
@@ -75,7 +78,9 @@ export const WalletConnectProvider = ({ children }) => {
 
         wallet.on('session_delete', ({ topic }) => {
           console.log('🗑️ Session deleted:', topic)
-          setSessions((prev) => prev.filter((s) => s.topic !== topic))
+          // Update sessions list
+          const activeSessions = wallet.getActiveSessions()
+          setSessions(Object.values(activeSessions))
         })
 
         // Load existing sessions
@@ -86,16 +91,24 @@ export const WalletConnectProvider = ({ children }) => {
 
         setWeb3wallet(wallet)
         setIsInitialized(true)
+        initializedRef.current = true
       } catch (err) {
         console.error('❌ Failed to initialize WalletConnect:', err)
+        console.error('Error details:', {
+          message: err.message,
+          stack: err.stack,
+          name: err.name
+        })
         setError(err.message || 'Failed to initialize WalletConnect')
+        initializingRef.current = false
       } finally {
-        setIsInitializing(false)
+        initializingRef.current = false
       }
     }
 
     initWalletConnect()
-  }, [isInitialized, isInitializing])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // Pair with a dApp using URI
   const pair = useCallback(async (uri) => {
@@ -105,7 +118,10 @@ export const WalletConnectProvider = ({ children }) => {
 
     try {
       console.log('🔗 Pairing with URI:', uri)
+
+      // Use core.pairing.pair instead of web3wallet.pair to avoid event listener issues
       await web3wallet.core.pairing.pair({ uri })
+
       console.log('✅ Pairing successful')
     } catch (err) {
       console.error('❌ Pairing failed:', err)
@@ -127,27 +143,23 @@ export const WalletConnectProvider = ({ children }) => {
       })
 
       const { id, params } = proposal
-      const { requiredNamespaces, optionalNamespaces } = params
 
-      // Build namespaces with the account address
-      const namespaces = buildApprovedNamespaces({
-        proposal: params,
-        supportedNamespaces: {
-          eip155: {
-            chains: [`eip155:${chainId}`],
-            methods: [
-              'eth_sendTransaction',
-              'eth_signTransaction',
-              'eth_sign',
-              'personal_sign',
-              'eth_signTypedData',
-              'eth_signTypedData_v4',
-            ],
-            events: ['chainChanged', 'accountsChanged'],
-            accounts: [`eip155:${chainId}:${accountAddress}`],
-          },
+      // Build namespaces manually
+      const namespaces = {
+        eip155: {
+          chains: [`eip155:${chainId}`],
+          methods: [
+            'eth_sendTransaction',
+            'eth_signTransaction',
+            'eth_sign',
+            'personal_sign',
+            'eth_signTypedData',
+            'eth_signTypedData_v4',
+          ],
+          events: ['chainChanged', 'accountsChanged'],
+          accounts: [`eip155:${chainId}:${accountAddress}`],
         },
-      })
+      }
 
       console.log('📋 Approved namespaces:', namespaces)
 
@@ -183,7 +195,10 @@ export const WalletConnectProvider = ({ children }) => {
 
       await web3wallet.rejectSession({
         id: proposal.id,
-        reason: getSdkError('USER_REJECTED'),
+        reason: {
+          code: 5000,
+          message: 'User rejected',
+        },
       })
 
       console.log('✅ Session rejected')
@@ -231,7 +246,10 @@ export const WalletConnectProvider = ({ children }) => {
 
       await web3wallet.disconnectSession({
         topic,
-        reason: getSdkError('USER_DISCONNECTED'),
+        reason: {
+          code: 6000,
+          message: 'User disconnected',
+        },
       })
 
       console.log('✅ Session disconnected')
@@ -258,7 +276,6 @@ export const WalletConnectProvider = ({ children }) => {
   const value = {
     web3wallet,
     isInitialized,
-    isInitializing,
     sessions,
     pendingProposal,
     pendingRequest,
