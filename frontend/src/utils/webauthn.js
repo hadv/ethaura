@@ -110,6 +110,18 @@ export async function signWithPasskey(credential, message) {
     credentialIdBytes = new Uint8Array(credentialId)
   } else if (Array.isArray(credentialId)) {
     credentialIdBytes = new Uint8Array(credentialId)
+  } else if (typeof credentialId === 'string') {
+    // Handle base64-encoded string (from server/localStorage)
+    try {
+      const binaryString = atob(credentialId)
+      credentialIdBytes = new Uint8Array(binaryString.length)
+      for (let i = 0; i < binaryString.length; i++) {
+        credentialIdBytes[i] = binaryString.charCodeAt(i)
+      }
+    } catch (error) {
+      console.error('❌ Failed to decode base64 credential ID:', error)
+      throw new Error('Invalid credential ID format')
+    }
   } else {
     credentialIdBytes = credentialId
   }

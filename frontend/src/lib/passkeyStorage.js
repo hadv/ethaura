@@ -6,6 +6,27 @@
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001'
 
 /**
+ * Deserialize a credential from JSON string or object
+ * Converts base64-encoded strings back to proper format
+ * @param {string|Object} data - Serialized credential (JSON string or object)
+ * @returns {Object} Deserialized credential
+ */
+export function deserializeCredential(data) {
+  try {
+    // Parse if it's a string
+    const credential = typeof data === 'string' ? JSON.parse(data) : data
+
+    // The credential is already in the correct format (base64 strings)
+    // We don't need to convert back to ArrayBuffers here because
+    // the signing functions will handle the conversion when needed
+    return credential
+  } catch (error) {
+    console.error('❌ Error deserializing credential:', error)
+    throw error
+  }
+}
+
+/**
  * Create authentication signature for API requests
  * @param {Function} signMessageFn - Sign message function from Web3Auth context
  * @param {string} ownerAddress - Owner address (Web3Auth social login address)
