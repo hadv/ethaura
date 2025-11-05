@@ -270,10 +270,21 @@ function PasskeySettings({ accountAddress }) {
         },
       }
 
+      // Serialize credential for storage (convert ArrayBuffers to base64)
+      const serializedCredential = {
+        id: credentialInfo.id,
+        rawId: btoa(String.fromCharCode(...new Uint8Array(credentialInfo.rawId))),
+        publicKey: credentialInfo.publicKey,
+        response: {
+          attestationObject: btoa(String.fromCharCode(...new Uint8Array(credentialInfo.response.attestationObject))),
+          clientDataJSON: btoa(String.fromCharCode(...new Uint8Array(credentialInfo.response.clientDataJSON))),
+        },
+      }
+
       // Save to server (account-specific)
       try {
         if (signMessage && ownerAddress && accountAddress) {
-          await storePasskeyCredential(signMessage, ownerAddress, accountAddress, credentialInfo)
+          await storePasskeyCredential(signMessage, ownerAddress, accountAddress, serializedCredential)
           console.log(`✅ Passkey credential saved to server for account: ${accountAddress}`)
         }
       } catch (serverError) {
@@ -283,15 +294,7 @@ function PasskeySettings({ accountAddress }) {
 
       // Save to localStorage as backup (account-specific key)
       const storageKey = `ethaura_passkey_credential_${accountAddress.toLowerCase()}`
-      localStorage.setItem(storageKey, JSON.stringify({
-        id: credentialInfo.id,
-        rawId: btoa(String.fromCharCode(...new Uint8Array(credentialInfo.rawId))),
-        publicKey: credentialInfo.publicKey,
-        response: {
-          attestationObject: btoa(String.fromCharCode(...new Uint8Array(credentialInfo.response.attestationObject))),
-          clientDataJSON: btoa(String.fromCharCode(...new Uint8Array(credentialInfo.response.clientDataJSON))),
-        },
-      }))
+      localStorage.setItem(storageKey, JSON.stringify(serializedCredential))
       console.log(`✅ Passkey credential saved to localStorage for account: ${accountAddress}`)
 
       setNewPasskey(publicKey)
