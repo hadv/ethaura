@@ -120,8 +120,40 @@ function TransactionSender({ accountAddress, credential, accountConfig, onSignat
                 y: passkeyPublicKey.y?.slice(0, 20) + '...',
               })
             } else {
-              console.warn('❌ No credential.publicKey found! Account will deploy in OWNER-ONLY mode')
-              if (accountConfig && accountConfig.hasPasskey) {
+              console.warn('❌ No credential.publicKey found in props!')
+
+              // FALLBACK: Try to load credential from localStorage directly
+              // This handles the case where App.jsx didn't load the credential
+              // (e.g., navigating directly from Settings to Send)
+              console.log('🔄 Attempting to load credential from localStorage as fallback...')
+              try {
+                const { retrievePasskeyCredential } = await import('../lib/passkeyStorage.js')
+                const storageKey = `ethaura_passkey_credential_${accountAddress.toLowerCase()}`
+                const stored = localStorage.getItem(storageKey)
+
+                if (stored) {
+                  console.log('📦 Found credential in localStorage!')
+                  const { deserializeCredential } = await import('../lib/passkeyStorage.js')
+                  const loadedCredential = deserializeCredential(stored)
+
+                  if (loadedCredential?.publicKey) {
+                    passkeyPublicKey = loadedCredential.publicKey
+                    console.log('✅ Successfully loaded passkey from localStorage fallback:', {
+                      x: passkeyPublicKey.x?.slice(0, 20) + '...',
+                      y: passkeyPublicKey.y?.slice(0, 20) + '...',
+                    })
+                  } else {
+                    console.warn('⚠️  Credential loaded but has no publicKey')
+                  }
+                } else {
+                  console.log('❌ No credential found in localStorage')
+                  console.log('Account will deploy in OWNER-ONLY mode')
+                }
+              } catch (err) {
+                console.error('❌ Failed to load credential from localStorage:', err)
+              }
+
+              if (accountConfig && accountConfig.hasPasskey && !passkeyPublicKey) {
                 console.warn('⚠️  accountConfig says hasPasskey but no credential loaded!')
               }
             }
