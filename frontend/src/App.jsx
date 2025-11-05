@@ -98,42 +98,67 @@ function AppContent() {
   useEffect(() => {
     const loadAccountCredential = async () => {
       if (!selectedWallet || !isConnected || !address || !signMessage) {
+        console.log('⏭️ Skipping credential load:', {
+          hasSelectedWallet: !!selectedWallet,
+          isConnected,
+          hasAddress: !!address,
+          hasSignMessage: !!signMessage,
+        })
         return
       }
 
       const accountAddress = selectedWallet.address
+      console.log(`🔍 Loading passkey credential for account: ${accountAddress}`)
       setCredentialLoading(true)
 
       try {
         // Try to load from server first
-        console.log(`🔍 Loading passkey credential for account: ${accountAddress}`)
+        console.log(`📡 Attempting to load from server...`)
         const serverCredential = await retrievePasskeyCredential(signMessage, address, accountAddress)
 
         if (serverCredential) {
           console.log(`✅ Loaded passkey credential from server for account: ${accountAddress}`)
+          console.log(`🔑 Credential details:`, {
+            id: serverCredential.id,
+            hasPublicKey: !!serverCredential.publicKey,
+            publicKeyX: serverCredential.publicKey?.x?.slice(0, 20) + '...',
+            publicKeyY: serverCredential.publicKey?.y?.slice(0, 20) + '...',
+          })
           setPasskeyCredential(serverCredential)
           setCredentialLoading(false)
           return
+        } else {
+          console.log('⚠️  Server returned null/undefined credential')
         }
       } catch (error) {
         console.log('⚠️  Failed to load from server, trying localStorage:', error.message)
+        console.error('Server error details:', error)
       }
 
       // Fallback to localStorage
       try {
         const storageKey = `ethaura_passkey_credential_${accountAddress.toLowerCase()}`
+        console.log(`💾 Checking localStorage with key: ${storageKey}`)
         const stored = localStorage.getItem(storageKey)
 
         if (stored) {
+          console.log(`📦 Found stored credential in localStorage (${stored.length} chars)`)
           const credential = deserializeCredential(stored)
           console.log(`✅ Loaded passkey credential from localStorage for account: ${accountAddress}`)
+          console.log(`🔑 Credential details:`, {
+            id: credential.id,
+            hasPublicKey: !!credential.publicKey,
+            publicKeyX: credential.publicKey?.x?.slice(0, 20) + '...',
+            publicKeyY: credential.publicKey?.y?.slice(0, 20) + '...',
+          })
           setPasskeyCredential(credential)
         } else {
-          console.log(`ℹ️  No passkey credential found for account: ${accountAddress}`)
+          console.log(`❌ No passkey credential found in localStorage for account: ${accountAddress}`)
+          console.log(`🔍 All localStorage keys:`, Object.keys(localStorage).filter(k => k.includes('passkey')))
           setPasskeyCredential(null)
         }
       } catch (error) {
-        console.error('Failed to load credential from localStorage:', error)
+        console.error('❌ Failed to load credential from localStorage:', error)
         setPasskeyCredential(null)
       }
 

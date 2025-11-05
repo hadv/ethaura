@@ -153,6 +153,39 @@ function PasskeySettings({ accountAddress }) {
     }
   }
 
+  // Propose the stored passkey to the on-chain contract
+  const proposeStoredPasskey = async () => {
+    if (!storedCredential?.publicKey) {
+      setError('No stored passkey found')
+      return
+    }
+
+    if (!web3AuthProvider || !ownerAddress) {
+      setError('Please connect your wallet')
+      return
+    }
+
+    setLoading(true)
+    setError('')
+    setStatus('Proposing stored passkey to smart contract...')
+
+    try {
+      const publicKey = storedCredential.publicKey
+      console.log('📤 Proposing stored passkey:', publicKey)
+
+      await proposePasskeyUpdate(publicKey)
+
+      setStatus('✅ Passkey proposal submitted! Wait 48 hours, then execute the update.')
+      await loadStoredCredential()
+      await loadAccountInfo()
+    } catch (err) {
+      console.error('Failed to propose stored passkey:', err)
+      setError(err.message || 'Failed to propose passkey update')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const createPasskey = async () => {
     setLoading(true)
     setError('')
@@ -380,9 +413,13 @@ function PasskeySettings({ accountAddress }) {
 
     // Check if passkey exists on-chain
     if (enable && !accountInfo?.hasPasskey) {
-      if (storedCredential) {
-        // Passkey is stored but not active on-chain yet
-        setError('⚠️ Your passkey is stored but not active on-chain yet. Please wait for the 48-hour timelock to complete, then execute the passkey update before enabling 2FA.')
+      if (storedCredential && pendingActions.length > 0) {
+        // Passkey is stored and there's a pending update
+        setError('⚠️ Your passkey update is pending. Please wait for the 48-hour timelock to complete, then execute the passkey update before enabling 2FA.')
+      } else if (storedCredential) {
+        // Passkey is stored but account was deployed without it
+        // This shouldn't happen with the new flow, but handle it gracefully
+        setError('⚠️ Your passkey is stored but the account was deployed without it. Please propose a passkey update first (it will take 48 hours).')
       } else {
         setError('You must add a passkey before enabling 2FA')
       }
@@ -451,8 +488,8 @@ function PasskeySettings({ accountAddress }) {
             </div>
           ) : (
             <>
-              {/* Only show 2FA section for deployed accounts */}
-              {accountInfo?.isDeployed && (
+              {/* Only show 2FA section for deployed accounts with active passkey */}
+              {accountInfo?.isDeployed && accountInfo?.hasPasskey && (
                 <div className="settings-section">
                   <h3>Two-Factor Authentication</h3>
                   <p className="section-description">
@@ -467,6 +504,19 @@ function PasskeySettings({ accountAddress }) {
                   >
                     {accountInfo.twoFactorEnabled ? 'Disable 2FA' : 'Enable 2FA'}
                   </button>
+                </div>
+              )}
+
+              {/* Show message if deployed but passkey not active yet */}
+              {accountInfo?.isDeployed && !accountInfo?.hasPasskey && storedCredential && (
+                <div className="settings-section">
+                  <h3>Two-Factor Authentication</h3>
+                  <p className="section-description">
+                    ⏳ Your passkey is stored but not active on-chain yet.
+                    {pendingActions.length > 0
+                      ? ' Please wait for the 48-hour timelock to complete, then execute the passkey update. After that, you can enable 2FA.'
+                      : ' The account was deployed without a passkey. Please create a passkey update proposal (48-hour timelock required).'}
+                  </p>
                 </div>
               )}
 
