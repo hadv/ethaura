@@ -431,21 +431,28 @@ function PasskeySettings({ accountAddress }) {
     setStatus(enable ? 'Enabling 2FA...' : 'Disabling 2FA...')
 
     try {
-      // Create ethers provider from Web3Auth provider
-      const ethersProvider = new ethers.BrowserProvider(web3AuthProvider)
-      const signer = await ethersProvider.getSigner()
-      const contract = new ethers.Contract(accountAddress, accountABI, signer)
+      // IMPORTANT: enableTwoFactor() and disableTwoFactor() can only be called via UserOperation
+      // They cannot be called directly from an EOA (even the owner)
+      // This is a security feature to ensure all account modifications go through the EntryPoint
 
-      const tx = enable ? await contract.enableTwoFactor() : await contract.disableTwoFactor()
-      setStatus('Transaction submitted. Waiting for confirmation...')
+      setError(`⚠️ 2FA toggle must be done through a UserOperation, not a direct transaction.
 
-      const receipt = await tx.wait()
-      console.log('✅ 2FA toggle transaction confirmed:', receipt.hash)
+This feature requires integration with the transaction sender to:
+1. Build a UserOperation that calls ${enable ? 'enableTwoFactor()' : 'disableTwoFactor()'}
+2. Sign it with your ${accountInfo.twoFactorEnabled ? 'passkey + owner' : 'passkey or owner'}
+3. Send it through the bundler
 
-      setStatus(enable ? '2FA enabled successfully!' : '2FA disabled successfully!')
+For now, please use the contract directly on Etherscan or wait for this feature to be implemented in the UI.`)
 
-      // Reload account info
-      await loadAccountInfo()
+      setLoading(false)
+      return
+
+      // TODO: Implement UserOperation-based 2FA toggle
+      // const callData = contract.interface.encodeFunctionData(enable ? 'enableTwoFactor' : 'disableTwoFactor')
+      // const userOp = await buildUserOperation(accountAddress, accountAddress, 0, callData)
+      // const signedUserOp = await signUserOperation(userOp, credential, ownerSigner)
+      // const txHash = await bundlerClient.sendUserOperation(signedUserOp)
+      // await bundlerClient.waitForUserOperationReceipt(txHash)
 
     } catch (err) {
       console.error('Error toggling 2FA:', err)
