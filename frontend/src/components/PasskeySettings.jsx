@@ -3,6 +3,7 @@ import { parsePublicKey } from '../utils/webauthn'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
 import { ethers } from 'ethers'
 import { NETWORKS } from '../lib/constants'
+import '../styles/PasskeySettings.css'
 
 function PasskeySettings({ accountAddress }) {
   const { address: ownerAddress, provider: web3AuthProvider } = useWeb3Auth()
@@ -285,107 +286,108 @@ function PasskeySettings({ accountAddress }) {
   }
 
   return (
-    <div className="card">
-      {accountInfo.hasPasskey ? (
-        <div className="status status-success mb-4">
-          ✅ Passkey is configured for this account
+    <div className="passkey-settings">
+      <div className="passkey-layout">
+        {/* Main Content - Left Column */}
+        <div className="passkey-main">
+          {/* Add/Manage Passkey */}
+          {!accountInfo.hasPasskey ? (
+            <div className="settings-section">
+              <h3>Add Passkey</h3>
+              <p className="section-description">
+                Add a passkey for biometric authentication (Touch ID, Face ID, Windows Hello).
+                This will require a 48-hour timelock before the passkey becomes active.
+              </p>
+              <button
+                className="btn btn-primary"
+                onClick={createPasskey}
+                disabled={loading || !ownerAddress}
+              >
+                {loading ? 'Creating...' : 'Create & Propose Passkey'}
+              </button>
+            </div>
+          ) : (
+            <div className="settings-section">
+              <h3>Two-Factor Authentication</h3>
+              <p className="section-description">
+                {accountInfo.twoFactorEnabled
+                  ? 'All transactions require both passkey and social login signatures. This provides maximum security for your account.'
+                  : 'Enable 2FA to require both passkey and social login for all transactions. This adds an extra layer of security.'}
+              </p>
+              <button
+                className={`btn ${accountInfo.twoFactorEnabled ? 'btn-danger' : 'btn-success'}`}
+                onClick={() => toggle2FA(!accountInfo.twoFactorEnabled)}
+                disabled={loading}
+              >
+                {accountInfo.twoFactorEnabled ? 'Disable 2FA' : 'Enable 2FA'}
+              </button>
+            </div>
+          )}
+
+          {/* Status Messages */}
+          {status && <div className="status-message success">{status}</div>}
+          {error && <div className="status-message error">❌ {error}</div>}
         </div>
-      ) : (
-        <div className="status status-info mb-4">
-          ℹ️ No passkey configured. Add one for enhanced security!
-        </div>
-      )}
 
-      <div className="status status-info mb-4">
-        <strong>2FA Status:</strong> {accountInfo.twoFactorEnabled ? '🔒 Enabled' : '🔓 Disabled'}
-      </div>
-
-      {!accountInfo.hasPasskey && (
-        <div className="mb-4">
-          <h4>Add Passkey</h4>
-          <p className="text-sm mb-3">
-            Add a passkey for biometric authentication (Touch ID, Face ID, Windows Hello).
-            This will require a 48-hour timelock before the passkey becomes active.
-          </p>
-          <button
-            className="button button-primary"
-            onClick={createPasskey}
-            disabled={loading || !ownerAddress}
-            style={{ width: '100%' }}
-          >
-            {loading ? 'Creating...' : '🔑 Create & Propose Passkey'}
-          </button>
-        </div>
-      )}
-
-      {pendingActions.length > 0 && (
-        <div className="mb-4">
-          <h4>Pending Passkey Updates</h4>
-          {pendingActions.map((action, index) => {
-            const now = Math.floor(Date.now() / 1000)
-            const canExecute = now >= action.executeAfter
-            const timeRemaining = action.executeAfter - now
-
-            return (
-              <div key={index} className="status status-warning mb-3">
-                <p className="text-sm mb-2">
-                  <strong>Pending Update #{index + 1}</strong>
-                </p>
-                <p className="text-xs mb-2">
-                  Action Hash: {action.actionHash.slice(0, 10)}...{action.actionHash.slice(-8)}
-                </p>
-                {canExecute ? (
-                  <button
-                    className="button button-success"
-                    onClick={() => executePasskeyUpdate(action.actionHash)}
-                    disabled={loading}
-                  >
-                    ✅ Execute Update Now
-                  </button>
-                ) : (
-                  <p className="text-xs">
-                    ⏳ Can be executed in: {Math.floor(timeRemaining / 3600)} hours
-                  </p>
-                )}
+        {/* Sidebar - Right Column */}
+        <div className="passkey-sidebar">
+          {/* Passkey Status */}
+          <div className="status-box">
+            <h3>Passkey Status</h3>
+            <div className="status-grid">
+              <div className="status-item">
+                <span className="status-label">Passkey Configured</span>
+                <span className={`status-badge ${accountInfo.hasPasskey ? 'badge-success' : 'badge-warning'}`}>
+                  {accountInfo.hasPasskey ? 'Yes' : 'No'}
+                </span>
               </div>
-            )
-          })}
-        </div>
-      )}
+              <div className="status-item">
+                <span className="status-label">2FA Status</span>
+                <span className={`status-badge ${accountInfo.twoFactorEnabled ? 'badge-success' : 'badge-neutral'}`}>
+                  {accountInfo.twoFactorEnabled ? 'Enabled' : 'Disabled'}
+                </span>
+              </div>
+            </div>
+          </div>
 
-      {accountInfo.hasPasskey && (
-        <div className="mb-4">
-          <h4>Two-Factor Authentication</h4>
-          <p className="text-sm mb-3">
-            {accountInfo.twoFactorEnabled
-              ? 'All transactions require both passkey and social login signatures.'
-              : 'Enable 2FA to require both passkey and social login for all transactions.'}
-          </p>
-          <button
-            className="button"
-            onClick={() => toggle2FA(!accountInfo.twoFactorEnabled)}
-            disabled={loading}
-            style={{
-              width: '100%',
-              backgroundColor: accountInfo.twoFactorEnabled ? '#ef4444' : '#10b981',
-            }}
-          >
-            {accountInfo.twoFactorEnabled ? '🔓 Disable 2FA' : '🔒 Enable 2FA'}
-          </button>
-        </div>
-      )}
+          {/* Pending Passkey Updates */}
+          {pendingActions.length > 0 && (
+            <div className="settings-section">
+              <h3>Pending Updates ({pendingActions.length})</h3>
+              <div className="pending-actions-list">
+                {pendingActions.map((action, index) => {
+                  const now = Math.floor(Date.now() / 1000)
+                  const canExecute = now >= action.executeAfter
+                  const timeRemaining = action.executeAfter - now
 
-      {status && !error && (
-        <div className="status status-info mt-4">
-          {status}
+                  return (
+                    <div key={index} className="pending-action-card">
+                      <h4>Pending Update #{index + 1}</h4>
+                      <p className="small-text">
+                        Action Hash: {action.actionHash.slice(0, 10)}...{action.actionHash.slice(-8)}
+                      </p>
+                      {canExecute ? (
+                        <button
+                          className="btn btn-success"
+                          onClick={() => executePasskeyUpdate(action.actionHash)}
+                          disabled={loading}
+                          style={{ marginTop: '8px' }}
+                        >
+                          Execute Update Now
+                        </button>
+                      ) : (
+                        <p className="small-text" style={{ marginTop: '8px' }}>
+                          ⏳ Can be executed in: {Math.floor(timeRemaining / 3600)} hours
+                        </p>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
         </div>
-      )}
-
-      {error && (
-        <div className="status status-error mt-4">
-          ❌ {error}
-        </div>
-      )}
+      </div>
     </div>
   )
 }
