@@ -97,21 +97,21 @@ function AppContent() {
   // Load account-specific credential when wallet is selected
   useEffect(() => {
     const loadAccountCredential = async () => {
-      if (!selectedWallet || !isConnected || !address || !signMessage) {
-        console.log('⏭️ Skipping credential load:', {
-          hasSelectedWallet: !!selectedWallet,
-          isConnected,
-          hasAddress: !!address,
-          hasSignMessage: !!signMessage,
-        })
-        return
-      }
-
-      const accountAddress = selectedWallet.address
-      console.log(`🔍 Loading passkey credential for account: ${accountAddress}`)
-      setCredentialLoading(true)
-
       try {
+        if (!selectedWallet || !isConnected || !address || !signMessage) {
+          console.log('⏭️ Skipping credential load:', {
+            hasSelectedWallet: !!selectedWallet,
+            isConnected,
+            hasAddress: !!address,
+            hasSignMessage: !!signMessage,
+          })
+          return
+        }
+
+        const accountAddress = selectedWallet.address
+        console.log(`🔍 Loading passkey credential for account: ${accountAddress}`)
+        setCredentialLoading(true)
+
         // Try to load from server first
         console.log(`📡 Attempting to load from server...`)
         const serverCredential = await retrievePasskeyCredential(signMessage, address, accountAddress)
@@ -130,13 +130,8 @@ function AppContent() {
         } else {
           console.log('⚠️  Server returned null/undefined credential')
         }
-      } catch (error) {
-        console.log('⚠️  Failed to load from server, trying localStorage:', error.message)
-        console.error('Server error details:', error)
-      }
 
-      // Fallback to localStorage
-      try {
+        // Fallback to localStorage
         const storageKey = `ethaura_passkey_credential_${accountAddress.toLowerCase()}`
         console.log(`💾 Checking localStorage with key: ${storageKey}`)
         const stored = localStorage.getItem(storageKey)
@@ -157,12 +152,14 @@ function AppContent() {
           console.log(`🔍 All localStorage keys:`, Object.keys(localStorage).filter(k => k.includes('passkey')))
           setPasskeyCredential(null)
         }
-      } catch (error) {
-        console.error('❌ Failed to load credential from localStorage:', error)
-        setPasskeyCredential(null)
-      }
 
-      setCredentialLoading(false)
+        setCredentialLoading(false)
+      } catch (error) {
+        console.error('❌ FATAL ERROR loading credential:', error)
+        console.error('Error stack:', error.stack)
+        setPasskeyCredential(null)
+        setCredentialLoading(false)
+      }
     }
 
     loadAccountCredential()
