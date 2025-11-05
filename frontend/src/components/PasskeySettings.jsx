@@ -4,10 +4,11 @@ import { useWeb3Auth } from '../contexts/Web3AuthContext'
 import { useNetwork } from '../contexts/NetworkContext'
 import { ethers } from 'ethers'
 import { NETWORKS } from '../lib/constants'
+import { storePasskeyCredential, retrievePasskeyCredential } from '../lib/passkeyStorage'
 import '../styles/PasskeySettings.css'
 
 function PasskeySettings({ accountAddress }) {
-  const { address: ownerAddress, provider: web3AuthProvider } = useWeb3Auth()
+  const { address: ownerAddress, provider: web3AuthProvider, signMessage } = useWeb3Auth()
   const { networkInfo } = useNetwork()
   const [status, setStatus] = useState('')
   const [error, setError] = useState('')
@@ -15,6 +16,7 @@ function PasskeySettings({ accountAddress }) {
   const [accountInfo, setAccountInfo] = useState(null)
   const [pendingActions, setPendingActions] = useState([])
   const [newPasskey, setNewPasskey] = useState(null)
+  const [storedCredential, setStoredCredential] = useState(null) // Passkey from server/localStorage
 
   // P256Account ABI (minimal for what we need)
   const accountABI = [
@@ -34,13 +36,45 @@ function PasskeySettings({ accountAddress }) {
     setAccountInfo(null)
     setPendingActions([])
     setNewPasskey(null)
+    setStoredCredential(null)
     setError('')
     setStatus('')
     setLoading(false)
 
     // Load new data
     loadAccountInfo()
+    loadStoredCredential()
   }, [accountAddress, web3AuthProvider, networkInfo.chainId])
+
+  // Load stored credential from server/localStorage
+  const loadStoredCredential = async () => {
+    if (!accountAddress || !ownerAddress || !signMessage) return
+
+    try {
+      // Try to load from server first
+      const credential = await retrievePasskeyCredential(signMessage, ownerAddress, accountAddress)
+      if (credential) {
+        console.log('✅ Loaded passkey credential from server for account:', accountAddress)
+        setStoredCredential(credential)
+        return
+      }
+    } catch (error) {
+      console.log('⚠️ Failed to load from server, trying localStorage:', error.message)
+    }
+
+    // Fallback to localStorage
+    try {
+      const storageKey = `ethaura_passkey_credential_${accountAddress.toLowerCase()}`
+      const stored = localStorage.getItem(storageKey)
+      if (stored) {
+        const credential = JSON.parse(stored)
+        console.log('✅ Loaded passkey credential from localStorage for account:', accountAddress)
+        setStoredCredential(credential)
+      }
+    } catch (error) {
+      console.error('Failed to load credential from localStorage:', error)
+    }
+  }
 
   const loadAccountInfo = async () => {
     if (!accountAddress) return
@@ -53,8 +87,16 @@ function PasskeySettings({ accountAddress }) {
       const rpcUrl = networkInfo.rpcUrl
       const provider = new ethers.JsonRpcProvider(rpcUrl)
 
+      console.log('🔍 Loading account info:', {
+        accountAddress,
+        network: networkInfo.name,
+        rpcUrl,
+      })
+
       // Check if account is deployed on this network
       const code = await provider.getCode(accountAddress)
+      console.log('🔍 Account code length:', code.length, 'bytes:', code.slice(0, 20) + '...')
+
       if (code === '0x') {
         console.log('⏭️ Account not deployed on this network')
         setAccountInfo({
@@ -62,11 +104,14 @@ function PasskeySettings({ accountAddress }) {
           qx: ethers.ZeroHash,
           qy: ethers.ZeroHash,
           twoFactorEnabled: false,
+          isDeployed: false, // Track deployment status
         })
         setPendingActions([])
         setError('') // Clear error since this is expected
         return
       }
+
+      console.log('✅ Account is deployed, loading contract data...')
 
       const contract = new ethers.Contract(accountAddress, accountABI, provider)
 
@@ -84,6 +129,7 @@ function PasskeySettings({ accountAddress }) {
         qx,
         qy,
         twoFactorEnabled,
+        isDeployed: true, // Track deployment status
       })
 
       // Parse pending actions
@@ -107,6 +153,39 @@ function PasskeySettings({ accountAddress }) {
     }
   }
 
+  // Propose the stored passkey to the on-chain contract
+  const proposeStoredPasskey = async () => {
+    if (!storedCredential?.publicKey) {
+      setError('No stored passkey found')
+      return
+    }
+
+    if (!web3AuthProvider || !ownerAddress) {
+      setError('Please connect your wallet')
+      return
+    }
+
+    setLoading(true)
+    setError('')
+    setStatus('Proposing stored passkey to smart contract...')
+
+    try {
+      const publicKey = storedCredential.publicKey
+      console.log('📤 Proposing stored passkey:', publicKey)
+
+      await proposePasskeyUpdate(publicKey)
+
+      setStatus('✅ Passkey proposal submitted! Wait 48 hours, then execute the update.')
+      await loadStoredCredential()
+      await loadAccountInfo()
+    } catch (err) {
+      console.error('Failed to propose stored passkey:', err)
+      setError(err.message || 'Failed to propose passkey update')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const createPasskey = async () => {
     setLoading(true)
     setError('')
@@ -122,9 +201,10 @@ function PasskeySettings({ accountAddress }) {
       const challenge = new Uint8Array(32)
       crypto.getRandomValues(challenge)
 
-      // Create a deterministic user ID based on owner address
-      const userId = ownerAddress
-        ? new TextEncoder().encode(ownerAddress.toLowerCase()).slice(0, 16)
+      // Create a deterministic user ID based on account address (not owner)
+      // This ensures the passkey is tied to the smart account, not the owner
+      const userId = accountAddress
+        ? new TextEncoder().encode(accountAddress.toLowerCase()).slice(0, 16)
         : crypto.getRandomValues(new Uint8Array(16))
 
       console.log('👤 Creating passkey for account:', accountAddress)
@@ -139,8 +219,8 @@ function PasskeySettings({ accountAddress }) {
           },
           user: {
             id: userId,
-            name: ownerAddress ? `${ownerAddress.slice(0, 6)}...${ownerAddress.slice(-4)}@ethaura.wallet` : 'user@ethaura.wallet',
-            displayName: ownerAddress ? `ΞTHΛURΛ User (${ownerAddress.slice(0, 6)}...${ownerAddress.slice(-4)})` : 'ΞTHΛURΛ User',
+            name: accountAddress ? `${accountAddress.slice(0, 6)}...${accountAddress.slice(-4)}@ethaura.wallet` : 'user@ethaura.wallet',
+            displayName: accountAddress ? `ΞTHΛURΛ Account (${accountAddress.slice(0, 6)}...${accountAddress.slice(-4)})` : 'ΞTHΛURΛ Account',
           },
           pubKeyCredParams: [
             {
@@ -179,11 +259,62 @@ function PasskeySettings({ accountAddress }) {
         },
       })
 
-      setNewPasskey(publicKey)
-      setStatus('Passkey created! Now proposing update to smart contract...')
+      // Store credential info for server storage
+      const credentialInfo = {
+        id: credential.id,
+        rawId: credential.rawId,
+        publicKey: publicKey,
+        response: {
+          attestationObject: credential.response.attestationObject,
+          clientDataJSON: credential.response.clientDataJSON,
+        },
+      }
 
-      // Propose the update to the smart contract
-      await proposePasskeyUpdate(publicKey)
+      // Serialize credential for storage (convert ArrayBuffers to base64)
+      const serializedCredential = {
+        id: credentialInfo.id,
+        rawId: btoa(String.fromCharCode(...new Uint8Array(credentialInfo.rawId))),
+        publicKey: credentialInfo.publicKey,
+        response: {
+          attestationObject: btoa(String.fromCharCode(...new Uint8Array(credentialInfo.response.attestationObject))),
+          clientDataJSON: btoa(String.fromCharCode(...new Uint8Array(credentialInfo.response.clientDataJSON))),
+        },
+      }
+
+      // Save to server (account-specific)
+      try {
+        if (signMessage && ownerAddress && accountAddress) {
+          await storePasskeyCredential(signMessage, ownerAddress, accountAddress, serializedCredential)
+          console.log(`✅ Passkey credential saved to server for account: ${accountAddress}`)
+        }
+      } catch (serverError) {
+        console.error('⚠️  Failed to save to server:', serverError)
+        // Continue anyway - we'll save to localStorage as fallback
+      }
+
+      // Save to localStorage as backup (account-specific key)
+      const storageKey = `ethaura_passkey_credential_${accountAddress.toLowerCase()}`
+      localStorage.setItem(storageKey, JSON.stringify(serializedCredential))
+      console.log(`✅ Passkey credential saved to localStorage for account: ${accountAddress}`)
+
+      setNewPasskey(publicKey)
+
+      // Check if account is deployed before proposing on-chain update
+      const rpcUrl = networkInfo.rpcUrl
+      const provider = new ethers.JsonRpcProvider(rpcUrl)
+      const code = await provider.getCode(accountAddress)
+      const isDeployed = code !== '0x'
+
+      if (isDeployed) {
+        setStatus('Passkey created! Now proposing update to smart contract...')
+        // Propose the update to the smart contract
+        await proposePasskeyUpdate(publicKey)
+      } else {
+        setStatus('✅ Passkey created and saved! It will be used when you deploy this account with your first transaction.')
+        // Reload stored credential to update UI
+        await loadStoredCredential()
+        await loadAccountInfo()
+      }
 
     } catch (err) {
       console.error('Error creating passkey:', err)
@@ -222,8 +353,10 @@ function PasskeySettings({ accountAddress }) {
 
       setStatus('Passkey update proposed! You must wait 48 hours before it can be executed.')
 
-      // Reload account info to show pending action
-      await loadAccountInfo()
+      // Wait a bit for the transaction to be indexed, then reload account info
+      setTimeout(async () => {
+        await loadAccountInfo()
+      }, 2000) // 2 second delay
 
     } catch (err) {
       console.error('Error proposing passkey update:', err)
@@ -275,8 +408,24 @@ function PasskeySettings({ accountAddress }) {
       return
     }
 
+    // Check if account is deployed
+    if (!accountInfo?.isDeployed) {
+      setError('⚠️ Cannot enable 2FA on undeployed account. The account will be deployed with your first transaction. You can enable 2FA after deployment.')
+      return
+    }
+
+    // Check if passkey exists on-chain
     if (enable && !accountInfo?.hasPasskey) {
-      setError('You must add a passkey before enabling 2FA')
+      if (storedCredential && pendingActions.length > 0) {
+        // Passkey is stored and there's a pending update
+        setError('⚠️ Your passkey update is pending. Please wait for the 48-hour timelock to complete, then execute the passkey update before enabling 2FA.')
+      } else if (storedCredential) {
+        // Passkey is stored but account was deployed without it
+        // This shouldn't happen with the new flow, but handle it gracefully
+        setError('⚠️ Your passkey is stored but the account was deployed without it. Please propose a passkey update first (it will take 48 hours).')
+      } else {
+        setError('You must add a passkey before enabling 2FA')
+      }
       return
     }
 
@@ -285,21 +434,28 @@ function PasskeySettings({ accountAddress }) {
     setStatus(enable ? 'Enabling 2FA...' : 'Disabling 2FA...')
 
     try {
-      // Create ethers provider from Web3Auth provider
-      const ethersProvider = new ethers.BrowserProvider(web3AuthProvider)
-      const signer = await ethersProvider.getSigner()
-      const contract = new ethers.Contract(accountAddress, accountABI, signer)
+      // IMPORTANT: enableTwoFactor() and disableTwoFactor() can only be called via UserOperation
+      // They cannot be called directly from an EOA (even the owner)
+      // This is a security feature to ensure all account modifications go through the EntryPoint
 
-      const tx = enable ? await contract.enableTwoFactor() : await contract.disableTwoFactor()
-      setStatus('Transaction submitted. Waiting for confirmation...')
+      setError(`⚠️ 2FA toggle must be done through a UserOperation, not a direct transaction.
 
-      const receipt = await tx.wait()
-      console.log('✅ 2FA toggle transaction confirmed:', receipt.hash)
+This feature requires integration with the transaction sender to:
+1. Build a UserOperation that calls ${enable ? 'enableTwoFactor()' : 'disableTwoFactor()'}
+2. Sign it with your ${accountInfo.twoFactorEnabled ? 'passkey + owner' : 'passkey or owner'}
+3. Send it through the bundler
 
-      setStatus(enable ? '2FA enabled successfully!' : '2FA disabled successfully!')
+For now, please use the contract directly on Etherscan or wait for this feature to be implemented in the UI.`)
 
-      // Reload account info
-      await loadAccountInfo()
+      setLoading(false)
+      return
+
+      // TODO: Implement UserOperation-based 2FA toggle
+      // const callData = contract.interface.encodeFunctionData(enable ? 'enableTwoFactor' : 'disableTwoFactor')
+      // const userOp = await buildUserOperation(accountAddress, accountAddress, 0, callData)
+      // const signedUserOp = await signUserOperation(userOp, credential, ownerSigner)
+      // const txHash = await bundlerClient.sendUserOperation(signedUserOp)
+      // await bundlerClient.waitForUserOperationReceipt(txHash)
 
     } catch (err) {
       console.error('Error toggling 2FA:', err)
@@ -323,12 +479,14 @@ function PasskeySettings({ accountAddress }) {
         {/* Main Content - Left Column */}
         <div className="passkey-main">
           {/* Add/Manage Passkey */}
-          {!accountInfo.hasPasskey ? (
+          {!accountInfo.hasPasskey && !storedCredential ? (
             <div className="settings-section">
               <h3>Add Passkey</h3>
               <p className="section-description">
                 Add a passkey for biometric authentication (Touch ID, Face ID, Windows Hello).
-                This will require a 48-hour timelock before the passkey becomes active.
+                {accountInfo && accountInfo.qx === ethers.ZeroHash
+                  ? ' The passkey will be used when you deploy this account with your first transaction.'
+                  : ' This will require a 48-hour timelock before the passkey becomes active.'}
               </p>
               <button
                 className="btn btn-primary"
@@ -339,21 +497,72 @@ function PasskeySettings({ accountAddress }) {
               </button>
             </div>
           ) : (
-            <div className="settings-section">
-              <h3>Two-Factor Authentication</h3>
-              <p className="section-description">
-                {accountInfo.twoFactorEnabled
-                  ? 'All transactions require both passkey and social login signatures. This provides maximum security for your account.'
-                  : 'Enable 2FA to require both passkey and social login for all transactions. This adds an extra layer of security.'}
-              </p>
-              <button
-                className={`btn ${accountInfo.twoFactorEnabled ? 'btn-danger' : 'btn-success'}`}
-                onClick={() => toggle2FA(!accountInfo.twoFactorEnabled)}
-                disabled={loading}
-              >
-                {accountInfo.twoFactorEnabled ? 'Disable 2FA' : 'Enable 2FA'}
-              </button>
-            </div>
+            <>
+              {/* Only show 2FA section for deployed accounts with active passkey */}
+              {accountInfo?.isDeployed && accountInfo?.hasPasskey && (
+                <div className="settings-section">
+                  <h3>Two-Factor Authentication</h3>
+                  <p className="section-description">
+                    {accountInfo.twoFactorEnabled
+                      ? 'All transactions require both passkey and social login signatures. This provides maximum security for your account.'
+                      : 'Enable 2FA to require both passkey and social login for all transactions. This adds an extra layer of security.'}
+                  </p>
+                  <button
+                    className={`btn ${accountInfo.twoFactorEnabled ? 'btn-danger' : 'btn-success'}`}
+                    onClick={() => toggle2FA(!accountInfo.twoFactorEnabled)}
+                    disabled={loading}
+                  >
+                    {accountInfo.twoFactorEnabled ? 'Disable 2FA' : 'Enable 2FA'}
+                  </button>
+                </div>
+              )}
+
+              {/* Show message if deployed but passkey not active yet */}
+              {accountInfo?.isDeployed && !accountInfo?.hasPasskey && storedCredential && (
+                <div className="settings-section">
+                  <h3>Two-Factor Authentication</h3>
+                  <p className="section-description">
+                    ⏳ Your passkey is stored but not active on-chain yet.
+                    {pendingActions.length > 0
+                      ? ' Please wait for the 48-hour timelock to complete, then execute the passkey update. After that, you can enable 2FA.'
+                      : ' The account was deployed without a passkey. Please create a passkey update proposal (48-hour timelock required).'}
+                  </p>
+                </div>
+              )}
+
+              {/* Show info message for undeployed accounts */}
+              {!accountInfo?.isDeployed && storedCredential && (
+                <div className="settings-section">
+                  <h3>Two-Factor Authentication</h3>
+                  <p className="section-description">
+                    ℹ️ 2FA settings will be available after your account is deployed. Your account will be deployed automatically with your first transaction.
+                  </p>
+                </div>
+              )}
+
+              <div className="settings-section" style={{ marginTop: '24px' }}>
+                <h3>Update Passkey</h3>
+                <p className="section-description">
+                  Replace your current passkey with a new one on this device. This is useful if:
+                </p>
+                <ul className="section-description" style={{ marginLeft: '20px', marginTop: '8px', marginBottom: '12px' }}>
+                  <li>You're using a new device and need to register a passkey here</li>
+                  <li>You lost access to your previous passkey</li>
+                  <li>You want to update your biometric authentication</li>
+                </ul>
+                <p className="section-description" style={{ fontSize: '0.85rem', color: '#666', marginBottom: '12px' }}>
+                  ⏱️ <strong>Note:</strong> The update requires a 48-hour timelock before the new passkey becomes active.
+                  Your old passkey will continue to work until the new one is activated.
+                </p>
+                <button
+                  className="btn btn-secondary"
+                  onClick={createPasskey}
+                  disabled={loading || !ownerAddress}
+                >
+                  {loading ? 'Creating...' : '🔑 Create & Propose New Passkey'}
+                </button>
+              </div>
+            </>
           )}
 
           {/* Status Messages */}
@@ -369,8 +578,14 @@ function PasskeySettings({ accountAddress }) {
             <div className="status-grid">
               <div className="status-item">
                 <span className="status-label">Passkey Configured</span>
-                <span className={`status-badge ${accountInfo.hasPasskey ? 'badge-success' : 'badge-warning'}`}>
-                  {accountInfo.hasPasskey ? 'Yes' : 'No'}
+                <span className={`status-badge ${(accountInfo.hasPasskey || storedCredential) ? 'badge-success' : 'badge-warning'}`}>
+                  {(accountInfo.hasPasskey || storedCredential) ? 'Yes' : 'No'}
+                </span>
+              </div>
+              <div className="status-item">
+                <span className="status-label">Status</span>
+                <span className={`status-badge ${accountInfo.hasPasskey ? 'badge-success' : 'badge-neutral'}`}>
+                  {accountInfo.hasPasskey ? 'Active On-Chain' : storedCredential ? 'Stored (Not Deployed)' : 'Not Configured'}
                 </span>
               </div>
               <div className="status-item">

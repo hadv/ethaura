@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { parsePublicKey } from '../utils/webauthn'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
+import { deletePasskeyCredential } from '../lib/passkeyStorage'
 
 function PasskeyManager({ onCredentialCreated, credential }) {
-  const { address: ownerAddress } = useWeb3Auth()
+  const { address: ownerAddress, signMessage } = useWeb3Auth()
   const [status, setStatus] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -169,8 +170,23 @@ function PasskeyManager({ onCredentialCreated, credential }) {
     }
   }
 
-  const clearPasskey = () => {
+  const clearPasskey = async () => {
+    try {
+      // Delete from server if connected
+      if (ownerAddress && signMessage && existingAccountAddress) {
+        await deletePasskeyCredential(signMessage, ownerAddress, existingAccountAddress)
+        console.log('✅ Deleted passkey from server')
+      }
+    } catch (error) {
+      console.error('⚠️  Failed to delete from server:', error)
+      // Continue anyway to clear local storage
+    }
+
+    // Clear local storage (both legacy and account-specific keys)
     localStorage.removeItem('ethaura_passkey_credential')
+    if (existingAccountAddress) {
+      localStorage.removeItem(`ethaura_passkey_credential_${existingAccountAddress.toLowerCase()}`)
+    }
     localStorage.removeItem('ethaura_account_address')
     localStorage.removeItem('ethaura_account_config')
     onCredentialCreated(null)

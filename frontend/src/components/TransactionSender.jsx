@@ -27,6 +27,7 @@ function TransactionSender({ accountAddress, credential, accountConfig, onSignat
   const [accountInfo, setAccountInfo] = useState(null)
   const [balanceInfo, setBalanceInfo] = useState(null)
   const [depositLoading, setDepositLoading] = useState(false)
+  const [loadedCredential, setLoadedCredential] = useState(null) // Store credential loaded from fallback
 
   // Token-related state
   const [selectedToken, setSelectedToken] = useState(null) // null = ETH, otherwise token object
@@ -102,38 +103,106 @@ function TransactionSender({ accountAddress, credential, accountConfig, onSignat
             })
           } else {
             // For undeployed accounts, derive from credentials
-            // Use the passkey that was used during account creation, not the current credential
-            // This prevents issues when user adds passkey AFTER creating owner-only account
+            console.log('🔍 Checking for passkey credential:', {
+              hasCredential: !!credential,
+              credentialType: typeof credential,
+              hasPublicKey: !!credential?.publicKey,
+              publicKeyType: typeof credential?.publicKey,
+              publicKeyKeys: credential?.publicKey ? Object.keys(credential.publicKey) : null,
+            })
+
+            // Check if there's a passkey credential available (either from accountConfig or loaded credential)
             let passkeyPublicKey = null
-            if (accountConfig && accountConfig.hasPasskey && credential?.publicKey) {
+            if (credential?.publicKey) {
+              // Use the loaded credential if available
               passkeyPublicKey = credential.publicKey
+              console.log('✅ Using passkey from loaded credential for deployment:', {
+                x: passkeyPublicKey.x?.slice(0, 20) + '...',
+                y: passkeyPublicKey.y?.slice(0, 20) + '...',
+              })
+            } else {
+              console.warn('❌ No credential.publicKey found in props!')
+
+              // FALLBACK: Try to load credential from localStorage directly
+              // This handles the case where App.jsx didn't load the credential
+              // (e.g., navigating directly from Settings to Send)
+              console.log('🔄 Attempting to load credential from localStorage as fallback...')
+              try {
+                const { retrievePasskeyCredential } = await import('../lib/passkeyStorage.js')
+                const storageKey = `ethaura_passkey_credential_${accountAddress.toLowerCase()}`
+                const stored = localStorage.getItem(storageKey)
+
+                if (stored) {
+                  console.log('📦 Found credential in localStorage!')
+                  const { deserializeCredential } = await import('../lib/passkeyStorage.js')
+                  const fallbackCredential = deserializeCredential(stored)
+
+                  if (fallbackCredential?.publicKey) {
+                    passkeyPublicKey = fallbackCredential.publicKey
+                    // IMPORTANT: Save the loaded credential to state so it can be used for signing
+                    setLoadedCredential(fallbackCredential)
+                    console.log('✅ Successfully loaded passkey from localStorage fallback:', {
+                      x: passkeyPublicKey.x?.slice(0, 20) + '...',
+                      y: passkeyPublicKey.y?.slice(0, 20) + '...',
+                      credentialId: fallbackCredential.id,
+                    })
+                  } else {
+                    console.warn('⚠️  Credential loaded but has no publicKey')
+                  }
+                } else {
+                  console.log('❌ No credential found in localStorage')
+                  console.log('Account will deploy in OWNER-ONLY mode')
+                }
+              } catch (err) {
+                console.error('❌ Failed to load credential from localStorage:', err)
+              }
+
+              if (accountConfig && accountConfig.hasPasskey && !passkeyPublicKey) {
+                console.warn('⚠️  accountConfig says hasPasskey but no credential loaded!')
+              }
             }
 
             // Get the salt from account config (default to 0 for backwards compatibility)
             const salt = accountConfig?.salt !== undefined ? BigInt(accountConfig.salt) : 0n
 
-            // Get the 2FA setting from account config
-            const enable2FA = accountConfig?.twoFactorEnabled || false
+            // IMPORTANT: If deploying with a passkey, enable 2FA by default
+            // This is the recommended security setting - require both passkey + owner for all transactions
+            // If deploying without a passkey (owner-only), 2FA is not applicable
+            const enable2FA = !!passkeyPublicKey
 
             console.log('📋 Deriving undeployed account info:', {
               accountAddress,
               hasAccountConfig: !!accountConfig,
-              accountConfigHasPasskey: accountConfig?.hasPasskey,
-              accountConfigTwoFactorEnabled: accountConfig?.twoFactorEnabled,
               accountConfigSalt: accountConfig?.salt,
               hasCredential: !!credential,
+              credentialPublicKey: credential?.publicKey,
               willUsePasskey: !!passkeyPublicKey,
+              passkeyPublicKey: passkeyPublicKey ? { x: passkeyPublicKey.x?.slice(0, 10) + '...', y: passkeyPublicKey.y?.slice(0, 10) + '...' } : null,
               salt: salt.toString(),
-              enable2FA,
+              enable2FA: enable2FA,
+              note: passkeyPublicKey ? '2FA will be ENABLED (passkey + owner required)' : '2FA not applicable (owner-only mode)',
+            })
+
+            console.log('🚀 IMPORTANT: Account will be deployed with:', {
+              mode: passkeyPublicKey ? '🔐 PASSKEY MODE (2FA ENABLED)' : '👤 OWNER-ONLY MODE',
+              hasPasskey: !!passkeyPublicKey,
+              twoFactorEnabled: enable2FA,
+              passkeyX: passkeyPublicKey?.x?.slice(0, 20) + '...',
+              passkeyY: passkeyPublicKey?.y?.slice(0, 20) + '...',
             })
 
             const derived = await sdk.createAccount(passkeyPublicKey, ownerAddress, salt, enable2FA)
             if (derived.address.toLowerCase() !== accountAddress.toLowerCase()) {
-              console.warn('Provided accountAddress differs from derived address from credentials/owner', {
+              console.warn('⚠️  Provided accountAddress differs from derived address from credentials/owner', {
                 provided: accountAddress,
                 derived: derived.address,
+                ownerAddress,
                 salt: salt.toString(),
+                passkeyPublicKey,
+                enable2FA,
               })
+              console.warn('⚠️  This means the account was created with different parameters!')
+              console.warn('⚠️  Address only depends on: owner + salt (NOT passkey)')
             }
             // Normalize to shape expected by this component
             setAccountInfo({
@@ -413,14 +482,33 @@ function TransactionSender({ accountAddress, credential, accountConfig, onSignat
         qy: onChainQy,
       })
 
+      console.log('🚨 IMPORTANT - Signature Requirements:', {
+        isDeployed: isActuallyDeployed,
+        twoFactorEnabled: onChainTwoFactorEnabled,
+        hasPasskey: hasPasskey,
+        willRequirePasskey: !isOwnerOnly,
+        willRequireOwner: isOwnerOnly || onChainTwoFactorEnabled,
+        totalSignaturesNeeded: isOwnerOnly ? 1 : (onChainTwoFactorEnabled ? 2 : 1),
+        signatureFlow: isOwnerOnly
+          ? '1️⃣ Owner signature only'
+          : (onChainTwoFactorEnabled
+            ? '1️⃣ Owner signature → 2️⃣ Passkey signature (2FA)'
+            : '1️⃣ Passkey signature only'),
+      })
+
+      // Use loadedCredential as fallback
+      const credentialToUse = credential || loadedCredential
+
       console.log('🔐 Credential Info:', {
         hasCredential: !!credential,
-        credentialId: credential?.id,
+        hasLoadedCredential: !!loadedCredential,
+        hasAnyCredential: !!credentialToUse,
+        credentialId: credentialToUse?.id,
       })
 
       if (!isOwnerOnly) {
         // Check if we have the passkey credential
-        if (!credential) {
+        if (!credentialToUse) {
           setError(
             `❌ PASSKEY REQUIRED BUT NOT FOUND!\n\n` +
             `This account requires a passkey to sign transactions, but you don't have the passkey on this device/browser.\n\n` +
@@ -800,7 +888,13 @@ function TransactionSender({ accountAddress, credential, accountConfig, onSignat
         setStatus(`🔑 ${stepLabel}: Signing with your passkey (biometric)...`)
         console.log(`🔑 Signing with passkey (${stepLabel})...`)
 
-        const passkeySignatureRaw = await signWithPasskey(credential, userOpHashBytes)
+        // Use loadedCredential as fallback if credential prop is not available
+        const credentialToUse = credential || loadedCredential
+        if (!credentialToUse) {
+          throw new Error('No credential available for signing. Please ensure the passkey is loaded.')
+        }
+
+        const passkeySignatureRaw = await signWithPasskey(credentialToUse, userOpHashBytes)
 
         // Step 6: Decode DER signature to r,s
         setStatus(`🔑 ${stepLabel}: Decoding P-256 signature...`)
