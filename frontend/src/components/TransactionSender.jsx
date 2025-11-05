@@ -102,11 +102,15 @@ function TransactionSender({ accountAddress, credential, accountConfig, onSignat
             })
           } else {
             // For undeployed accounts, derive from credentials
-            // Use the passkey that was used during account creation, not the current credential
-            // This prevents issues when user adds passkey AFTER creating owner-only account
+            // Check if there's a passkey credential available (either from accountConfig or loaded credential)
             let passkeyPublicKey = null
-            if (accountConfig && accountConfig.hasPasskey && credential?.publicKey) {
+            if (credential?.publicKey) {
+              // Use the loaded credential if available
               passkeyPublicKey = credential.publicKey
+              console.log('✅ Using passkey from loaded credential for deployment')
+            } else if (accountConfig && accountConfig.hasPasskey) {
+              // Fallback to accountConfig (shouldn't happen if credential loading works)
+              console.warn('⚠️  accountConfig says hasPasskey but no credential loaded!')
             }
 
             // Get the salt from account config (default to 0 for backwards compatibility)
@@ -122,9 +126,18 @@ function TransactionSender({ accountAddress, credential, accountConfig, onSignat
               accountConfigTwoFactorEnabled: accountConfig?.twoFactorEnabled,
               accountConfigSalt: accountConfig?.salt,
               hasCredential: !!credential,
+              credentialPublicKey: credential?.publicKey,
               willUsePasskey: !!passkeyPublicKey,
+              passkeyPublicKey: passkeyPublicKey ? { x: passkeyPublicKey.x?.slice(0, 10) + '...', y: passkeyPublicKey.y?.slice(0, 10) + '...' } : null,
               salt: salt.toString(),
               enable2FA,
+            })
+
+            console.log('🚀 IMPORTANT: Account will be deployed with:', {
+              mode: passkeyPublicKey ? '🔐 PASSKEY MODE' : '👤 OWNER-ONLY MODE',
+              hasPasskey: !!passkeyPublicKey,
+              passkeyX: passkeyPublicKey?.x?.slice(0, 20) + '...',
+              passkeyY: passkeyPublicKey?.y?.slice(0, 20) + '...',
             })
 
             const derived = await sdk.createAccount(passkeyPublicKey, ownerAddress, salt, enable2FA)
