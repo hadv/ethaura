@@ -104,6 +104,7 @@ function PasskeySettings({ accountAddress }) {
           qx: ethers.ZeroHash,
           qy: ethers.ZeroHash,
           twoFactorEnabled: false,
+          isDeployed: false, // Track deployment status
         })
         setPendingActions([])
         setError('') // Clear error since this is expected
@@ -128,6 +129,7 @@ function PasskeySettings({ accountAddress }) {
         qx,
         qy,
         twoFactorEnabled,
+        isDeployed: true, // Track deployment status
       })
 
       // Parse pending actions
@@ -370,8 +372,20 @@ function PasskeySettings({ accountAddress }) {
       return
     }
 
+    // Check if account is deployed
+    if (!accountInfo?.isDeployed) {
+      setError('⚠️ Cannot enable 2FA on undeployed account. The account will be deployed with your first transaction. You can enable 2FA after deployment.')
+      return
+    }
+
+    // Check if passkey exists on-chain
     if (enable && !accountInfo?.hasPasskey) {
-      setError('You must add a passkey before enabling 2FA')
+      if (storedCredential) {
+        // Passkey is stored but not active on-chain yet
+        setError('⚠️ Your passkey is stored but not active on-chain yet. Please wait for the 48-hour timelock to complete, then execute the passkey update before enabling 2FA.')
+      } else {
+        setError('You must add a passkey before enabling 2FA')
+      }
       return
     }
 
@@ -437,21 +451,34 @@ function PasskeySettings({ accountAddress }) {
             </div>
           ) : (
             <>
-              <div className="settings-section">
-                <h3>Two-Factor Authentication</h3>
-                <p className="section-description">
-                  {accountInfo.twoFactorEnabled
-                    ? 'All transactions require both passkey and social login signatures. This provides maximum security for your account.'
-                    : 'Enable 2FA to require both passkey and social login for all transactions. This adds an extra layer of security.'}
-                </p>
-                <button
-                  className={`btn ${accountInfo.twoFactorEnabled ? 'btn-danger' : 'btn-success'}`}
-                  onClick={() => toggle2FA(!accountInfo.twoFactorEnabled)}
-                  disabled={loading}
-                >
-                  {accountInfo.twoFactorEnabled ? 'Disable 2FA' : 'Enable 2FA'}
-                </button>
-              </div>
+              {/* Only show 2FA section for deployed accounts */}
+              {accountInfo?.isDeployed && (
+                <div className="settings-section">
+                  <h3>Two-Factor Authentication</h3>
+                  <p className="section-description">
+                    {accountInfo.twoFactorEnabled
+                      ? 'All transactions require both passkey and social login signatures. This provides maximum security for your account.'
+                      : 'Enable 2FA to require both passkey and social login for all transactions. This adds an extra layer of security.'}
+                  </p>
+                  <button
+                    className={`btn ${accountInfo.twoFactorEnabled ? 'btn-danger' : 'btn-success'}`}
+                    onClick={() => toggle2FA(!accountInfo.twoFactorEnabled)}
+                    disabled={loading}
+                  >
+                    {accountInfo.twoFactorEnabled ? 'Disable 2FA' : 'Enable 2FA'}
+                  </button>
+                </div>
+              )}
+
+              {/* Show info message for undeployed accounts */}
+              {!accountInfo?.isDeployed && storedCredential && (
+                <div className="settings-section">
+                  <h3>Two-Factor Authentication</h3>
+                  <p className="section-description">
+                    ℹ️ 2FA settings will be available after your account is deployed. Your account will be deployed automatically with your first transaction.
+                  </p>
+                </div>
+              )}
 
               <div className="settings-section" style={{ marginTop: '24px' }}>
                 <h3>Update Passkey</h3>
