@@ -15,6 +15,15 @@ function SendTransactionScreen({ wallet, onBack, onHome, onSettings, credential,
   const [showWalletConnectModal, setShowWalletConnectModal] = useState(false)
   const walletConnectButtonRef = useRef(null)
 
+  // Build account config from wallet object
+  // Each wallet has its own salt (index) and owner, so we need to use those
+  const walletAccountConfig = selectedWallet ? {
+    salt: selectedWallet.index !== undefined ? selectedWallet.index : 0,
+    owner: selectedWallet.owner,
+    hasPasskey: selectedWallet.hasPasskey || false,
+    twoFactorEnabled: selectedWallet.twoFactorEnabled || false,
+  } : accountConfig
+
   // Load all wallets from localStorage
   useEffect(() => {
     const storedWallets = localStorage.getItem('ethaura_wallets_list')
@@ -81,7 +90,7 @@ function SendTransactionScreen({ wallet, onBack, onHome, onSettings, credential,
             <TransactionSender
               accountAddress={selectedWallet.address}
               credential={credential}
-              accountConfig={accountConfig}
+              accountConfig={walletAccountConfig}
               onSignatureRequest={onSignatureRequest}
             />
           </div>

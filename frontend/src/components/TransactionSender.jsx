@@ -129,11 +129,16 @@ function TransactionSender({ accountAddress, credential, accountConfig, onSignat
 
             const derived = await sdk.createAccount(passkeyPublicKey, ownerAddress, salt, enable2FA)
             if (derived.address.toLowerCase() !== accountAddress.toLowerCase()) {
-              console.warn('Provided accountAddress differs from derived address from credentials/owner', {
+              console.warn('⚠️  Provided accountAddress differs from derived address from credentials/owner', {
                 provided: accountAddress,
                 derived: derived.address,
+                ownerAddress,
                 salt: salt.toString(),
+                passkeyPublicKey,
+                enable2FA,
               })
+              console.warn('⚠️  This means the account was created with different parameters!')
+              console.warn('⚠️  Address only depends on: owner + salt (NOT passkey)')
             }
             // Normalize to shape expected by this component
             setAccountInfo({
