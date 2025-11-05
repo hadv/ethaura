@@ -123,9 +123,10 @@ function PasskeySettings({ accountAddress }) {
       const challenge = new Uint8Array(32)
       crypto.getRandomValues(challenge)
 
-      // Create a deterministic user ID based on owner address
-      const userId = ownerAddress
-        ? new TextEncoder().encode(ownerAddress.toLowerCase()).slice(0, 16)
+      // Create a deterministic user ID based on account address (not owner)
+      // This ensures the passkey is tied to the smart account, not the owner
+      const userId = accountAddress
+        ? new TextEncoder().encode(accountAddress.toLowerCase()).slice(0, 16)
         : crypto.getRandomValues(new Uint8Array(16))
 
       console.log('👤 Creating passkey for account:', accountAddress)
@@ -140,8 +141,8 @@ function PasskeySettings({ accountAddress }) {
           },
           user: {
             id: userId,
-            name: ownerAddress ? `${ownerAddress.slice(0, 6)}...${ownerAddress.slice(-4)}@ethaura.wallet` : 'user@ethaura.wallet',
-            displayName: ownerAddress ? `ΞTHΛURΛ User (${ownerAddress.slice(0, 6)}...${ownerAddress.slice(-4)})` : 'ΞTHΛURΛ User',
+            name: accountAddress ? `${accountAddress.slice(0, 6)}...${accountAddress.slice(-4)}@ethaura.wallet` : 'user@ethaura.wallet',
+            displayName: accountAddress ? `ΞTHΛURΛ Account (${accountAddress.slice(0, 6)}...${accountAddress.slice(-4)})` : 'ΞTHΛURΛ Account',
           },
           pubKeyCredParams: [
             {
