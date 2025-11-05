@@ -4,7 +4,7 @@ import { useWeb3Auth } from '../contexts/Web3AuthContext'
 import { useNetwork } from '../contexts/NetworkContext'
 import { ethers } from 'ethers'
 import { NETWORKS } from '../lib/constants'
-import { storePasskeyCredential } from '../lib/passkeyStorage'
+import { storePasskeyCredential, retrievePasskeyCredential } from '../lib/passkeyStorage'
 import '../styles/PasskeySettings.css'
 
 function PasskeySettings({ accountAddress }) {
@@ -16,6 +16,7 @@ function PasskeySettings({ accountAddress }) {
   const [accountInfo, setAccountInfo] = useState(null)
   const [pendingActions, setPendingActions] = useState([])
   const [newPasskey, setNewPasskey] = useState(null)
+  const [storedCredential, setStoredCredential] = useState(null) // Passkey from server/localStorage
 
   // P256Account ABI (minimal for what we need)
   const accountABI = [
@@ -35,13 +36,45 @@ function PasskeySettings({ accountAddress }) {
     setAccountInfo(null)
     setPendingActions([])
     setNewPasskey(null)
+    setStoredCredential(null)
     setError('')
     setStatus('')
     setLoading(false)
 
     // Load new data
     loadAccountInfo()
+    loadStoredCredential()
   }, [accountAddress, web3AuthProvider, networkInfo.chainId])
+
+  // Load stored credential from server/localStorage
+  const loadStoredCredential = async () => {
+    if (!accountAddress || !ownerAddress || !signMessage) return
+
+    try {
+      // Try to load from server first
+      const credential = await retrievePasskeyCredential(signMessage, ownerAddress, accountAddress)
+      if (credential) {
+        console.log('✅ Loaded passkey credential from server for account:', accountAddress)
+        setStoredCredential(credential)
+        return
+      }
+    } catch (error) {
+      console.log('⚠️ Failed to load from server, trying localStorage:', error.message)
+    }
+
+    // Fallback to localStorage
+    try {
+      const storageKey = `ethaura_passkey_credential_${accountAddress.toLowerCase()}`
+      const stored = localStorage.getItem(storageKey)
+      if (stored) {
+        const credential = JSON.parse(stored)
+        console.log('✅ Loaded passkey credential from localStorage for account:', accountAddress)
+        setStoredCredential(credential)
+      }
+    } catch (error) {
+      console.error('Failed to load credential from localStorage:', error)
+    }
+  }
 
   const loadAccountInfo = async () => {
     if (!accountAddress) return
@@ -227,10 +260,23 @@ function PasskeySettings({ accountAddress }) {
       console.log(`✅ Passkey credential saved to localStorage for account: ${accountAddress}`)
 
       setNewPasskey(publicKey)
-      setStatus('Passkey created! Now proposing update to smart contract...')
 
-      // Propose the update to the smart contract
-      await proposePasskeyUpdate(publicKey)
+      // Check if account is deployed before proposing on-chain update
+      const rpcUrl = networkInfo.rpcUrl
+      const provider = new ethers.JsonRpcProvider(rpcUrl)
+      const code = await provider.getCode(accountAddress)
+      const isDeployed = code !== '0x'
+
+      if (isDeployed) {
+        setStatus('Passkey created! Now proposing update to smart contract...')
+        // Propose the update to the smart contract
+        await proposePasskeyUpdate(publicKey)
+      } else {
+        setStatus('✅ Passkey created and saved! It will be used when you deploy this account with your first transaction.')
+        // Reload stored credential to update UI
+        await loadStoredCredential()
+        await loadAccountInfo()
+      }
 
     } catch (err) {
       console.error('Error creating passkey:', err)
@@ -372,12 +418,14 @@ function PasskeySettings({ accountAddress }) {
         {/* Main Content - Left Column */}
         <div className="passkey-main">
           {/* Add/Manage Passkey */}
-          {!accountInfo.hasPasskey ? (
+          {!accountInfo.hasPasskey && !storedCredential ? (
             <div className="settings-section">
               <h3>Add Passkey</h3>
               <p className="section-description">
                 Add a passkey for biometric authentication (Touch ID, Face ID, Windows Hello).
-                This will require a 48-hour timelock before the passkey becomes active.
+                {accountInfo && accountInfo.qx === ethers.ZeroHash
+                  ? ' The passkey will be used when you deploy this account with your first transaction.'
+                  : ' This will require a 48-hour timelock before the passkey becomes active.'}
               </p>
               <button
                 className="btn btn-primary"
@@ -443,8 +491,14 @@ function PasskeySettings({ accountAddress }) {
             <div className="status-grid">
               <div className="status-item">
                 <span className="status-label">Passkey Configured</span>
-                <span className={`status-badge ${accountInfo.hasPasskey ? 'badge-success' : 'badge-warning'}`}>
-                  {accountInfo.hasPasskey ? 'Yes' : 'No'}
+                <span className={`status-badge ${(accountInfo.hasPasskey || storedCredential) ? 'badge-success' : 'badge-warning'}`}>
+                  {(accountInfo.hasPasskey || storedCredential) ? 'Yes' : 'No'}
+                </span>
+              </div>
+              <div className="status-item">
+                <span className="status-label">Status</span>
+                <span className={`status-badge ${accountInfo.hasPasskey ? 'badge-success' : 'badge-neutral'}`}>
+                  {accountInfo.hasPasskey ? 'Active On-Chain' : storedCredential ? 'Stored (Not Deployed)' : 'Not Configured'}
                 </span>
               </div>
               <div className="status-item">
