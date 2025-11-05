@@ -27,6 +27,7 @@ function TransactionSender({ accountAddress, credential, accountConfig, onSignat
   const [accountInfo, setAccountInfo] = useState(null)
   const [balanceInfo, setBalanceInfo] = useState(null)
   const [depositLoading, setDepositLoading] = useState(false)
+  const [loadedCredential, setLoadedCredential] = useState(null) // Store credential loaded from fallback
 
   // Token-related state
   const [selectedToken, setSelectedToken] = useState(null) // null = ETH, otherwise token object
@@ -134,13 +135,16 @@ function TransactionSender({ accountAddress, credential, accountConfig, onSignat
                 if (stored) {
                   console.log('📦 Found credential in localStorage!')
                   const { deserializeCredential } = await import('../lib/passkeyStorage.js')
-                  const loadedCredential = deserializeCredential(stored)
+                  const fallbackCredential = deserializeCredential(stored)
 
-                  if (loadedCredential?.publicKey) {
-                    passkeyPublicKey = loadedCredential.publicKey
+                  if (fallbackCredential?.publicKey) {
+                    passkeyPublicKey = fallbackCredential.publicKey
+                    // IMPORTANT: Save the loaded credential to state so it can be used for signing
+                    setLoadedCredential(fallbackCredential)
                     console.log('✅ Successfully loaded passkey from localStorage fallback:', {
                       x: passkeyPublicKey.x?.slice(0, 20) + '...',
                       y: passkeyPublicKey.y?.slice(0, 20) + '...',
+                      credentialId: fallbackCredential.id,
                     })
                   } else {
                     console.warn('⚠️  Credential loaded but has no publicKey')
@@ -492,14 +496,19 @@ function TransactionSender({ accountAddress, credential, accountConfig, onSignat
             : '1️⃣ Passkey signature only'),
       })
 
+      // Use loadedCredential as fallback
+      const credentialToUse = credential || loadedCredential
+
       console.log('🔐 Credential Info:', {
         hasCredential: !!credential,
-        credentialId: credential?.id,
+        hasLoadedCredential: !!loadedCredential,
+        hasAnyCredential: !!credentialToUse,
+        credentialId: credentialToUse?.id,
       })
 
       if (!isOwnerOnly) {
         // Check if we have the passkey credential
-        if (!credential) {
+        if (!credentialToUse) {
           setError(
             `❌ PASSKEY REQUIRED BUT NOT FOUND!\n\n` +
             `This account requires a passkey to sign transactions, but you don't have the passkey on this device/browser.\n\n` +
@@ -879,7 +888,13 @@ function TransactionSender({ accountAddress, credential, accountConfig, onSignat
         setStatus(`🔑 ${stepLabel}: Signing with your passkey (biometric)...`)
         console.log(`🔑 Signing with passkey (${stepLabel})...`)
 
-        const passkeySignatureRaw = await signWithPasskey(credential, userOpHashBytes)
+        // Use loadedCredential as fallback if credential prop is not available
+        const credentialToUse = credential || loadedCredential
+        if (!credentialToUse) {
+          throw new Error('No credential available for signing. Please ensure the passkey is loaded.')
+        }
+
+        const passkeySignatureRaw = await signWithPasskey(credentialToUse, userOpHashBytes)
 
         // Step 6: Decode DER signature to r,s
         setStatus(`🔑 ${stepLabel}: Decoding P-256 signature...`)
