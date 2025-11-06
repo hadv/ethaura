@@ -11,7 +11,7 @@ import { formatPublicKeyForContract } from '../lib/accountManager'
 import { SUPPORTED_TOKENS, ERC20_ABI, ethIcon } from '../lib/constants'
 import '../styles/TransactionSender.css'
 
-function TransactionSender({ accountAddress, credential, accountConfig, onSignatureRequest }) {
+function TransactionSender({ accountAddress, credential, accountConfig, onSignatureRequest, preSelectedToken }) {
   const { isConnected, signMessage, signRawHash, address: ownerAddress } = useWeb3Auth()
   const { networkInfo } = useNetwork()
   const sdk = useP256SDK()
@@ -249,6 +249,24 @@ function TransactionSender({ accountAddress, credential, accountConfig, onSignat
     const tokens = SUPPORTED_TOKENS[networkName] || []
     setAvailableTokens(tokens)
   }, [networkInfo.chainId])
+
+  // Set pre-selected token if provided
+  useEffect(() => {
+    if (preSelectedToken && availableTokens.length > 0) {
+      // If it's ETH (native token)
+      if (preSelectedToken.symbol === 'ETH' || preSelectedToken.address === 'native') {
+        setSelectedToken(null)
+      } else if (preSelectedToken.address) {
+        // For ERC-20 tokens, find the matching token from availableTokens
+        const matchingToken = availableTokens.find(
+          t => t.address && t.address.toLowerCase() === preSelectedToken.address.toLowerCase()
+        )
+        if (matchingToken) {
+          setSelectedToken(matchingToken)
+        }
+      }
+    }
+  }, [preSelectedToken, availableTokens])
 
   // Load balance and deposit info
   const loadBalanceInfo = async (address) => {

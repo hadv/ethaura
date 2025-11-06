@@ -10,6 +10,8 @@ import CreateWalletScreen from './screens/CreateWalletScreen'
 import NewWalletScreen from './screens/NewWalletScreen'
 import SendTransactionScreen from './screens/SendTransactionScreen'
 import SignatureConfirmationScreen from './screens/SignatureConfirmationScreen'
+import ViewAllTokensScreen from './screens/ViewAllTokensScreen'
+import ViewAllTransactionsScreen from './screens/ViewAllTransactionsScreen'
 import { retrievePasskeyCredential, storePasskeyCredential } from './lib/passkeyStorage'
 
 // Inner component that uses Web3Auth context
@@ -17,8 +19,9 @@ function AppContent() {
   const { isConnected, isLoading, logout, signMessage, address } = useWeb3Auth()
 
   // Navigation state
-  const [currentScreen, setCurrentScreen] = useState('home') // 'home', 'wallet-detail', 'wallet-settings', 'add-wallet', 'new-wallet', 'send-transaction', 'signature-confirmation'
+  const [currentScreen, setCurrentScreen] = useState('home') // 'home', 'wallet-detail', 'wallet-settings', 'add-wallet', 'new-wallet', 'send-transaction', 'signature-confirmation', 'view-all-tokens', 'view-all-transactions'
   const [selectedWallet, setSelectedWallet] = useState(null)
+  const [selectedToken, setSelectedToken] = useState(null) // Pre-selected token for send screen
   const [previousScreen, setPreviousScreen] = useState(null) // Track previous screen for proper back navigation
   const [signatureData, setSignatureData] = useState(null) // Data for signature confirmation screen
   const [signatureCallbacks, setSignatureCallbacks] = useState(null) // Callbacks for signature confirmation
@@ -262,19 +265,31 @@ function AppContent() {
     setCurrentScreen('wallet-settings')
   }
 
-  const handleSend = () => {
+  const handleSend = (token = null) => {
+    setSelectedToken(token)
     setPreviousScreen(currentScreen)
     setCurrentScreen('send-transaction')
   }
 
   const handleSendFromHome = (wallet) => {
     setSelectedWallet(wallet)
+    setSelectedToken(null)
     setPreviousScreen(currentScreen)
     setCurrentScreen('send-transaction')
   }
 
   const handleWalletChange = (wallet) => {
     setSelectedWallet(wallet)
+  }
+
+  const handleViewAllTokens = () => {
+    setPreviousScreen(currentScreen)
+    setCurrentScreen('view-all-tokens')
+  }
+
+  const handleViewAllTransactions = () => {
+    setPreviousScreen(currentScreen)
+    setCurrentScreen('view-all-transactions')
   }
 
   // Handle signature confirmation navigation
@@ -327,6 +342,10 @@ function AppContent() {
     } else if (currentScreen === 'signature-confirmation') {
       // Cancel signature and go back
       handleSignatureCancel()
+    } else if (currentScreen === 'view-all-tokens' || currentScreen === 'view-all-transactions') {
+      // Go back to wallet detail
+      setCurrentScreen(previousScreen || 'wallet-detail')
+      setPreviousScreen(null)
     } else if (currentScreen === 'add-wallet' || currentScreen === 'new-wallet') {
       setCurrentScreen('home')
       setPreviousScreen(null)
@@ -392,6 +411,8 @@ function AppContent() {
           onSend={handleSend}
           onWalletChange={handleWalletChange}
           onLogout={handleLogout}
+          onViewAllTokens={handleViewAllTokens}
+          onViewAllTransactions={handleViewAllTransactions}
         />
       )}
 
@@ -430,6 +451,7 @@ function AppContent() {
       {currentScreen === 'send-transaction' && (
         <SendTransactionScreen
           wallet={selectedWallet}
+          selectedToken={selectedToken}
           onBack={handleBack}
           onHome={handleHome}
           onSettings={handleSettings}
@@ -448,6 +470,27 @@ function AppContent() {
           onCancel={handleSignatureCancel}
           onLogout={handleLogout}
           onHome={handleHome}
+        />
+      )}
+
+      {currentScreen === 'view-all-tokens' && (
+        <ViewAllTokensScreen
+          wallet={selectedWallet}
+          onBack={handleBack}
+          onHome={handleHome}
+          onSettings={handleSettings}
+          onWalletChange={handleWalletChange}
+          onSend={handleSend}
+          onLogout={handleLogout}
+        />
+      )}
+
+      {currentScreen === 'view-all-transactions' && (
+        <ViewAllTransactionsScreen
+          wallet={selectedWallet}
+          onBack={handleBack}
+          onHome={handleHome}
+          onLogout={handleLogout}
         />
       )}
     </>
