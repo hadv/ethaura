@@ -491,6 +491,8 @@ function AppContent() {
           onBack={handleBack}
           onHome={handleHome}
           onLogout={handleLogout}
+          onSettings={handleSettings}
+          onWalletChange={handleWalletClick}
         />
       )}
     </>
