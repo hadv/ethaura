@@ -7,7 +7,7 @@ import { useWeb3Auth } from '../contexts/Web3AuthContext'
 import { useNetwork } from '../contexts/NetworkContext'
 import '../styles/SendTransactionScreen.css'
 
-function SendTransactionScreen({ wallet, onBack, onHome, onSettings, credential, accountConfig, onLogout, onSignatureRequest }) {
+function SendTransactionScreen({ wallet, selectedToken, onBack, onHome, onSettings, credential, accountConfig, onLogout, onSignatureRequest }) {
   const { userInfo } = useWeb3Auth()
   const { networkInfo } = useNetwork()
   const [wallets, setWallets] = useState([])
@@ -92,6 +92,7 @@ function SendTransactionScreen({ wallet, onBack, onHome, onSettings, credential,
               credential={credential}
               accountConfig={walletAccountConfig}
               onSignatureRequest={onSignatureRequest}
+              preSelectedToken={selectedToken}
             />
           </div>
         </div>

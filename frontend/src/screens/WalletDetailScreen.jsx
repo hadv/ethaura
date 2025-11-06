@@ -14,10 +14,12 @@ import ReceiveModal from '../components/ReceiveModal'
 import { WalletConnectModal } from '../components/WalletConnectModal'
 import { SessionProposalModal } from '../components/SessionProposalModal'
 import { SessionRequestModal } from '../components/SessionRequestModal'
+import { createTokenBalanceService } from '../lib/tokenService'
+import { createTransactionHistoryService } from '../lib/transactionService'
 import '../styles/WalletDetailScreen.css'
 import logo from '../assets/logo.svg'
 
-function WalletDetailScreen({ wallet, onBack, onHome, onSettings, onSend, onLogout, onWalletChange }) {
+function WalletDetailScreen({ wallet, onBack, onHome, onSettings, onSend, onLogout, onWalletChange, onViewAllTokens, onViewAllTransactions }) {
   const { userInfo, provider: web3authProvider } = useWeb3Auth()
   const { networkInfo } = useNetwork()
   const { pendingProposal, pendingRequest, isInitialized: wcInitialized } = useWalletConnect()
@@ -107,6 +109,14 @@ function WalletDetailScreen({ wallet, onBack, onHome, onSettings, onSend, onLogo
     }
   }
 
+  // Handle asset click to send
+  const handleAssetClick = (asset) => {
+    // Only allow sending assets with balance > 0
+    if (asset.amount > 0 && onSend) {
+      onSend(asset)
+    }
+  }
+
   const fetchWalletData = useCallback(async () => {
     if (!selectedWallet?.address) return
 
@@ -121,41 +131,34 @@ function WalletDetailScreen({ wallet, onBack, onHome, onSettings, onSend, onLogo
     try {
       const provider = new ethers.JsonRpcProvider(networkInfo.rpcUrl)
 
-      // Fetch balance
-      const balanceWei = await provider.getBalance(selectedWallet.address)
-      const balanceEth = ethers.formatEther(balanceWei)
-      setBalance(balanceEth)
+      // Mock ETH price (in production, fetch from price API like CoinGecko)
+      const ethPriceUSD = 2500
 
-      // Mock USD conversion (in production, fetch from price API)
-      const ethPriceUSD = 2500 // Mock ETH price
-      const usdValue = (parseFloat(balanceEth) * ethPriceUSD).toFixed(2)
-      setBalanceUSD(usdValue)
+      // Create services
+      const tokenService = createTokenBalanceService(provider, networkInfo.name)
+      const txService = createTransactionHistoryService(provider, networkInfo.name)
 
-      // Mock assets data (in production, fetch from token balance APIs)
-      setAssets([
-        {
-          id: 1,
-          name: 'Ether',
-          symbol: 'ETH',
-          icon: '⟠',
-          amount: parseFloat(balanceEth).toFixed(2),
-          amountFull: `${parseFloat(balanceEth).toFixed(2)} ETH`,
-          value: `$${(parseFloat(balanceEth) * ethPriceUSD).toFixed(2)}`
-        }
+      // Fetch token balances and transactions in parallel
+      const [tokenBalances, txHistory] = await Promise.all([
+        tokenService.getAllTokenBalances(selectedWallet.address, ethPriceUSD),
+        txService.getTransactionHistory(selectedWallet.address, 10), // Fetch last 10 transactions
       ])
 
-      // Mock transactions data
-      setTransactions([
-        {
-          id: 1,
-          date: 'Oct 19, 2025',
-          type: 'receive',
-          description: 'Received ETH',
-          amount: '+0.5 ETH',
-          value: '$1,250.00',
-          status: 'completed'
-        }
-      ])
+      // Set assets (tokens with balances)
+      setAssets(tokenBalances)
+
+      // Calculate total balance in USD
+      const totalUSD = tokenBalances.reduce((sum, token) => sum + (token.valueUSD || 0), 0)
+      setBalanceUSD(totalUSD.toFixed(2))
+
+      // Get ETH balance for display
+      const ethToken = tokenBalances.find(t => t.symbol === 'ETH')
+      if (ethToken) {
+        setBalance(ethToken.amount.toString())
+      }
+
+      // Set transactions
+      setTransactions(txHistory)
 
       // Check if account is deployed
       const code = await provider.getCode(selectedWallet.address)
@@ -300,7 +303,7 @@ function WalletDetailScreen({ wallet, onBack, onHome, onSettings, onSend, onLogo
                 </div>
                 <span>Swap</span>
               </button>
-              <button className="action-btn" onClick={onSend}>
+              <button className="action-btn" onClick={() => onSend()}>
                 <div className="action-icon">
                   <HiArrowUp />
                 </div>
@@ -325,16 +328,27 @@ function WalletDetailScreen({ wallet, onBack, onHome, onSettings, onSend, onLogo
           <div className="assets-section">
             <div className="section-header">
               <h3 className="section-title">Top assets</h3>
-              <button className="view-all-btn">
+              <button className="view-all-btn" onClick={onViewAllTokens}>
                 View all <span>→</span>
               </button>
             </div>
             <div className="assets-list">
               {assets.length > 0 ? (
                 assets.map((asset) => (
-                  <div key={asset.id} className="asset-item">
+                  <div
+                    key={asset.id}
+                    className={`asset-item ${asset.amount > 0 ? 'clickable' : 'disabled'}`}
+                    onClick={() => handleAssetClick(asset)}
+                    title={asset.amount > 0 ? `Click to send ${asset.symbol}` : 'No balance to send'}
+                  >
                     <div className="asset-info">
-                      <div className="asset-icon">{asset.icon}</div>
+                      <div className="asset-icon">
+                        {typeof asset.icon === 'string' && asset.icon.startsWith('/') ? (
+                          <img src={asset.icon} alt={asset.symbol} />
+                        ) : (
+                          asset.icon
+                        )}
+                      </div>
                       <div className="asset-details">
                         <div className="asset-name">{asset.name}</div>
                         <div className="asset-symbol">{asset.symbol}</div>
@@ -358,32 +372,48 @@ function WalletDetailScreen({ wallet, onBack, onHome, onSettings, onSend, onLogo
           <div className="transactions-section">
             <div className="section-header">
               <h3 className="section-title">Latest transactions</h3>
-              <button className="view-all-btn">
+              <button className="view-all-btn" onClick={onViewAllTransactions}>
                 View all <span>→</span>
               </button>
             </div>
             {transactions.length > 0 ? (
               <div className="transactions-list">
-                <div className="transaction-date">Oct 19, 2025</div>
-                {transactions.map((tx) => (
-                  <div key={tx.id} className="transaction-item">
-                    <div className="transaction-info">
-                      <div className="transaction-icon">
-                        {tx.type === 'receive' ? '↓' : '↑'}
-                      </div>
-                      <div className="transaction-details">
-                        <div className="transaction-description">{tx.description}</div>
-                        <div className="transaction-status">{tx.status}</div>
-                      </div>
+                {(() => {
+                  // Group transactions by date
+                  const groupedTxs = transactions.reduce((groups, tx) => {
+                    const date = tx.date
+                    if (!groups[date]) {
+                      groups[date] = []
+                    }
+                    groups[date].push(tx)
+                    return groups
+                  }, {})
+
+                  return Object.entries(groupedTxs).map(([date, txs]) => (
+                    <div key={date}>
+                      <div className="transaction-date">{date}</div>
+                      {txs.map((tx) => (
+                        <div key={tx.id} className="transaction-item">
+                          <div className="transaction-info">
+                            <div className="transaction-icon">
+                              {tx.type === 'receive' ? '↓' : tx.type === 'send' ? '↑' : '↔'}
+                            </div>
+                            <div className="transaction-details">
+                              <div className="transaction-description">{tx.description}</div>
+                              <div className="transaction-status">{tx.status}</div>
+                            </div>
+                          </div>
+                          <div className="transaction-amount">
+                            <div className={`transaction-value ${tx.type === 'receive' ? 'positive' : 'negative'}`}>
+                              {tx.amount}
+                            </div>
+                            {tx.value && <div className="transaction-usd">{tx.value}</div>}
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                    <div className="transaction-amount">
-                      <div className={`transaction-value ${tx.type === 'receive' ? 'positive' : 'negative'}`}>
-                        {tx.amount}
-                      </div>
-                      <div className="transaction-usd">{tx.value}</div>
-                    </div>
-                  </div>
-                ))}
+                  ))
+                })()}
               </div>
             ) : (
               <div className="empty-state">

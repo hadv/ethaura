@@ -44,18 +44,25 @@
   margin-bottom: 20px;
 }
 
-.balance-amount {
-  font-size: 48px;
-  font-weight: 400;
-  color: #000;
-  line-height: 1;
+.home-screen .balance-currency {
+  font-size: 48px !important;
+  font-weight: 600 !important;
+  color: #000 !important;
+  line-height: 1 !important;
 }
 
-.balance-decimals {
-  font-size: 32px;
-  font-weight: 400;
-  color: #9ca3af;
-  line-height: 1;
+.home-screen .balance-amount {
+  font-size: 48px !important;
+  font-weight: 600 !important;
+  color: #000 !important;
+  line-height: 1 !important;
+}
+
+.home-screen .balance-decimals {
+  font-size: 32px !important;
+  font-weight: 400 !important;
+  color: #9ca3af !important;
+  line-height: 1 !important;
 }
 
 .balance-change {
@@ -421,12 +428,16 @@
     padding: 20px;
   }
 
-  .balance-amount {
-    font-size: 36px;
+  .home-screen .balance-currency {
+    font-size: 36px !important;
   }
 
-  .balance-decimals {
-    font-size: 24px;
+  .home-screen .balance-amount {
+    font-size: 36px !important;
+  }
+
+  .home-screen .balance-decimals {
+    font-size: 24px !important;
   }
 
   .balance-change {

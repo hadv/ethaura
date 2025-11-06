@@ -118,8 +118,8 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onLogo
     const total = wallets.reduce((sum, wallet) => {
       return sum + parseFloat(wallet.balanceUSD || 0)
     }, 0)
-    // Return the decimal part
-    const decimals = (total % 1).toFixed(2).substring(1) // Gets ".XX"
+    // Return the decimal part (without the dot)
+    const decimals = (total % 1).toFixed(2).substring(2) // Gets "XX" (skip the "0.")
     return decimals
   }
 
@@ -497,8 +497,9 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onLogo
           <div className="balance-card">
             <div className="balance-label">Total Balance</div>
             <div className="balance-main">
-              <span className="balance-amount">${getTotalBalance()}</span>
-              <span className="balance-decimals">{getTotalBalanceDecimals()}</span>
+              <span className="balance-currency">$</span>
+              <span className="balance-amount">{getTotalBalance()}</span>
+              <span className="balance-decimals">.{getTotalBalanceDecimals()}</span>
               <span className={`balance-change ${getTotalPercentChange().startsWith('+') ? 'positive' : 'negative'}`}>
                 {getTotalPercentChange().startsWith('+') ? '▲' : '▼'} {getTotalPercentChange()}%
               </span>
