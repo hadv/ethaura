@@ -569,8 +569,8 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onLogo
                 <h3>No Wallets Yet</h3>
                 <p>Create a new smart account or add an existing one</p>
                 <div className="empty-actions">
-                  <button className="create-first-btn" onClick={onCreateWallet}>
-                    Create New Wallet
+                  <button className="create-first-btn" onClick={() => setShowAddModal(true)}>
+                    Add Wallet
                   </button>
                 </div>
               </div>
@@ -629,9 +629,23 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onLogo
           </div>
         </div>
 
-        {/* Right Panel - Placeholder for future content */}
+        {/* Right Panel - Transactions */}
         <div className="right-panel">
-          {/* This can be used for charts, activity, etc. in the future */}
+          {/* Pending Transactions */}
+          <div className="sidebar-card">
+            <h3 className="sidebar-title">Pending transactions</h3>
+            <div className="sidebar-empty">
+              <p>No pending transaction.</p>
+            </div>
+          </div>
+
+          {/* Queued Transactions */}
+          <div className="sidebar-card">
+            <h3 className="sidebar-title">Queued transactions</h3>
+            <div className="sidebar-empty">
+              <p>No queued transaction.</p>
+            </div>
+          </div>
         </div>
       </div>
 

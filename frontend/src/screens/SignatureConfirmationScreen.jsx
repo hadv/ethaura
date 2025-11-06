@@ -25,6 +25,9 @@ function SignatureConfirmationScreen({
     setIsLoading(true)
     try {
       await onConfirm()
+      // Don't reset isLoading - keep showing "Signing..."
+      // The transaction broadcast will navigate us away from this screen
+      // If there's an error, it will be caught below
     } catch (error) {
       console.error('Signature confirmation error:', error)
       setIsLoading(false)

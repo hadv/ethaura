@@ -84,14 +84,39 @@ export async function storePasskeyCredential(signMessageFn, ownerAddress, accoun
     })
 
     if (!response.ok) {
-      const error = await response.json()
-      throw new Error(error.error || 'Failed to store credential')
+      let errorMessage = 'Failed to store credential'
+      try {
+        const contentType = response.headers.get('content-type')
+        if (contentType && contentType.includes('application/json')) {
+          const error = await response.json()
+          errorMessage = error.error || errorMessage
+        } else {
+          const text = await response.text()
+          errorMessage = `Server error: ${response.status} ${response.statusText}`
+          console.error('Server returned non-JSON response:', text.substring(0, 200))
+        }
+      } catch (parseError) {
+        console.error('Failed to parse error response:', parseError)
+      }
+      throw new Error(errorMessage)
     }
 
-    const result = await response.json()
-    console.log('✅ Passkey credential stored on server:', result)
+    // Parse successful response
+    try {
+      const contentType = response.headers.get('content-type')
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text()
+        console.error('Server returned non-JSON success response:', text.substring(0, 200))
+        throw new Error('Server returned invalid response format')
+      }
 
-    return result
+      const result = await response.json()
+      console.log('✅ Passkey credential stored on server:', result)
+      return result
+    } catch (parseError) {
+      console.error('Failed to parse success response:', parseError)
+      throw new Error('Failed to parse server response')
+    }
   } catch (error) {
     console.error('❌ Error storing passkey credential:', error)
     throw error
@@ -136,14 +161,39 @@ export async function retrievePasskeyCredential(signMessageFn, ownerAddress, acc
     }
 
     if (!response.ok) {
-      const error = await response.json()
-      throw new Error(error.error || 'Failed to retrieve credential')
+      let errorMessage = 'Failed to retrieve credential'
+      try {
+        const contentType = response.headers.get('content-type')
+        if (contentType && contentType.includes('application/json')) {
+          const error = await response.json()
+          errorMessage = error.error || errorMessage
+        } else {
+          const text = await response.text()
+          errorMessage = `Server error: ${response.status} ${response.statusText}`
+          console.error('Server returned non-JSON response:', text.substring(0, 200))
+        }
+      } catch (parseError) {
+        console.error('Failed to parse error response:', parseError)
+      }
+      throw new Error(errorMessage)
     }
 
-    const result = await response.json()
-    console.log('✅ Passkey credential retrieved from server')
+    // Parse successful response
+    try {
+      const contentType = response.headers.get('content-type')
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text()
+        console.error('Server returned non-JSON success response:', text.substring(0, 200))
+        throw new Error('Server returned invalid response format')
+      }
 
-    return result.credential
+      const result = await response.json()
+      console.log('✅ Passkey credential retrieved from server')
+      return result.credential
+    } catch (parseError) {
+      console.error('Failed to parse success response:', parseError)
+      throw new Error('Failed to parse server response')
+    }
   } catch (error) {
     console.error('❌ Error retrieving passkey credential:', error)
     throw error
@@ -182,14 +232,39 @@ export async function deletePasskeyCredential(signMessageFn, ownerAddress, accou
     })
 
     if (!response.ok) {
-      const error = await response.json()
-      throw new Error(error.error || 'Failed to delete credential')
+      let errorMessage = 'Failed to delete credential'
+      try {
+        const contentType = response.headers.get('content-type')
+        if (contentType && contentType.includes('application/json')) {
+          const error = await response.json()
+          errorMessage = error.error || errorMessage
+        } else {
+          const text = await response.text()
+          errorMessage = `Server error: ${response.status} ${response.statusText}`
+          console.error('Server returned non-JSON response:', text.substring(0, 200))
+        }
+      } catch (parseError) {
+        console.error('Failed to parse error response:', parseError)
+      }
+      throw new Error(errorMessage)
     }
 
-    const result = await response.json()
-    console.log('✅ Passkey credential deleted from server:', result)
+    // Parse successful response
+    try {
+      const contentType = response.headers.get('content-type')
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text()
+        console.error('Server returned non-JSON success response:', text.substring(0, 200))
+        throw new Error('Server returned invalid response format')
+      }
 
-    return result
+      const result = await response.json()
+      console.log('✅ Passkey credential deleted from server:', result)
+      return result
+    } catch (parseError) {
+      console.error('Failed to parse success response:', parseError)
+      throw new Error('Failed to parse server response')
+    }
   } catch (error) {
     console.error('❌ Error deleting passkey credential:', error)
     throw error
