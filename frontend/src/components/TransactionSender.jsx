@@ -12,7 +12,7 @@ import { SUPPORTED_TOKENS, ERC20_ABI, ethIcon } from '../lib/constants'
 import { walletDataCache } from '../lib/walletDataCache'
 import '../styles/TransactionSender.css'
 
-function TransactionSender({ accountAddress, credential, accountConfig, onSignatureRequest, preSelectedToken }) {
+function TransactionSender({ accountAddress, credential, accountConfig, onSignatureRequest, preSelectedToken, onTransactionBroadcast }) {
   const { isConnected, signMessage, signRawHash, address: ownerAddress } = useWeb3Auth()
   const { networkInfo } = useNetwork()
   const sdk = useP256SDK()
@@ -975,43 +975,52 @@ function TransactionSender({ accountAddress, credential, accountConfig, onSignat
 
       setTxHash(transactionHash)
       const txType = selectedToken ? `${selectedToken.symbol} transfer` : 'ETH transfer'
-      setStatus(`✅ Transaction confirmed! ${isActuallyDeployed ? '' : 'Account deployed + '}${txType} executed`)
+      setStatus(`✅ Transaction broadcast! ${isActuallyDeployed ? '' : 'Account deployed + '}${txType} submitted`)
 
-      // Create transaction object to add to cache
+      // Create transaction object
       const now = Date.now()
       const date = new Date(now)
       const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 
-      const newTransaction = {
+      const transactionData = {
         hash: transactionHash,
         from: accountAddress,
         to: targetAddress,
         value: selectedToken ? '0' : ethers.formatEther(amountWei),
-        input: selectedToken ? '0x' : '0x', // Will be updated if needed
+        input: selectedToken ? '0x' : '0x',
         blockNumber: txReceipt.blockNumber || 0,
         timestamp: now,
         date: dateStr,
-        status: 'success',
+        status: 'pending',
         type: 'send',
         description: selectedToken ? `Sent ${selectedToken.symbol}` : 'Sent ETH',
         amount: selectedToken ? amount : ethers.formatEther(amountWei),
         tokenSymbol: selectedToken ? selectedToken.symbol : 'ETH',
         tokenIcon: selectedToken ? selectedToken.icon : ethIcon,
-        isContractCall: selectedToken ? true : false, // Token transfers are contract calls
+        isContractCall: selectedToken ? true : false,
       }
 
-      // Add new transaction to cache at the top
-      walletDataCache.addTransactionToCache(accountAddress, networkInfo.name, newTransaction)
+      // Navigate to result screen if callback provided
+      if (onTransactionBroadcast) {
+        // Call the callback immediately to navigate to result screen
+        // Don't reset loading state - let the result screen handle it
+        onTransactionBroadcast(transactionData)
+        // Don't set loading to false here - keep the loading state
+        return
+      } else {
+        // Fallback: Add to cache immediately (old behavior)
+        walletDataCache.addTransactionToCache(accountAddress, networkInfo.name, transactionData)
 
-      // Clear cache and refresh account info
-      sdk.accountManager.clearCache(accountAddress)
-      const updatedInfo = await sdk.getAccountInfo(accountAddress)
-      setAccountInfo({ ...updatedInfo, deployed: updatedInfo.deployed })
+        // Clear cache and refresh account info
+        sdk.accountManager.clearCache(accountAddress)
+        const updatedInfo = await sdk.getAccountInfo(accountAddress)
+        setAccountInfo({ ...updatedInfo, deployed: updatedInfo.deployed })
 
-      // Reload balances
-      await loadBalanceInfo(accountAddress)
-      if (selectedToken) {
-        await loadTokenBalances(accountAddress)
+        // Reload balances
+        await loadBalanceInfo(accountAddress)
+        if (selectedToken) {
+          await loadTokenBalances(accountAddress)
+        }
       }
 
     } catch (err) {
@@ -1030,7 +1039,10 @@ function TransactionSender({ accountAddress, credential, accountConfig, onSignat
       setError(errorMessage)
       setStatus('')
     } finally {
-      setLoading(false)
+      // Only reset loading if we didn't navigate to result screen
+      if (!onTransactionBroadcast) {
+        setLoading(false)
+      }
     }
   }
 

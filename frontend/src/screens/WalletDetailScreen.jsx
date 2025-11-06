@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { ethers } from 'ethers'
 import { HiArrowUp, HiArrowDown } from 'react-icons/hi'
 import { BiTransfer } from 'react-icons/bi'
@@ -406,8 +406,8 @@ function WalletDetailScreen({ wallet, onBack, onHome, onSettings, onSend, onLogo
                   }, {})
 
                   return Object.entries(groupedTxs).map(([date, txs]) => (
-                    <div key={date}>
-                      <div className="transaction-date">{date}</div>
+                    <React.Fragment key={date}>
+                      <div key={`date-${date}`} className="transaction-date">{date}</div>
                       {txs.map((tx) => {
                         const explorerUrl = `${networkInfo.explorerUrl}/tx/${tx.hash}`
 
@@ -444,7 +444,7 @@ function WalletDetailScreen({ wallet, onBack, onHome, onSettings, onSend, onLogo
                           </div>
                         )
                       })}
-                    </div>
+                    </React.Fragment>
                   ))
                 })()}
               </div>
@@ -459,50 +459,6 @@ function WalletDetailScreen({ wallet, onBack, onHome, onSettings, onSend, onLogo
 
         {/* Sidebar */}
         <div className="sidebar-content">
-          {/* Security Status */}
-          <div className="sidebar-card">
-            <h3 className="sidebar-title">Security Status</h3>
-            <div className="security-status-content">
-              {securityStatus.error ? (
-                <div className="status-item">
-                  <span className="status-label">⚠️ Network:</span>
-                  <span className="status-value" style={{ color: '#ff6b6b', fontSize: '0.9em' }}>
-                    {securityStatus.error}
-                  </span>
-                </div>
-              ) : (
-                <>
-                  <div className="status-item">
-                    <span className="status-label">Status:</span>
-                    <span className={`status-value ${securityStatus.isDeployed ? 'deployed' : 'not-deployed'}`}>
-                      {securityStatus.isDeployed ? '✅ Deployed' : '⏳ Not Deployed'}
-                    </span>
-                  </div>
-                  <div className="status-item">
-                    <span className="status-label">Security:</span>
-                    <span className={`status-value ${securityStatus.has2FA ? 'enabled' : 'disabled'}`}>
-                      {securityStatus.has2FA ? '🔒 2FA Enabled' : '🔓 2FA Disabled'}
-                    </span>
-                  </div>
-                  {securityStatus.guardianCount > 0 && (
-                    <div className="status-item">
-                      <span className="status-label">Guardians:</span>
-                      <span className="status-value">
-                        👥 {securityStatus.guardianCount} Guardian{securityStatus.guardianCount !== 1 ? 's' : ''}
-                      </span>
-                    </div>
-                  )}
-                </>
-              )}
-              <div className="status-item">
-                <span className="status-label">Network:</span>
-                <span className="status-value network-name">
-                  {networkInfo.icon} {networkInfo.name}
-                </span>
-              </div>
-            </div>
-          </div>
-
           {/* Pending Transactions */}
           <div className="sidebar-card">
             <h3 className="sidebar-title">Pending transactions</h3>

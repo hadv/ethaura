@@ -6,10 +6,9 @@ import LoginScreen from './components/LoginScreen'
 import HomeScreen from './screens/HomeScreen'
 import WalletDetailScreen from './screens/WalletDetailScreen'
 import WalletSettingsScreen from './screens/WalletSettingsScreen'
-import CreateWalletScreen from './screens/CreateWalletScreen'
-import NewWalletScreen from './screens/NewWalletScreen'
 import SendTransactionScreen from './screens/SendTransactionScreen'
 import SignatureConfirmationScreen from './screens/SignatureConfirmationScreen'
+import TransactionResultScreen from './screens/TransactionResultScreen'
 import ViewAllTokensScreen from './screens/ViewAllTokensScreen'
 import ViewAllTransactionsScreen from './screens/ViewAllTransactionsScreen'
 import { retrievePasskeyCredential, storePasskeyCredential } from './lib/passkeyStorage'
@@ -19,12 +18,13 @@ function AppContent() {
   const { isConnected, isLoading, logout, signMessage, address } = useWeb3Auth()
 
   // Navigation state
-  const [currentScreen, setCurrentScreen] = useState('home') // 'home', 'wallet-detail', 'wallet-settings', 'add-wallet', 'new-wallet', 'send-transaction', 'signature-confirmation', 'view-all-tokens', 'view-all-transactions'
+  const [currentScreen, setCurrentScreen] = useState('home') // 'home', 'wallet-detail', 'wallet-settings', 'add-wallet', 'new-wallet', 'send-transaction', 'signature-confirmation', 'transaction-result', 'view-all-tokens', 'view-all-transactions'
   const [selectedWallet, setSelectedWallet] = useState(null)
   const [selectedToken, setSelectedToken] = useState(null) // Pre-selected token for send screen
   const [previousScreen, setPreviousScreen] = useState(null) // Track previous screen for proper back navigation
   const [signatureData, setSignatureData] = useState(null) // Data for signature confirmation screen
   const [signatureCallbacks, setSignatureCallbacks] = useState(null) // Callbacks for signature confirmation
+  const [transactionData, setTransactionData] = useState(null) // Data for transaction result screen
 
   // Helper to serialize credential (convert ArrayBuffers to base64)
   const serializeCredential = (cred) => {
@@ -116,8 +116,13 @@ function AppContent() {
         setCredentialLoading(true)
 
         // Try to load from server first
-        console.log(`📡 Attempting to load from server...`)
-        const serverCredential = await retrievePasskeyCredential(signMessage, address, accountAddress)
+        let serverCredential = null
+        try {
+          console.log(`📡 Attempting to load from server...`)
+          serverCredential = await retrievePasskeyCredential(signMessage, address, accountAddress)
+        } catch (serverError) {
+          console.warn('⚠️  Failed to load from server, will try localStorage:', serverError.message)
+        }
 
         if (serverCredential) {
           console.log(`✅ Loaded passkey credential from server for account: ${accountAddress}`)
@@ -131,7 +136,7 @@ function AppContent() {
           setCredentialLoading(false)
           return
         } else {
-          console.log('⚠️  Server returned null/undefined credential')
+          console.log('⚠️  Server returned null/undefined credential, trying localStorage...')
         }
 
         // Fallback to localStorage
@@ -158,8 +163,8 @@ function AppContent() {
 
         setCredentialLoading(false)
       } catch (error) {
-        console.error('❌ FATAL ERROR loading credential:', error)
-        console.error('Error stack:', error.stack)
+        console.error('❌ Error loading credential from localStorage:', error)
+        console.error('Error details:', error.message)
         setPasskeyCredential(null)
         setCredentialLoading(false)
       }
@@ -223,42 +228,7 @@ function AppContent() {
     setCurrentScreen('wallet-detail')
   }
 
-  const handleAddWallet = () => {
-    setPreviousScreen(currentScreen)
-    setCurrentScreen('add-wallet')
-  }
 
-  const handleCreateWallet = () => {
-    setPreviousScreen(currentScreen)
-    setCurrentScreen('new-wallet')
-  }
-
-  const handleWalletCreated = (address) => {
-    // Wallet was added (imported) - just go back to home
-    // The CreateWalletScreen already added it to localStorage
-    setPreviousScreen(null)
-    setCurrentScreen('home')
-  }
-
-  const handleNewWalletCreated = (address) => {
-    // New wallet was created - add to list
-    const walletsList = JSON.parse(localStorage.getItem('ethaura_wallets_list') || '[]')
-    const newWallet = {
-      id: Date.now().toString(),
-      name: `Wallet ${walletsList.length + 1}`,
-      address: address,
-      icon: '🔐',
-      has2FA: accountConfig?.require2FA || false,
-      guardianCount: 0,
-      balance: '0'
-    }
-    walletsList.push(newWallet)
-    localStorage.setItem('ethaura_wallets_list', JSON.stringify(walletsList))
-
-    // Go back to home
-    setPreviousScreen(null)
-    setCurrentScreen('home')
-  }
 
   const handleSettings = () => {
     setPreviousScreen(currentScreen)
@@ -304,11 +274,8 @@ function AppContent() {
     if (signatureCallbacks?.onConfirm) {
       await signatureCallbacks.onConfirm()
     }
-    // Return to previous screen
-    setCurrentScreen(previousScreen || 'send-transaction')
-    setSignatureData(null)
-    setSignatureCallbacks(null)
-    setPreviousScreen(null)
+    // Don't navigate or clean up here - let the transaction broadcast callback handle everything
+    // The signature screen will stay in "Signing..." state until transaction is broadcast
   }
 
   const handleSignatureCancel = () => {
@@ -320,6 +287,16 @@ function AppContent() {
     setSignatureData(null)
     setSignatureCallbacks(null)
     setPreviousScreen(null)
+  }
+
+  // Handle transaction broadcast navigation
+  const handleTransactionBroadcast = (txData) => {
+    setTransactionData(txData)
+    // Clean up signature state now that we're navigating away
+    setSignatureData(null)
+    setSignatureCallbacks(null)
+    setPreviousScreen(currentScreen)
+    setCurrentScreen('transaction-result')
   }
 
   const handleBack = () => {
@@ -342,6 +319,11 @@ function AppContent() {
     } else if (currentScreen === 'signature-confirmation') {
       // Cancel signature and go back
       handleSignatureCancel()
+    } else if (currentScreen === 'transaction-result') {
+      // Go back to send transaction screen
+      setCurrentScreen('send-transaction')
+      setTransactionData(null)
+      setPreviousScreen(null)
     } else if (currentScreen === 'view-all-tokens' || currentScreen === 'view-all-transactions') {
       // Go back to wallet detail
       setCurrentScreen(previousScreen || 'wallet-detail')
@@ -361,6 +343,7 @@ function AppContent() {
     setPreviousScreen(null)
     setSignatureData(null)
     setSignatureCallbacks(null)
+    setTransactionData(null)
   }
 
   const handleLogout = async () => {
@@ -395,8 +378,6 @@ function AppContent() {
       {currentScreen === 'home' && (
         <HomeScreen
           onWalletClick={handleWalletClick}
-          onAddWallet={handleAddWallet}
-          onCreateWallet={handleCreateWallet}
           onSend={handleSendFromHome}
           onLogout={handleLogout}
         />
@@ -428,25 +409,7 @@ function AppContent() {
         />
       )}
 
-      {currentScreen === 'add-wallet' && (
-        <CreateWalletScreen
-          onBack={handleBack}
-          onWalletCreated={handleWalletCreated}
-          onLogout={handleLogout}
-          onHome={handleHome}
-        />
-      )}
 
-      {currentScreen === 'new-wallet' && (
-        <NewWalletScreen
-          onBack={handleBack}
-          onWalletCreated={handleNewWalletCreated}
-          credential={passkeyCredential}
-          onCredentialCreated={handleCredentialCreated}
-          onLogout={handleLogout}
-          onHome={handleHome}
-        />
-      )}
 
       {currentScreen === 'send-transaction' && (
         <SendTransactionScreen
@@ -459,6 +422,7 @@ function AppContent() {
           accountConfig={accountConfig}
           onLogout={handleLogout}
           onSignatureRequest={handleSignatureRequest}
+          onTransactionBroadcast={handleTransactionBroadcast}
         />
       )}
 
@@ -470,6 +434,19 @@ function AppContent() {
           onCancel={handleSignatureCancel}
           onLogout={handleLogout}
           onHome={handleHome}
+        />
+      )}
+
+      {currentScreen === 'transaction-result' && (
+        <TransactionResultScreen
+          wallet={selectedWallet}
+          transactionData={transactionData}
+          onBack={handleBack}
+          onHome={handleHome}
+          onSettings={handleSettings}
+          onLogout={handleLogout}
+          onWalletChange={handleWalletChange}
+          wallets={JSON.parse(localStorage.getItem('ethaura_wallets_list') || '[]')}
         />
       )}
 
