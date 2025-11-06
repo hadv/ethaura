@@ -9,6 +9,9 @@ import { HiPencil, HiTrash } from 'react-icons/hi2'
 import Header from '../components/Header'
 import { Identicon } from '../utils/identicon.jsx'
 import ReceiveModal from '../components/ReceiveModal'
+import { walletDataCache } from '../lib/walletDataCache'
+import { createTokenBalanceService } from '../lib/tokenService'
+import { createTransactionHistoryService } from '../lib/transactionService'
 import '../styles/HomeScreen.css'
 import logo from '../assets/logo.svg'
 
@@ -41,6 +44,30 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onLogo
   useEffect(() => {
     loadWallets()
   }, [networkInfo.chainId])
+
+  // Preload wallet data in background
+  useEffect(() => {
+    if (wallets.length === 0) return
+
+    const preloadData = async () => {
+      try {
+        const provider = new ethers.JsonRpcProvider(networkInfo.rpcUrl)
+        const tokenService = createTokenBalanceService(provider, networkInfo.name)
+        const txService = createTransactionHistoryService(provider, networkInfo.name)
+
+        console.log(`🚀 Starting background preload for ${wallets.length} wallets`)
+
+        // Preload data for all wallets in background
+        walletDataCache.preloadMultipleWallets(wallets, networkInfo.name, tokenService, txService)
+      } catch (error) {
+        console.error('Failed to start preload:', error)
+      }
+    }
+
+    // Start preload after a short delay to avoid blocking initial render
+    const timer = setTimeout(preloadData, 500)
+    return () => clearTimeout(timer)
+  }, [wallets, networkInfo])
 
   // Close menu when clicking outside
   useEffect(() => {

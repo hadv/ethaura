@@ -9,6 +9,7 @@ import { buildSendEthUserOp, getUserOpHash, signUserOperation, signUserOperation
 import { getUserFriendlyMessage, getSuggestedAction, isRetryableError } from '../lib/errors'
 import { formatPublicKeyForContract } from '../lib/accountManager'
 import { SUPPORTED_TOKENS, ERC20_ABI, ethIcon } from '../lib/constants'
+import { walletDataCache } from '../lib/walletDataCache'
 import '../styles/TransactionSender.css'
 
 function TransactionSender({ accountAddress, credential, accountConfig, onSignatureRequest, preSelectedToken }) {
@@ -965,11 +966,42 @@ function TransactionSender({ accountAddress, credential, accountConfig, onSignat
 
       // Step 8: Submit UserOperation to bundler
       setStatus('Submitting to bundler...')
-      const receipt = await sdk.bundler.sendUserOperationAndWait(signedUserOp)
+      const userOpReceipt = await sdk.bundler.sendUserOperationAndWait(signedUserOp)
 
-      setTxHash(receipt.transactionHash)
+      // Extract transaction hash from the receipt
+      // ERC-4337 receipt has a nested 'receipt' field with the actual transaction receipt
+      const txReceipt = userOpReceipt.receipt || userOpReceipt
+      const transactionHash = txReceipt.transactionHash || userOpReceipt.userOpHash || ''
+
+      setTxHash(transactionHash)
       const txType = selectedToken ? `${selectedToken.symbol} transfer` : 'ETH transfer'
       setStatus(`✅ Transaction confirmed! ${isActuallyDeployed ? '' : 'Account deployed + '}${txType} executed`)
+
+      // Create transaction object to add to cache
+      const now = Date.now()
+      const date = new Date(now)
+      const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+
+      const newTransaction = {
+        hash: transactionHash,
+        from: accountAddress,
+        to: targetAddress,
+        value: selectedToken ? '0' : ethers.formatEther(amountWei),
+        input: selectedToken ? '0x' : '0x', // Will be updated if needed
+        blockNumber: txReceipt.blockNumber || 0,
+        timestamp: now,
+        date: dateStr,
+        status: 'success',
+        type: 'send',
+        description: selectedToken ? `Sent ${selectedToken.symbol}` : 'Sent ETH',
+        amount: selectedToken ? amount : ethers.formatEther(amountWei),
+        tokenSymbol: selectedToken ? selectedToken.symbol : 'ETH',
+        tokenIcon: selectedToken ? selectedToken.icon : ethIcon,
+        isContractCall: selectedToken ? true : false, // Token transfers are contract calls
+      }
+
+      // Add new transaction to cache at the top
+      walletDataCache.addTransactionToCache(accountAddress, networkInfo.name, newTransaction)
 
       // Clear cache and refresh account info
       sdk.accountManager.clearCache(accountAddress)

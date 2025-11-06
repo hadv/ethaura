@@ -16,6 +16,7 @@ import { SessionProposalModal } from '../components/SessionProposalModal'
 import { SessionRequestModal } from '../components/SessionRequestModal'
 import { createTokenBalanceService } from '../lib/tokenService'
 import { createTransactionHistoryService } from '../lib/transactionService'
+import { walletDataCache } from '../lib/walletDataCache'
 import '../styles/WalletDetailScreen.css'
 import logo from '../assets/logo.svg'
 
@@ -138,11 +139,26 @@ function WalletDetailScreen({ wallet, onBack, onHome, onSettings, onSend, onLogo
       const tokenService = createTokenBalanceService(provider, networkInfo.name)
       const txService = createTransactionHistoryService(provider, networkInfo.name)
 
-      // Fetch token balances and transactions in parallel
-      const [tokenBalances, txHistory] = await Promise.all([
-        tokenService.getAllTokenBalances(selectedWallet.address, ethPriceUSD),
-        txService.getTransactionHistory(selectedWallet.address, 10), // Fetch last 10 transactions
-      ])
+      // Try to get cached data first
+      let tokenBalances, txHistory
+      const cachedData = walletDataCache.getCachedData(selectedWallet.address, networkInfo.name)
+
+      if (cachedData) {
+        console.log('📦 Using cached wallet data')
+        tokenBalances = cachedData.assets
+        txHistory = cachedData.transactions
+      } else {
+        console.log('🔄 Fetching fresh wallet data')
+        // Fetch token balances and transactions in parallel
+        const [assets, transactions] = await Promise.all([
+          tokenService.getAllTokenBalances(selectedWallet.address, ethPriceUSD),
+          txService.getTransactionHistory(selectedWallet.address, 10), // Fetch last 10 transactions
+        ])
+        tokenBalances = assets
+        txHistory = transactions
+        // Cache the data for future use
+        walletDataCache.setCachedData(selectedWallet.address, networkInfo.name, tokenBalances, txHistory)
+      }
 
       // Set assets (tokens with balances)
       setAssets(tokenBalances)
@@ -392,25 +408,42 @@ function WalletDetailScreen({ wallet, onBack, onHome, onSettings, onSend, onLogo
                   return Object.entries(groupedTxs).map(([date, txs]) => (
                     <div key={date}>
                       <div className="transaction-date">{date}</div>
-                      {txs.map((tx) => (
-                        <div key={tx.id} className="transaction-item">
-                          <div className="transaction-info">
-                            <div className="transaction-icon">
-                              {tx.type === 'receive' ? '↓' : tx.type === 'send' ? '↑' : '↔'}
+                      {txs.map((tx) => {
+                        const explorerUrl = `${networkInfo.explorerUrl}/tx/${tx.hash}`
+
+                        return (
+                          <div
+                            key={tx.id}
+                            className="transaction-item clickable"
+                            onClick={() => window.open(explorerUrl, '_blank', 'noopener,noreferrer')}
+                            title="Click to view on explorer"
+                          >
+                            <div className="transaction-info">
+                              {tx.tokenIcon ? (
+                                <div className="transaction-icon-with-badge">
+                                  <img src={tx.tokenIcon} alt={tx.tokenSymbol || 'ETH'} className="token-icon-img" />
+                                  <div className={`direction-badge ${tx.type}`}>
+                                    {tx.type === 'receive' ? '↓' : tx.type === 'send' ? '↑' : '↔'}
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="transaction-icon">
+                                  {tx.type === 'receive' ? '↓' : tx.type === 'send' ? '↑' : '↔'}
+                                </div>
+                              )}
+                              <div className="transaction-details">
+                                <div className="transaction-description">{tx.description}</div>
+                                <div className="transaction-status">{tx.status}</div>
+                              </div>
                             </div>
-                            <div className="transaction-details">
-                              <div className="transaction-description">{tx.description}</div>
-                              <div className="transaction-status">{tx.status}</div>
+                            <div className="transaction-amount">
+                              <div className={`transaction-value ${tx.type === 'receive' ? 'positive' : 'negative'}`}>
+                                {tx.amount}
+                              </div>
                             </div>
                           </div>
-                          <div className="transaction-amount">
-                            <div className={`transaction-value ${tx.type === 'receive' ? 'positive' : 'negative'}`}>
-                              {tx.amount}
-                            </div>
-                            {tx.value && <div className="transaction-usd">{tx.value}</div>}
-                          </div>
-                        </div>
-                      ))}
+                        )
+                      })}
                     </div>
                   ))
                 })()}
