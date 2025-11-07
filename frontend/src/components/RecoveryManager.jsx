@@ -317,13 +317,8 @@ function RecoveryManager({ accountAddress, credential }) {
     }
   }
 
-  // Cancel recovery (owner only, via passkey signature)
+  // Cancel recovery (owner only, via EntryPoint with passkey OR owner signature)
   const handleCancelRecovery = async (nonce) => {
-    if (!credential) {
-      setError('Please create a passkey first')
-      return
-    }
-
     setLoading(true)
     setError('')
     setStatus(`Cancelling recovery request ${nonce}...`)
@@ -331,59 +326,102 @@ function RecoveryManager({ accountAddress, credential }) {
     try {
       console.log('🔐 Cancelling recovery:', { accountAddress, nonce })
 
-      // Check if account is deployed and get 2FA status
+      // Check on-chain account state to determine signature format
       const isDeployed = await sdk.accountManager.isDeployed(accountAddress)
-      let ownerSignature = null
+
+      let hasPasskey = false
+      let twoFactorEnabled = false
 
       if (isDeployed) {
-        // Get 2FA status from deployed account
+        // Get on-chain account info
         const accountInfo = await sdk.getAccountInfo(accountAddress)
-        console.log('🔐 Account 2FA status:', { twoFactorEnabled: accountInfo.twoFactorEnabled })
+        hasPasskey = accountInfo.hasPasskey
+        twoFactorEnabled = accountInfo.twoFactorEnabled
 
-        // Only get owner signature if 2FA is enabled
-        if (accountInfo.twoFactorEnabled) {
-          setStatus('🔐 Step 1/2: Requesting signature from your social login account...')
+        console.log('🔐 On-chain account state:', {
+          isDeployed,
+          hasPasskey,
+          twoFactorEnabled,
+          qx: accountInfo.qx,
+          qy: accountInfo.qy,
+          hasCredential: !!credential
+        })
+      } else {
+        // Account not deployed yet - check initCode
+        console.log('⚠️ Account not deployed yet, cannot cancel recovery')
+        setError('Account must be deployed to cancel recovery')
+        return
+      }
 
-          // We need to build the UserOperation to get the userOpHash for signing
-          const accountContract = sdk.accountManager.getAccountContract(accountAddress)
-          const data = accountContract.interface.encodeFunctionData('cancelRecovery', [nonce])
-          const accountNonce = await sdk.accountManager.getNonce(accountAddress)
+      // If account has no passkey (qx=0, qy=0), use owner-only mode (65-byte ECDSA signature)
+      if (!hasPasskey) {
+        setStatus('🔐 Cancelling recovery with owner signature (owner-only mode)...')
 
-          // Import userOperation utilities
-          const { encodeExecute, createUserOperation, getUserOpHash } = await import('../lib/userOperation.js')
-          const callData = encodeExecute(accountAddress, 0n, data)
+        const receipt = await sdk.cancelRecoveryOwnerOnly({
+          accountAddress,
+          requestNonce: nonce,
+          getSigner,
+        })
 
-          // Create UserOperation
-          const userOp = createUserOperation({
-            sender: accountAddress,
+        console.log('✅ Recovery cancelled (owner-only mode):', receipt)
+        setStatus('✅ Recovery cancelled successfully!')
+
+        // Refresh recovery info
+        await fetchRecoveryInfo()
+        return
+      }
+
+      // Account has passkey - require passkey credential
+      if (!credential) {
+        setError('This account requires a passkey to cancel recovery. Please use the device with the passkey.')
+        return
+      }
+
+      let ownerSignature = null
+
+      if (twoFactorEnabled) {
+        console.log('🔐 Account has 2FA enabled, need owner signature')
+        setStatus('🔐 Step 1/2: Requesting signature from your social login account...')
+
+        // We need to build the UserOperation to get the userOpHash for signing
+        const accountContract = sdk.accountManager.getAccountContract(accountAddress)
+        const data = accountContract.interface.encodeFunctionData('cancelRecovery', [nonce])
+        const accountNonce = await sdk.accountManager.getNonce(accountAddress)
+
+        // Import userOperation utilities
+        const { encodeExecute, createUserOperation, getUserOpHash } = await import('../lib/userOperation.js')
+        const callData = encodeExecute(accountAddress, 0n, data)
+
+        // Create UserOperation
+        const userOp = createUserOperation({
+          sender: accountAddress,
+          nonce: accountNonce,
+          initCode: '0x',
+          callData,
+        })
+
+        // Get UserOperation hash
+        const userOpHash = await getUserOpHash(userOp, sdk.provider, sdk.chainId)
+        console.log('🔐 UserOpHash for cancel recovery:', userOpHash)
+
+        try {
+          // Show confirmation dialog before signing with Web3Auth
+          ownerSignature = await requestSignatureWithConfirmation({
+            userOpHash,
+            targetAddress: accountAddress,
+            amount: 0n,
+            accountAddress,
             nonce: accountNonce,
-            initCode: '0x',
-            callData,
+            isDeployment: false,
+            isTwoFactorAuth: true,
+            signatureStep: '1/2',
+            operationType: 'Cancel Recovery',
+            operationDetails: `Cancel recovery request #${nonce}`,
           })
-
-          // Get UserOperation hash
-          const userOpHash = await getUserOpHash(userOp, sdk.provider, sdk.chainId)
-          console.log('🔐 UserOpHash for cancel recovery:', userOpHash)
-
-          try {
-            // Show confirmation dialog before signing with Web3Auth
-            ownerSignature = await requestSignatureWithConfirmation({
-              userOpHash,
-              targetAddress: accountAddress,
-              amount: 0n,
-              accountAddress,
-              nonce: accountNonce,
-              isDeployment: false,
-              isTwoFactorAuth: true,
-              signatureStep: '1/2',
-              operationType: 'Cancel Recovery',
-              operationDetails: `Cancel recovery request #${nonce}`,
-            })
-            console.log('✅ Owner signature obtained for 2FA')
-          } catch (err) {
-            console.error('Failed to get owner signature for 2FA:', err)
-            throw new Error('2FA is enabled but failed to get owner signature')
-          }
+          console.log('✅ Owner signature obtained for 2FA')
+        } catch (err) {
+          console.error('Failed to get owner signature for 2FA:', err)
+          throw new Error('2FA is enabled but failed to get owner signature')
         }
       }
 
@@ -641,8 +679,8 @@ function RecoveryManager({ accountAddress, credential }) {
                         <span className="status-badge badge-warning">⏳ Locked</span>
                       )}
 
-                      {/* Owner can cancel any pending recovery with passkey */}
-                      {credential ? (
+                      {/* Owner can cancel any pending recovery */}
+                      {credential || !accountInfo?.hasPasskey ? (
                         <button
                           onClick={() => handleCancelRecovery(recovery.nonce)}
                           disabled={loading}
@@ -651,8 +689,8 @@ function RecoveryManager({ accountAddress, credential }) {
                           ❌ Cancel (Owner)
                         </button>
                       ) : (
-                        <div style={{ fontSize: '12px', color: '#999', marginTop: '8px' }}>
-                          ℹ️ No passkey credential found on this device
+                        <div style={{ fontSize: '12px', color: '#ff9800', marginTop: '8px', fontWeight: '500' }}>
+                          ⚠️ Passkey required to cancel. Use the device with your passkey.
                         </div>
                       )}
                     </div>

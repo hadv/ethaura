@@ -359,6 +359,35 @@ export class P256AccountSDK {
   }
 
   /**
+   * Cancel a recovery request (owner-only mode, via owner signature through EntryPoint)
+   * For accounts with qx=0, qy=0 (no passkey)
+   * @param {Object} params - Parameters
+   * @param {string} params.accountAddress - P256Account address
+   * @param {number} params.requestNonce - Recovery request nonce
+   * @param {Function} params.getSigner - Function to get Web3Auth signer
+   * @returns {Promise<Object>} UserOperation receipt
+   */
+  async cancelRecoveryOwnerOnly({
+    accountAddress,
+    requestNonce,
+    getSigner,
+  }) {
+    // Encode cancelRecovery call
+    const accountContract = this.accountManager.getAccountContract(accountAddress)
+    const data = accountContract.interface.encodeFunctionData('cancelRecovery', [requestNonce])
+
+    return await this.executeCallOwnerOnly({
+      accountAddress,
+      targetAddress: accountAddress,
+      value: 0n,
+      data,
+      getSigner,
+      needsDeployment: false,
+      initCode: '0x',
+    })
+  }
+
+  /**
    * Send ETH from P256Account
    * @param {Object} params - Parameters
    * @param {string} params.accountAddress - P256Account address
@@ -464,6 +493,53 @@ export class P256AccountSDK {
 
     // Sign UserOperation
     const signedUserOp = signUserOperation(userOp, passkeySignature, ownerSignature)
+
+    // Submit to bundler
+    const receipt = await this.bundler.sendUserOperationAndWait(signedUserOp)
+
+    return receipt
+  }
+
+  /**
+   * Execute arbitrary call from P256Account (owner-only mode)
+   * For accounts with qx=0, qy=0 (no passkey)
+   * @param {Object} params - Parameters
+   * @returns {Promise<Object>} UserOperation receipt
+   */
+  async executeCallOwnerOnly({
+    accountAddress,
+    targetAddress,
+    value = 0n,
+    data = '0x',
+    getSigner,
+    needsDeployment = false,
+    initCode = '0x',
+  }) {
+    const { encodeExecute, createUserOperation, getUserOpHash, signUserOperationOwnerOnly } = await import('./userOperation.js')
+
+    // Get nonce
+    const nonce = await this.accountManager.getNonce(accountAddress)
+
+    // Encode execute call
+    const callData = encodeExecute(targetAddress, value, data)
+
+    // Create UserOperation
+    const userOp = createUserOperation({
+      sender: accountAddress,
+      nonce,
+      initCode: needsDeployment ? initCode : '0x',
+      callData,
+    })
+
+    // Get UserOperation hash
+    const userOpHash = await getUserOpHash(userOp, this.provider, this.chainId)
+
+    // Sign with owner (Web3Auth)
+    const signer = await getSigner()
+    const ownerSignature = await signer.signMessage(ethers.getBytes(userOpHash))
+
+    // Sign UserOperation with owner signature only (65 bytes)
+    const signedUserOp = signUserOperationOwnerOnly(userOp, ownerSignature)
 
     // Submit to bundler
     const receipt = await this.bundler.sendUserOperationAndWait(signedUserOp)
