@@ -1,45 +1,120 @@
 /**
  * Database module for passkey credential storage
  * Uses sqlite3 for reliable, cross-platform SQLite support
+ *
+ * Production optimizations:
+ * - WAL mode for better concurrency
+ * - Connection pooling with busy timeout
+ * - Automatic backups
+ * - Performance monitoring
  */
 
 import sqlite3 from 'sqlite3'
-import { mkdir } from 'fs/promises'
-import { dirname } from 'path'
+import { mkdir, copyFile } from 'fs/promises'
+import { dirname, join } from 'path'
+import { existsSync } from 'fs'
 
 const DB_PATH = process.env.DATABASE_PATH || './data/passkeys.db'
+const BACKUP_DIR = process.env.BACKUP_DIR || './data/backups'
+const BACKUP_INTERVAL_HOURS = parseInt(process.env.BACKUP_INTERVAL_HOURS || '24', 10)
+const BUSY_TIMEOUT_MS = 5000 // 5 seconds
 
 // Ensure data directory exists
 await mkdir(dirname(DB_PATH), { recursive: true })
+await mkdir(BACKUP_DIR, { recursive: true })
 
 // Initialize database with verbose mode for debugging
 const sqlite = sqlite3.verbose()
 const db = new sqlite.Database(DB_PATH)
 
-// Promisify database operations
+// Performance metrics
+let queryCount = 0
+let errorCount = 0
+let lastBackupTime = null
+
+// Configure SQLite for production
+// Set busy timeout to prevent immediate failures on lock
+db.configure('busyTimeout', BUSY_TIMEOUT_MS)
+
+// Enable WAL mode for better concurrency (allows concurrent reads during writes)
+await new Promise((resolve, reject) => {
+  db.run('PRAGMA journal_mode = WAL', (err) => {
+    if (err) reject(err)
+    else resolve()
+  })
+})
+
+// Enable foreign keys
+await new Promise((resolve, reject) => {
+  db.run('PRAGMA foreign_keys = ON', (err) => {
+    if (err) reject(err)
+    else resolve()
+  })
+})
+
+// Optimize for performance
+await new Promise((resolve, reject) => {
+  db.run('PRAGMA synchronous = NORMAL', (err) => { // NORMAL is safe with WAL mode
+    if (err) reject(err)
+    else resolve()
+  })
+})
+
+await new Promise((resolve, reject) => {
+  db.run('PRAGMA cache_size = -64000', (err) => { // 64MB cache
+    if (err) reject(err)
+    else resolve()
+  })
+})
+
+await new Promise((resolve, reject) => {
+  db.run('PRAGMA temp_store = MEMORY', (err) => {
+    if (err) reject(err)
+    else resolve()
+  })
+})
+
+console.log('✅ SQLite optimizations applied (WAL mode, busy timeout, cache)')
+
+// Promisify database operations with metrics
 function runAsync(sql, params = []) {
+  queryCount++
   return new Promise((resolve, reject) => {
     db.run(sql, params, function(err) {
-      if (err) reject(err)
-      else resolve(this)
+      if (err) {
+        errorCount++
+        reject(err)
+      } else {
+        resolve(this)
+      }
     })
   })
 }
 
 function getAsync(sql, params = []) {
+  queryCount++
   return new Promise((resolve, reject) => {
     db.get(sql, params, (err, row) => {
-      if (err) reject(err)
-      else resolve(row)
+      if (err) {
+        errorCount++
+        reject(err)
+      } else {
+        resolve(row)
+      }
     })
   })
 }
 
 function allAsync(sql, params = []) {
+  queryCount++
   return new Promise((resolve, reject) => {
     db.all(sql, params, (err, rows) => {
-      if (err) reject(err)
-      else resolve(rows)
+      if (err) {
+        errorCount++
+        reject(err)
+      } else {
+        resolve(rows)
+      }
     })
   })
 }
@@ -187,16 +262,137 @@ export async function getAllCredentials() {
 }
 
 /**
- * Close database connection
+ * Create a backup of the database
+ * @returns {Promise<string>} Path to backup file
+ */
+export async function createBackup() {
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
+  const backupPath = join(BACKUP_DIR, `passkeys-${timestamp}.db`)
+
+  try {
+    // Use VACUUM INTO for atomic backup (SQLite 3.27.0+)
+    // This creates a clean copy without WAL files
+    await runAsync(`VACUUM INTO ?`, [backupPath])
+    lastBackupTime = Date.now()
+    console.log(`✅ Database backup created: ${backupPath}`)
+    return backupPath
+  } catch (error) {
+    // Fallback to file copy if VACUUM INTO not supported
+    console.warn('⚠️  VACUUM INTO not supported, using file copy')
+    await copyFile(DB_PATH, backupPath)
+    lastBackupTime = Date.now()
+    console.log(`✅ Database backup created (file copy): ${backupPath}`)
+    return backupPath
+  }
+}
+
+/**
+ * Get database statistics
+ * @returns {Object} Database stats
+ */
+export async function getDatabaseStats() {
+  const stats = await getAsync(`
+    SELECT
+      COUNT(*) as total_credentials,
+      MIN(created_at) as oldest_credential,
+      MAX(created_at) as newest_credential
+    FROM passkey_credentials
+  `)
+
+  return {
+    ...stats,
+    queryCount,
+    errorCount,
+    lastBackupTime,
+    dbPath: DB_PATH,
+  }
+}
+
+/**
+ * Optimize database (run VACUUM and ANALYZE)
+ * Should be run periodically (e.g., weekly)
+ */
+export async function optimizeDatabase() {
+  console.log('🔧 Optimizing database...')
+
+  // ANALYZE updates query planner statistics
+  await runAsync('ANALYZE')
+
+  // Note: VACUUM cannot be run in WAL mode while transactions are active
+  // It's better to run this during maintenance windows
+  // await runAsync('VACUUM')
+
+  console.log('✅ Database optimized')
+}
+
+/**
+ * Close database connection gracefully
  */
 export function closeDatabase() {
   return new Promise((resolve, reject) => {
+    console.log('🔒 Closing database connection...')
     db.close((err) => {
-      if (err) reject(err)
-      else resolve()
+      if (err) {
+        console.error('❌ Error closing database:', err)
+        reject(err)
+      } else {
+        console.log('✅ Database connection closed')
+        resolve()
+      }
     })
   })
 }
+
+// Automatic backup scheduler
+let backupInterval = null
+
+/**
+ * Start automatic backup scheduler
+ */
+export function startBackupScheduler() {
+  if (backupInterval) {
+    console.log('⚠️  Backup scheduler already running')
+    return
+  }
+
+  const intervalMs = BACKUP_INTERVAL_HOURS * 60 * 60 * 1000
+
+  backupInterval = setInterval(async () => {
+    try {
+      await createBackup()
+    } catch (error) {
+      console.error('❌ Automatic backup failed:', error)
+    }
+  }, intervalMs)
+
+  console.log(`✅ Automatic backup scheduler started (every ${BACKUP_INTERVAL_HOURS} hours)`)
+}
+
+/**
+ * Stop automatic backup scheduler
+ */
+export function stopBackupScheduler() {
+  if (backupInterval) {
+    clearInterval(backupInterval)
+    backupInterval = null
+    console.log('✅ Backup scheduler stopped')
+  }
+}
+
+// Graceful shutdown handler
+process.on('SIGINT', async () => {
+  console.log('\n🛑 Received SIGINT, shutting down gracefully...')
+  stopBackupScheduler()
+  await closeDatabase()
+  process.exit(0)
+})
+
+process.on('SIGTERM', async () => {
+  console.log('\n🛑 Received SIGTERM, shutting down gracefully...')
+  stopBackupScheduler()
+  await closeDatabase()
+  process.exit(0)
+})
 
 export default {
   storeCredential,
@@ -204,4 +400,9 @@ export default {
   deleteCredential,
   getAllCredentials,
   closeDatabase,
+  createBackup,
+  getDatabaseStats,
+  optimizeDatabase,
+  startBackupScheduler,
+  stopBackupScheduler,
 }

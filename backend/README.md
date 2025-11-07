@@ -5,10 +5,14 @@ Backend server for persistent storage of passkey credentials. This solves the is
 ## Features
 
 - **Persistent Storage**: SQLite database for reliable credential storage
+- **Production-Ready SQLite**: WAL mode, busy timeout, optimized PRAGMAs
+- **Automatic Backups**: Scheduled backups every 24 hours (configurable)
 - **Signature-Based Authentication**: Users must sign requests with their wallet to prove ownership
 - **Rate Limiting**: Protection against abuse
 - **CORS Support**: Configured for frontend integration
 - **Security Headers**: Helmet.js for security best practices
+- **Performance Monitoring**: Query metrics and database statistics
+- **Graceful Shutdown**: Proper cleanup on SIGINT/SIGTERM
 
 ## Setup
 
@@ -153,13 +157,43 @@ CREATE TABLE passkey_credentials (
 
 ## Production Deployment
 
+**See [PRODUCTION.md](./PRODUCTION.md) for complete production deployment guide.**
+
+Quick checklist:
 1. Set `NODE_ENV=production` in `.env`
-2. Use a strong `JWT_SECRET`
+2. Use a strong `JWT_SECRET` (generate with: `openssl rand -base64 32`)
 3. Configure proper `FRONTEND_URL`
-4. Use HTTPS (reverse proxy with nginx/caddy)
-5. Set up database backups
-6. Monitor logs and errors
-7. Consider using PostgreSQL instead of SQLite for high traffic
+4. Configure `BACKUP_DIR` and `BACKUP_INTERVAL_HOURS`
+5. Use HTTPS (reverse proxy with nginx/caddy)
+6. Automatic backups are enabled by default
+7. Monitor logs and database stats
+8. Consider PostgreSQL for >1000 concurrent users
+
+### SQLite Production Optimizations
+
+This backend is production-ready with SQLite:
+- ✅ WAL mode enabled (concurrent reads during writes)
+- ✅ 5-second busy timeout (prevents "database locked" errors)
+- ✅ 64MB cache for better performance
+- ✅ Automatic backups every 24 hours
+- ✅ Graceful shutdown handling
+- ✅ Performance monitoring
+
+### New API Endpoints
+
+**Get Database Statistics**
+```
+GET /api/admin/stats
+```
+
+Returns query count, error count, total credentials, and last backup time.
+
+**Create Manual Backup** (development only)
+```
+POST /api/admin/backup
+```
+
+Creates an immediate backup of the database.
 
 ## Troubleshooting
 

@@ -14,7 +14,9 @@ import {
   getCredential,
   deleteCredential,
   getAllCredentials,
-  closeDatabase,
+  createBackup,
+  getDatabaseStats,
+  startBackupScheduler,
 } from './database.js'
 
 // Load environment variables
@@ -270,6 +272,53 @@ app.get('/api/admin/credentials', async (req, res) => {
   }
 })
 
+/**
+ * GET /api/admin/stats
+ * Get database statistics
+ */
+app.get('/api/admin/stats', async (req, res) => {
+  try {
+    const stats = await getDatabaseStats()
+    res.json({
+      success: true,
+      stats,
+    })
+  } catch (error) {
+    console.error('Error getting database stats:', error)
+    res.status(500).json({
+      error: 'Failed to retrieve stats',
+    })
+  }
+})
+
+/**
+ * POST /api/admin/backup
+ * Create a manual database backup
+ */
+app.post('/api/admin/backup', async (req, res) => {
+  if (process.env.NODE_ENV === 'production') {
+    // In production, you might want to add authentication here
+    return res.status(403).json({
+      error: 'Manual backup endpoint disabled in production. Use automatic backups.',
+    })
+  }
+
+  try {
+    const backupPath = await createBackup()
+    res.json({
+      success: true,
+      message: 'Backup created successfully',
+      backupPath,
+    })
+  } catch (error) {
+    console.error('Error creating backup:', error)
+    res.status(500).json({
+      error: 'Failed to create backup',
+      details: error.message,
+    })
+  }
+})
+
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error('Unhandled error:', err)
@@ -279,23 +328,15 @@ app.use((err, req, res, next) => {
   })
 })
 
-// Graceful shutdown
-process.on('SIGINT', () => {
-  console.log('\n🛑 Shutting down gracefully...')
-  closeDatabase()
-  process.exit(0)
-})
-
-process.on('SIGTERM', () => {
-  console.log('\n🛑 Shutting down gracefully...')
-  closeDatabase()
-  process.exit(0)
-})
-
 // Start server
 app.listen(PORT, () => {
   console.log(`🚀 EthAura Backend Server running on port ${PORT}`)
   console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`)
   console.log(`🌐 CORS enabled for: ${process.env.FRONTEND_URL || 'http://localhost:5173'}`)
+
+  // Start automatic backup scheduler
+  startBackupScheduler()
 })
+
+// Note: Graceful shutdown is handled in database.js
 
