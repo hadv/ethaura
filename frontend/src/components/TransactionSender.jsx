@@ -12,7 +12,7 @@ import { SUPPORTED_TOKENS, ERC20_ABI, ethIcon } from '../lib/constants'
 import { walletDataCache } from '../lib/walletDataCache'
 import '../styles/TransactionSender.css'
 
-function TransactionSender({ accountAddress, credential, accountConfig, onSignatureRequest, preSelectedToken, onTransactionBroadcast }) {
+function TransactionSender({ accountAddress, credential, accountConfig, onSignatureRequest, preSelectedToken, onTransactionBroadcast, onAccountInfoChange }) {
   const { isConnected, signMessage, signRawHash, address: ownerAddress } = useWeb3Auth()
   const { networkInfo } = useNetwork()
   const sdk = useP256SDK()
@@ -62,6 +62,14 @@ function TransactionSender({ accountAddress, credential, accountConfig, onSignat
       }
     })
   }
+
+  // Notify parent when accountInfo changes (only when it has data)
+  useEffect(() => {
+    if (onAccountInfoChange && accountInfo) {
+      onAccountInfoChange(accountInfo)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [accountInfo])
 
   // Load account info (derive from SDK using passkey + owner OR owner-only)
   useEffect(() => {
@@ -1246,35 +1254,6 @@ function TransactionSender({ accountAddress, credential, accountConfig, onSignat
           >
             View on Explorer →
           </a>
-        </div>
-      )}
-
-      {/* Account Info - Collapsible */}
-      {accountInfo && !txHash && (
-        <div className="account-info">
-          {accountInfo.error ? (
-            <div className="info-item">
-              <span className="info-label">⚠️ Network Status:</span>
-              <span className="info-value" style={{ color: '#ff6b6b' }}>
-                {accountInfo.error}
-              </span>
-            </div>
-          ) : (
-            <>
-              <div className="info-item">
-                <span className="info-label">Status:</span>
-                <span className="info-value">
-                  {accountInfo.isDeployed ? '✅ Deployed' : '⏳ Will deploy on first transaction'}
-                </span>
-              </div>
-              {accountInfo.twoFactorEnabled && (
-                <div className="info-item">
-                  <span className="info-label">Security:</span>
-                  <span className="info-value">🔒 2FA Enabled</span>
-                </div>
-              )}
-            </>
-          )}
         </div>
       )}
     </div>

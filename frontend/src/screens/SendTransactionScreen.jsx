@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import TransactionSender from '../components/TransactionSender'
 import Header from '../components/Header'
 import SubHeader from '../components/SubHeader'
@@ -13,6 +13,7 @@ function SendTransactionScreen({ wallet, selectedToken, onBack, onHome, onSettin
   const [wallets, setWallets] = useState([])
   const [selectedWallet, setSelectedWallet] = useState(wallet)
   const [showWalletConnectModal, setShowWalletConnectModal] = useState(false)
+  const [accountInfo, setAccountInfo] = useState(null)
   const walletConnectButtonRef = useRef(null)
 
   // Build account config from wallet object
@@ -45,6 +46,10 @@ function SendTransactionScreen({ wallet, selectedToken, onBack, onHome, onSettin
       setSelectedWallet(newWallet)
     }
   }
+
+  const handleAccountInfoChange = useCallback((info) => {
+    setAccountInfo(info)
+  }, [])
 
   if (!selectedWallet) {
     return (
@@ -80,13 +85,13 @@ function SendTransactionScreen({ wallet, selectedToken, onBack, onHome, onSettin
       {/* Main Content */}
       <div className="send-content-wrapper">
         <div className="send-main">
-          <div className="send-container">
+          {/* Transaction Form Card */}
+          <div className="send-form-card">
             {/* Page Title */}
             <div className="page-header">
               <h1 className="page-title">Send</h1>
             </div>
 
-            {/* Transaction Form */}
             <TransactionSender
               accountAddress={selectedWallet.address}
               credential={credential}
@@ -94,13 +99,43 @@ function SendTransactionScreen({ wallet, selectedToken, onBack, onHome, onSettin
               onSignatureRequest={onSignatureRequest}
               preSelectedToken={selectedToken}
               onTransactionBroadcast={onTransactionBroadcast}
+              onAccountInfoChange={handleAccountInfoChange}
             />
           </div>
         </div>
 
-        {/* Right Panel - Placeholder */}
+        {/* Right Panel - Account Info */}
         <div className="send-sidebar">
-          {/* This can be used for transaction history or tips in the future */}
+          {accountInfo && (
+            <div className="sidebar-section">
+              <h3 className="sidebar-title">Account Information</h3>
+              <div className="sidebar-content">
+                {accountInfo.error ? (
+                  <div className="sidebar-info-item error">
+                    <span className="sidebar-info-label">⚠️ Network Status:</span>
+                    <span className="sidebar-info-value">
+                      {accountInfo.error}
+                    </span>
+                  </div>
+                ) : (
+                  <>
+                    <div className="sidebar-info-item">
+                      <span className="sidebar-info-label">Status:</span>
+                      <span className="sidebar-info-value">
+                        {accountInfo.isDeployed ? '✅ Deployed' : '⏳ Will deploy on first transaction'}
+                      </span>
+                    </div>
+                    {accountInfo.twoFactorEnabled && (
+                      <div className="sidebar-info-item">
+                        <span className="sidebar-info-label">Security:</span>
+                        <span className="sidebar-info-value">🔒 2FA Enabled</span>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
