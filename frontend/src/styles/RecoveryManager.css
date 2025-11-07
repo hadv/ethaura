@@ -161,7 +161,16 @@
   background: rgba(244, 67, 54, 0.1);
   border: 1px solid rgba(244, 67, 54, 0.3);
   color: #991b1b;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
+
+.info-box-danger strong {
+  display: block;
+}
+
+
 
 /* Form Groups */
 .form-group {
@@ -338,6 +347,19 @@
   margin-bottom: 16px;
   padding-bottom: 16px;
   border-bottom: 1px solid #e5e5e5;
+  gap: 12px;
+}
+
+.recovery-header h4 {
+  flex: 1;
+  margin: 0;
+}
+
+.recovery-header .status-badge {
+  padding: 4px 10px !important;
+  font-size: 11px !important;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .recovery-details {
@@ -363,9 +385,17 @@
 
 .recovery-actions {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 8px;
   align-items: center;
+}
+
+.recovery-actions .btn {
+  padding: 8px 16px !important;
+  font-size: 13px !important;
+  margin-right: 0 !important;
+  margin-bottom: 0 !important;
+  flex-shrink: 0;
 }
 
 /* Status Messages */
