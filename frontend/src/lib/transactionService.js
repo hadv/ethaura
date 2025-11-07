@@ -447,6 +447,56 @@ export class TransactionHistoryService {
       pageSize,
     }
   }
+
+  /**
+   * Fetch transactions progressively for lazy loading (fetches from Etherscan API page by page)
+   * This method fetches transactions in batches from Etherscan API instead of fetching all at once
+   * @param {string} address - Account address
+   * @param {number} page - Page number (1-indexed)
+   * @param {number} pageSize - Number of transactions per page
+   * @returns {Promise<Object>} { transactions, hasMore, page, pageSize }
+   */
+  async fetchTransactionsLazy(address, page = 1, pageSize = 20) {
+    try {
+      // Fetch ETH transactions and token transfers for this page
+      // We fetch pageSize + 1 to determine if there are more pages
+      const fetchSize = pageSize + 1
+
+      const [ethTxs, tokenTxs] = await Promise.all([
+        this.fetchFromEtherscan(address, 0, 99999999, page, fetchSize),
+        this.fetchTokenTransfersFromEtherscan(address, null, 0, 99999999, page, fetchSize),
+      ])
+
+      // Parse and format transactions
+      const parsedEthTxs = ethTxs.map(tx => this.parseTransaction(tx, address))
+      const parsedTokenTxs = tokenTxs.map(tx => this.parseTokenTransfer(tx, address))
+
+      // Combine and sort by timestamp
+      const allTxs = [...parsedEthTxs, ...parsedTokenTxs]
+      allTxs.sort((a, b) => b.timestamp - a.timestamp)
+
+      // Take only pageSize transactions, check if there are more
+      const hasMore = allTxs.length > pageSize
+      const transactions = allTxs.slice(0, pageSize)
+
+      console.log(`✅ Fetched page ${page} with ${transactions.length} transactions (hasMore: ${hasMore})`)
+
+      return {
+        transactions,
+        hasMore,
+        page,
+        pageSize,
+      }
+    } catch (error) {
+      console.error('Failed to fetch transactions lazily:', error)
+      return {
+        transactions: [],
+        hasMore: false,
+        page,
+        pageSize,
+      }
+    }
+  }
 }
 
 /**
