@@ -132,9 +132,6 @@ function WalletDetailScreen({ wallet, onBack, onHome, onSettings, onSend, onLogo
     try {
       const provider = new ethers.JsonRpcProvider(networkInfo.rpcUrl)
 
-      // Mock ETH price (in production, fetch from price API like CoinGecko)
-      const ethPriceUSD = 2500
-
       // Create services
       const tokenService = createTokenBalanceService(provider, networkInfo.name)
       const txService = createTransactionHistoryService(provider, networkInfo.name)
@@ -152,7 +149,7 @@ function WalletDetailScreen({ wallet, onBack, onHome, onSettings, onSend, onLogo
         // Fetch token balances and transactions in parallel
         // Fetch 30 transactions to match preload behavior (display 10, cache 20 more for view all)
         const [assets, transactions] = await Promise.all([
-          tokenService.getAllTokenBalances(selectedWallet.address, ethPriceUSD),
+          tokenService.getAllTokenBalances(selectedWallet.address, false, true), // includeZeroBalances=false, fetchPrices=true
           txService.getTransactionHistory(selectedWallet.address, 30), // Fetch last 30 transactions
         ])
         tokenBalances = assets

@@ -4,6 +4,7 @@
 
 import { ethers } from 'ethers'
 import { SUPPORTED_TOKENS, ethIcon } from './constants.js'
+import { priceOracle } from './priceOracle.js'
 
 // ERC20 ABI for balanceOf
 const ERC20_ABI = [
@@ -132,19 +133,36 @@ export class TokenBalanceService {
   /**
    * Get all token balances for an address (ETH + all supported ERC20 tokens)
    * @param {string} address - Account address
-   * @param {number} ethPriceUSD - ETH price in USD (optional, for value calculation)
-   * @param {Object} tokenPrices - Token prices in USD (optional, keyed by symbol)
    * @param {boolean} includeZeroBalances - Whether to include tokens with zero balance (default: false)
+   * @param {boolean} fetchPrices - Whether to fetch real-time prices from oracle (default: true)
    * @returns {Promise<Array>} Array of token balance objects
    */
-  async getAllTokenBalances(address, ethPriceUSD = null, tokenPrices = {}, includeZeroBalances = false) {
+  async getAllTokenBalances(address, includeZeroBalances = false, fetchPrices = true) {
     const tokens = []
 
     try {
+      // Get supported tokens for this network
+      const normalizedNetworkName = this.networkName.toLowerCase()
+      const supportedTokens = SUPPORTED_TOKENS[normalizedNetworkName] || []
+
+      console.log(`🔍 Network name: "${this.networkName}" (normalized: "${normalizedNetworkName}")`)
+      console.log(`🔍 Available networks in SUPPORTED_TOKENS:`, Object.keys(SUPPORTED_TOKENS))
+      console.log(`🔍 Supported tokens for ${normalizedNetworkName}:`, supportedTokens.length)
+
+      // Fetch real-time prices if requested
+      let tokenPrices = {}
+      if (fetchPrices) {
+        const symbols = ['ETH', ...supportedTokens.map(t => t.symbol)]
+        console.log('💰 Fetching prices for:', symbols)
+        tokenPrices = await priceOracle.getPrices(symbols)
+        console.log('💰 Fetched prices:', tokenPrices)
+      }
+
       // Fetch ETH balance
       const ethBalance = await this.getEthBalance(address)
       const ethAmount = parseFloat(ethBalance.balance)
-      
+      const ethPrice = tokenPrices['ETH'] || null
+
       tokens.push({
         id: 'ETH',
         name: 'Ether',
@@ -154,19 +172,10 @@ export class TokenBalanceService {
         amount: ethAmount,
         amountFormatted: ethAmount.toFixed(4),
         amountFull: `${ethAmount.toFixed(4)} ETH`,
-        value: ethPriceUSD ? `$${(ethAmount * ethPriceUSD).toFixed(2)}` : null,
-        valueUSD: ethPriceUSD ? ethAmount * ethPriceUSD : null,
+        value: ethPrice ? `$${(ethAmount * ethPrice).toFixed(2)}` : null,
+        valueUSD: ethPrice ? ethAmount * ethPrice : null,
         balanceWei: ethBalance.balanceWei,
       })
-
-      // Get supported tokens for this network
-      // Normalize network name to lowercase to match SUPPORTED_TOKENS keys
-      const normalizedNetworkName = this.networkName.toLowerCase()
-      const supportedTokens = SUPPORTED_TOKENS[normalizedNetworkName] || []
-
-      console.log(`🔍 Network name: "${this.networkName}" (normalized: "${normalizedNetworkName}")`)
-      console.log(`🔍 Available networks in SUPPORTED_TOKENS:`, Object.keys(SUPPORTED_TOKENS))
-      console.log(`🔍 Supported tokens for ${normalizedNetworkName}:`, supportedTokens.length)
 
       // Fetch all token balances in parallel
       const tokenBalances = await Promise.all(

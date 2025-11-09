@@ -166,13 +166,10 @@ class WalletDataCache {
           return existingCache
         }
 
-        // Mock ETH price (in production, fetch from price API)
-        const ethPriceUSD = 2500
-
         // Fetch assets and transactions in parallel
         // Preload 30 transactions for better caching (display 10 on wallet detail, 20 more for view all)
         const [assets, transactions] = await Promise.all([
-          tokenService.getAllTokenBalances(address, ethPriceUSD),
+          tokenService.getAllTokenBalances(address, false, true), // includeZeroBalances=false, fetchPrices=true
           txService.getTransactionHistory(address, 30) // Last 30 transactions for preload
         ])
 

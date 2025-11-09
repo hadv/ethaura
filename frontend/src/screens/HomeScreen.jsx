@@ -9,6 +9,7 @@ import { HiPencil, HiTrash } from 'react-icons/hi2'
 import Header from '../components/Header'
 import { Identicon } from '../utils/identicon.jsx'
 import ReceiveModal from '../components/ReceiveModal'
+import DonutChart from '../components/DonutChart'
 import { walletDataCache } from '../lib/walletDataCache'
 import { createTokenBalanceService } from '../lib/tokenService'
 import { createTransactionHistoryService } from '../lib/transactionService'
@@ -40,12 +41,18 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onLogo
   // Receive modal state
   const [showReceiveModal, setShowReceiveModal] = useState(false)
 
+  // Portfolio summary state
+  const [portfolioData, setPortfolioData] = useState({
+    tokens: [], // Aggregated token holdings across all wallets
+    totalValue: 0,
+  })
+
   // Load wallets from localStorage
   useEffect(() => {
     loadWallets()
   }, [networkInfo.chainId])
 
-  // Preload wallet data in background
+  // Preload wallet data in background and aggregate portfolio
   useEffect(() => {
     if (wallets.length === 0) return
 
@@ -58,7 +65,10 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onLogo
         console.log(`🚀 Starting background preload for ${wallets.length} wallets`)
 
         // Preload data for all wallets in background
-        walletDataCache.preloadMultipleWallets(wallets, networkInfo.name, tokenService, txService)
+        await walletDataCache.preloadMultipleWallets(wallets, networkInfo.name, tokenService, txService)
+
+        // After preload, aggregate portfolio data
+        aggregatePortfolioData()
       } catch (error) {
         console.error('Failed to start preload:', error)
       }
@@ -153,6 +163,55 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onLogo
   const getTotalPercentChange = () => {
     // Mock total percentage change (in real app, calculate from historical data)
     return '+1.23'
+  }
+
+  // Aggregate portfolio data from all wallets
+  const aggregatePortfolioData = () => {
+    const tokenMap = new Map() // symbol -> { name, symbol, icon, totalAmount, totalValue, addresses }
+    let totalPortfolioValue = 0
+
+    wallets.forEach((wallet) => {
+      const cached = walletDataCache.getCachedData(wallet.address, networkInfo.name)
+      if (!cached || !cached.assets) return
+
+      cached.assets.forEach((asset) => {
+        const existing = tokenMap.get(asset.symbol)
+        if (existing) {
+          // Aggregate amounts and values
+          existing.totalAmount += asset.amount
+          existing.totalValue += asset.valueUSD || 0
+          if (!existing.addresses.includes(asset.address)) {
+            existing.addresses.push(asset.address)
+          }
+        } else {
+          // New token
+          tokenMap.set(asset.symbol, {
+            name: asset.name,
+            symbol: asset.symbol,
+            icon: asset.icon,
+            totalAmount: asset.amount,
+            totalValue: asset.valueUSD || 0,
+            addresses: [asset.address],
+          })
+        }
+        totalPortfolioValue += asset.valueUSD || 0
+      })
+    })
+
+    // Convert to array and sort by value (descending)
+    const tokens = Array.from(tokenMap.values())
+      .sort((a, b) => b.totalValue - a.totalValue)
+      .map((token) => ({
+        ...token,
+        percentage: totalPortfolioValue > 0 ? (token.totalValue / totalPortfolioValue) * 100 : 0,
+      }))
+
+    setPortfolioData({
+      tokens,
+      totalValue: totalPortfolioValue,
+    })
+
+    console.log('📊 Portfolio aggregated:', tokens.length, 'unique tokens, total value:', totalPortfolioValue)
   }
 
   const handleAddWallet = async () => {
@@ -629,24 +688,35 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onLogo
           </div>
         </div>
 
-        {/* Right Panel - Transactions */}
+        {/* Right Panel - Portfolio Summary */}
         <div className="right-panel">
-          {/* Pending Transactions */}
           <div className="sidebar-card">
-            <h3 className="sidebar-title">Pending transactions</h3>
-            <div className="sidebar-empty">
-              <p>No pending transaction.</p>
-            </div>
-          </div>
+            <h3 className="sidebar-title">Portfolio Distribution</h3>
 
-          {/* Queued Transactions */}
-          <div className="sidebar-card">
-            <h3 className="sidebar-title">Queued transactions</h3>
-            <div className="sidebar-empty">
-              <p>No queued transaction.</p>
-            </div>
+            {portfolioData.tokens.length === 0 ? (
+              <div className="sidebar-empty">
+                <p>No assets yet. Add wallets to see your portfolio.</p>
+              </div>
+            ) : (
+              <DonutChart
+                data={portfolioData.tokens.slice(0, 5).map((token) => ({
+                  label: token.symbol,
+                  value: token.totalValue,
+                  icon: token.icon,
+                }))}
+                size={200}
+              />
+            )}
+
+            {/* Show message if there are more tokens */}
+            {portfolioData.tokens.length > 5 && (
+              <div className="portfolio-more">
+                +{portfolioData.tokens.length - 5} more token{portfolioData.tokens.length - 5 > 1 ? 's' : ''}
+              </div>
+            )}
           </div>
         </div>
+
       </div>
 
       {/* Add Wallet Modal */}
