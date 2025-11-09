@@ -462,7 +462,15 @@
   }
 
   .right-panel {
-    display: none;
+    display: block;
+    background: white;
+    padding: 24px 20px;
+    border-top: 1px solid #e5e5e5;
+  }
+
+  .sidebar-card {
+    max-width: 600px;
+    margin: 0 auto;
   }
 }
 

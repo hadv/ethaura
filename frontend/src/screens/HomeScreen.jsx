@@ -48,6 +48,29 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onLogo
     totalValue: 0,
   })
 
+  // Responsive pie chart size
+  const [pieChartSize, setPieChartSize] = useState(200)
+
+  // Handle responsive pie chart size
+  useEffect(() => {
+    const updatePieChartSize = () => {
+      if (window.innerWidth <= 480) {
+        setPieChartSize(160)
+      } else if (window.innerWidth <= 768) {
+        setPieChartSize(180)
+      } else {
+        setPieChartSize(200)
+      }
+    }
+
+    // Set initial size
+    updatePieChartSize()
+
+    // Add resize listener
+    window.addEventListener('resize', updatePieChartSize)
+    return () => window.removeEventListener('resize', updatePieChartSize)
+  }, [])
+
   // Load wallets from localStorage
   useEffect(() => {
     loadWallets()
@@ -728,7 +751,7 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onLogo
                   value: token.totalValue,
                   icon: token.icon,
                 }))}
-                size={200}
+                size={pieChartSize}
               />
             )}
 
