@@ -12,6 +12,7 @@ import ReceiveModal from '../components/ReceiveModal'
 import DonutChart from '../components/DonutChart'
 import { walletDataCache } from '../lib/walletDataCache'
 import { createTokenBalanceService } from '../lib/tokenService'
+import { priceOracle } from '../lib/priceOracle'
 import { createTransactionHistoryService } from '../lib/transactionService'
 import '../styles/HomeScreen.css'
 import logo from '../assets/logo.svg'
@@ -103,15 +104,17 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onLogo
         // Fetch balances for each wallet
         const provider = new ethers.JsonRpcProvider(networkInfo.rpcUrl)
 
-        // Mock ETH price (in real app, fetch from API)
-        const ethPriceUSD = 2500
+        // Fetch real ETH price from oracle
+        const ethPriceUSD = await priceOracle.getPrice('ETH')
 
         const walletsWithBalances = await Promise.all(
           walletsList.map(async (wallet) => {
             try {
               const balanceWei = await provider.getBalance(wallet.address)
               const balanceEth = ethers.formatEther(balanceWei)
-              const balanceUSD = (parseFloat(balanceEth) * ethPriceUSD).toFixed(2)
+              const balanceUSD = ethPriceUSD
+                ? (parseFloat(balanceEth) * ethPriceUSD).toFixed(2)
+                : '0.00'
               // Mock percentage change for demo (in real app, calculate from historical data)
               const percentChange = (Math.random() * 4 - 2).toFixed(2) // Random between -2% and +2%
               return { ...wallet, balance: balanceEth, balanceUSD, percentChange }
@@ -255,8 +258,12 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onLogo
       )
       const balanceWei = await provider.getBalance(walletAddress.trim())
       const balanceEth = ethers.formatEther(balanceWei)
-      const ethPriceUSD = 2500 // Mock price
-      const balanceUSD = (parseFloat(balanceEth) * ethPriceUSD).toFixed(2)
+
+      // Fetch real ETH price from oracle
+      const ethPriceUSD = await priceOracle.getPrice('ETH')
+      const balanceUSD = ethPriceUSD
+        ? (parseFloat(balanceEth) * ethPriceUSD).toFixed(2)
+        : '0.00'
       const percentChange = (Math.random() * 4 - 2).toFixed(2)
 
       // Add new wallet
@@ -430,8 +437,11 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onLogo
         // Continue with 0 balance instead of failing the whole operation
       }
 
-      const ethPriceUSD = 2500 // Mock price
-      const balanceUSD = (parseFloat(balanceEth) * ethPriceUSD).toFixed(2)
+      // Fetch real ETH price from oracle
+      const ethPriceUSD = await priceOracle.getPrice('ETH')
+      const balanceUSD = ethPriceUSD
+        ? (parseFloat(balanceEth) * ethPriceUSD).toFixed(2)
+        : '0.00'
       const percentChange = (Math.random() * 4 - 2).toFixed(2)
 
       // Add new wallet
