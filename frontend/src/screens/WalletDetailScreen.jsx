@@ -341,50 +341,6 @@ function WalletDetailScreen({ wallet, onBack, onHome, onSettings, onSend, onLogo
             </div>
           </div>
 
-          {/* Top Assets */}
-          <div className="assets-section">
-            <div className="section-header">
-              <h3 className="section-title">Top assets</h3>
-              <button className="view-all-btn" onClick={onViewAllTokens}>
-                View all <span>→</span>
-              </button>
-            </div>
-            <div className="assets-list">
-              {assets.length > 0 ? (
-                assets.map((asset) => (
-                  <div
-                    key={asset.id}
-                    className={`asset-item ${asset.amount > 0 ? 'clickable' : 'disabled'}`}
-                    onClick={() => handleAssetClick(asset)}
-                    title={asset.amount > 0 ? `Click to send ${asset.symbol}` : 'No balance to send'}
-                  >
-                    <div className="asset-info">
-                      <div className="asset-icon">
-                        {typeof asset.icon === 'string' && asset.icon.startsWith('/') ? (
-                          <img src={asset.icon} alt={asset.symbol} />
-                        ) : (
-                          asset.icon
-                        )}
-                      </div>
-                      <div className="asset-details">
-                        <div className="asset-name">{asset.name}</div>
-                        <div className="asset-symbol">{asset.symbol}</div>
-                      </div>
-                    </div>
-                    <div className="asset-balance">
-                      <div className="asset-amount">{asset.amountFull}</div>
-                      <div className="asset-value">{asset.value}</div>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="empty-state">
-                  <p>No assets found</p>
-                </div>
-              )}
-            </div>
-          </div>
-
           {/* Latest Transactions */}
           <div className="transactions-section">
             <div className="section-header">
@@ -460,19 +416,47 @@ function WalletDetailScreen({ wallet, onBack, onHome, onSettings, onSend, onLogo
 
         {/* Sidebar */}
         <div className="sidebar-content">
-          {/* Pending Transactions */}
-          <div className="sidebar-card">
-            <h3 className="sidebar-title">Pending transactions</h3>
-            <div className="sidebar-empty">
-              <p>No pending transaction.</p>
+          {/* Top Assets */}
+          <div className="sidebar-card assets-sidebar-card">
+            <div className="sidebar-header">
+              <h3 className="sidebar-title">Top assets</h3>
+              <button className="view-all-btn" onClick={onViewAllTokens}>
+                View all <span>→</span>
+              </button>
             </div>
-          </div>
-
-          {/* Queued Transactions */}
-          <div className="sidebar-card">
-            <h3 className="sidebar-title">Queued transactions</h3>
-            <div className="sidebar-empty">
-              <p>No queued transaction.</p>
+            <div className="assets-list">
+              {assets.length > 0 ? (
+                assets.map((asset) => (
+                  <div
+                    key={asset.id}
+                    className={`asset-item ${asset.amount > 0 ? 'clickable' : 'disabled'}`}
+                    onClick={() => handleAssetClick(asset)}
+                    title={asset.amount > 0 ? `Click to send ${asset.symbol}` : 'No balance to send'}
+                  >
+                    <div className="asset-info">
+                      <div className="asset-icon">
+                        {typeof asset.icon === 'string' && asset.icon.startsWith('/') ? (
+                          <img src={asset.icon} alt={asset.symbol} />
+                        ) : (
+                          asset.icon
+                        )}
+                      </div>
+                      <div className="asset-details">
+                        <div className="asset-name">{asset.name}</div>
+                        <div className="asset-symbol">{asset.symbol}</div>
+                      </div>
+                    </div>
+                    <div className="asset-balance">
+                      <div className="asset-amount">{asset.amountFull}</div>
+                      <div className="asset-value">{asset.value}</div>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="sidebar-empty">
+                  <p>No assets found</p>
+                </div>
+              )}
             </div>
           </div>
         </div>

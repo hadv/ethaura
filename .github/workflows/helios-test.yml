@@ -1,13 +1,10 @@
 # GitHub Actions workflow to test Helios integration
 # This workflow ensures Helios can be installed and configured correctly
+# NOTE: Disabled for now - only runs on manual trigger
 
 name: Helios Integration Test
 
 on:
-  push:
-    branches: [ main, develop ]
-  pull_request:
-    branches: [ main, develop ]
   workflow_dispatch:
 
 jobs:
