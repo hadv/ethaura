@@ -212,15 +212,19 @@ export class TokenBalanceService {
       console.log(`📊 Found ${validTokens.length} tokens with ${includeZeroBalances ? 'any' : 'non-zero'} balance out of ${supportedTokens.length} supported tokens`)
       tokens.push(...validTokens)
 
-      // Sort by value (if available) or amount
-      tokens.sort((a, b) => {
+      // Sort tokens by value (if available) or amount, but keep ETH always first
+      const ethToken = tokens.find(t => t.symbol === 'ETH')
+      const otherTokens = tokens.filter(t => t.symbol !== 'ETH')
+
+      otherTokens.sort((a, b) => {
         if (a.valueUSD !== null && b.valueUSD !== null) {
           return b.valueUSD - a.valueUSD
         }
         return b.amount - a.amount
       })
 
-      return tokens
+      // Return with ETH first, followed by sorted other tokens
+      return ethToken ? [ethToken, ...otherTokens] : otherTokens
     } catch (error) {
       console.error('Failed to fetch all token balances:', error)
       return tokens // Return whatever we managed to fetch
