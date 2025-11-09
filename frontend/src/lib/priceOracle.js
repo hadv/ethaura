@@ -17,6 +17,7 @@ class PriceOracle {
       'USDC': 'usd-coin',
       'USDT': 'tether',
       'DAI': 'dai',
+      'PYUSD': 'paypal-usd',
       'WBTC': 'wrapped-bitcoin',
       'UNI': 'uniswap',
       'LINK': 'chainlink',
