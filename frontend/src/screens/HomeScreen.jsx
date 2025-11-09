@@ -103,21 +103,30 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onLogo
 
         // Fetch balances for each wallet
         const provider = new ethers.JsonRpcProvider(networkInfo.rpcUrl)
-
-        // Fetch real ETH price from oracle
-        const ethPriceUSD = await priceOracle.getPrice('ETH')
+        const tokenService = createTokenBalanceService(provider, networkInfo.name)
 
         const walletsWithBalances = await Promise.all(
           walletsList.map(async (wallet) => {
             try {
-              const balanceWei = await provider.getBalance(wallet.address)
-              const balanceEth = ethers.formatEther(balanceWei)
-              const balanceUSD = ethPriceUSD
-                ? (parseFloat(balanceEth) * ethPriceUSD).toFixed(2)
-                : '0.00'
+              // Fetch all token balances (ETH + ERC20 tokens) with real prices
+              const tokenBalances = await tokenService.getAllTokenBalances(wallet.address, false, true)
+
+              // Calculate total portfolio value in USD
+              const totalBalanceUSD = tokenBalances.reduce((sum, token) => sum + (token.valueUSD || 0), 0)
+
+              // Get ETH balance for display
+              const ethToken = tokenBalances.find(t => t.symbol === 'ETH')
+              const balanceEth = ethToken ? ethToken.amount.toString() : '0'
+
               // Mock percentage change for demo (in real app, calculate from historical data)
               const percentChange = (Math.random() * 4 - 2).toFixed(2) // Random between -2% and +2%
-              return { ...wallet, balance: balanceEth, balanceUSD, percentChange }
+
+              return {
+                ...wallet,
+                balance: balanceEth,
+                balanceUSD: totalBalanceUSD.toFixed(2),
+                percentChange
+              }
             } catch (error) {
               console.error('Failed to fetch balance for', wallet.address, error)
               return { ...wallet, balance: '0', balanceUSD: '0.00', percentChange: '0.00' }
@@ -256,14 +265,18 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onLogo
       const provider = new ethers.JsonRpcProvider(
         import.meta.env.VITE_RPC_URL || 'https://rpc.sepolia.org'
       )
-      const balanceWei = await provider.getBalance(walletAddress.trim())
-      const balanceEth = ethers.formatEther(balanceWei)
+      const tokenService = createTokenBalanceService(provider, networkInfo.name)
 
-      // Fetch real ETH price from oracle
-      const ethPriceUSD = await priceOracle.getPrice('ETH')
-      const balanceUSD = ethPriceUSD
-        ? (parseFloat(balanceEth) * ethPriceUSD).toFixed(2)
-        : '0.00'
+      // Fetch all token balances (ETH + ERC20 tokens) with real prices
+      const tokenBalances = await tokenService.getAllTokenBalances(walletAddress.trim(), false, true)
+
+      // Calculate total portfolio value in USD
+      const totalBalanceUSD = tokenBalances.reduce((sum, token) => sum + (token.valueUSD || 0), 0)
+
+      // Get ETH balance for display
+      const ethToken = tokenBalances.find(t => t.symbol === 'ETH')
+      const balanceEth = ethToken ? ethToken.amount.toString() : '0'
+
       const percentChange = (Math.random() * 4 - 2).toFixed(2)
 
       // Add new wallet
@@ -272,7 +285,7 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onLogo
         name: walletName.trim(),
         address: walletAddress.trim(),
         balance: balanceEth,
-        balanceUSD,
+        balanceUSD: totalBalanceUSD.toFixed(2),
         percentChange,
       }
 
@@ -421,27 +434,28 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onLogo
       // Fetch balance for the new wallet
       console.log('⏳ Fetching balance...')
       const provider = new ethers.JsonRpcProvider(networkInfo.rpcUrl)
-
-      const balancePromise = provider.getBalance(accountData.address)
-      const balanceTimeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Balance fetch timed out')), 15000)
-      )
+      const tokenService = createTokenBalanceService(provider, networkInfo.name)
 
       let balanceEth = '0.0'
+      let totalBalanceUSD = 0
+
       try {
-        const balanceWei = await Promise.race([balancePromise, balanceTimeoutPromise])
-        balanceEth = ethers.formatEther(balanceWei)
-        console.log('✅ Balance fetched:', balanceEth)
+        // Fetch all token balances (ETH + ERC20 tokens) with real prices
+        const tokenBalances = await tokenService.getAllTokenBalances(accountData.address, false, true)
+
+        // Calculate total portfolio value in USD
+        totalBalanceUSD = tokenBalances.reduce((sum, token) => sum + (token.valueUSD || 0), 0)
+
+        // Get ETH balance for display
+        const ethToken = tokenBalances.find(t => t.symbol === 'ETH')
+        balanceEth = ethToken ? ethToken.amount.toString() : '0'
+
+        console.log('✅ Balance fetched:', balanceEth, 'ETH, Total USD:', totalBalanceUSD)
       } catch (balanceError) {
         console.warn('⚠️ Failed to fetch balance, using 0.0:', balanceError.message)
         // Continue with 0 balance instead of failing the whole operation
       }
 
-      // Fetch real ETH price from oracle
-      const ethPriceUSD = await priceOracle.getPrice('ETH')
-      const balanceUSD = ethPriceUSD
-        ? (parseFloat(balanceEth) * ethPriceUSD).toFixed(2)
-        : '0.00'
       const percentChange = (Math.random() * 4 - 2).toFixed(2)
 
       // Add new wallet
@@ -450,7 +464,7 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onLogo
         name: walletName.trim(),
         address: accountData.address,
         balance: balanceEth,
-        balanceUSD,
+        balanceUSD: totalBalanceUSD.toFixed(2),
         percentChange,
         index: indexNum, // Store the index for reference
         owner: ownerAddress, // Store the owner address used to create this wallet
