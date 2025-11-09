@@ -150,9 +150,10 @@ function WalletDetailScreen({ wallet, onBack, onHome, onSettings, onSend, onLogo
       } else {
         console.log('🔄 Fetching fresh wallet data')
         // Fetch token balances and transactions in parallel
+        // Fetch 30 transactions to match preload behavior (display 10, cache 20 more for view all)
         const [assets, transactions] = await Promise.all([
           tokenService.getAllTokenBalances(selectedWallet.address, ethPriceUSD),
-          txService.getTransactionHistory(selectedWallet.address, 10), // Fetch last 10 transactions
+          txService.getTransactionHistory(selectedWallet.address, 30), // Fetch last 30 transactions
         ])
         tokenBalances = assets
         txHistory = transactions
@@ -173,8 +174,8 @@ function WalletDetailScreen({ wallet, onBack, onHome, onSettings, onSend, onLogo
         setBalance(ethToken.amount.toString())
       }
 
-      // Set transactions
-      setTransactions(txHistory)
+      // Set transactions - display only latest 10 even if cache has 30
+      setTransactions(txHistory.slice(0, 10))
 
       // Check if account is deployed
       const code = await provider.getCode(selectedWallet.address)

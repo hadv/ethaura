@@ -14,19 +14,21 @@ function ViewAllTransactionsScreen({ wallet, onBack, onHome, onLogout, onSetting
   const [wallets, setWallets] = useState([])
   const [selectedWallet, setSelectedWallet] = useState(wallet)
   const [transactions, setTransactions] = useState([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false) // Start with false, only show when actually fetching
   const [loadingMore, setLoadingMore] = useState(false)
   const [filter, setFilter] = useState('all') // all, sent, received
   const [searchQuery, setSearchQuery] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const [hasMore, setHasMore] = useState(false)
   const [totalCount, setTotalCount] = useState(0)
-  const pageSize = 20
+  const pageSize = 10 // Show 10 transactions per page
   const observerTarget = useRef(null)
 
   // Store all fetched transactions in a ref to avoid re-fetching
   const allTransactionsRef = useRef([])
   const hasFetchedAllRef = useRef(false)
+  const hasFetched100Ref = useRef(false) // Track if we've fetched 100 transactions from on-chain
+  const isFetching100Ref = useRef(false) // Track if we're currently fetching 100 transactions
 
   // Load all wallets from localStorage
   useEffect(() => {
@@ -52,6 +54,8 @@ function ViewAllTransactionsScreen({ wallet, onBack, onHome, onLogout, onSetting
     // Reset refs when wallet changes
     allTransactionsRef.current = []
     hasFetchedAllRef.current = false
+    hasFetched100Ref.current = false
+    isFetching100Ref.current = false
     if (onWalletChange) {
       onWalletChange(newWallet)
     }
@@ -62,65 +66,97 @@ function ViewAllTransactionsScreen({ wallet, onBack, onHome, onLogout, onSetting
 
     console.log(`🔍 fetchTransactionsPage called: page=${page}, isLoadMore=${isLoadMore}`)
 
-    if (isLoadMore) {
-      setLoadingMore(true)
-    } else {
-      setLoading(true)
-    }
-
     try {
       const provider = new ethers.JsonRpcProvider(networkInfo.rpcUrl)
       const txService = createTransactionHistoryService(provider, networkInfo.name)
 
       let allTransactions = []
+      let shouldShowLoading = false // Track if we should show loading
 
-      // Check if we already have all transactions fetched
-      if (hasFetchedAllRef.current && allTransactionsRef.current.length > 0) {
-        console.log(`📦 Using already fetched transactions from memory (${allTransactionsRef.current.length} total)`)
+      // Progressive loading strategy:
+      // 1. Page 1: Display items 1-10 from cache (30 available)
+      // 2. Page 2: Display items 11-20 from cache + trigger background fetch of 100
+      // 3. Page 3: Display items 21-30 from cache (100 ready in background)
+      // 4. Page 4+: Display items 31-100 from fetched data (no waiting!)
+
+      // Check if we already have transactions in memory
+      if (allTransactionsRef.current.length > 0) {
+        console.log(`📦 Using transactions from memory (${allTransactionsRef.current.length} total)`)
         allTransactions = allTransactionsRef.current
-      } else {
-        // For first page, try to use cached data from walletDataCache
-        if (page === 1 && !isLoadMore) {
-          const cachedData = walletDataCache.getCachedData(selectedWallet.address, networkInfo.name)
-          if (cachedData && cachedData.transactions && cachedData.transactions.length > 0) {
-            console.log('📦 Using cached transactions from walletDataCache for first page')
+        // No loading needed - we have data in memory
 
-            // Apply filter to cached transactions
-            let filtered = cachedData.transactions
-            if (filter !== 'all') {
-              filtered = cachedData.transactions.filter(tx => {
-                if (filter === 'sent') return tx.type === 'send'
-                if (filter === 'received') return tx.type === 'receive'
-                return true
-              })
-            }
+        // Calculate how many items we need for this page
+        const itemsNeeded = page * pageSize
 
-            // Use cached transactions for first page
-            const pageTransactions = filtered.slice(0, pageSize)
+        // Trigger background fetch on page 2 for better UX
+        // By the time user reaches page 4, data is already loaded
+        const shouldFetch100InBackground = page >= 2 &&
+                                           !hasFetched100Ref.current &&
+                                           !isFetching100Ref.current &&
+                                           allTransactionsRef.current.length <= 30
 
-            setTransactions(pageTransactions)
-            // Always assume there are more transactions to fetch from API
-            // (cached data only has last 10 transactions)
-            setHasMore(true)
-            setCurrentPage(page)
-            setTotalCount(filtered.length)
+        if (shouldFetch100InBackground) {
+          console.log(`🔄 Fetching 100 transactions in background (page ${page})`)
+          isFetching100Ref.current = true
 
-            // Store in ref for subsequent pages
-            allTransactionsRef.current = cachedData.transactions
-            hasFetchedAllRef.current = false // Not all fetched yet, just cached
-
-            setLoading(false)
-            return
-          }
+          // Fetch in background - don't await, let it load while user scrolls
+          txService.getTransactionHistory(selectedWallet.address, 100).then(fetchedTxs => {
+            console.log(`✅ Background fetch complete: ${fetchedTxs.length} transactions`)
+            allTransactionsRef.current = fetchedTxs
+            hasFetched100Ref.current = true
+            isFetching100Ref.current = false
+          }).catch(err => {
+            console.error('Background fetch failed:', err)
+            isFetching100Ref.current = false
+          })
         }
 
-        // Fetch all transactions from API (limit to 100 transactions)
-        console.log(`🔄 Fetching all transactions from API (limit: 100)`)
-        allTransactions = await txService.getTransactionHistory(selectedWallet.address, 100)
+        // If we need more than 30 items but background fetch hasn't completed yet, wait for it
+        if (itemsNeeded > 30 && !hasFetched100Ref.current && allTransactionsRef.current.length <= 30) {
+          console.log(`⏳ Page ${page} needs ${itemsNeeded} items, waiting for background fetch to complete...`)
+          shouldShowLoading = true // Need to fetch, will show loading
 
-        // Store in ref to avoid re-fetching
-        allTransactionsRef.current = allTransactions
-        hasFetchedAllRef.current = true
+          // Show loading before fetching
+          if (isLoadMore) {
+            setLoadingMore(true)
+          } else {
+            setLoading(true)
+          }
+
+          // Fetch synchronously if background fetch hasn't completed
+          allTransactions = await txService.getTransactionHistory(selectedWallet.address, 100)
+          allTransactionsRef.current = allTransactions
+          hasFetched100Ref.current = true
+          isFetching100Ref.current = false
+        }
+      } else {
+        // First load - try to use cached data from walletDataCache (preloaded 30 transactions)
+        const cachedData = walletDataCache.getCachedData(selectedWallet.address, networkInfo.name)
+        if (cachedData && cachedData.transactions && cachedData.transactions.length > 0) {
+          console.log(`📦 Using cached transactions from walletDataCache (${cachedData.transactions.length} cached)`)
+
+          // Store all cached transactions in ref (all 30)
+          allTransactionsRef.current = cachedData.transactions
+          allTransactions = cachedData.transactions
+          // No loading needed - we have cached data
+        } else {
+          // No cache available, fetch from on-chain
+          console.log(`🔄 No cache available, fetching 100 transactions from on-chain`)
+          shouldShowLoading = true // Need to fetch, will show loading
+
+          // Show loading before fetching
+          if (isLoadMore) {
+            setLoadingMore(true)
+          } else {
+            setLoading(true)
+          }
+
+          allTransactions = await txService.getTransactionHistory(selectedWallet.address, 100)
+
+          // Store in ref and mark as fetched
+          allTransactionsRef.current = allTransactions
+          hasFetched100Ref.current = true
+        }
       }
 
       // Apply filter
@@ -139,7 +175,7 @@ function ViewAllTransactionsScreen({ wallet, onBack, onHome, onLogout, onSetting
       const pageTransactions = filtered.slice(startIndex, endIndex)
       const hasMorePages = filtered.length > endIndex
 
-      console.log(`📊 Pagination: page=${page}, startIndex=${startIndex}, endIndex=${endIndex}, pageTransactions=${pageTransactions.length}, hasMore=${hasMorePages}, totalFiltered=${filtered.length}`)
+      console.log(`📊 Pagination: page=${page}, startIndex=${startIndex}, endIndex=${endIndex}, pageTransactions=${pageTransactions.length}, hasMore=${hasMorePages}, totalFiltered=${filtered.length}, allTransactions=${allTransactions.length}`)
 
       if (isLoadMore) {
         setTransactions(prev => [...prev, ...pageTransactions])
@@ -153,10 +189,13 @@ function ViewAllTransactionsScreen({ wallet, onBack, onHome, onLogout, onSetting
     } catch (error) {
       console.error('Failed to fetch transactions:', error)
     } finally {
-      if (isLoadMore) {
-        setLoadingMore(false)
-      } else {
-        setLoading(false)
+      // Only clear loading if we showed it
+      if (shouldShowLoading) {
+        if (isLoadMore) {
+          setLoadingMore(false)
+        } else {
+          setLoading(false)
+        }
       }
     }
   }, [selectedWallet?.address, networkInfo, filter, pageSize])
@@ -168,6 +207,8 @@ function ViewAllTransactionsScreen({ wallet, onBack, onHome, onLogout, onSetting
     // Reset refs when wallet or network changes (but not filter - filter is applied client-side)
     allTransactionsRef.current = []
     hasFetchedAllRef.current = false
+    hasFetched100Ref.current = false
+    isFetching100Ref.current = false
     fetchTransactionsPage(1, false)
   }, [selectedWallet?.address, networkInfo, filter, fetchTransactionsPage])
 
@@ -301,7 +342,7 @@ function ViewAllTransactionsScreen({ wallet, onBack, onHome, onLogout, onSetting
 
           {/* Transactions List */}
           <div className="transactions-list-container">
-            {loading ? (
+            {loading && transactions.length === 0 ? (
               <div className="loading-state">
                 <div className="spinner"></div>
                 <p>Loading transactions...</p>

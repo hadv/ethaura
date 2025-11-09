@@ -170,9 +170,10 @@ class WalletDataCache {
         const ethPriceUSD = 2500
 
         // Fetch assets and transactions in parallel
+        // Preload 30 transactions for better caching (display 10 on wallet detail, 20 more for view all)
         const [assets, transactions] = await Promise.all([
           tokenService.getAllTokenBalances(address, ethPriceUSD),
-          txService.getTransactionHistory(address, 10) // Last 10 transactions
+          txService.getTransactionHistory(address, 30) // Last 30 transactions for preload
         ])
 
         console.log(`✅ Preload completed for ${address}: ${transactions?.length || 0} txs, ${assets?.length || 0} assets`)
