@@ -113,7 +113,7 @@ function ViewAllTokensScreen({ wallet, onBack, onHome, onLogout, onSettings, onW
       {/* Header */}
       <Header userInfo={userInfo} onLogout={onLogout} onHome={onHome} />
 
-      {/* SubHeader with wallet dropdown, network selector, and WalletConnect */}
+      {/* SubHeader with wallet dropdown, network selector, title, total value, and WalletConnect */}
       <SubHeader
         wallet={selectedWallet}
         onBack={onBack}
@@ -122,6 +122,9 @@ function ViewAllTokensScreen({ wallet, onBack, onHome, onLogout, onSettings, onW
         showWalletDropdown={true}
         wallets={wallets}
         onWalletChange={handleWalletChange}
+        title="All Assets"
+        rightLabel="Total Value"
+        rightValue={`$${totalValue.toFixed(2)}`}
         showWalletConnect={true}
         onWalletConnectClick={() => setShowWalletConnectModal(true)}
         walletConnectButtonRef={walletConnectButtonRef}
@@ -129,18 +132,6 @@ function ViewAllTokensScreen({ wallet, onBack, onHome, onLogout, onSettings, onW
 
       <div className="view-all-tokens-container">
         <div className="view-all-tokens-content">
-          {/* Header */}
-          <div className="tokens-header">
-            <div className="tokens-title-section">
-              <h1 className="tokens-title">All Assets</h1>
-              <p className="tokens-subtitle">{selectedWallet?.name || 'Wallet'}</p>
-            </div>
-            <div className="tokens-total-value">
-              <div className="total-label">Total Value</div>
-              <div className="total-amount">${totalValue.toFixed(2)}</div>
-            </div>
-          </div>
-
           {/* Search and Filters */}
           <div className="tokens-filters">
             <div className="tokens-search">

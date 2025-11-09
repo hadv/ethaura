@@ -15,7 +15,11 @@ const SubHeader = ({
   onWalletChange,
   showWalletConnect = false,
   onWalletConnectClick,
-  walletConnectButtonRef
+  walletConnectButtonRef,
+  title,
+  subtitle,
+  rightLabel,
+  rightValue
 }) => {
   const formatAddress = (address) => {
     if (!address) return ''
@@ -51,10 +55,23 @@ const SubHeader = ({
         )}
 
         <NetworkSelector />
+
+        {title && (
+          <div className="sub-header-title-section">
+            <h1 className="sub-header-title">{title}</h1>
+            {subtitle && <p className="sub-header-subtitle">{subtitle}</p>}
+          </div>
+        )}
       </div>
 
       {!hideActions && (
         <div className="sub-header-right">
+          {rightLabel && rightValue !== undefined && (
+            <div className="sub-header-count">
+              <div className="sub-header-count-label">{rightLabel}</div>
+              <div className="sub-header-count-value">{rightValue}</div>
+            </div>
+          )}
           {showWalletConnect && (
             <div className="walletconnect-container">
               <button
