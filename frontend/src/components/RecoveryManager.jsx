@@ -19,6 +19,7 @@ function RecoveryManager({ accountAddress, credential }) {
   const [newQy, setNewQy] = useState('')
   const [newOwner, setNewOwner] = useState('')
   const [recoveryType, setRecoveryType] = useState('passkey') // 'passkey' or 'owner'
+  const [accountInfo, setAccountInfo] = useState(null) // Store account info for UI rendering
 
   // Debug: Log credential status
   useEffect(() => {
@@ -82,17 +83,20 @@ function RecoveryManager({ accountAddress, credential }) {
         setGuardianInfo(null)
         setPendingRecoveries([])
         setIsGuardian(false)
+        setAccountInfo(null)
         setError('') // Clear error since this is expected
         return
       }
 
-      const [guardians, recoveries] = await Promise.all([
+      const [guardians, recoveries, accInfo] = await Promise.all([
         sdk.getGuardians(accountAddress),
         sdk.getPendingRecoveries(accountAddress),
+        sdk.getAccountInfo(accountAddress),
       ])
 
       setGuardianInfo(guardians)
       setPendingRecoveries(recoveries)
+      setAccountInfo(accInfo)
 
       // Check if current user is a guardian
       const isCurrentUserGuardian = guardians.guardians.some(
@@ -105,12 +109,18 @@ function RecoveryManager({ accountAddress, credential }) {
         threshold: guardians.threshold,
         pendingRecoveries: recoveries.length,
         isGuardian: isCurrentUserGuardian,
+        hasPasskey: accInfo.hasPasskey,
       })
 
       // Clear error on success
       setError('')
     } catch (err) {
       console.error('Error fetching recovery info:', err)
+      // Set default accountInfo when backend is not available
+      setAccountInfo(null)
+      setGuardianInfo(null)
+      setPendingRecoveries([])
+      setIsGuardian(false)
       setError(`Failed to load recovery information: ${err.message}`)
     }
   }, [accountAddress, sdk, ownerAddress])
@@ -121,6 +131,7 @@ function RecoveryManager({ accountAddress, credential }) {
     setGuardianInfo(null)
     setPendingRecoveries([])
     setIsGuardian(false)
+    setAccountInfo(null)
     setSelectedRecovery(null)
     setNewQx('')
     setNewQy('')
