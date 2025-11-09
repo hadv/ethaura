@@ -9,8 +9,10 @@ import { HiPencil, HiTrash } from 'react-icons/hi2'
 import Header from '../components/Header'
 import { Identicon } from '../utils/identicon.jsx'
 import ReceiveModal from '../components/ReceiveModal'
+import DonutChart from '../components/DonutChart'
 import { walletDataCache } from '../lib/walletDataCache'
 import { createTokenBalanceService } from '../lib/tokenService'
+import { priceOracle } from '../lib/priceOracle'
 import { createTransactionHistoryService } from '../lib/transactionService'
 import '../styles/HomeScreen.css'
 import logo from '../assets/logo.svg'
@@ -40,12 +42,41 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onLogo
   // Receive modal state
   const [showReceiveModal, setShowReceiveModal] = useState(false)
 
+  // Portfolio summary state
+  const [portfolioData, setPortfolioData] = useState({
+    tokens: [], // Aggregated token holdings across all wallets
+    totalValue: 0,
+  })
+
+  // Responsive pie chart size
+  const [pieChartSize, setPieChartSize] = useState(200)
+
+  // Handle responsive pie chart size
+  useEffect(() => {
+    const updatePieChartSize = () => {
+      if (window.innerWidth <= 480) {
+        setPieChartSize(160)
+      } else if (window.innerWidth <= 768) {
+        setPieChartSize(180)
+      } else {
+        setPieChartSize(200)
+      }
+    }
+
+    // Set initial size
+    updatePieChartSize()
+
+    // Add resize listener
+    window.addEventListener('resize', updatePieChartSize)
+    return () => window.removeEventListener('resize', updatePieChartSize)
+  }, [])
+
   // Load wallets from localStorage
   useEffect(() => {
     loadWallets()
   }, [networkInfo.chainId])
 
-  // Preload wallet data in background
+  // Preload wallet data in background and aggregate portfolio
   useEffect(() => {
     if (wallets.length === 0) return
 
@@ -58,7 +89,10 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onLogo
         console.log(`🚀 Starting background preload for ${wallets.length} wallets`)
 
         // Preload data for all wallets in background
-        walletDataCache.preloadMultipleWallets(wallets, networkInfo.name, tokenService, txService)
+        await walletDataCache.preloadMultipleWallets(wallets, networkInfo.name, tokenService, txService)
+
+        // After preload, aggregate portfolio data
+        aggregatePortfolioData()
       } catch (error) {
         console.error('Failed to start preload:', error)
       }
@@ -92,19 +126,30 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onLogo
 
         // Fetch balances for each wallet
         const provider = new ethers.JsonRpcProvider(networkInfo.rpcUrl)
-
-        // Mock ETH price (in real app, fetch from API)
-        const ethPriceUSD = 2500
+        const tokenService = createTokenBalanceService(provider, networkInfo.name)
 
         const walletsWithBalances = await Promise.all(
           walletsList.map(async (wallet) => {
             try {
-              const balanceWei = await provider.getBalance(wallet.address)
-              const balanceEth = ethers.formatEther(balanceWei)
-              const balanceUSD = (parseFloat(balanceEth) * ethPriceUSD).toFixed(2)
+              // Fetch all token balances (ETH + ERC20 tokens) with real prices
+              const tokenBalances = await tokenService.getAllTokenBalances(wallet.address, false, true)
+
+              // Calculate total portfolio value in USD
+              const totalBalanceUSD = tokenBalances.reduce((sum, token) => sum + (token.valueUSD || 0), 0)
+
+              // Get ETH balance for display
+              const ethToken = tokenBalances.find(t => t.symbol === 'ETH')
+              const balanceEth = ethToken ? ethToken.amount.toString() : '0'
+
               // Mock percentage change for demo (in real app, calculate from historical data)
               const percentChange = (Math.random() * 4 - 2).toFixed(2) // Random between -2% and +2%
-              return { ...wallet, balance: balanceEth, balanceUSD, percentChange }
+
+              return {
+                ...wallet,
+                balance: balanceEth,
+                balanceUSD: totalBalanceUSD.toFixed(2),
+                percentChange
+              }
             } catch (error) {
               console.error('Failed to fetch balance for', wallet.address, error)
               return { ...wallet, balance: '0', balanceUSD: '0.00', percentChange: '0.00' }
@@ -155,6 +200,55 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onLogo
     return '+1.23'
   }
 
+  // Aggregate portfolio data from all wallets
+  const aggregatePortfolioData = () => {
+    const tokenMap = new Map() // symbol -> { name, symbol, icon, totalAmount, totalValue, addresses }
+    let totalPortfolioValue = 0
+
+    wallets.forEach((wallet) => {
+      const cached = walletDataCache.getCachedData(wallet.address, networkInfo.name)
+      if (!cached || !cached.assets) return
+
+      cached.assets.forEach((asset) => {
+        const existing = tokenMap.get(asset.symbol)
+        if (existing) {
+          // Aggregate amounts and values
+          existing.totalAmount += asset.amount
+          existing.totalValue += asset.valueUSD || 0
+          if (!existing.addresses.includes(asset.address)) {
+            existing.addresses.push(asset.address)
+          }
+        } else {
+          // New token
+          tokenMap.set(asset.symbol, {
+            name: asset.name,
+            symbol: asset.symbol,
+            icon: asset.icon,
+            totalAmount: asset.amount,
+            totalValue: asset.valueUSD || 0,
+            addresses: [asset.address],
+          })
+        }
+        totalPortfolioValue += asset.valueUSD || 0
+      })
+    })
+
+    // Convert to array and sort by value (descending)
+    const tokens = Array.from(tokenMap.values())
+      .sort((a, b) => b.totalValue - a.totalValue)
+      .map((token) => ({
+        ...token,
+        percentage: totalPortfolioValue > 0 ? (token.totalValue / totalPortfolioValue) * 100 : 0,
+      }))
+
+    setPortfolioData({
+      tokens,
+      totalValue: totalPortfolioValue,
+    })
+
+    console.log('📊 Portfolio aggregated:', tokens.length, 'unique tokens, total value:', totalPortfolioValue)
+  }
+
   const handleAddWallet = async () => {
     setAddError('')
 
@@ -194,10 +288,18 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onLogo
       const provider = new ethers.JsonRpcProvider(
         import.meta.env.VITE_RPC_URL || 'https://rpc.sepolia.org'
       )
-      const balanceWei = await provider.getBalance(walletAddress.trim())
-      const balanceEth = ethers.formatEther(balanceWei)
-      const ethPriceUSD = 2500 // Mock price
-      const balanceUSD = (parseFloat(balanceEth) * ethPriceUSD).toFixed(2)
+      const tokenService = createTokenBalanceService(provider, networkInfo.name)
+
+      // Fetch all token balances (ETH + ERC20 tokens) with real prices
+      const tokenBalances = await tokenService.getAllTokenBalances(walletAddress.trim(), false, true)
+
+      // Calculate total portfolio value in USD
+      const totalBalanceUSD = tokenBalances.reduce((sum, token) => sum + (token.valueUSD || 0), 0)
+
+      // Get ETH balance for display
+      const ethToken = tokenBalances.find(t => t.symbol === 'ETH')
+      const balanceEth = ethToken ? ethToken.amount.toString() : '0'
+
       const percentChange = (Math.random() * 4 - 2).toFixed(2)
 
       // Add new wallet
@@ -206,7 +308,7 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onLogo
         name: walletName.trim(),
         address: walletAddress.trim(),
         balance: balanceEth,
-        balanceUSD,
+        balanceUSD: totalBalanceUSD.toFixed(2),
         percentChange,
       }
 
@@ -355,24 +457,28 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onLogo
       // Fetch balance for the new wallet
       console.log('⏳ Fetching balance...')
       const provider = new ethers.JsonRpcProvider(networkInfo.rpcUrl)
-
-      const balancePromise = provider.getBalance(accountData.address)
-      const balanceTimeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Balance fetch timed out')), 15000)
-      )
+      const tokenService = createTokenBalanceService(provider, networkInfo.name)
 
       let balanceEth = '0.0'
+      let totalBalanceUSD = 0
+
       try {
-        const balanceWei = await Promise.race([balancePromise, balanceTimeoutPromise])
-        balanceEth = ethers.formatEther(balanceWei)
-        console.log('✅ Balance fetched:', balanceEth)
+        // Fetch all token balances (ETH + ERC20 tokens) with real prices
+        const tokenBalances = await tokenService.getAllTokenBalances(accountData.address, false, true)
+
+        // Calculate total portfolio value in USD
+        totalBalanceUSD = tokenBalances.reduce((sum, token) => sum + (token.valueUSD || 0), 0)
+
+        // Get ETH balance for display
+        const ethToken = tokenBalances.find(t => t.symbol === 'ETH')
+        balanceEth = ethToken ? ethToken.amount.toString() : '0'
+
+        console.log('✅ Balance fetched:', balanceEth, 'ETH, Total USD:', totalBalanceUSD)
       } catch (balanceError) {
         console.warn('⚠️ Failed to fetch balance, using 0.0:', balanceError.message)
         // Continue with 0 balance instead of failing the whole operation
       }
 
-      const ethPriceUSD = 2500 // Mock price
-      const balanceUSD = (parseFloat(balanceEth) * ethPriceUSD).toFixed(2)
       const percentChange = (Math.random() * 4 - 2).toFixed(2)
 
       // Add new wallet
@@ -381,7 +487,7 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onLogo
         name: walletName.trim(),
         address: accountData.address,
         balance: balanceEth,
-        balanceUSD,
+        balanceUSD: totalBalanceUSD.toFixed(2),
         percentChange,
         index: indexNum, // Store the index for reference
         owner: ownerAddress, // Store the owner address used to create this wallet
@@ -629,24 +735,35 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onLogo
           </div>
         </div>
 
-        {/* Right Panel - Transactions */}
+        {/* Right Panel - Portfolio Summary */}
         <div className="right-panel">
-          {/* Pending Transactions */}
           <div className="sidebar-card">
-            <h3 className="sidebar-title">Pending transactions</h3>
-            <div className="sidebar-empty">
-              <p>No pending transaction.</p>
-            </div>
-          </div>
+            <h3 className="sidebar-title">Portfolio Distribution</h3>
 
-          {/* Queued Transactions */}
-          <div className="sidebar-card">
-            <h3 className="sidebar-title">Queued transactions</h3>
-            <div className="sidebar-empty">
-              <p>No queued transaction.</p>
-            </div>
+            {portfolioData.tokens.length === 0 ? (
+              <div className="sidebar-empty">
+                <p>No assets yet. Add wallets to see your portfolio.</p>
+              </div>
+            ) : (
+              <DonutChart
+                data={portfolioData.tokens.slice(0, 5).map((token) => ({
+                  label: token.symbol,
+                  value: token.totalValue,
+                  icon: token.icon,
+                }))}
+                size={pieChartSize}
+              />
+            )}
+
+            {/* Show message if there are more tokens */}
+            {portfolioData.tokens.length > 5 && (
+              <div className="portfolio-more">
+                +{portfolioData.tokens.length - 5} more token{portfolioData.tokens.length - 5 > 1 ? 's' : ''}
+              </div>
+            )}
           </div>
         </div>
+
       </div>
 
       {/* Add Wallet Modal */}

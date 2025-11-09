@@ -65,11 +65,8 @@ function ViewAllTokensScreen({ wallet, onBack, onHome, onLogout, onSettings, onW
       const provider = new ethers.JsonRpcProvider(networkInfo.rpcUrl)
       const tokenService = createTokenBalanceService(provider, networkInfo.name)
 
-      // Mock ETH price (in production, fetch from price API)
-      const ethPriceUSD = 2500
-
       // Fetch all token balances (including zero balances for "View All" screen)
-      const tokenBalances = await tokenService.getAllTokenBalances(selectedWallet.address, ethPriceUSD, {}, true)
+      const tokenBalances = await tokenService.getAllTokenBalances(selectedWallet.address, true, true) // includeZeroBalances=true, fetchPrices=true
       setTokens(tokenBalances)
 
       console.log('📊 ViewAllTokensScreen: Loaded', tokenBalances.length, 'tokens')
