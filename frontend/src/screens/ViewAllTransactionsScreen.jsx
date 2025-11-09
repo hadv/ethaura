@@ -270,7 +270,7 @@ function ViewAllTransactionsScreen({ wallet, onBack, onHome, onLogout, onSetting
       {/* Header */}
       <Header userInfo={userInfo} onLogout={onLogout} onHome={onHome} />
 
-      {/* SubHeader with wallet dropdown, network selector, and WalletConnect */}
+      {/* SubHeader with wallet dropdown, network selector, title and transaction count */}
       <SubHeader
         wallet={selectedWallet}
         onBack={onBack}
@@ -279,22 +279,13 @@ function ViewAllTransactionsScreen({ wallet, onBack, onHome, onLogout, onSetting
         showWalletDropdown={true}
         wallets={wallets}
         onWalletChange={handleWalletChange}
+        title="All Transactions"
+        rightLabel="Total"
+        rightValue={totalCount}
       />
 
       <div className="view-all-transactions-container">
         <div className="view-all-transactions-content">
-          {/* Header */}
-          <div className="transactions-header">
-            <div className="transactions-title-section">
-              <h1 className="transactions-title">All Transactions</h1>
-              <p className="transactions-subtitle">{selectedWallet?.name || 'Wallet'}</p>
-            </div>
-            <div className="transactions-count">
-              <div className="count-label">Total</div>
-              <div className="count-amount">{totalCount}</div>
-            </div>
-          </div>
-
           {/* Filters and Search */}
           <div className="transactions-controls">
             <div className="filter-buttons">

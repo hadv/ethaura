@@ -17,7 +17,7 @@
 }
 
 .view-all-transactions-container {
-  padding: 2rem 40px;
+  padding: 1.5rem 40px;
   animation: slideUp 0.4s ease-out;
 }
 
@@ -35,52 +35,9 @@
 .view-all-transactions-content {
   background: white;
   border-radius: 16px;
-  padding: 2rem;
+  padding: 1.5rem;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   border: 1px solid #e5e7eb;
-}
-
-/* Header */
-.transactions-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 2rem;
-  padding-bottom: 1.5rem;
-  border-bottom: 1px solid #e2e8f0;
-}
-
-.transactions-title-section {
-  flex: 1;
-}
-
-.transactions-title {
-  font-size: 2rem;
-  font-weight: 700;
-  color: #1a202c;
-  margin: 0 0 0.5rem 0;
-}
-
-.transactions-subtitle {
-  font-size: 1rem;
-  color: #718096;
-  margin: 0;
-}
-
-.transactions-count {
-  text-align: right;
-}
-
-.count-label {
-  font-size: 0.875rem;
-  color: #718096;
-  margin-bottom: 0.25rem;
-}
-
-.count-amount {
-  font-size: 1.75rem;
-  font-weight: 700;
-  color: #667eea;
 }
 
 /* Controls */
