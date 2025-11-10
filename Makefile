@@ -9,6 +9,7 @@ help:
 	@echo "  make build          - Build smart contracts"
 	@echo "  make test           - Run contract tests"
 	@echo "  make test-gas       - Run tests with gas report"
+	@echo "  make coverage       - Run tests with coverage report"
 	@echo "  make deploy-sepolia - Deploy to Sepolia testnet"
 	@echo "  make verify-sepolia - Verify contracts on Sepolia"
 	@echo "  make verify-mainnet - Verify contracts on Mainnet"
@@ -57,7 +58,7 @@ test-gas:
 # Run tests with coverage
 coverage:
 	@echo "Running coverage..."
-	forge coverage
+	forge coverage --ir-minimum
 	@echo "✅ Coverage complete!"
 
 # Deploy to Sepolia
