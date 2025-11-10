@@ -11,12 +11,16 @@ Welcome to the ΞTHΛURΛ documentation! This directory contains additional reso
 ### Technical Guides
 - **[COUNTERFACTUAL_ADDRESS.md](./COUNTERFACTUAL_ADDRESS.md)** - How account addresses are calculated
 - **[DESIGN_DECISIONS.md](./DESIGN_DECISIONS.md)** - Design rationale and trade-offs
+- **[PROXY_IMPLEMENTATION.md](./PROXY_IMPLEMENTATION.md)** - ERC-1967 proxy pattern implementation (60-70% gas savings)
+- **[TWO_FACTOR_AUTH.md](./TWO_FACTOR_AUTH.md)** - Two-factor authentication implementation
+- **[WEB3AUTH_INTEGRATION.md](./WEB3AUTH_INTEGRATION.md)** - Web3Auth social login integration
 
 ### Visual Resources
 - **[DIAGRAMS.md](./DIAGRAMS.md)** - Architecture diagrams and flow charts
 
 ### Deployment Resources
 - **[DEPLOYMENT_CHECKLIST.md](./DEPLOYMENT_CHECKLIST.md)** - Complete deployment checklist
+- **[VERIFICATION_GUIDE.md](./VERIFICATION_GUIDE.md)** - Contract verification on Etherscan
 
 ## 🗂️ Main Documentation
 
