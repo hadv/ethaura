@@ -6,6 +6,7 @@ import {IEntryPoint} from "@account-abstraction/interfaces/IEntryPoint.sol";
 import {PackedUserOperation} from "@account-abstraction/interfaces/PackedUserOperation.sol";
 import {IERC1271} from "@openzeppelin/contracts/interfaces/IERC1271.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import {P256} from "solady/utils/P256.sol";
 import {Base64Url} from "./libraries/Base64Url.sol";
 import {LibBytes} from "solady/utils/LibBytes.sol";
@@ -14,8 +15,9 @@ import {LibBytes} from "solady/utils/LibBytes.sol";
  * @title P256Account
  * @notice ERC-4337 Account Abstraction wallet with P-256/secp256r1 signature support
  * @dev Supports both raw P-256 signatures and WebAuthn/Passkey signatures
+ * @dev Designed to be used with ERC-1967 proxy pattern for gas-efficient deployment
  */
-contract P256Account is IAccount, IERC1271, Ownable {
+contract P256Account is IAccount, IERC1271, Ownable, Initializable {
     /*//////////////////////////////////////////////////////////////
                                 CONSTANTS
     //////////////////////////////////////////////////////////////*/
