@@ -110,16 +110,46 @@ This saves ~60-70% gas on account deployment.
 
 **Note:** The implementation contract is deployed automatically by the factory constructor. All user accounts will be minimal proxies pointing to this shared implementation.
 
-### 6. Verify Contracts (if not auto-verified)
+### 6. Verify Contracts
+
+**Option 1: Automated (Recommended)**
+
+```bash
+# Set factory address from deployment
+export FACTORY_ADDRESS=0x...  # Your factory address from step 5
+
+# Run automated verification
+make verify-sepolia
+```
+
+**Option 2: Manual**
 
 ```bash
 forge verify-contract \
   --chain-id 11155111 \
   --compiler-version v0.8.23 \
+  --num-of-optimizations 200 \
   --constructor-args $(cast abi-encode "constructor(address)" 0x0000000071727De22E5E9d8BAf0edAc6f37da032) \
+  --etherscan-api-key $ETHERSCAN_API_KEY \
   <FACTORY_ADDRESS> \
   src/P256AccountFactory.sol:P256AccountFactory
+
+# Verify implementation (get address from factory)
+IMPLEMENTATION=$(cast call $FACTORY_ADDRESS "IMPLEMENTATION()(address)" --rpc-url sepolia)
+
+forge verify-contract \
+  --chain-id 11155111 \
+  --compiler-version v0.8.23 \
+  --num-of-optimizations 200 \
+  --constructor-args $(cast abi-encode "constructor(address)" 0x0000000071727De22E5E9d8BAf0edAc6f37da032) \
+  --etherscan-api-key $ETHERSCAN_API_KEY \
+  $IMPLEMENTATION \
+  src/P256Account.sol:P256Account
 ```
+
+**Note:** ERC-1967 proxies are automatically detected by Etherscan. Once the implementation is verified, all proxy accounts will show "Read as Proxy" and "Write as Proxy" tabs automatically!
+
+See [`docs/VERIFICATION_GUIDE.md`](docs/VERIFICATION_GUIDE.md) for detailed verification instructions and troubleshooting.
 
 ### 7. Create Test Account
 
