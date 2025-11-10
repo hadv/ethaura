@@ -92,7 +92,8 @@ contract P256AccountTest is Test {
     }
 
     function test_CannotReinitialize() public {
-        vm.expectRevert("Already initialized");
+        // OpenZeppelin's Initializable uses InvalidInitialization() error
+        vm.expectRevert(abi.encodeWithSignature("InvalidInitialization()"));
         account.initialize(bytes32(uint256(1)), bytes32(uint256(2)), owner, true);
     }
 

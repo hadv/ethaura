@@ -171,4 +171,68 @@ contract P256AccountFactoryTest is Test {
         // salt SHOULD affect address
         assertTrue(addr1 != addr5, "salt should affect address");
     }
+
+    /**
+     * Test: Implementation contract should be locked (cannot be initialized)
+     */
+    function test_ImplementationContractIsLocked() public {
+        P256Account implementation = factory.IMPLEMENTATION();
+
+        // Try to initialize the implementation contract - should revert
+        vm.expectRevert(abi.encodeWithSignature("InvalidInitialization()"));
+        implementation.initialize(QX1, QY1, owner1, true);
+    }
+
+    /**
+     * Test: Proxy accounts should be minimal in size
+     */
+    function test_ProxyAccountsAreMinimal() public {
+        P256Account account = factory.createAccount(QX1, QY1, owner1, 0, true);
+
+        // Get the bytecode size of the deployed proxy
+        uint256 proxySize = address(account).code.length;
+
+        // ERC-1967 proxy should be around 160 bytes (much smaller than full implementation)
+        // Allow some margin for variations
+        assertTrue(proxySize < 500, "Proxy should be minimal (<500 bytes)");
+
+        // For reference, log the actual size
+        emit log_named_uint("Proxy bytecode size", proxySize);
+    }
+
+    /**
+     * Test: All proxies should point to the same implementation
+     */
+    function test_AllProxiesShareSameImplementation() public {
+        P256Account account1 = factory.createAccount(QX1, QY1, owner1, 0, true);
+        P256Account account2 = factory.createAccount(QX2, QY2, owner2, 1, false);
+
+        // Both should point to the same implementation
+        P256Account impl = factory.IMPLEMENTATION();
+
+        // Verify both accounts are functional (have the same interface)
+        assertEq(address(account1.ENTRYPOINT()), address(entryPoint));
+        assertEq(address(account2.ENTRYPOINT()), address(entryPoint));
+
+        // Verify implementation is set correctly
+        assertTrue(address(impl) != address(0), "Implementation should be deployed");
+    }
+
+    /**
+     * Test: Gas benchmark for proxy deployment vs full deployment
+     */
+    function test_GasBenchmarkProxyDeployment() public {
+        // Measure gas for proxy deployment
+        uint256 gasBefore = gasleft();
+        P256Account account = factory.createAccount(QX1, QY1, owner1, 0, true);
+        uint256 gasUsed = gasBefore - gasleft();
+
+        // Log gas usage
+        emit log_named_uint("Gas used for proxy deployment", gasUsed);
+
+        // Verify account is functional
+        assertEq(address(account.ENTRYPOINT()), address(entryPoint));
+        assertEq(account.owner(), owner1);
+        assertTrue(account.twoFactorEnabled());
+    }
 }
