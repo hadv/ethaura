@@ -12,6 +12,7 @@
 - ✅ **ERC-4337 Compatible**: Tuân thủ chuẩn Account Abstraction v0.7
 - ✅ **Gas Efficient**: Sử dụng native precompile (~6,900 gas) thay vì Solidity verification
 - ✅ **Two-Factor Authentication (2FA)**: Optional dual signature mode (passkey + owner key)
+- ✅ **ERC-1967 Proxy Pattern**: 60-70% gas savings on deployment (~312k gas vs ~500-700k)
 - ✅ **Factory Pattern**: Deploy deterministic accounts với CREATE2
 - ✅ **EIP-1271 Support**: Tương thích với dApp signatures
 - 🛡️ **Guardian-Based Social Recovery**: Decentralized account recovery with multi-sig guardians (owner auto-added as first guardian)
@@ -136,6 +137,9 @@ forge test
 # Run tests with gas report
 forge test --gas-report
 
+# Run tests with coverage
+forge coverage --ir-minimum
+
 # Run tests on Sepolia fork
 forge test --fork-url $SEPOLIA_RPC_URL
 ```
@@ -146,9 +150,23 @@ forge test --fork-url $SEPOLIA_RPC_URL
 # Deploy factory to Sepolia
 forge script script/Deploy.s.sol:DeployScript --rpc-url sepolia --broadcast --verify
 
-# Note the factory address from output
+# Note the factory address and implementation address from output
 # Update VITE_FACTORY_ADDRESS in frontend/.env
 ```
+
+### 6. Verify contracts (optional)
+
+```bash
+# Automated verification (recommended)
+export FACTORY_ADDRESS=0x...  # Your factory address from deployment
+export ETHERSCAN_API_KEY=your_api_key
+make verify-sepolia
+
+# Or use the script directly
+./scripts/verify-contracts.sh sepolia
+```
+
+See [docs/VERIFICATION_GUIDE.md](docs/VERIFICATION_GUIDE.md) for detailed verification instructions.
 
 ### 6. Run frontend
 
@@ -286,7 +304,11 @@ forge test --gas-report
 ### Test Coverage
 
 ```bash
-forge coverage
+# Run coverage with --ir-minimum to avoid "stack too deep" errors
+forge coverage --ir-minimum
+
+# Or use make command
+make coverage
 ```
 
 ## 🌐 Deployment
@@ -388,6 +410,8 @@ ethaura/
 - [Architecture Overview](ARCHITECTURE.md) - System architecture and design
 - [Security Considerations](SECURITY.md) - Security best practices
 - [Deployment Guide](DEPLOYMENT.md) - How to deploy to testnet/mainnet
+- **[Proxy Implementation](docs/PROXY_IMPLEMENTATION.md)** - ERC-1967 proxy pattern details
+- **[Verification Guide](docs/VERIFICATION_GUIDE.md)** - Contract verification on Etherscan
 
 ### Infrastructure Documentation
 - **[Production Setup Guide](PRODUCTION_SETUP.md)** - Complete production deployment guide

@@ -164,9 +164,11 @@ contract P256Account is IAccount, IERC1271, Ownable, Initializable {
     /**
      * @notice Constructor for P256Account
      * @param _entryPoint The EntryPoint contract address
+     * @dev Locks the implementation contract to prevent initialization
      */
     constructor(IEntryPoint _entryPoint) Ownable(msg.sender) {
         ENTRYPOINT = _entryPoint;
+        _disableInitializers(); // Lock the implementation contract
     }
 
     /**
@@ -178,10 +180,9 @@ contract P256Account is IAccount, IERC1271, Ownable, Initializable {
      * @dev If _qx and _qy are both 0, the account operates in owner-only mode (no passkey)
      * @dev If _qx and _qy are set but _enable2FA is false, passkey can be used but 2FA is not required
      * @dev If _enable2FA is true, both _qx and _qy must be non-zero
+     * @dev Uses OpenZeppelin's Initializable to ensure this can only be called once per proxy
      */
-    function initialize(bytes32 _qx, bytes32 _qy, address _owner, bool _enable2FA) external {
-        require(qx == bytes32(0) && qy == bytes32(0), "Already initialized");
-
+    function initialize(bytes32 _qx, bytes32 _qy, address _owner, bool _enable2FA) external initializer {
         // If enabling 2FA, passkey must be provided
         if (_enable2FA) {
             require(_qx != bytes32(0) && _qy != bytes32(0), "2FA requires passkey");
