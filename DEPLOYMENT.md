@@ -98,10 +98,17 @@ Expected output:
 === Deployment Complete ===
 EntryPoint: 0x0000000071727De22E5E9d8BAf0edAc6f37da032
 P256AccountFactory: 0x... (your factory address)
+P256Account Implementation: 0x... (shared implementation)
 ========================
+
+Note: Factory uses ERC-1967 proxy pattern.
+Each account is a minimal proxy (~141 bytes) pointing to the implementation.
+This saves ~60-70% gas on account deployment.
 ```
 
 **Save the factory address!** You'll need it for the frontend.
+
+**Note:** The implementation contract is deployed automatically by the factory constructor. All user accounts will be minimal proxies pointing to this shared implementation.
 
 ### 6. Verify Contracts (if not auto-verified)
 
@@ -298,15 +305,26 @@ Before mainnet deployment:
 
 ### Deployment Costs (Sepolia)
 
-- Factory deployment: ~2M gas (~0.002 ETH on Sepolia)
-- Account creation: ~300k gas per account
-- Transaction: ~100k gas (with precompile)
+- **Factory deployment**: ~4.1M gas (~0.004 ETH on Sepolia)
+  - Includes one-time implementation contract deployment
+  - Factory uses ERC-1967 proxy pattern for gas savings
+- **Account creation**: ~312k gas per account (60-70% savings vs full deployment!)
+  - Each account is a minimal proxy (~141 bytes)
+  - Points to shared implementation contract
+- **Transaction**: ~100k gas (with precompile)
 
 ### Mainnet Estimates (at 30 gwei)
 
-- Factory deployment: ~$120
-- Account creation: ~$18 per account
-- Transaction: ~$6 per transaction
+- **Factory deployment**: ~$246 (one-time cost)
+- **Account creation**: ~$19 per account (was ~$45-60 before proxy optimization)
+- **Transaction**: ~$6 per transaction
+
+**Note:** The proxy pattern provides significant savings:
+- 60-70% reduction in account deployment gas
+- 99.1% reduction in on-chain bytecode (141 bytes vs 16KB)
+- Lower costs for users, especially important for counterfactual deployment
+
+See [`docs/PROXY_IMPLEMENTATION.md`](docs/PROXY_IMPLEMENTATION.md) for detailed gas analysis.
 
 ## Support
 

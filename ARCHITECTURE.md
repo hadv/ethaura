@@ -48,20 +48,35 @@ messageHash = SHA256(userOpHash)
 
 #### P256AccountFactory (`src/P256AccountFactory.sol`)
 
-Factory for deterministic account deployment using CREATE2.
+Factory for deterministic account deployment using **ERC-1967 Proxy Pattern** with CREATE2.
+
+**Architecture:**
+- Deploys a single P256Account implementation contract (once)
+- Creates minimal ERC-1967 proxies (~141 bytes) for each account
+- Saves ~60-70% gas on deployment vs full contract deployment
 
 **Key Functions:**
-- `createAccount(qx, qy, owner, salt)`: Deploy new account
+- `createAccount(qx, qy, owner, salt, enable2FA)`: Deploy new proxy account
 - `getAddress(qx, qy, owner, salt)`: Predict account address
 - `getInitCode(...)`: Generate initCode for UserOperation
+- `IMPLEMENTATION`: Returns the shared implementation contract address
 
 **Deterministic Address:**
 ```
 address = CREATE2(
-  salt,
-  keccak256(creationCode || abi.encode(entryPoint))
+  keccak256(owner, salt),
+  keccak256(ERC1967Proxy.creationCode || abi.encode(implementation, ""))
 )
 ```
+
+**Note:** Address depends ONLY on `owner` and `salt`, NOT on `qx`, `qy`, or `enable2FA`. This allows users to receive funds before deciding on passkey/2FA settings.
+
+**Gas Savings:**
+- Deployment: ~312,358 gas (vs ~500,000-700,000 before)
+- On-chain bytecode: 141 bytes (vs ~16,124 bytes before)
+- Savings: ~60-70% gas, ~99.1% bytecode reduction
+
+See [`docs/PROXY_IMPLEMENTATION.md`](docs/PROXY_IMPLEMENTATION.md) for full details.
 
 ### 2. Frontend Layer
 
