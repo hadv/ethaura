@@ -10,6 +10,8 @@ help:
 	@echo "  make test           - Run contract tests"
 	@echo "  make test-gas       - Run tests with gas report"
 	@echo "  make deploy-sepolia - Deploy to Sepolia testnet"
+	@echo "  make verify-sepolia - Verify contracts on Sepolia"
+	@echo "  make verify-mainnet - Verify contracts on Mainnet"
 	@echo "  make frontend       - Run frontend dev server"
 	@echo "  make clean          - Clean build artifacts"
 	@echo ""
@@ -63,6 +65,30 @@ deploy-sepolia:
 	@echo "Deploying to Sepolia..."
 	forge script script/Deploy.s.sol:DeployScript --rpc-url sepolia --broadcast --verify
 	@echo "✅ Deployment complete!"
+
+# Verify contracts on Sepolia
+verify-sepolia:
+	@echo "Verifying contracts on Sepolia..."
+	@if [ -z "$$FACTORY_ADDRESS" ]; then \
+		echo "Error: FACTORY_ADDRESS not set"; \
+		echo "Usage: FACTORY_ADDRESS=0x... make verify-sepolia"; \
+		exit 1; \
+	fi
+	@chmod +x scripts/verify-contracts.sh
+	@./scripts/verify-contracts.sh sepolia
+	@echo "✅ Verification complete!"
+
+# Verify contracts on Mainnet
+verify-mainnet:
+	@echo "Verifying contracts on Mainnet..."
+	@if [ -z "$$FACTORY_ADDRESS" ]; then \
+		echo "Error: FACTORY_ADDRESS not set"; \
+		echo "Usage: FACTORY_ADDRESS=0x... make verify-mainnet"; \
+		exit 1; \
+	fi
+	@chmod +x scripts/verify-contracts.sh
+	@./scripts/verify-contracts.sh mainnet
+	@echo "✅ Verification complete!"
 
 # Run frontend
 frontend:
