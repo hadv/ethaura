@@ -14,6 +14,7 @@ import {
   getCredential,
   deleteCredential,
   getAllCredentials,
+  // Admin/maintenance
   createBackup,
   getDatabaseStats,
   startBackupScheduler,

@@ -65,7 +65,7 @@ export const AVAILABLE_NETWORKS = [
 export const NetworkProvider = ({ children }) => {
   // Get default network from env or use Sepolia
   const defaultChainId = parseInt(import.meta.env.VITE_CHAIN_ID || '11155111');
-  
+
   // Load selected network from localStorage or use default
   const [selectedNetwork, setSelectedNetwork] = useState(() => {
     const stored = localStorage.getItem('ethaura_selected_network');
@@ -85,11 +85,25 @@ export const NetworkProvider = ({ children }) => {
     return AVAILABLE_NETWORKS.find(n => n.chainId === defaultChainId) || AVAILABLE_NETWORKS[0];
   });
 
-  // Save to localStorage when network changes
+  // Custom RPC overrides per chainId
+  const [customRpcs, setCustomRpcs] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('ethaura_custom_rpcs') || '{}');
+    } catch (e) {
+      console.warn('Failed to parse custom RPCs from storage, resetting');
+      return {};
+    }
+  });
+
+  // Persist selections
   useEffect(() => {
     localStorage.setItem('ethaura_selected_network', JSON.stringify(selectedNetwork));
     console.log('🌐 Network changed to:', selectedNetwork.name, `(Chain ID: ${selectedNetwork.chainId})`);
   }, [selectedNetwork]);
+
+  useEffect(() => {
+    localStorage.setItem('ethaura_custom_rpcs', JSON.stringify(customRpcs));
+  }, [customRpcs]);
 
   const switchNetwork = (chainId) => {
     const network = AVAILABLE_NETWORKS.find(n => n.chainId === chainId);
@@ -101,9 +115,37 @@ export const NetworkProvider = ({ children }) => {
     return false;
   };
 
+  const validateRpcUrl = (url) => {
+    try {
+      const u = new URL(url);
+      return u.protocol === 'http:' || u.protocol === 'https:';
+    } catch {
+      return false;
+    }
+  };
+
+  const setCustomRpcForChain = (chainId, url) => {
+    if (!validateRpcUrl(url)) {
+      throw new Error('Invalid RPC URL');
+    }
+    setCustomRpcs(prev => ({ ...prev, [chainId]: { rpcUrl: url } }));
+  };
+
+  const clearCustomRpcForChain = (chainId) => {
+    setCustomRpcs(prev => {
+      const next = { ...prev };
+      delete next[chainId];
+      return next;
+    });
+  };
+
+  const getEffectiveRpcUrl = (chainId) => customRpcs?.[chainId]?.rpcUrl || (AVAILABLE_NETWORKS.find(n => n.chainId === chainId)?.rpcUrl);
+
   const getNetworkInfo = () => {
+    const effectiveRpcUrl = getEffectiveRpcUrl(selectedNetwork.chainId);
     return {
       ...selectedNetwork,
+      rpcUrl: effectiveRpcUrl,
       icon: getNetworkIcon(selectedNetwork.chainId),
       color: getNetworkColor(selectedNetwork.chainId),
     };
@@ -114,6 +156,11 @@ export const NetworkProvider = ({ children }) => {
     networkInfo: getNetworkInfo(),
     availableNetworks: AVAILABLE_NETWORKS,
     switchNetwork,
+    // RPC controls
+    customRpcs,
+    setCustomRpcForChain,
+    clearCustomRpcForChain,
+    getEffectiveRpcUrl,
   };
 
   return (

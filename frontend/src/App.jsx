@@ -476,16 +476,16 @@ function AppContent() {
   )
 }
 
-// Main App component with Web3AuthProvider, NetworkProvider, and WalletConnectProvider
+// Main App component with NetworkProvider, Web3AuthProvider, and WalletConnectProvider
 function App() {
   return (
-    <Web3AuthProvider>
-      <NetworkProvider>
+    <NetworkProvider>
+      <Web3AuthProvider>
         <WalletConnectProvider>
           <AppContent />
         </WalletConnectProvider>
-      </NetworkProvider>
-    </Web3AuthProvider>
+      </Web3AuthProvider>
+    </NetworkProvider>
   )
 }
 

@@ -129,6 +129,7 @@
   padding: 12px 20px;
   gap: 16px;
   transition: background 0.15s ease;
+  cursor: pointer;
 }
 
 .network-health-item:hover {
@@ -204,6 +205,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 12px;
   flex-shrink: 0;
 }
 
@@ -226,6 +228,41 @@
 
 .network-health-status.placeholder {
   background: #D1D5DB;
+}
+
+/* Network Switch Icon Button */
+.network-switch-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  color: #6B7280;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.network-switch-icon:hover {
+  background: rgba(0, 0, 0, 0.05);
+  color: #111827;
+}
+
+.network-switch-icon:active {
+  background: rgba(0, 0, 0, 0.1);
+}
+
+.network-health-item.active .network-switch-icon {
+  color: #10B981;
+}
+
+.network-health-item.active .network-switch-icon:hover {
+  background: rgba(16, 185, 129, 0.1);
+  color: #059669;
 }
 
 /* Error Message */
@@ -318,5 +355,144 @@
   .network-health-label::after {
     content: ':';
   }
+}
+
+
+/* RPC Modal Styles */
+.rpc-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+}
+
+.rpc-modal {
+  width: 520px;
+  max-width: 92vw;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+  overflow: hidden;
+}
+
+.rpc-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid #eee;
+}
+
+.rpc-modal-header h4 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.rpc-close {
+  border: none;
+  background: transparent;
+  font-size: 20px;
+  cursor: pointer;
+  color: #6B7280;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  transition: background 0.15s ease;
+}
+
+.rpc-close:hover {
+  background: #F3F4F6;
+}
+
+.rpc-modal-body {
+  padding: 16px;
+}
+
+.rpc-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.rpc-field label {
+  font-size: 13px;
+  color: #555;
+  font-weight: 500;
+}
+
+.rpc-field input {
+  padding: 10px 12px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-size: 14px;
+}
+
+.rpc-field input:focus {
+  outline: none;
+  border-color: #111827;
+}
+
+.rpc-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.rpc-actions button {
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1px solid #ddd;
+  background: #fafafa;
+  cursor: pointer;
+  font-size: 13px;
+  transition: all 0.15s ease;
+}
+
+.rpc-actions button:hover:not(:disabled) {
+  background: #f0f0f0;
+  border-color: #ccc;
+}
+
+.rpc-actions button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.rpc-actions button.primary {
+  background: #111827;
+  color: white;
+  border-color: #111827;
+}
+
+.rpc-actions button.primary:hover:not(:disabled) {
+  background: #1F2937;
+}
+
+.rpc-test-result {
+  margin-top: 10px;
+  font-size: 13px;
+  padding: 8px 12px;
+  border-radius: 6px;
+}
+
+.rpc-test-result.ok {
+  color: #059669;
+  background: #ECFDF5;
+  border: 1px solid #D1FAE5;
+}
+
+.rpc-test-result.err {
+  color: #dc2626;
+  background: #FEF2F2;
+  border: 1px solid #FEE2E2;
 }
 

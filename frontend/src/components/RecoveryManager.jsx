@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
 import { useP256SDK } from '../hooks/useP256SDK'
+import { useNetwork } from '../contexts/NetworkContext'
 import { signWithPasskey } from '../utils/webauthn'
 import { ethers } from 'ethers'
 import SignatureConfirmationDialog from './SignatureConfirmationDialog'
@@ -8,6 +9,7 @@ import '../styles/RecoveryManager.css'
 
 function RecoveryManager({ accountAddress, credential }) {
   const { isConnected, address: ownerAddress, provider: web3AuthProvider, signRawHash } = useWeb3Auth()
+  const { networkInfo } = useNetwork()
   const [status, setStatus] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -170,8 +172,8 @@ function RecoveryManager({ accountAddress, credential }) {
       throw new Error('Web3Auth provider not available')
     }
 
-    // Create an ethers JsonRpcProvider from the Web3Auth provider
-    const rpcUrl = import.meta.env.VITE_RPC_URL || 'https://eth-sepolia.g.alchemy.com/v2/demo'
+    // Use current network RPC for the signer provider
+    const rpcUrl = networkInfo?.rpcUrl || import.meta.env.VITE_RPC_URL || 'https://eth-sepolia.g.alchemy.com/v2/demo'
     const provider = new ethers.JsonRpcProvider(rpcUrl)
 
     // Get private key from Web3Auth

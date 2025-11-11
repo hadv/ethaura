@@ -12,7 +12,6 @@
 import sqlite3 from 'sqlite3'
 import { mkdir, copyFile } from 'fs/promises'
 import { dirname, join } from 'path'
-import { existsSync } from 'fs'
 
 const DB_PATH = process.env.DATABASE_PATH || './data/passkeys.db'
 const BACKUP_DIR = process.env.BACKUP_DIR || './data/backups'
@@ -399,6 +398,7 @@ export default {
   getCredential,
   deleteCredential,
   getAllCredentials,
+  // Admin/maintenance
   closeDatabase,
   createBackup,
   getDatabaseStats,

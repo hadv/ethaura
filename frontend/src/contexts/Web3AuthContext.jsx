@@ -4,6 +4,7 @@ import { CHAIN_NAMESPACES, WEB3AUTH_NETWORK } from '@web3auth/base';
 import { EthereumPrivateKeyProvider } from '@web3auth/ethereum-provider';
 import { createWalletClient, custom } from 'viem';
 import { sepolia } from 'viem/chains';
+import { useNetwork } from './NetworkContext.jsx';
 
 const Web3AuthContext = createContext(null);
 
@@ -25,16 +26,20 @@ export const Web3AuthProvider = ({ children }) => {
   const [isConnected, setIsConnected] = useState(false);
   const [initError, setInitError] = useState(null);
 
+  const { networkInfo, setCustomRpcsBulk } = useNetwork();
+
   useEffect(() => {
     const init = async () => {
       try {
-        // Configure Ethereum provider for Sepolia
+        const chainIdHex = '0x' + Number(networkInfo?.chainId || 11155111).toString(16);
+
+        // Configure Ethereum provider from selected network
         const chainConfig = {
           chainNamespace: CHAIN_NAMESPACES.EIP155,
-          chainId: '0xaa36a7', // Sepolia chain ID (11155111)
-          rpcTarget: import.meta.env.VITE_RPC_URL || 'https://eth-sepolia.g.alchemy.com/v2/demo',
-          displayName: 'Sepolia Testnet',
-          blockExplorerUrl: 'https://sepolia.etherscan.io',
+          chainId: chainIdHex,
+          rpcTarget: networkInfo?.rpcUrl || import.meta.env.VITE_RPC_URL || 'https://eth-sepolia.g.alchemy.com/v2/demo',
+          displayName: networkInfo?.name || 'Sepolia Testnet',
+          blockExplorerUrl: networkInfo?.explorerUrl || 'https://sepolia.etherscan.io',
           ticker: 'ETH',
           tickerName: 'Ethereum',
         };
@@ -49,7 +54,7 @@ export const Web3AuthProvider = ({ children }) => {
           web3AuthNetwork: WEB3AUTH_NETWORK.SAPPHIRE_DEVNET,
           chainConfig,
           privateKeyProvider,
-          uxMode: 'redirect', // Use redirect mode instead of popup to avoid COOP issues
+          uxMode: 'redirect',
           uiConfig: {
             appName: 'ΞTHΛURΛ - P256 Account Abstraction',
             mode: 'light',
@@ -57,22 +62,14 @@ export const Web3AuthProvider = ({ children }) => {
             logoLight: 'https://web3auth.io/images/web3authlog.png',
             logoDark: 'https://web3auth.io/images/web3authlogodark.png',
             defaultLanguage: 'en',
-            theme: {
-              primary: '#768729',
-            },
-            modalConfig: {
-              modalZIndex: '2147483647',
-            },
+            theme: { primary: '#768729' },
+            modalConfig: { modalZIndex: '2147483647' },
           },
-          sessionTime: 86400, // 1 day
+          sessionTime: 86400,
           enableLogging: false,
         });
 
-        console.log('Web3Auth instance created, checking available methods...');
-        console.log('initModal:', typeof web3authInstance.initModal);
-        console.log('init:', typeof web3authInstance.init);
-
-        // Try both possible method names
+        // Initialize
         if (typeof web3authInstance.initModal === 'function') {
           await web3authInstance.initModal();
         } else if (typeof web3authInstance.init === 'function') {
@@ -81,26 +78,21 @@ export const Web3AuthProvider = ({ children }) => {
           throw new Error('No initialization method found on Web3Auth instance');
         }
 
-        console.log('Web3Auth initialized successfully');
         setWeb3auth(web3authInstance);
 
-        // Check if already connected
         if (web3authInstance.connected) {
           const web3authProvider = web3authInstance.provider;
           setProvider(web3authProvider);
 
-          // Create wallet client
           const client = createWalletClient({
-            chain: sepolia,
+            chain: sepolia, // TODO: map to selected chain if needed
             transport: custom(web3authProvider),
           });
           setWalletClient(client);
 
-          // Get user info
           const user = await web3authInstance.getUserInfo();
           setUserInfo(user);
 
-          // Get address
           const [addr] = await client.getAddresses();
           setAddress(addr);
           setIsConnected(true);
@@ -114,7 +106,8 @@ export const Web3AuthProvider = ({ children }) => {
     };
 
     init();
-  }, []);
+    // Re-init when network changes
+  }, [networkInfo]);
 
   const login = async () => {
     if (!web3auth) {
@@ -128,7 +121,7 @@ export const Web3AuthProvider = ({ children }) => {
 
       // Create wallet client
       const client = createWalletClient({
-        chain: sepolia,
+        chain: sepolia, // TODO: map to selected chain if needed
         transport: custom(web3authProvider),
       });
       setWalletClient(client);
@@ -276,6 +269,8 @@ export const Web3AuthProvider = ({ children }) => {
       throw error;
     }
   };
+
+
 
   const value = {
     web3auth,
