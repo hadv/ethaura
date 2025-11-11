@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
 import { useP256SDK } from '../hooks/useP256SDK'
+import { useNetwork } from '../contexts/NetworkContext'
 import { ethers } from 'ethers'
 import { Identicon } from '../utils/identicon.jsx'
 import '../styles/Dashboard.css'
@@ -8,6 +9,7 @@ import '../styles/Dashboard.css'
 function Dashboard({ accountAddress, accountConfig, onSendClick, onReceiveClick, onWalletClick }) {
   const { isConnected } = useWeb3Auth()
   const { sdk } = useP256SDK()
+  const { networkInfo } = useNetwork()
   const [balance, setBalance] = useState('0')
   const [balanceChange, setBalanceChange] = useState('+0.00%')
   const [wallets, setWallets] = useState([])
@@ -29,10 +31,8 @@ function Dashboard({ accountAddress, accountConfig, onSendClick, onReceiveClick,
   const fetchBalance = async () => {
     try {
       setLoading(true)
-      const provider = new ethers.JsonRpcProvider(
-        import.meta.env.VITE_RPC_URL || 'https://rpc.sepolia.org'
-      )
-      
+      const provider = new ethers.JsonRpcProvider(networkInfo.rpcUrl)
+
       const balanceWei = await provider.getBalance(accountAddress)
       const balanceEth = ethers.formatEther(balanceWei)
       setBalance(balanceEth)

@@ -140,6 +140,7 @@ function WalletSettingsScreen({ wallet, onBack, onHome, onLogout, credential, on
                 />
               </div>
             )}
+
           </div>
         </div>
       </div>

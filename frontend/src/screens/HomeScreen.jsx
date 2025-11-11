@@ -285,9 +285,7 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onLogo
       }
 
       // Fetch balance for the new wallet
-      const provider = new ethers.JsonRpcProvider(
-        import.meta.env.VITE_RPC_URL || 'https://rpc.sepolia.org'
-      )
+      const provider = new ethers.JsonRpcProvider(networkInfo.rpcUrl)
       const tokenService = createTokenBalanceService(provider, networkInfo.name)
 
       // Fetch all token balances (ETH + ERC20 tokens) with real prices

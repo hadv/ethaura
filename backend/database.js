@@ -138,6 +138,21 @@ await runAsync(`
 await runAsync(`CREATE INDEX IF NOT EXISTS idx_user_id ON passkey_credentials(user_id)`)
 await runAsync(`CREATE INDEX IF NOT EXISTS idx_credential_id ON passkey_credentials(credential_id)`)
 
+
+// Table for per-user per-network RPC configurations
+await runAsync(`
+  CREATE TABLE IF NOT EXISTS user_rpc_configs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id TEXT NOT NULL,
+    chain_id INTEGER NOT NULL,
+    rpc_url TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    UNIQUE(user_id, chain_id)
+  )
+`)
+
+await runAsync(`CREATE UNIQUE INDEX IF NOT EXISTS idx_rpc_user_chain ON user_rpc_configs(user_id, chain_id)`)
 console.log('✅ Database initialized:', DB_PATH)
 
 /**
@@ -260,6 +275,55 @@ export async function getAllCredentials() {
 
   return rows || []
 }
+
+/**
+ * Upsert RPC configuration for a user + chainId
+ */
+export async function setUserRpcConfig(userId, chainId, rpcUrl) {
+  const now = Date.now()
+  // Try update first
+  const result = await runAsync(
+    `UPDATE user_rpc_configs
+     SET rpc_url = ?, updated_at = ?
+     WHERE user_id = ? AND chain_id = ?`,
+    [rpcUrl, now, userId, chainId]
+  )
+
+  if (result.changes === 0) {
+    // Insert new
+    await runAsync(
+      `INSERT INTO user_rpc_configs (user_id, chain_id, rpc_url, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?)`,
+      [userId, chainId, rpcUrl, now, now]
+    )
+  }
+
+  return { success: true }
+}
+
+/**
+ * Get all RPC configurations for a user
+ */
+export async function getUserRpcConfigs(userId) {
+  const rows = await allAsync(
+    `SELECT chain_id as chainId, rpc_url as rpcUrl FROM user_rpc_configs WHERE user_id = ?`,
+    [userId]
+  )
+  // Return as array; callers can map to object
+  return rows || []
+}
+
+/**
+ * Delete RPC configuration for a user + chainId
+ */
+export async function deleteUserRpcConfig(userId, chainId) {
+  const result = await runAsync(
+    `DELETE FROM user_rpc_configs WHERE user_id = ? AND chain_id = ?`,
+    [userId, chainId]
+  )
+  return result.changes > 0
+}
+
 
 /**
  * Create a backup of the database
@@ -399,6 +463,11 @@ export default {
   getCredential,
   deleteCredential,
   getAllCredentials,
+  // RPC config exports
+  setUserRpcConfig,
+  getUserRpcConfigs,
+  deleteUserRpcConfig,
+  // Admin/maintenance
   closeDatabase,
   createBackup,
   getDatabaseStats,
