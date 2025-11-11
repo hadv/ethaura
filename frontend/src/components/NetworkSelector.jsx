@@ -8,6 +8,7 @@ const NetworkSelector = () => {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef(null);
 
+
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -49,7 +50,7 @@ const NetworkSelector = () => {
     <div className="network-selector-container" ref={dropdownRef}>
       <div
         className="network-selector"
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={() => { setIsOpen(!isOpen); }}
       >
         <img
           src={getNetworkIcon(networkInfo.chainId)}
@@ -105,8 +106,12 @@ const NetworkSelector = () => {
         </div>
       )}
     </div>
+
   );
+
 };
+
+
 
 export default NetworkSelector;
 
