@@ -137,8 +137,6 @@ await runAsync(`
 await runAsync(`CREATE INDEX IF NOT EXISTS idx_user_id ON passkey_credentials(user_id)`)
 await runAsync(`CREATE INDEX IF NOT EXISTS idx_credential_id ON passkey_credentials(credential_id)`)
 
-
-
 console.log('✅ Database initialized:', DB_PATH)
 
 /**
