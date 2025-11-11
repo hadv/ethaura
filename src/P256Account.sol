@@ -6,7 +6,7 @@ import {IEntryPoint} from "@account-abstraction/interfaces/IEntryPoint.sol";
 import {PackedUserOperation} from "@account-abstraction/interfaces/PackedUserOperation.sol";
 import {IERC1271} from "@openzeppelin/contracts/interfaces/IERC1271.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
-import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
+import {Initializable} from "solady/utils/Initializable.sol";
 import {P256} from "solady/utils/P256.sol";
 import {Base64Url} from "./libraries/Base64Url.sol";
 import {LibBytes} from "solady/utils/LibBytes.sol";
@@ -180,7 +180,7 @@ contract P256Account is IAccount, IERC1271, Ownable, Initializable {
      * @dev If _qx and _qy are both 0, the account operates in owner-only mode (no passkey)
      * @dev If _qx and _qy are set but _enable2FA is false, passkey can be used but 2FA is not required
      * @dev If _enable2FA is true, both _qx and _qy must be non-zero
-     * @dev Uses OpenZeppelin's Initializable to ensure this can only be called once per proxy
+     * @dev Uses Solady's Initializable to ensure this can only be called once per proxy
      */
     function initialize(bytes32 _qx, bytes32 _qy, address _owner, bool _enable2FA) external initializer {
         // If enabling 2FA, passkey must be provided
