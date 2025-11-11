@@ -139,12 +139,6 @@ export const NetworkProvider = ({ children }) => {
     });
   };
 
-
-
-
-  const setCustomRpc = (url) => setCustomRpcForChain(selectedNetwork.chainId, url);
-  const clearCustomRpc = () => clearCustomRpcForChain(selectedNetwork.chainId);
-
   const getEffectiveRpcUrl = (chainId) => customRpcs?.[chainId]?.rpcUrl || (AVAILABLE_NETWORKS.find(n => n.chainId === chainId)?.rpcUrl);
 
   const getNetworkInfo = () => {
@@ -164,8 +158,6 @@ export const NetworkProvider = ({ children }) => {
     switchNetwork,
     // RPC controls
     customRpcs,
-    setCustomRpc,
-    clearCustomRpc,
     setCustomRpcForChain,
     clearCustomRpcForChain,
     getEffectiveRpcUrl,
