@@ -59,6 +59,12 @@ const Header = ({
     }
   }
 
+  const handleLogout = (e) => {
+    e.stopPropagation()
+    setShowProfileMenu(false)
+    onLogout()
+  }
+
   const formatAddress = (addr) => {
     if (!addr) return ''
     return `${addr.slice(0, 6)}...${addr.slice(-4)}`
@@ -135,14 +141,22 @@ const Header = ({
                     <span className="explorer-text">View on Explorer</span>
                   </button>
                 </div>
+
+                <div className="profile-menu-divider"></div>
+
+                <div className="profile-menu-section">
+                  <button
+                    className="profile-logout-btn"
+                    onClick={handleLogout}
+                  >
+                    <HiLogout className="logout-icon" />
+                    <span className="logout-text">Logout</span>
+                  </button>
+                </div>
               </div>
             )}
           </div>
         )}
-        <button className="logout-btn" onClick={onLogout}>
-          <HiLogout className="btn-icon" />
-          Logout
-        </button>
       </div>
     </header>
   )

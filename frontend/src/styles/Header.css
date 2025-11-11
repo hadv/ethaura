@@ -73,31 +73,6 @@
   color: #111827;
 }
 
-.logout-btn {
-  padding: 0 24px;
-  height: 44px;
-  background: #000;
-  color: white;
-  border: none;
-  border-radius: 24px;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.logout-btn:hover {
-  background: #1f1f1f;
-  transform: translateY(-1px);
-}
-
-.btn-icon {
-  font-size: 16px;
-}
-
 /* Profile Dropdown Menu */
 .profile-dropdown-menu {
   position: absolute;
@@ -295,6 +270,45 @@
   color: #374151;
 }
 
+/* Profile Menu Divider */
+.profile-menu-divider {
+  height: 1px;
+  background: #e5e7eb;
+  margin: 8px 0;
+}
+
+/* Profile Logout Button */
+.profile-logout-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: #000;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.profile-logout-btn:hover {
+  background: #1f1f1f;
+  transform: translateY(-1px);
+}
+
+.logout-icon {
+  font-size: 16px;
+}
+
+.logout-text {
+  font-size: 13px;
+  font-weight: 500;
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
   .app-header {
@@ -307,11 +321,6 @@
 
   .user-name-small {
     display: none;
-  }
-
-  .logout-btn {
-    padding: 0 16px;
-    font-size: 13px;
   }
 }
 
