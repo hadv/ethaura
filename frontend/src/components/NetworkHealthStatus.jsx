@@ -44,16 +44,16 @@ const NetworkHealthStatus = () => {
   // Format last sync time
   const getLastSyncText = () => {
     if (!healthData.lastSync) return 'Never'
-    
+
     const now = Date.now()
     const diff = now - healthData.lastSync
     const seconds = Math.floor(diff / 1000)
-    
-    if (seconds < 60) return 'less than a minute'
-    if (seconds < 120) return '1 minute ago'
-    if (seconds < 3600) return `${Math.floor(seconds / 60)} minutes ago`
-    if (seconds < 7200) return '1 hour ago'
-    return `${Math.floor(seconds / 3600)} hours ago`
+
+    if (seconds < 60) return 'just now'
+    if (seconds < 120) return '1m ago'
+    if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`
+    if (seconds < 7200) return '1h ago'
+    return `${Math.floor(seconds / 3600)}h ago`
   }
 
   // Format block number with commas
@@ -115,11 +115,11 @@ const NetworkHealthStatus = () => {
                 const diff = now - networkHealth.lastSync;
                 const seconds = Math.floor(diff / 1000);
 
-                if (seconds < 60) return 'less than a minute';
-                if (seconds < 120) return '1 minute ago';
-                if (seconds < 3600) return `${Math.floor(seconds / 60)} minutes ago`;
-                if (seconds < 7200) return '1 hour ago';
-                return `${Math.floor(seconds / 3600)} hours ago`;
+                if (seconds < 60) return 'just now';
+                if (seconds < 120) return '1m ago';
+                if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+                if (seconds < 7200) return '1h ago';
+                return `${Math.floor(seconds / 3600)}h ago`;
               };
 
               return (
