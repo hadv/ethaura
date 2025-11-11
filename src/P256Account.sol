@@ -6,7 +6,7 @@ import {IEntryPoint} from "@account-abstraction/interfaces/IEntryPoint.sol";
 import {PackedUserOperation} from "@account-abstraction/interfaces/PackedUserOperation.sol";
 import {IERC1271} from "@openzeppelin/contracts/interfaces/IERC1271.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
-import {P256} from "./libraries/P256.sol";
+import {P256} from "solady/utils/P256.sol";
 import {Base64Url} from "./libraries/Base64Url.sol";
 import {LibBytes} from "solady/utils/LibBytes.sol";
 
@@ -300,7 +300,7 @@ contract P256Account is IAccount, IERC1271, Ownable {
             )
         );
 
-        if (!P256.verify(messageHash, r, s, _qx, _qy)) return 1;
+        if (!P256.verifySignature(messageHash, r, s, _qx, _qy)) return 1;
 
         // Verify owner signature (last 65 bytes)
         if (_recoverSigner(userOpHash, sig[sig.length - 65:]) != _owner) return 1;
@@ -460,7 +460,7 @@ contract P256Account is IAccount, IERC1271, Ownable {
 
         // Use SHA-256 for consistency with validateUserOp
         bytes32 messageHash = sha256(abi.encodePacked(hash));
-        bool isValid = P256.verify(messageHash, r, s, qx, qy);
+        bool isValid = P256.verifySignature(messageHash, r, s, qx, qy);
 
         return isValid ? MAGICVALUE : bytes4(0);
     }

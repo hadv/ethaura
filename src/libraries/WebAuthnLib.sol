@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.23;
 
-import {P256} from "./P256.sol";
+import {P256} from "solady/utils/P256.sol";
 
 /**
  * @title WebAuthnLib
@@ -47,7 +47,7 @@ library WebAuthnLib {
         bytes32 messageHash = sha256(abi.encodePacked(authenticatorData, clientDataHash));
 
         // 4. Verify the P-256 signature
-        return P256.verify(messageHash, r, s, qx, qy);
+        return P256.verifySignature(messageHash, r, s, qx, qy);
     }
 
     /**
