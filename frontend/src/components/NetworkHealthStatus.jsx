@@ -7,13 +7,15 @@
 import { useState, useRef, useEffect } from 'react'
 import { useNetwork } from '../contexts/NetworkContext'
 import { useNetworkHealth } from '../hooks/useNetworkHealth'
+import { useAllNetworksHealth } from '../hooks/useAllNetworksHealth'
 import { getNetworkIcon } from '../utils/network'
 import { ethers } from 'ethers'
 import '../styles/NetworkHealthStatus.css'
 
 const NetworkHealthStatus = () => {
   const { networkInfo, availableNetworks, switchNetwork, getEffectiveRpcUrl, setCustomRpcForChain, clearCustomRpcForChain } = useNetwork()
-  const healthData = useNetworkHealth()
+  const healthData = useNetworkHealth() // Current network health (for the button indicator)
+  const allNetworksHealth = useAllNetworksHealth() // All networks health (for the dropdown)
   const [isOpen, setIsOpen] = useState(false)
   const dropdownRef = useRef(null)
 
@@ -97,8 +99,28 @@ const NetworkHealthStatus = () => {
             {/* All Networks */}
             {availableNetworks.map(network => {
               const isCurrentNetwork = networkInfo.chainId === network.chainId;
-              const isSepolia = network.chainId === 11155111;
-              const showHealthData = isSepolia && isCurrentNetwork;
+              const networkHealth = allNetworksHealth[network.chainId] || {
+                blockNumber: null,
+                lastSync: null,
+                isHealthy: false,
+                isLoading: true,
+                error: null,
+              };
+
+              // Helper to format last sync for this specific network
+              const getNetworkLastSyncText = () => {
+                if (!networkHealth.lastSync) return 'Never';
+
+                const now = Date.now();
+                const diff = now - networkHealth.lastSync;
+                const seconds = Math.floor(diff / 1000);
+
+                if (seconds < 60) return 'less than a minute';
+                if (seconds < 120) return '1 minute ago';
+                if (seconds < 3600) return `${Math.floor(seconds / 60)} minutes ago`;
+                if (seconds < 7200) return '1 hour ago';
+                return `${Math.floor(seconds / 3600)} hours ago`;
+              };
 
               return (
                 <div
@@ -129,18 +151,30 @@ const NetworkHealthStatus = () => {
                     <div className="network-health-sync">
                       <span className="network-health-label">Last sync</span>
                       <span className="network-health-value">
-                        {showHealthData ? getLastSyncText() : <span className="placeholder-text">Coming soon</span>}
+                        {networkHealth.isLoading ? (
+                          <span className="placeholder-text">Loading...</span>
+                        ) : networkHealth.isHealthy ? (
+                          getNetworkLastSyncText()
+                        ) : (
+                          <span className="placeholder-text">Unavailable</span>
+                        )}
                       </span>
                     </div>
                     <div className="network-health-block">
                       <span className="network-health-label">Block</span>
                       <span className="network-health-value">
-                        {showHealthData ? formatBlockNumber(healthData.blockNumber) : <span className="placeholder-text">-</span>}
+                        {networkHealth.isLoading ? (
+                          <span className="placeholder-text">-</span>
+                        ) : networkHealth.isHealthy ? (
+                          formatBlockNumber(networkHealth.blockNumber)
+                        ) : (
+                          <span className="placeholder-text">-</span>
+                        )}
                       </span>
                     </div>
                   </div>
                   <div className="network-health-right">
-                    <div className={`network-health-status ${showHealthData ? (healthData.isHealthy ? 'healthy' : 'error') : 'placeholder'}`} />
+                    <div className={`network-health-status ${networkHealth.isLoading ? 'loading' : networkHealth.isHealthy ? 'healthy' : 'error'}`} />
                     <button
                       className="network-switch-icon"
                       onClick={(e) => {
