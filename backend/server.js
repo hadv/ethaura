@@ -14,10 +14,6 @@ import {
   getCredential,
   deleteCredential,
   getAllCredentials,
-  // RPC config APIs
-  setUserRpcConfig,
-  getUserRpcConfigs,
-  deleteUserRpcConfig,
   // Admin/maintenance
   createBackup,
   getDatabaseStats,
@@ -250,105 +246,6 @@ app.delete('/api/passkeys', verifySignature, async (req, res) => {
     })
   }
 })
-
-/**
- * RPC Configuration Endpoints
- * Per-user (owner address) and per-network (chainId) RPC overrides
- */
-
-/**
- * POST /api/rpc-config
- * Body: { userId, ownerAddress, signature, message, timestamp, chainId, rpcUrl }
- */
-app.post('/api/rpc-config', verifySignature, async (req, res) => {
-  try {
-    const userId = req.verifiedUserId // we use owner address as userId for per-user scope
-    const { chainId, rpcUrl } = req.body
-
-    if (!chainId || !rpcUrl) {
-      return res.status(400).json({ error: 'Missing chainId or rpcUrl' })
-    }
-
-    // Basic validation
-    if (typeof chainId !== 'number') {
-      return res.status(400).json({ error: 'chainId must be a number' })
-    }
-    if (typeof rpcUrl !== 'string' || !/^https?:\/\//i.test(rpcUrl)) {
-      return res.status(400).json({ error: 'rpcUrl must be a valid http(s) URL' })
-    }
-
-    await setUserRpcConfig(userId, chainId, rpcUrl)
-
-    res.json({ success: true })
-  } catch (error) {
-    console.error('Error setting RPC config:', error)
-    res.status(500).json({ error: 'Failed to set RPC config', details: error.message })
-  }
-})
-
-/**
- * GET /api/rpc-config/:userId
- * Query: { ownerAddress, signature, message, timestamp }
- */
-app.get('/api/rpc-config/:userId', async (req, res) => {
-  try {
-    const { userId } = req.params
-    const { signature, message, timestamp, ownerAddress } = req.query
-
-    if (!signature || !message || !timestamp || !ownerAddress) {
-      return res.status(400).json({ error: 'Missing authentication parameters' })
-    }
-
-    const now = Date.now()
-    const timeDiff = Math.abs(now - parseInt(timestamp))
-    if (timeDiff > 5 * 60 * 1000) {
-      return res.status(401).json({ error: 'Authentication expired' })
-    }
-
-    // Verify signature - should be signed by owner
-    const recoveredAddress = ethers.verifyMessage(message, signature)
-    if (recoveredAddress.toLowerCase() !== ownerAddress.toLowerCase()) {
-      return res.status(401).json({ error: 'Invalid signature. Owner address mismatch.' })
-    }
-
-    const normalizedUserId = userId.toLowerCase()
-    const rows = await getUserRpcConfigs(normalizedUserId)
-
-    // Convert to map { [chainId]: { rpcUrl } }
-    const configs = {}
-    for (const row of rows) {
-      configs[row.chainId] = { rpcUrl: row.rpcUrl }
-    }
-
-    res.json({ success: true, configs })
-  } catch (error) {
-    console.error('Error fetching RPC configs:', error)
-    res.status(500).json({ error: 'Failed to fetch RPC configs', details: error.message })
-  }
-})
-
-/**
- * DELETE /api/rpc-config
- * Body: { userId, ownerAddress, signature, message, timestamp, chainId }
- */
-app.delete('/api/rpc-config', verifySignature, async (req, res) => {
-  try {
-    const userId = req.verifiedUserId
-    const { chainId } = req.body
-
-    if (!chainId || typeof chainId !== 'number') {
-      return res.status(400).json({ error: 'Missing or invalid chainId' })
-    }
-
-    const deleted = await deleteUserRpcConfig(userId, chainId)
-
-    res.json({ success: true, deleted })
-  } catch (error) {
-    console.error('Error deleting RPC config:', error)
-    res.status(500).json({ error: 'Failed to delete RPC config', details: error.message })
-  }
-})
-
 
 /**
  * GET /api/admin/credentials

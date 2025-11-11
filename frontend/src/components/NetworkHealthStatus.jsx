@@ -6,16 +6,13 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { useNetwork } from '../contexts/NetworkContext'
-import { useWeb3Auth } from '../contexts/Web3AuthContext'
 import { useNetworkHealth } from '../hooks/useNetworkHealth'
 import { getNetworkIcon } from '../utils/network'
-import { saveRpcConfig, clearRpcConfig } from '../lib/settingsApi'
 import { ethers } from 'ethers'
 import '../styles/NetworkHealthStatus.css'
 
 const NetworkHealthStatus = () => {
   const { networkInfo, availableNetworks, switchNetwork, getEffectiveRpcUrl, setCustomRpcForChain, clearCustomRpcForChain } = useNetwork()
-  const { address, signMessage } = useWeb3Auth()
   const healthData = useNetworkHealth()
   const [isOpen, setIsOpen] = useState(false)
   const dropdownRef = useRef(null)
@@ -225,11 +222,10 @@ const NetworkHealthStatus = () => {
                 >{isTesting ? 'Testing...' : 'Test connection'}</button>
                 <button
                   className="primary"
-                  disabled={!address || !targetChain || !inputUrl || isSaving}
-                  onClick={async () => {
+                  disabled={!targetChain || !inputUrl || isSaving}
+                  onClick={() => {
                     try {
                       setIsSaving(true)
-                      await saveRpcConfig(address, Number(targetChain), inputUrl, signMessage)
                       setCustomRpcForChain(Number(targetChain), inputUrl)
                       setShowRpcModal(false)
                     } catch (e) {
@@ -240,11 +236,10 @@ const NetworkHealthStatus = () => {
                   }}
                 >{isSaving ? 'Saving...' : 'Save'}</button>
                 <button
-                  disabled={!address || !targetChain || isSaving}
-                  onClick={async () => {
+                  disabled={!targetChain || isSaving}
+                  onClick={() => {
                     try {
                       setIsSaving(true)
-                      await clearRpcConfig(address, Number(targetChain), signMessage)
                       clearCustomRpcForChain(Number(targetChain))
                       // Clear the input to hide the default RPC
                       setInputUrl('')

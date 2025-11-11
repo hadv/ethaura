@@ -5,7 +5,6 @@ import { EthereumPrivateKeyProvider } from '@web3auth/ethereum-provider';
 import { createWalletClient, custom } from 'viem';
 import { sepolia } from 'viem/chains';
 import { useNetwork } from './NetworkContext.jsx';
-import { fetchRpcConfigs } from '../lib/settingsApi';
 
 const Web3AuthContext = createContext(null);
 
@@ -270,26 +269,7 @@ export const Web3AuthProvider = ({ children }) => {
       throw error;
     }
   };
-  // After wallet connects, sync user RPC configs from backend into NetworkContext
-  useEffect(() => {
-    const syncRpc = async () => {
-      try {
-        if (!isConnected || !address) return
-        const res = await fetchRpcConfigs(address, signMessage)
-        const configs = res?.configs || {}
-        // Ensure numeric keys
-        const mapped = {}
-        Object.entries(configs).forEach(([cid, val]) => {
-          const num = Number(cid)
-          if (Number.isFinite(num) && val?.rpcUrl) mapped[num] = { rpcUrl: val.rpcUrl }
-        })
-        setCustomRpcsBulk(mapped)
-      } catch (e) {
-        console.warn('RPC config sync failed:', e?.message || e)
-      }
-    }
-    syncRpc()
-  }, [isConnected, address])
+
 
 
   const value = {

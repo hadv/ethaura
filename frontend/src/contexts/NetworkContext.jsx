@@ -140,15 +140,7 @@ export const NetworkProvider = ({ children }) => {
   };
 
 
-  // Replace all custom RPCs at once (used for backend sync)
-  const setCustomRpcsBulk = (mapping) => {
-    try {
-      const next = mapping && typeof mapping === 'object' ? mapping : {}
-      setCustomRpcs(next)
-    } catch (e) {
-      console.warn('Failed to set custom RPCs bulk:', e)
-    }
-  }
+
 
   const setCustomRpc = (url) => setCustomRpcForChain(selectedNetwork.chainId, url);
   const clearCustomRpc = () => clearCustomRpcForChain(selectedNetwork.chainId);
@@ -176,7 +168,6 @@ export const NetworkProvider = ({ children }) => {
     clearCustomRpc,
     setCustomRpcForChain,
     clearCustomRpcForChain,
-    setCustomRpcsBulk,
     getEffectiveRpcUrl,
   };
 
