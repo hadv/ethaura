@@ -2,6 +2,13 @@
  * Network utility functions
  */
 
+// Import network icons
+import ethereumIcon from '../assets/networks/ethereum.png'
+import sepoliaIcon from '../assets/networks/sepolia.png'
+import optimismIcon from '../assets/networks/optimism.png'
+import polygonIcon from '../assets/networks/polygon.png'
+import arbitrumIcon from '../assets/networks/arbitrum.png'
+
 /**
  * Get network name from chain ID
  * @param {number} chainId - The chain ID
@@ -23,24 +30,24 @@ export function getNetworkName(chainId) {
 }
 
 /**
- * Get network icon/color from chain ID
+ * Get network icon from chain ID
  * @param {number} chainId - The chain ID
- * @returns {string} Network icon (emoji or symbol)
+ * @returns {string} Network icon image path
  */
 export function getNetworkIcon(chainId) {
   const icons = {
-    1: '●',
-    11155111: '●',
-    17000: '●',
-    137: '◆',
-    80001: '◆',
-    42161: '▲',
-    421614: '▲',
-    10: '🔴',
-    11155420: '🔴',
+    1: ethereumIcon,
+    11155111: sepoliaIcon,
+    17000: ethereumIcon,
+    137: polygonIcon,
+    80001: polygonIcon,
+    42161: arbitrumIcon,
+    421614: arbitrumIcon,
+    10: optimismIcon,
+    11155420: optimismIcon,
   }
-  
-  return icons[chainId] || '●'
+
+  return icons[chainId] || ethereumIcon
 }
 
 /**

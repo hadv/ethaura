@@ -1,0 +1,322 @@
+/* Network Health Status Component */
+.network-health-container {
+  position: relative;
+}
+
+/* Health Button */
+.network-health-button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  background: transparent;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.network-health-button:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.network-health-button:active {
+  background: rgba(0, 0, 0, 0.08);
+}
+
+/* Health Icon */
+.health-icon {
+  flex-shrink: 0;
+  opacity: 0.5;
+  transition: opacity 0.2s ease;
+}
+
+.network-health-button:hover .health-icon {
+  opacity: 1;
+}
+
+/* Status Dot Indicator */
+.status-dot {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  z-index: 1;
+}
+
+.status-dot.healthy {
+  background: #10B981;
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
+}
+
+.status-dot.error {
+  background: #EF4444;
+  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.2);
+}
+
+.status-dot.loading {
+  background: #6B7280;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+/* Pulse Animation for Loading State */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+/* Dropdown */
+.network-health-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 420px;
+  background: white;
+  border: 1px solid #E5E5E5;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  z-index: 1000;
+  overflow: hidden;
+  animation: slideDown 0.2s ease;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Header */
+.network-health-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid #E5E5E5;
+}
+
+.network-health-header h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #1F2937;
+}
+
+/* Network List */
+.network-health-list {
+  padding: 8px 0;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+/* Network Item */
+.network-health-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  gap: 16px;
+  transition: background 0.15s ease;
+}
+
+.network-health-item:hover {
+  background: #F9FAFB;
+}
+
+.network-health-item.active {
+  background: #F0F9FF;
+}
+
+.network-health-item.placeholder {
+  opacity: 0.6;
+}
+
+/* Left Section - Network Icon and Name */
+.network-health-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 120px;
+}
+
+.network-health-icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  object-fit: cover;
+}
+
+.network-health-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: #1F2937;
+  white-space: nowrap;
+}
+
+/* Middle Section - Sync Info and Block */
+.network-health-middle {
+  display: flex;
+  gap: 24px;
+  flex: 1;
+}
+
+.network-health-sync,
+.network-health-block {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.network-health-label {
+  font-size: 10px;
+  font-weight: 500;
+  color: #6B7280;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.network-health-value {
+  font-size: 13px;
+  font-weight: 500;
+  color: #1F2937;
+}
+
+.network-health-value.placeholder-text {
+  color: #9CA3AF;
+  font-style: italic;
+}
+
+/* Right Section - Status Indicator */
+.network-health-right {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.network-health-status {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.network-health-status.healthy {
+  background: #10B981;
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
+}
+
+.network-health-status.error {
+  background: #EF4444;
+  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.2);
+}
+
+.network-health-status.placeholder {
+  background: #D1D5DB;
+}
+
+/* Error Message */
+.network-health-error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px;
+  background: #FEF2F2;
+  border-top: 1px solid #FEE2E2;
+  color: #991B1B;
+  font-size: 12px;
+}
+
+.error-icon {
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.error-text {
+  flex: 1;
+  line-height: 1.4;
+}
+
+/* Scrollbar Styling */
+.network-health-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.network-health-list::-webkit-scrollbar-track {
+  background: #F9FAFB;
+}
+
+.network-health-list::-webkit-scrollbar-thumb {
+  background: #D1D5DB;
+  border-radius: 3px;
+}
+
+.network-health-list::-webkit-scrollbar-thumb:hover {
+  background: #9CA3AF;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .network-health-dropdown {
+    min-width: 360px;
+    right: -20px;
+  }
+
+  .network-health-button {
+    width: 36px;
+    height: 36px;
+  }
+
+  .network-health-item {
+    padding: 10px 16px;
+  }
+
+  .network-health-middle {
+    gap: 16px;
+  }
+
+  .network-health-name {
+    font-size: 13px;
+  }
+
+  .network-health-value {
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .network-health-dropdown {
+    min-width: 320px;
+    max-width: calc(100vw - 40px);
+  }
+
+  .network-health-middle {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .network-health-sync,
+  .network-health-block {
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .network-health-label::after {
+    content: ':';
+  }
+}
+

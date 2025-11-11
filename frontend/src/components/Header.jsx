@@ -4,6 +4,7 @@ import { IoCopyOutline, IoCheckmark, IoOpenOutline } from 'react-icons/io5'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
 import { useNetwork } from '../contexts/NetworkContext'
 import { Identicon } from '../utils/identicon.jsx'
+import NetworkHealthStatus from './NetworkHealthStatus'
 import '../styles/Header.css'
 import logo from '../assets/logo.svg'
 
@@ -69,6 +70,7 @@ const Header = ({
         <img src={logo} alt="Ethaura Logo" className="brand-logo" />
       </div>
       <div className="header-right">
+        <NetworkHealthStatus />
         {userInfo && (
           <div className="profile-menu-container" ref={menuRef}>
             <div

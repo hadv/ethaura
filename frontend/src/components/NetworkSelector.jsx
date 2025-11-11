@@ -1,13 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNetwork } from '../contexts/NetworkContext';
+import { getNetworkIcon } from '../utils/network';
 import '../styles/NetworkSelector.css';
-
-// Import network icons
-import ethereumIcon from '../assets/networks/ethereum.png';
-import sepoliaIcon from '../assets/networks/sepolia.png';
-import optimismIcon from '../assets/networks/optimism.png';
-import polygonIcon from '../assets/networks/polygon.png';
-import arbitrumIcon from '../assets/networks/arbitrum.png';
 
 const NetworkSelector = () => {
   const { networkInfo, availableNetworks, switchNetwork } = useNetwork();
@@ -48,24 +42,6 @@ const NetworkSelector = () => {
         return '#FF0420';
       default:
         return '#6B7280';
-    }
-  };
-
-  // Get network icon based on chainId
-  const getNetworkIcon = (chainId) => {
-    switch (chainId) {
-      case 11155111: // Sepolia
-        return sepoliaIcon;
-      case 1: // Ethereum
-        return ethereumIcon;
-      case 137: // Polygon
-        return polygonIcon;
-      case 42161: // Arbitrum
-        return arbitrumIcon;
-      case 10: // Optimism
-        return optimismIcon;
-      default:
-        return ethereumIcon;
     }
   };
 
