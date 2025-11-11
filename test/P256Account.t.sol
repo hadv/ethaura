@@ -6,6 +6,7 @@ import {P256Account} from "../src/P256Account.sol";
 import {P256AccountFactory} from "../src/P256AccountFactory.sol";
 import {IEntryPoint} from "@account-abstraction/interfaces/IEntryPoint.sol";
 import {PackedUserOperation} from "@account-abstraction/interfaces/PackedUserOperation.sol";
+import {ERC1967FactoryConstants} from "solady/utils/ERC1967FactoryConstants.sol";
 
 /**
  * @title P256AccountTest
@@ -34,6 +35,11 @@ contract P256AccountTest is Test {
         // This allows tests to call EntryPoint functions without reverting
         vm.etch(ENTRYPOINT_ADDR, hex"00");
         entryPoint = IEntryPoint(ENTRYPOINT_ADDR);
+
+        // Deploy canonical ERC1967Factory if not already deployed
+        if (ERC1967FactoryConstants.ADDRESS.code.length == 0) {
+            vm.etch(ERC1967FactoryConstants.ADDRESS, ERC1967FactoryConstants.BYTECODE);
+        }
 
         // Deploy factory
         factory = new P256AccountFactory(entryPoint);

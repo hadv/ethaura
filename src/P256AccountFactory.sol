@@ -3,14 +3,15 @@ pragma solidity ^0.8.23;
 
 import {IEntryPoint} from "@account-abstraction/interfaces/IEntryPoint.sol";
 import {P256Account} from "./P256Account.sol";
-import {Create2} from "@openzeppelin/contracts/utils/Create2.sol";
-import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import {ERC1967Factory} from "solady/utils/ERC1967Factory.sol";
+import {ERC1967FactoryConstants} from "solady/utils/ERC1967FactoryConstants.sol";
 
 /**
  * @title P256AccountFactory
- * @notice Factory contract for deploying P256Account instances using ERC-1967 proxies
- * @dev Uses proxy pattern for gas-efficient deployment (60-70% gas savings)
+ * @notice Factory contract for deploying P256Account instances using Solady's ERC-1967 proxies
+ * @dev Uses Solady's hyper-optimized proxy pattern for maximum gas efficiency
  * @dev Allows deterministic account addresses based on owner and salt
+ * @dev Uses canonical ERC1967Factory at 0x0000000000006396FF2a80c067f99B3d2Ab4Df24
  */
 contract P256AccountFactory {
     /*//////////////////////////////////////////////////////////////
@@ -22,6 +23,10 @@ contract P256AccountFactory {
 
     /// @notice The P256Account implementation contract (deployed once)
     P256Account public immutable IMPLEMENTATION;
+
+    /// @notice Solady's canonical ERC1967Factory for deploying proxies
+    /// @dev Uses the canonical address: 0x0000000000006396FF2a80c067f99B3d2Ab4Df24
+    ERC1967Factory public immutable PROXY_FACTORY;
 
     /*//////////////////////////////////////////////////////////////
                                 EVENTS
@@ -37,11 +42,14 @@ contract P256AccountFactory {
      * @notice Constructor - deploys the implementation contract
      * @param _entryPoint The EntryPoint contract address
      * @dev The implementation is deployed once and reused by all proxies
+     * @dev Uses canonical ERC1967Factory - must be deployed on the chain first
      */
     constructor(IEntryPoint _entryPoint) {
         ENTRYPOINT = _entryPoint;
         // Deploy the implementation contract once
         IMPLEMENTATION = new P256Account(_entryPoint);
+        // Use Solady's canonical ERC1967Factory (saves deployment gas)
+        PROXY_FACTORY = ERC1967Factory(ERC1967FactoryConstants.ADDRESS);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -61,7 +69,7 @@ contract P256AccountFactory {
      * @dev If enable2FA=true, both qx and qy must be non-zero
      * @dev IMPORTANT: Account address depends ONLY on owner and salt, NOT on passkey (qx, qy) or enable2FA
      * @dev This allows users to add/change passkey later without changing the account address
-     * @dev Uses ERC-1967 proxy pattern for 60-70% gas savings compared to full contract deployment
+     * @dev Uses Solady's hyper-optimized ERC-1967 proxy pattern for maximum gas efficiency
      */
     function createAccount(bytes32 qx, bytes32 qy, address owner, uint256 salt, bool enable2FA)
         public
@@ -75,17 +83,20 @@ contract P256AccountFactory {
             return P256Account(payable(addr));
         }
 
-        // Deploy ERC-1967 proxy using CREATE2 with salt based ONLY on owner and salt
-        // Deploy with empty initialization data to make address independent of parameters
-        bytes32 finalSalt = keccak256(abi.encodePacked(owner, salt));
+        // Deploy ERC-1967 proxy using Solady's factory with CREATE2
+        // Salt is based ONLY on owner and salt to make address independent of passkey/2FA
+        bytes32 finalSalt = _computeSalt(owner, salt);
 
-        // Deploy proxy with empty init data (initialization happens in separate call)
-        ERC1967Proxy proxy = new ERC1967Proxy{salt: finalSalt}(address(IMPLEMENTATION), "");
+        // Deploy proxy using Solady's factory
+        // Admin is set to address(0) since we don't need upgradeability (account is immutable)
+        address proxy = PROXY_FACTORY.deployDeterministicAndCall(
+            address(IMPLEMENTATION),
+            address(0), // No admin - proxies are not upgradeable
+            finalSalt,
+            abi.encodeCall(P256Account.initialize, (qx, qy, owner, enable2FA))
+        );
 
-        account = P256Account(payable(address(proxy)));
-
-        // Initialize the account after deployment
-        account.initialize(qx, qy, owner, enable2FA);
+        account = P256Account(payable(proxy));
 
         emit AccountCreated(address(account), qx, qy, owner, salt);
     }
@@ -99,7 +110,7 @@ contract P256AccountFactory {
      * @return The predicted proxy address
      * @dev Address is calculated ONLY from owner and salt, NOT from passkey (qx, qy) or enable2FA
      * @dev This allows users to add/change passkey later without changing the account address
-     * @dev Computes the address of the ERC-1967 proxy, not the implementation
+     * @dev Uses Solady's ERC1967Factory.predictDeterministicAddress()
      */
     function getAddress(bytes32 qx, bytes32 qy, address owner, uint256 salt) public view returns (address) {
         // Silence unused parameter warnings - qx and qy are intentionally not used
@@ -109,14 +120,27 @@ contract P256AccountFactory {
         // IMPORTANT: Only use owner and salt for address calculation
         // This allows the same address regardless of passkey choice or 2FA setting
         // Users can receive funds first, then decide on passkey/2FA later
-        bytes32 finalSalt = keccak256(abi.encodePacked(owner, salt));
+        bytes32 finalSalt = _computeSalt(owner, salt);
 
-        // Compute the address of the ERC-1967 proxy with empty init data
-        // Empty init data ensures address is independent of initialization parameters
-        bytes memory proxyCreationCode =
-            abi.encodePacked(type(ERC1967Proxy).creationCode, abi.encode(address(IMPLEMENTATION), ""));
+        // Use Solady's factory to predict the deterministic address
+        return PROXY_FACTORY.predictDeterministicAddress(finalSalt);
+    }
 
-        return Create2.computeAddress(finalSalt, keccak256(proxyCreationCode));
+    /**
+     * @notice Compute the final salt for CREATE2 deployment
+     * @param owner The owner address
+     * @param salt The user-provided salt
+     * @return The final salt (includes owner to prevent collisions)
+     * @dev Solady's factory requires salt to start with caller address or zero address
+     * @dev We use zero address prefix to allow anyone to deploy on behalf of users
+     * @dev Salt format: [20 bytes: zero address][12 bytes: hash of owner+salt]
+     */
+    function _computeSalt(address owner, uint256 salt) internal pure returns (bytes32) {
+        // Combine owner and salt to create unique hash
+        bytes32 combinedSalt = keccak256(abi.encodePacked(owner, salt));
+        // Keep only the last 96 bits (12 bytes) of the hash
+        // The first 160 bits (20 bytes) will be zero, satisfying Solady's requirement
+        return bytes32(uint256(combinedSalt) & ((1 << 96) - 1));
     }
 
     /**
