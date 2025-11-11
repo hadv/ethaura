@@ -5,6 +5,8 @@ import "forge-std/Test.sol";
 import {P256AccountFactory} from "../src/P256AccountFactory.sol";
 import {P256Account} from "../src/P256Account.sol";
 import {IEntryPoint} from "@account-abstraction/interfaces/IEntryPoint.sol";
+import {ERC1967Factory} from "solady/utils/ERC1967Factory.sol";
+import {ERC1967FactoryConstants} from "solady/utils/ERC1967FactoryConstants.sol";
 
 contract P256AccountFactoryTest is Test {
     P256AccountFactory factory;
@@ -23,6 +25,11 @@ contract P256AccountFactoryTest is Test {
     function setUp() public {
         // Deploy EntryPoint (using a mock address for testing)
         entryPoint = IEntryPoint(address(0x0000000071727De22E5E9d8BAf0edAc6f37da032));
+
+        // Deploy canonical ERC1967Factory if not already deployed
+        if (ERC1967FactoryConstants.ADDRESS.code.length == 0) {
+            vm.etch(ERC1967FactoryConstants.ADDRESS, ERC1967FactoryConstants.BYTECODE);
+        }
 
         // Deploy factory
         factory = new P256AccountFactory(entryPoint);
