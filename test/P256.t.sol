@@ -2,7 +2,7 @@
 pragma solidity ^0.8.23;
 
 import {Test, console2} from "forge-std/Test.sol";
-import {P256} from "../src/libraries/P256.sol";
+import {P256} from "solady/utils/P256.sol";
 
 /**
  * @title P256Test
@@ -22,14 +22,14 @@ contract P256Test is Test {
 
     function setUp() public {
         // Check if precompile is available
-        if (!P256.isPrecompileAvailable()) {
+        if (!P256.hasPrecompile()) {
             console2.log("WARNING: P256 precompile not available on this network");
             console2.log("Tests may fail. Deploy to Sepolia (post-Fusaka) for full support.");
         }
     }
 
     function test_PrecompileAvailable() public view {
-        bool available = P256.isPrecompileAvailable();
+        bool available = P256.hasPrecompile();
         console2.log("P256 precompile available:", available);
         // Don't assert - just log for information
     }
@@ -49,7 +49,7 @@ contract P256Test is Test {
         bytes32 qy = bytes32(uint256(2));
 
         // This will return false but shouldn't revert
-        bool result = P256.verify(hash, r, s, qx, qy);
+        bool result = P256.verifySignature(hash, r, s, qx, qy);
 
         // We expect false for invalid signature
         assertFalse(result, "Invalid signature should return false");
@@ -68,7 +68,7 @@ contract P256Test is Test {
         bytes32 qy = bytes32(uint256(2));
 
         // Should return false due to malleability check
-        bool result = P256.verify(hash, r, highS, qx, qy);
+        bool result = P256.verifySignature(hash, r, highS, qx, qy);
         assertFalse(result, "High-s signature should be rejected");
     }
 
@@ -85,7 +85,7 @@ contract P256Test is Test {
 
         // This version doesn't check malleability, but signature is still invalid
         // so it should return false (from precompile)
-        bool result = P256.verifyNoMalleabilityCheck(hash, r, highS, qx, qy);
+        bool result = P256.verifySignatureAllowMalleability(hash, r, highS, qx, qy);
 
         // Result depends on precompile availability
         // Just ensure it doesn't revert
@@ -101,7 +101,7 @@ contract P256Test is Test {
         bytes32 qx = bytes32(0);
         bytes32 qy = bytes32(0);
 
-        bool result = P256.verify(hash, r, s, qx, qy);
+        bool result = P256.verifySignature(hash, r, s, qx, qy);
 
         // Should return false for all-zero input
         assertFalse(result, "All-zero input should return false");
@@ -112,7 +112,7 @@ contract P256Test is Test {
         // It should always return true or false
 
         // This should never revert
-        P256.verify(hash, r, s, qx, qy);
+        P256.verifySignature(hash, r, s, qx, qy);
     }
 
     function test_GasCost() public view {
@@ -123,10 +123,10 @@ contract P256Test is Test {
         bytes32 qy = bytes32(uint256(2));
 
         uint256 gasBefore = gasleft();
-        P256.verify(hash, r, s, qx, qy);
+        P256.verifySignature(hash, r, s, qx, qy);
         uint256 gasUsed = gasBefore - gasleft();
 
-        console2.log("Gas used for P256.verify:", gasUsed);
+        console2.log("Gas used for P256.verifySignature:", gasUsed);
 
         // According to EIP-7951, gas cost should be around 6,900
         // But this includes our wrapper overhead

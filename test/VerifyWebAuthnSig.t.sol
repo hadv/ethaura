@@ -2,7 +2,7 @@
 pragma solidity ^0.8.20;
 
 import "forge-std/Test.sol";
-import "../src/libraries/P256.sol";
+import {P256} from "solady/utils/P256.sol";
 
 /**
  * @title VerifyWebAuthnSig
@@ -23,7 +23,7 @@ contract VerifyWebAuthnSigTest is Test {
         bytes32 messageHash = 0xd7cec55e322302be89b6c8052974f5266287ba60cebabdf3ce48ee31788e3a5f;
 
         // Verify the signature
-        bool isValid = P256.verify(messageHash, r, s, qx, qy);
+        bool isValid = P256.verifySignature(messageHash, r, s, qx, qy);
 
         console.log("Signature verification result:", isValid);
         console.log("Public key qx:", vm.toString(qx));
