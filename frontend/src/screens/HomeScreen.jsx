@@ -815,8 +815,7 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onLogo
               {modalMode === 'import' && (
                 <>
                   <p className="modal-description">
-                    Add an existing smart account wallet by entering its address.
-                    This allows you to track and manage multiple wallets in one place.
+                    Add an existing smart account wallet to track and manage it.
                   </p>
 
                   <div className="form-group">
@@ -850,56 +849,7 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onLogo
                 <>
                   <p className="modal-description">
                     Create a new smart account wallet using your Web3Auth social login.
-                    Use different indices to create multiple wallets.
                   </p>
-
-                  <div className="info-box">
-                    <div className="info-icon">ℹ️</div>
-                    <div className="info-text">
-                      <strong>Your Owner Address:</strong>
-                      <div className="owner-address">{ownerAddress || 'Not logged in'}</div>
-                      <p className="info-hint">
-                        Each index creates a unique wallet address. Use index 0 for your first wallet,
-                        1 for your second, and so on.
-                        <br />
-                        <strong>Important:</strong> Same owner + same index = same address (always deterministic)
-                      </p>
-                      {(() => {
-                        const walletsList = JSON.parse(localStorage.getItem('ethaura_wallets_list') || '[]')
-
-                        // Get indices used by current owner
-                        const currentOwnerIndices = walletsList
-                          .filter(w => w.index !== undefined && w.owner === ownerAddress)
-                          .map(w => w.index)
-                          .sort((a, b) => a - b)
-
-                        // Get indices used by other owners
-                        const otherOwnerIndices = walletsList
-                          .filter(w => w.index !== undefined && w.owner && w.owner !== ownerAddress)
-                          .map(w => w.index)
-                          .sort((a, b) => a - b)
-
-                        return (
-                          <>
-                            {currentOwnerIndices.length > 0 && (
-                              <p className="info-hint" style={{ marginTop: '8px', color: '#f59e0b' }}>
-                                <strong>Your used indices:</strong> {currentOwnerIndices.join(', ')}
-                              </p>
-                            )}
-                            {otherOwnerIndices.length > 0 && (
-                              <p className="info-hint" style={{ marginTop: '4px', color: '#9ca3af', fontSize: '11px' }}>
-                                (Indices {otherOwnerIndices.join(', ')} used by other accounts)
-                              </p>
-                            )}
-                            <p className="info-hint" style={{ marginTop: '8px', fontSize: '11px', color: '#6b7280' }}>
-                              💡 Tip: If you previously created wallets on another device or session,
-                              use "Import Existing" tab to add them to this list.
-                            </p>
-                          </>
-                        )
-                      })()}
-                    </div>
-                  </div>
 
                   <div className="form-group">
                     <label className="form-label">Wallet Name</label>
@@ -914,8 +864,43 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onLogo
                   </div>
 
                   <div className="form-group">
-                    <label className="form-label">
-                      Index (Salt)
+                    <label className="form-label-with-info">
+                      <span>Index (Salt)</span>
+                      <div className="info-icon-wrapper">
+                        <span className="info-icon-btn"></span>
+                        <div className="info-tooltip">
+                          <div className="tooltip-section">
+                            <strong>Your Owner Address:</strong>
+                            <div className="tooltip-address">{ownerAddress || 'Not logged in'}</div>
+                          </div>
+
+                          <div className="tooltip-section">
+                            <p>Each index creates a unique wallet address. Use index 0 for your first wallet, 1 for your second, and so on.</p>
+                          </div>
+
+                          <div className="tooltip-section tooltip-important">
+                            <strong>Important:</strong> Same owner + same index = same address (always deterministic)
+                          </div>
+
+                          {(() => {
+                            const walletsList = JSON.parse(localStorage.getItem('ethaura_wallets_list') || '[]')
+                            const currentOwnerIndices = walletsList
+                              .filter(w => w.index !== undefined && w.owner === ownerAddress)
+                              .map(w => w.index)
+                              .sort((a, b) => a - b)
+
+                            return currentOwnerIndices.length > 0 ? (
+                              <div className="tooltip-section tooltip-warning">
+                                <strong>Your used indices:</strong> {currentOwnerIndices.join(', ')}
+                              </div>
+                            ) : null
+                          })()}
+
+                          <div className="tooltip-section tooltip-tip">
+                            💡 If you previously created wallets on another device, use "Import Existing" tab.
+                          </div>
+                        </div>
+                      </div>
                     </label>
                     <input
                       type="number"
@@ -927,7 +912,7 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onLogo
                       step="1"
                     />
                     <p className="form-hint">
-                      Use 0 for your first wallet, 1 for second, etc. Each index creates a different address.
+                      Use 0 for your first wallet, 1 for second, etc.
                     </p>
                   </div>
                 </>
