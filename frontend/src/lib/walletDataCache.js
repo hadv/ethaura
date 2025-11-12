@@ -196,21 +196,35 @@ class WalletDataCache {
 
   /**
    * Preload data for multiple wallets
-   * Runs in background without blocking
+   * Returns a promise that resolves when all wallets are preloaded
    * Staggered to avoid rate limiting
+   * @param {Function} onWalletLoaded - Optional callback called after each wallet is loaded
    */
-  preloadMultipleWallets(wallets, networkName, tokenService, txService) {
+  async preloadMultipleWallets(wallets, networkName, tokenService, txService, onWalletLoaded = null) {
     // Stagger preload requests to avoid rate limiting
     // Start each wallet preload with a delay to spread out API calls
-    wallets.forEach((wallet, index) => {
-      const delayMs = index * 500 // 500ms delay between each wallet
-      setTimeout(() => {
-        this.preloadWalletData(wallet.address, networkName, tokenService, txService)
-          .catch(error => {
+    const preloadPromises = wallets.map((wallet, index) => {
+      return new Promise((resolve) => {
+        const delayMs = index * 500 // 500ms delay between each wallet
+        setTimeout(async () => {
+          try {
+            await this.preloadWalletData(wallet.address, networkName, tokenService, txService)
+            // Call the callback after each wallet is loaded (for progressive updates)
+            if (onWalletLoaded) {
+              onWalletLoaded(wallet)
+            }
+            resolve()
+          } catch (error) {
             console.error(`Failed to preload wallet ${wallet.address}:`, error)
-          })
-      }, delayMs)
+            resolve() // Resolve anyway to not block other wallets
+          }
+        }, delayMs)
+      })
     })
+
+    // Wait for all preload operations to complete
+    await Promise.all(preloadPromises)
+    console.log(`✅ All ${wallets.length} wallets preloaded`)
   }
 
   /**

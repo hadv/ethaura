@@ -88,10 +88,20 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onLogo
 
         console.log(`🚀 Starting background preload for ${wallets.length} wallets`)
 
-        // Preload data for all wallets in background
-        await walletDataCache.preloadMultipleWallets(wallets, networkInfo.name, tokenService, txService)
+        // Preload data for all wallets in background with progressive updates
+        // The callback will be called after each wallet is loaded, updating the portfolio incrementally
+        await walletDataCache.preloadMultipleWallets(
+          wallets,
+          networkInfo.name,
+          tokenService,
+          txService,
+          () => {
+            // Progressive update: re-aggregate portfolio after each wallet loads
+            aggregatePortfolioData()
+          }
+        )
 
-        // After preload, aggregate portfolio data
+        // Final aggregation after all wallets are loaded
         aggregatePortfolioData()
       } catch (error) {
         console.error('Failed to start preload:', error)
