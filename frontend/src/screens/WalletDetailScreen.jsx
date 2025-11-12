@@ -3,6 +3,7 @@ import { ethers } from 'ethers'
 import { HiArrowUp, HiArrowDown } from 'react-icons/hi'
 import { BiTransfer } from 'react-icons/bi'
 import { MdFlashOn } from 'react-icons/md'
+import { HiOutlineDocumentText } from 'react-icons/hi2'
 import { P256_ACCOUNT_ABI } from '../lib/constants'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
 import { useNetwork } from '../contexts/NetworkContext'
@@ -404,8 +405,11 @@ function WalletDetailScreen({ wallet, onBack, onHome, onSettings, onSend, onLogo
               </div>
             ) : (
               <div className="empty-state">
-                <div className="empty-icon">📊</div>
-                <p>No transactions yet</p>
+                <div className="empty-icon">
+                  <HiOutlineDocumentText />
+                </div>
+                <h3>No transactions yet</h3>
+                <p>Your transaction history will appear here once you start using your wallet</p>
               </div>
             )}
           </div>

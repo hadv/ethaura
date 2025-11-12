@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { ethers } from 'ethers'
+import { HiOutlineCurrencyDollar } from 'react-icons/hi2'
 import { useNetwork } from '../contexts/NetworkContext'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
 import { createTokenBalanceService } from '../lib/tokenService'
@@ -204,7 +205,9 @@ function ViewAllTokensScreen({ wallet, onBack, onHome, onLogout, onSettings, onW
               </div>
             ) : (
               <div className="empty-state">
-                <div className="empty-icon">🪙</div>
+                <div className="empty-icon">
+                  <HiOutlineCurrencyDollar />
+                </div>
                 <h3>No tokens found</h3>
                 <p>
                   {searchQuery

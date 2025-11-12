@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { ethers } from 'ethers'
+import { HiOutlineDocumentText } from 'react-icons/hi2'
 import { useNetwork } from '../contexts/NetworkContext'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
 import { createTransactionHistoryService } from '../lib/transactionService'
@@ -66,12 +67,13 @@ function ViewAllTransactionsScreen({ wallet, onBack, onHome, onLogout, onSetting
 
     console.log(`🔍 fetchTransactionsPage called: page=${page}, isLoadMore=${isLoadMore}`)
 
+    let shouldShowLoading = false // Track if we should show loading - declare outside try block
+
     try {
       const provider = new ethers.JsonRpcProvider(networkInfo.rpcUrl)
       const txService = createTransactionHistoryService(provider, networkInfo.name)
 
       let allTransactions = []
-      let shouldShowLoading = false // Track if we should show loading
 
       // Progressive loading strategy:
       // 1. Page 1: Display items 1-10 from cache (30 available)
@@ -426,7 +428,9 @@ function ViewAllTransactionsScreen({ wallet, onBack, onHome, onLogout, onSetting
               </>
             ) : (
               <div className="empty-state">
-                <div className="empty-icon">📊</div>
+                <div className="empty-icon">
+                  <HiOutlineDocumentText />
+                </div>
                 <h3>No transactions found</h3>
                 <p>
                   {searchQuery

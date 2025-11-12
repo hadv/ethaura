@@ -3,6 +3,7 @@ import { useWeb3Auth } from '../contexts/Web3AuthContext'
 import { useP256SDK } from '../hooks/useP256SDK'
 import { useNetwork } from '../contexts/NetworkContext'
 import { ethers } from 'ethers'
+import { HiOutlineWallet, HiOutlineSparkles } from 'react-icons/hi2'
 import { Identicon } from '../utils/identicon.jsx'
 import '../styles/Dashboard.css'
 
@@ -102,7 +103,9 @@ function Dashboard({ accountAddress, accountConfig, onSendClick, onReceiveClick,
     return (
       <div className="dashboard-container">
         <div className="dashboard-empty">
-          <div className="empty-icon">👛</div>
+          <div className="empty-icon">
+            <HiOutlineWallet />
+          </div>
           <h2>No Wallet Connected</h2>
           <p>Please connect your wallet to view your dashboard</p>
         </div>
@@ -114,7 +117,9 @@ function Dashboard({ accountAddress, accountConfig, onSendClick, onReceiveClick,
     return (
       <div className="dashboard-container">
         <div className="dashboard-empty">
-          <div className="empty-icon">🚀</div>
+          <div className="empty-icon">
+            <HiOutlineSparkles />
+          </div>
           <h2>Welcome to ΞTHΛURΛ!</h2>
           <p>You're connected! Now create your smart account to get started.</p>
           <p className="text-sm" style={{ marginTop: '12px', color: '#a0aec0' }}>
