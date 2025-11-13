@@ -308,11 +308,14 @@ export function signUserOperationOwnerOnly(userOp, ownerSignature) {
 }
 
 /**
- * Sign UserOperation with P256 passkey signature (WebAuthn format)
+ * Sign UserOperation with P256 passkey signature (WebAuthn format - Solady compact encoding)
  * @param {Object} userOp - UserOperation
  * @param {Object} passkeySignature - { r, s, authenticatorData, clientDataJSON } from passkey
  * @param {string} ownerSignature - ECDSA signature from owner (for 2FA)
  * @returns {Object} UserOperation with signature
+ *
+ * Solady compact encoding format:
+ * authDataLen(2) || authenticatorData || clientDataJSON || challengeIdx(2) || typeIdx(2) || r(32) || s(32) [|| ownerSig(65)]
  */
 export function signUserOperation(userOp, passkeySignature, ownerSignature = null) {
   const { r, s, authenticatorData, clientDataJSON } = passkeySignature
@@ -336,15 +339,22 @@ export function signUserOperation(userOp, passkeySignature, ownerSignature = nul
   const authDataLenHex = authDataLen.toString(16).padStart(4, '0')
 
   // Find the index of "challenge":" in clientDataJSON
-  // The contract expects this to point to the opening quote before "challenge"
   const challengeIndex = clientDataJSON.indexOf('"challenge":"')
   if (challengeIndex === -1) {
     throw new Error('Challenge not found in clientDataJSON')
   }
   const challengeIndexHex = challengeIndex.toString(16).padStart(4, '0')
 
-  // Build signature: r || s || authDataLen || challengeIndex || authenticatorData || clientDataJSON [|| ownerSig]
-  let signature = '0x' + rClean + sClean + authDataLenHex + challengeIndexHex + authDataHex + clientDataHex
+  // Find the index of "type":" in clientDataJSON
+  const typeIndex = clientDataJSON.indexOf('"type":"')
+  if (typeIndex === -1) {
+    throw new Error('Type not found in clientDataJSON')
+  }
+  const typeIndexHex = typeIndex.toString(16).padStart(4, '0')
+
+  // Build signature using Solady compact encoding:
+  // authDataLen(2) || authenticatorData || clientDataJSON || challengeIdx(2) || typeIdx(2) || r(32) || s(32) [|| ownerSig(65)]
+  let signature = '0x' + authDataLenHex + authDataHex + clientDataHex + challengeIndexHex + typeIndexHex + rClean + sClean
 
   // If 2FA is enabled, append owner signature
   let ownerSigLength = 0
@@ -359,12 +369,13 @@ export function signUserOperation(userOp, passkeySignature, ownerSignature = nul
     signature += ownerSigClean
   }
 
-  console.log('📝 Signature components:', {
+  console.log('📝 Signature components (Solady compact):', {
+    authDataLength: authDataLen,
+    clientDataLength: clientDataJSON.length,
+    challengeIndex: challengeIndex,
+    typeIndex: typeIndex,
     rLength: rClean.length / 2,
     sLength: sClean.length / 2,
-    authDataLength: authDataLen,
-    challengeIndex: challengeIndex,
-    clientDataLength: clientDataJSON.length,
     ownerSigLength: ownerSigLength,
     totalSignatureLength: signature.length / 2 - 1, // -1 for '0x'
   })
