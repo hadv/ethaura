@@ -1,6 +1,21 @@
 import { hexToBytes, bytesToHex, concat } from 'viem';
 
 /**
+ * NOTE: These legacy functions are kept for backward compatibility but are deprecated.
+ * The actual signature encoding is now handled by signUserOperation() in userOperation.js
+ * which uses Solady's WebAuthn compact encoding format:
+ *
+ * Solady WebAuthn Format (Passkey with 2FA):
+ * authDataLen(2) || authenticatorData || clientDataJSON || challengeIdx(2) || typeIdx(2) || r(32) || s(32) || ownerSig(65)
+ * Typical size: ~286+ bytes
+ *
+ * Owner-Only Format:
+ * ownerSig(65)
+ * Size: 65 bytes
+ */
+
+/**
+ * @deprecated Use signUserOperation() from userOperation.js instead
  * Combine P-256 passkey signature with owner ECDSA signature for 2FA
  * @param {Object} passkeySignature - P-256 signature from WebAuthn { r, s }
  * @param {string} ownerSignature - ECDSA signature from Web3Auth wallet (0x-prefixed hex)
@@ -40,6 +55,7 @@ export function combineTwoFactorSignatures(passkeySignature, ownerSignature) {
 }
 
 /**
+ * @deprecated Use signUserOperation() from userOperation.js instead
  * Create single-factor signature (passkey only) for normal mode
  * @param {Object} passkeySignature - P-256 signature from WebAuthn { r, s }
  * @returns {string} Signature in format: r (32) || s (32) = 64 bytes
@@ -90,22 +106,36 @@ export function parseECDSASignature(signature) {
 }
 
 /**
- * Validate signature format
+ * Validate signature format (updated for Solady WebAuthn)
  * @param {string} signature - Signature to validate
- * @param {boolean} is2FA - Whether this is a 2FA signature
+ * @param {boolean} is2FA - Whether this is a 2FA signature (passkey + owner)
  * @returns {boolean} True if valid
  */
 export function validateSignatureFormat(signature, is2FA = false) {
   try {
     const sigBytes = hexToBytes(signature);
-    const expectedLength = is2FA ? 129 : 64;
+    const length = sigBytes.length;
 
-    if (sigBytes.length !== expectedLength) {
-      console.error(`Invalid signature length: expected ${expectedLength} bytes, got ${sigBytes.length}`);
-      return false;
+    // Owner-only signature: 65 bytes
+    if (!is2FA && length === 65) {
+      return true;
     }
 
-    return true;
+    // Solady WebAuthn signature (passkey with optional 2FA):
+    // Minimum: authDataLen(2) + authData(37+) + clientDataJSON(87+) + challengeIdx(2) + typeIdx(2) + r(32) + s(32) = ~194+ bytes
+    // With 2FA: add ownerSig(65) = ~259+ bytes
+    // Typical size: ~286+ bytes with 2FA
+    if (is2FA && length >= 259) {
+      return true;
+    }
+
+    // Passkey-only (no 2FA): ~194+ bytes
+    if (!is2FA && length >= 194) {
+      return true;
+    }
+
+    console.warn(`Unexpected signature length: ${length} bytes (is2FA: ${is2FA})`);
+    return false;
   } catch (error) {
     console.error('Error validating signature:', error);
     return false;
@@ -113,22 +143,36 @@ export function validateSignatureFormat(signature, is2FA = false) {
 }
 
 /**
- * Format signature for display
+ * Format signature for display (updated for Solady WebAuthn)
  * @param {string} signature - Signature to format
  * @returns {string} Formatted signature
  */
 export function formatSignatureForDisplay(signature) {
   if (!signature) return 'N/A';
 
-  const sigBytes = hexToBytes(signature);
-  const length = sigBytes.length;
+  try {
+    const sigBytes = hexToBytes(signature);
+    const length = sigBytes.length;
 
-  if (length === 64) {
-    return `${signature.slice(0, 10)}...${signature.slice(-8)} (64 bytes - Single Factor)`;
-  } else if (length === 129) {
-    return `${signature.slice(0, 10)}...${signature.slice(-8)} (129 bytes - Two Factor)`;
-  } else {
-    return `${signature.slice(0, 10)}...${signature.slice(-8)} (${length} bytes)`;
+    // Owner-only signature
+    if (length === 65) {
+      return `${signature.slice(0, 10)}...${signature.slice(-8)} (65 bytes - Owner Only)`;
+    }
+
+    // Solady WebAuthn signature (passkey with optional 2FA)
+    // Check if it has owner signature at the end (last 65 bytes)
+    const hasOwnerSig = length >= 259; // Minimum for WebAuthn + owner sig
+
+    if (hasOwnerSig) {
+      return `${signature.slice(0, 10)}...${signature.slice(-8)} (${length} bytes - Passkey + 2FA)`;
+    } else if (length >= 194) {
+      return `${signature.slice(0, 10)}...${signature.slice(-8)} (${length} bytes - Passkey Only)`;
+    } else {
+      return `${signature.slice(0, 10)}...${signature.slice(-8)} (${length} bytes)`;
+    }
+  } catch (error) {
+    console.error('Error formatting signature:', error);
+    return `${signature.slice(0, 10)}...${signature.slice(-8)}`;
   }
 }
 
