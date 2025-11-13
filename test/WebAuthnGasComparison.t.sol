@@ -8,6 +8,8 @@ import {IEntryPoint} from "@account-abstraction/interfaces/IEntryPoint.sol";
 import {PackedUserOperation} from "@account-abstraction/interfaces/PackedUserOperation.sol";
 import {WebAuthn} from "solady/utils/WebAuthn.sol";
 import {Base64} from "solady/utils/Base64.sol";
+import {ERC1967Factory} from "solady/utils/ERC1967Factory.sol";
+import {ERC1967FactoryConstants} from "solady/utils/ERC1967FactoryConstants.sol";
 
 /**
  * @title WebAuthnGasComparison
@@ -36,6 +38,11 @@ contract WebAuthnGasComparisonTest is Test {
         // Mock EntryPoint
         vm.etch(ENTRYPOINT_ADDR, hex"00");
         entryPoint = IEntryPoint(ENTRYPOINT_ADDR);
+
+        // Deploy canonical ERC1967Factory if not already deployed
+        if (ERC1967FactoryConstants.ADDRESS.code.length == 0) {
+            vm.etch(ERC1967FactoryConstants.ADDRESS, type(ERC1967Factory).runtimeCode);
+        }
 
         // Deploy factory and account
         factory = new P256AccountFactory(entryPoint);
