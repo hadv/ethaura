@@ -503,13 +503,14 @@ contract P256AccountTest is Test {
 
         // Mock WebAuthn data
         bytes memory authenticatorData = hex"49960de5880e8c687434170f6476605b8fe4aeb9a28632c7995cf3ba831d97631d00000000";
-        string memory clientDataJSON = '{"type":"webauthn.get","challenge":"test","origin":"http://localhost:3000","crossOrigin":false}';
+        string memory clientDataJSON =
+            '{"type":"webauthn.get","challenge":"test","origin":"http://localhost:3000","crossOrigin":false}';
 
         // Encode using Solady compact format:
         // authDataLen(2) || authenticatorData || clientDataJSON || challengeIdx(2) || typeIdx(2) || r(32) || s(32) || ownerSig(65)
         uint16 authDataLen = uint16(authenticatorData.length);
         uint16 challengeIndex = 23; // Index of "challenge" in clientDataJSON
-        uint16 typeIndex = 1;       // Index of "type" in clientDataJSON
+        uint16 typeIndex = 1; // Index of "type" in clientDataJSON
 
         // Create a real owner signature
         bytes32 userOpHash = keccak256("test");
@@ -529,14 +530,7 @@ contract P256AccountTest is Test {
         // Combine signatures using Solady compact format:
         // authDataLen(2) || authenticatorData || clientDataJSON || challengeIdx(2) || typeIdx(2) || r(32) || s(32) || ownerSig(65)
         userOp.signature = abi.encodePacked(
-            authDataLen,
-            authenticatorData,
-            bytes(clientDataJSON),
-            challengeIndex,
-            typeIndex,
-            r,
-            s,
-            ownerSig
+            authDataLen, authenticatorData, bytes(clientDataJSON), challengeIndex, typeIndex, r, s, ownerSig
         );
 
         // Mock the EntryPoint call
