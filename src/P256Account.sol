@@ -8,7 +8,7 @@ import {IERC1271} from "@openzeppelin/contracts/interfaces/IERC1271.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {Initializable} from "solady/utils/Initializable.sol";
 import {P256} from "solady/utils/P256.sol";
-import {Base64Url} from "./libraries/Base64Url.sol";
+import {WebAuthn} from "solady/utils/WebAuthn.sol";
 import {LibBytes} from "solady/utils/LibBytes.sol";
 
 /**
@@ -243,11 +243,11 @@ contract P256Account is IAccount, IERC1271, Ownable, Initializable {
      *      1. Owner-only: 65-byte ECDSA signature from owner
      *         - Used when qx=0, qy=0 (no passkey configured)
      *         - Used when qx!=0, qy!=0 but twoFactorEnabled=false (passkey configured but 2FA disabled)
-     *      2. Passkey with 2FA: WebAuthn signature + 65-byte ECDSA signature from owner
+     *      2. Passkey with 2FA: WebAuthn signature (Solady compact format) + 65-byte ECDSA signature from owner
      *         - Used when qx!=0, qy!=0 and twoFactorEnabled=true
      *
-     *      WebAuthn signature format (2FA mode):
-     *      r (32) || s (32) || authDataLen (2) || challengeIndex (2) || authenticatorData || clientDataJSON || ownerSig (65)
+     *      WebAuthn signature format (2FA mode) - Solady compact encoding:
+     *      authDataLen(2) || authenticatorData || clientDataJSON || challengeIdx(2) || typeIdx(2) || r(32) || s(32) || ownerSig(65)
      *
      *      SECURITY: The challenge field in clientDataJSON MUST contain the base64url-encoded userOpHash.
      *                This ensures the WebAuthn signature is actually authorizing this specific transaction.
@@ -270,43 +270,39 @@ contract P256Account is IAccount, IERC1271, Ownable, Initializable {
         }
 
         // Passkey with 2FA: requires both passkey and owner signatures
-        // Minimum: r(32) + s(32) + authLen(2) + challengeIdx(2) + authData(37) + clientData(20) + ownerSig(65) = 190 bytes
-        if (sig.length < 190) return 1;
+        // Minimum: authDataLen(2) + authData(37) + clientData(20) + challengeIdx(2) + typeIdx(2) + r(32) + s(32) + ownerSig(65) = 192 bytes
+        if (sig.length < 192) return 1;
 
-        // Extract WebAuthn signature components
-        bytes32 r;
-        bytes32 s;
-        uint16 authDataLen;
-        uint16 challengeIndex;
-        assembly {
-            r := calldataload(sig.offset)
-            s := calldataload(add(sig.offset, 32))
-            authDataLen := shr(240, calldataload(add(sig.offset, 64)))
-            challengeIndex := shr(240, calldataload(add(sig.offset, 66)))
-        }
+        // Extract owner signature (last 65 bytes)
+        bytes calldata ownerSig = sig[sig.length - 65:];
 
-        // Calculate data boundaries
-        uint256 authDataOffset = 68; // After r(32) + s(32) + authLen(2) + challengeIdx(2)
-        uint256 clientDataOffset = authDataOffset + authDataLen;
-        uint256 clientDataLen = sig.length - clientDataOffset - 65; // Exclude owner signature
+        // Extract WebAuthn compact signature (everything except owner signature)
+        bytes calldata webAuthnSig = sig[:sig.length - 65];
 
-        // Verify challenge in clientDataJSON matches userOpHash
-        // Expected format: "challenge":"<base64url(userOpHash)>"
-        if (!_verifyChallenge(sig[clientDataOffset:clientDataOffset + clientDataLen], challengeIndex, userOpHash)) {
-            return 1;
-        }
+        // Decode WebAuthn signature using Solady's compact decoder
+        // This handles the format: authDataLen(2) || authenticatorData || clientDataJSON || challengeIdx(2) || typeIdx(2) || r(32) || s(32)
+        WebAuthn.WebAuthnAuth memory auth = WebAuthn.tryDecodeAuthCompactCalldata(webAuthnSig);
 
-        // Verify WebAuthn signature: SHA256(authenticatorData || SHA256(clientDataJSON))
-        bytes32 messageHash = sha256(
-            abi.encodePacked(
-                sig[authDataOffset:clientDataOffset], sha256(sig[clientDataOffset:clientDataOffset + clientDataLen])
-            )
+        // Verify WebAuthn signature using Solady's verify function
+        // This validates:
+        // - User Present flag is set
+        // - User Verified flag is set (if requireUserVerification=true)
+        // - Type is "webauthn.get"
+        // - Challenge matches userOpHash (base64url encoded)
+        // - P256 signature is valid
+        bytes memory challenge = abi.encodePacked(userOpHash);
+        bool webAuthnValid = WebAuthn.verify(
+            challenge,
+            true, // requireUserVerification - enforce UV flag for security
+            auth,
+            _qx,
+            _qy
         );
 
-        if (!P256.verifySignature(messageHash, r, s, _qx, _qy)) return 1;
+        if (!webAuthnValid) return 1;
 
-        // Verify owner signature (last 65 bytes)
-        if (_recoverSigner(userOpHash, sig[sig.length - 65:]) != _owner) return 1;
+        // Verify owner signature
+        if (_recoverSigner(userOpHash, ownerSig) != _owner) return 1;
 
         return 0; // SIG_VALIDATION_SUCCESS
     }
@@ -348,40 +344,6 @@ contract P256Account is IAccount, IERC1271, Ownable, Initializable {
             // Load enable2FA at offset 152 (24 + 32 + 32 + 32 + 32)
             _twoFactorEnabled = uint256(LibBytes.loadCalldata(initCode, 152)) != 0;
         }
-    }
-
-    /**
-     * @notice Verify that the challenge in clientDataJSON matches the expected userOpHash
-     * @param clientDataJSON The client data JSON bytes
-     * @param challengeIndex The index where "challenge":"..." starts
-     * @param expectedHash The expected userOpHash
-     * @return valid True if challenge matches
-     */
-    function _verifyChallenge(bytes calldata clientDataJSON, uint256 challengeIndex, bytes32 expectedHash)
-        internal
-        pure
-        returns (bool valid)
-    {
-        // Expected format at challengeIndex: "challenge":"<base64url(expectedHash)>"
-        // Base64url encoding of 32 bytes = 43 characters (no padding)
-        // Full string: "challenge":"..." = 13 + 43 + 1 = 57 characters
-
-        if (clientDataJSON.length < challengeIndex + 57) return false;
-
-        // Verify the prefix: "challenge":"
-        bytes memory prefix = bytes('"challenge":"');
-        for (uint256 i = 0; i < 13; i++) {
-            if (clientDataJSON[challengeIndex + i] != prefix[i]) return false;
-        }
-
-        // Extract the base64url challenge (43 characters)
-        bytes memory actualChallenge = clientDataJSON[challengeIndex + 13:challengeIndex + 56];
-
-        // Encode expected hash to base64url using library
-        bytes memory expectedChallenge = Base64Url.encode(expectedHash);
-
-        // Compare
-        return keccak256(actualChallenge) == keccak256(expectedChallenge);
     }
 
     /**
