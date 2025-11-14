@@ -1,5 +1,7 @@
 # Two-Factor Authentication (2FA) for P256Account
 
+> **⚠️ IMPORTANT:** This document describes the 2FA concept. The signature format has been updated to use Solady's WebAuthn library. For the latest signature format details, see [SOLADY_WEBAUTHN_SIGNATURE_FORMAT.md](./SOLADY_WEBAUTHN_SIGNATURE_FORMAT.md)
+
 ## 🔐 Overview
 
 P256Account supports **optional Two-Factor Authentication (2FA)** mode, where transactions require **both** signatures:

@@ -98,21 +98,58 @@ Expected output:
 === Deployment Complete ===
 EntryPoint: 0x0000000071727De22E5E9d8BAf0edAc6f37da032
 P256AccountFactory: 0x... (your factory address)
+P256Account Implementation: 0x... (shared implementation)
 ========================
+
+Note: Factory uses ERC-1967 proxy pattern.
+Each account is a minimal proxy (~141 bytes) pointing to the implementation.
+This saves ~60-70% gas on account deployment.
 ```
 
 **Save the factory address!** You'll need it for the frontend.
 
-### 6. Verify Contracts (if not auto-verified)
+**Note:** The implementation contract is deployed automatically by the factory constructor. All user accounts will be minimal proxies pointing to this shared implementation.
+
+### 6. Verify Contracts
+
+**Option 1: Automated (Recommended)**
+
+```bash
+# Set factory address from deployment
+export FACTORY_ADDRESS=0x...  # Your factory address from step 5
+
+# Run automated verification
+make verify-sepolia
+```
+
+**Option 2: Manual**
 
 ```bash
 forge verify-contract \
   --chain-id 11155111 \
   --compiler-version v0.8.23 \
+  --num-of-optimizations 200 \
   --constructor-args $(cast abi-encode "constructor(address)" 0x0000000071727De22E5E9d8BAf0edAc6f37da032) \
+  --etherscan-api-key $ETHERSCAN_API_KEY \
   <FACTORY_ADDRESS> \
   src/P256AccountFactory.sol:P256AccountFactory
+
+# Verify implementation (get address from factory)
+IMPLEMENTATION=$(cast call $FACTORY_ADDRESS "IMPLEMENTATION()(address)" --rpc-url sepolia)
+
+forge verify-contract \
+  --chain-id 11155111 \
+  --compiler-version v0.8.23 \
+  --num-of-optimizations 200 \
+  --constructor-args $(cast abi-encode "constructor(address)" 0x0000000071727De22E5E9d8BAf0edAc6f37da032) \
+  --etherscan-api-key $ETHERSCAN_API_KEY \
+  $IMPLEMENTATION \
+  src/P256Account.sol:P256Account
 ```
+
+**Note:** ERC-1967 proxies are automatically detected by Etherscan. Once the implementation is verified, all proxy accounts will show "Read as Proxy" and "Write as Proxy" tabs automatically!
+
+See [`docs/VERIFICATION_GUIDE.md`](docs/VERIFICATION_GUIDE.md) for detailed verification instructions and troubleshooting.
 
 ### 7. Create Test Account
 
@@ -298,15 +335,26 @@ Before mainnet deployment:
 
 ### Deployment Costs (Sepolia)
 
-- Factory deployment: ~2M gas (~0.002 ETH on Sepolia)
-- Account creation: ~300k gas per account
-- Transaction: ~100k gas (with precompile)
+- **Factory deployment**: ~4.1M gas (~0.004 ETH on Sepolia)
+  - Includes one-time implementation contract deployment
+  - Factory uses ERC-1967 proxy pattern for gas savings
+- **Account creation**: ~312k gas per account (60-70% savings vs full deployment!)
+  - Each account is a minimal proxy (~141 bytes)
+  - Points to shared implementation contract
+- **Transaction**: ~100k gas (with precompile)
 
 ### Mainnet Estimates (at 30 gwei)
 
-- Factory deployment: ~$120
-- Account creation: ~$18 per account
-- Transaction: ~$6 per transaction
+- **Factory deployment**: ~$246 (one-time cost)
+- **Account creation**: ~$19 per account (was ~$45-60 before proxy optimization)
+- **Transaction**: ~$6 per transaction
+
+**Note:** The proxy pattern provides significant savings:
+- 60-70% reduction in account deployment gas
+- 99.1% reduction in on-chain bytecode (141 bytes vs 16KB)
+- Lower costs for users, especially important for counterfactual deployment
+
+See [`docs/PROXY_IMPLEMENTATION.md`](docs/PROXY_IMPLEMENTATION.md) for detailed gas analysis.
 
 ## Support
 

@@ -9,6 +9,7 @@ import {IEntryPoint} from "@account-abstraction/interfaces/IEntryPoint.sol";
 /**
  * @title DeployScript
  * @notice Deployment script for P256AccountFactory
+ * @dev Factory constructor automatically deploys the P256Account implementation contract
  */
 contract DeployScript is Script {
     // EntryPoint v0.7 address on Sepolia
@@ -19,14 +20,23 @@ contract DeployScript is Script {
 
         vm.startBroadcast(deployerPrivateKey);
 
-        // Deploy factory
+        // Deploy factory (this also deploys the implementation contract)
         IEntryPoint entryPoint = IEntryPoint(ENTRYPOINT_V07);
         P256AccountFactory factory = new P256AccountFactory(entryPoint);
+
+        // Get the implementation address
+        P256Account implementation = factory.IMPLEMENTATION();
 
         console2.log("=== Deployment Complete ===");
         console2.log("EntryPoint:", address(entryPoint));
         console2.log("P256AccountFactory:", address(factory));
+        console2.log("P256Account Implementation:", address(implementation));
+        console2.log("Solady ERC1967Factory:", address(factory.PROXY_FACTORY()));
         console2.log("========================");
+        console2.log("");
+        console2.log("Note: Factory uses Solady's canonical ERC-1967 proxy pattern.");
+        console2.log("Each account is a minimal proxy (~121 bytes) pointing to the implementation.");
+        console2.log("This saves ~60-70% gas on account deployment.");
 
         vm.stopBroadcast();
     }

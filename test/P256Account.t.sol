@@ -6,6 +6,7 @@ import {P256Account} from "../src/P256Account.sol";
 import {P256AccountFactory} from "../src/P256AccountFactory.sol";
 import {IEntryPoint} from "@account-abstraction/interfaces/IEntryPoint.sol";
 import {PackedUserOperation} from "@account-abstraction/interfaces/PackedUserOperation.sol";
+import {ERC1967FactoryConstants} from "solady/utils/ERC1967FactoryConstants.sol";
 
 /**
  * @title P256AccountTest
@@ -34,6 +35,11 @@ contract P256AccountTest is Test {
         // This allows tests to call EntryPoint functions without reverting
         vm.etch(ENTRYPOINT_ADDR, hex"00");
         entryPoint = IEntryPoint(ENTRYPOINT_ADDR);
+
+        // Deploy canonical ERC1967Factory if not already deployed
+        if (ERC1967FactoryConstants.ADDRESS.code.length == 0) {
+            vm.etch(ERC1967FactoryConstants.ADDRESS, ERC1967FactoryConstants.BYTECODE);
+        }
 
         // Deploy factory
         factory = new P256AccountFactory(entryPoint);
@@ -92,7 +98,8 @@ contract P256AccountTest is Test {
     }
 
     function test_CannotReinitialize() public {
-        vm.expectRevert("Already initialized");
+        // OpenZeppelin's Initializable uses InvalidInitialization() error
+        vm.expectRevert(abi.encodeWithSignature("InvalidInitialization()"));
         account.initialize(bytes32(uint256(1)), bytes32(uint256(2)), owner, true);
     }
 
@@ -487,7 +494,7 @@ contract P256AccountTest is Test {
         // 2FA is already enabled by default
         assertTrue(account.twoFactorEnabled(), "2FA should be enabled by default");
 
-        // Create a mock UserOperation with dual signature (129 bytes)
+        // Create a mock UserOperation with dual signature
         PackedUserOperation memory userOp;
 
         // Mock P-256 signature (r || s = 64 bytes)
@@ -496,9 +503,14 @@ contract P256AccountTest is Test {
 
         // Mock WebAuthn data
         bytes memory authenticatorData = hex"49960de5880e8c687434170f6476605b8fe4aeb9a28632c7995cf3ba831d97631d00000000";
-        bytes memory clientDataJSON =
-            bytes('{"type":"webauthn.get","challenge":"test","origin":"http://localhost:3000","crossOrigin":false}');
+        string memory clientDataJSON =
+            '{"type":"webauthn.get","challenge":"test","origin":"http://localhost:3000","crossOrigin":false}';
+
+        // Encode using Solady compact format:
+        // authDataLen(2) || authenticatorData || clientDataJSON || challengeIdx(2) || typeIdx(2) || r(32) || s(32) || ownerSig(65)
         uint16 authDataLen = uint16(authenticatorData.length);
+        uint16 challengeIndex = 23; // Index of "challenge" in clientDataJSON
+        uint16 typeIndex = 1; // Index of "type" in clientDataJSON
 
         // Create a real owner signature
         bytes32 userOpHash = keccak256("test");
@@ -515,8 +527,11 @@ contract P256AccountTest is Test {
         (uint8 v, bytes32 sigR, bytes32 sigS) = vm.sign(ownerPrivateKey, userOpHash);
         bytes memory ownerSig = abi.encodePacked(sigR, sigS, v);
 
-        // Combine signatures: r (32) || s (32) || authDataLen (2) || authenticatorData || clientDataJSON || ownerSig (65)
-        userOp.signature = abi.encodePacked(r, s, authDataLen, authenticatorData, clientDataJSON, ownerSig);
+        // Combine signatures using Solady compact format:
+        // authDataLen(2) || authenticatorData || clientDataJSON || challengeIdx(2) || typeIdx(2) || r(32) || s(32) || ownerSig(65)
+        userOp.signature = abi.encodePacked(
+            authDataLen, authenticatorData, bytes(clientDataJSON), challengeIndex, typeIndex, r, s, ownerSig
+        );
 
         // Mock the EntryPoint call
         vm.prank(ENTRYPOINT_ADDR);
