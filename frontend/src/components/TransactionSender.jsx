@@ -250,7 +250,11 @@ function TransactionSender({ accountAddress, credential, accountConfig, onSignat
       }
     }
     loadAccountInfo()
-  }, [accountAddress, sdk, credential, ownerAddress, accountConfig, networkInfo.chainId])
+    // NOTE: Removed accountConfig from dependencies to prevent infinite loop
+    // accountConfig is an object that gets recreated on every render in parent component
+    // We only need to re-run when accountAddress, sdk, credential, ownerAddress, or chainId changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [accountAddress, sdk, credential, ownerAddress, networkInfo.chainId])
 
   // Load available tokens based on network
   useEffect(() => {
