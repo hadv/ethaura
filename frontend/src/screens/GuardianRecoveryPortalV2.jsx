@@ -399,13 +399,21 @@ function GuardianRecoveryPortalContent() {
 }
 
 /**
+ * Custom avatar component for RainbowKit
+ * Uses our Identicon instead of default avatars
+ */
+const CustomAvatar = ({ address, size }) => {
+  return <Identicon address={address} size={size} />
+}
+
+/**
  * Wrapper component with Wagmi and RainbowKit providers
  */
 export const GuardianRecoveryPortalV2 = () => {
   return (
     <WagmiProvider config={wagmiConfig}>
       <QueryClientProvider client={queryClient}>
-        <RainbowKitProvider chains={chains}>
+        <RainbowKitProvider chains={chains} avatar={CustomAvatar}>
           <GuardianRecoveryPortalContent />
         </RainbowKitProvider>
       </QueryClientProvider>
