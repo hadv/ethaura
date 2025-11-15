@@ -17,6 +17,7 @@ import logo from '../assets/logo.svg'
 // Reuse existing app styles
 import '../styles/HomeScreen.css'
 import '../styles/Header.css'
+import '../styles/GuardianRecoveryPortal.css'
 
 // Create a client for React Query
 const queryClient = new QueryClient()
@@ -70,20 +71,15 @@ function GuardianRecoveryPortalContent() {
     <div className="home-screen">
       {/* Header - Matching existing app header */}
       <header className="app-header">
-        <div className="brand-section" style={{ cursor: 'default' }}>
+        <div className="brand-section guardian-portal-brand">
           <img src={logo} alt="EthAura" className="brand-logo" />
-          <span style={{
-            marginLeft: '12px',
-            fontSize: '14px',
-            fontWeight: '500',
-            color: '#6b7280'
-          }}>
+          <span className="guardian-portal-subtitle">
             Guardian Recovery Portal
           </span>
         </div>
         <div className="header-right">
           <NetworkHealthStatus />
-          <div style={{ marginLeft: '12px' }}>
+          <div className="guardian-connect-button">
             <ConnectButton.Custom>
               {({
                 account,
@@ -119,16 +115,7 @@ function GuardianRecoveryPortalContent() {
                           <button
                             onClick={openConnectModal}
                             type="button"
-                            style={{
-                              padding: '8px 16px',
-                              background: '#000',
-                              color: 'white',
-                              border: 'none',
-                              borderRadius: '8px',
-                              fontWeight: '600',
-                              cursor: 'pointer',
-                              fontSize: '14px',
-                            }}
+                            className="guardian-connect-btn"
                           >
                             Connect
                           </button>
@@ -139,19 +126,7 @@ function GuardianRecoveryPortalContent() {
                         <button
                           onClick={openAccountModal}
                           type="button"
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px',
-                            padding: '8px 12px',
-                            background: '#f9fafb',
-                            color: '#111827',
-                            border: '1px solid #e5e7eb',
-                            borderRadius: '8px',
-                            fontWeight: '500',
-                            cursor: 'pointer',
-                            fontSize: '14px',
-                          }}
+                          className="guardian-account-btn"
                         >
                           <Identicon address={account.address} size={24} />
                           {account.displayName}
@@ -170,21 +145,11 @@ function GuardianRecoveryPortalContent() {
       <div className="home-content">
         <div className="left-panel">
           {/* Title Section */}
-          <div style={{ marginBottom: '32px' }}>
-            <h2 style={{
-              fontSize: '24px',
-              fontWeight: '700',
-              color: '#000',
-              margin: '0 0 8px 0'
-            }}>
+          <div className="guardian-title-section">
+            <h2 className="guardian-title">
               {mode === 'approve' ? `Recovery Request #${nonce}` : 'Initiate Account Recovery'}
             </h2>
-            <p style={{
-              fontSize: '15px',
-              color: '#6b7280',
-              margin: 0,
-              lineHeight: '1.5'
-            }}>
+            <p className="guardian-description">
               {mode === 'approve'
                 ? 'Review and approve this recovery request to help restore access to the account.'
                 : 'Help a user recover their account by initiating the recovery process as their guardian.'}
@@ -193,35 +158,19 @@ function GuardianRecoveryPortalContent() {
 
           {/* Network Warning */}
           {isConnected && !isCorrectNetwork && (
-            <div style={{
-              marginBottom: '24px',
-              background: '#fff3cd',
-              border: '2px solid #ffc107',
-              borderRadius: '12px',
-              padding: '16px'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div style={{ flex: 1 }}>
-                  <strong style={{ display: 'block', color: '#856404', marginBottom: '4px' }}>
+            <div className="guardian-network-warning">
+              <div className="guardian-network-warning-content">
+                <div className="guardian-network-warning-text">
+                  <strong className="guardian-network-warning-title">
                     Wrong Network
                   </strong>
-                  <p style={{ margin: 0, color: '#856404', fontSize: '14px' }}>
+                  <p className="guardian-network-warning-message">
                     Please switch to {networkInfo.name}
                   </p>
                 </div>
                 <button
                   onClick={() => switchChain({ chainId: networkInfo.chainId })}
-                  style={{
-                    padding: '8px 16px',
-                    background: '#ffc107',
-                    color: '#000',
-                    border: 'none',
-                    borderRadius: '6px',
-                    fontWeight: '600',
-                    cursor: 'pointer',
-                    whiteSpace: 'nowrap',
-                    fontSize: '14px'
-                  }}
+                  className="guardian-switch-network-btn"
                 >
                   Switch to {networkInfo.name}
                 </button>
@@ -231,15 +180,8 @@ function GuardianRecoveryPortalContent() {
 
           {/* Connection Status */}
           {!isConnected && (
-            <div style={{
-              marginBottom: '24px',
-              background: '#f9fafb',
-              border: '1px solid #e5e7eb',
-              borderRadius: '12px',
-              padding: '16px',
-              textAlign: 'center'
-            }}>
-              <p style={{ margin: 0, color: '#6b7280', fontSize: '14px' }}>
+            <div className="guardian-connection-status">
+              <p className="guardian-connection-message">
                 Please connect your wallet to continue
               </p>
             </div>
@@ -275,32 +217,20 @@ function GuardianRecoveryPortalContent() {
           <div className="sidebar-card">
             <h3 className="sidebar-title">How It Works</h3>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            <div className="guardian-help-steps">
               {/* Step 1 */}
-              <div style={{ display: 'flex', gap: '12px' }}>
-                <div style={{
-                  width: '32px',
-                  height: '32px',
-                  borderRadius: '50%',
-                  background: '#000',
-                  color: 'white',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontWeight: '600',
-                  fontSize: '14px',
-                  flexShrink: 0
-                }}>
+              <div className="guardian-help-step">
+                <div className="guardian-step-number">
                   1
                 </div>
-                <div style={{ flex: 1 }}>
-                  <strong style={{ display: 'block', marginBottom: '4px', color: '#111827', fontSize: '14px' }}>
+                <div className="guardian-step-content">
+                  <strong className="guardian-step-title">
                     Connect Your Wallet
                   </strong>
-                  <p style={{ margin: '0 0 8px 0', color: '#6b7280', fontSize: '13px', lineHeight: '1.5' }}>
+                  <p className="guardian-step-text">
                     Click "Connect Wallet" and choose your preferred method:
                   </p>
-                  <ul style={{ margin: 0, paddingLeft: '20px', color: '#6b7280', fontSize: '13px' }}>
+                  <ul className="guardian-step-list">
                     <li>Browser extension (MetaMask, Rainbow, Coinbase)</li>
                     <li>Mobile wallet via WalletConnect QR code</li>
                     <li>Hardware wallet (Ledger, Trezor)</li>
@@ -309,54 +239,30 @@ function GuardianRecoveryPortalContent() {
               </div>
 
               {/* Step 2 */}
-              <div style={{ display: 'flex', gap: '12px' }}>
-                <div style={{
-                  width: '32px',
-                  height: '32px',
-                  borderRadius: '50%',
-                  background: '#000',
-                  color: 'white',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontWeight: '600',
-                  fontSize: '14px',
-                  flexShrink: 0
-                }}>
+              <div className="guardian-help-step">
+                <div className="guardian-step-number">
                   2
                 </div>
-                <div style={{ flex: 1 }}>
-                  <strong style={{ display: 'block', marginBottom: '4px', color: '#111827', fontSize: '14px' }}>
+                <div className="guardian-step-content">
+                  <strong className="guardian-step-title">
                     Verify Guardian Status
                   </strong>
-                  <p style={{ margin: 0, color: '#6b7280', fontSize: '13px', lineHeight: '1.5' }}>
+                  <p className="guardian-step-text-no-margin">
                     We'll verify that you're a guardian for the account.
                   </p>
                 </div>
               </div>
 
               {/* Step 3 */}
-              <div style={{ display: 'flex', gap: '12px' }}>
-                <div style={{
-                  width: '32px',
-                  height: '32px',
-                  borderRadius: '50%',
-                  background: '#000',
-                  color: 'white',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontWeight: '600',
-                  fontSize: '14px',
-                  flexShrink: 0
-                }}>
+              <div className="guardian-help-step">
+                <div className="guardian-step-number">
                   3
                 </div>
-                <div style={{ flex: 1 }}>
-                  <strong style={{ display: 'block', marginBottom: '4px', color: '#111827', fontSize: '14px' }}>
+                <div className="guardian-step-content">
+                  <strong className="guardian-step-title">
                     {mode === 'approve' ? 'Approve Recovery' : 'Initiate Recovery'}
                   </strong>
-                  <p style={{ margin: 0, color: '#6b7280', fontSize: '13px', lineHeight: '1.5' }}>
+                  <p className="guardian-step-text-no-margin">
                     {mode === 'approve'
                       ? 'Review the recovery details and approve with your signature.'
                       : 'Provide the new public key and initiate the recovery process.'}
@@ -365,27 +271,15 @@ function GuardianRecoveryPortalContent() {
               </div>
 
               {/* Step 4 */}
-              <div style={{ display: 'flex', gap: '12px' }}>
-                <div style={{
-                  width: '32px',
-                  height: '32px',
-                  borderRadius: '50%',
-                  background: '#000',
-                  color: 'white',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontWeight: '600',
-                  fontSize: '14px',
-                  flexShrink: 0
-                }}>
+              <div className="guardian-help-step">
+                <div className="guardian-step-number">
                   4
                 </div>
-                <div style={{ flex: 1 }}>
-                  <strong style={{ display: 'block', marginBottom: '4px', color: '#111827', fontSize: '14px' }}>
+                <div className="guardian-step-content">
+                  <strong className="guardian-step-title">
                     Wait for Timelock
                   </strong>
-                  <p style={{ margin: 0, color: '#6b7280', fontSize: '13px', lineHeight: '1.5' }}>
+                  <p className="guardian-step-text-no-margin">
                     After threshold is met, wait 24 hours before executing recovery.
                   </p>
                 </div>

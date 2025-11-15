@@ -1,0 +1,198 @@
+/* Guardian Recovery Portal Screen Styles */
+/* Matches existing app architecture pattern */
+
+/* Brand Section */
+.guardian-portal-brand {
+  cursor: default;
+}
+
+.guardian-portal-subtitle {
+  margin-left: 12px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #6b7280;
+}
+
+/* Connect Button Container */
+.guardian-connect-button {
+  margin-left: 12px;
+}
+
+/* Custom Connect Button */
+.guardian-connect-btn {
+  padding: 8px 16px;
+  background: #000;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s;
+}
+
+.guardian-connect-btn:hover {
+  background: #1f1f1f;
+}
+
+/* Account Button */
+.guardian-account-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s;
+}
+
+.guardian-account-btn:hover {
+  background: #f3f4f6;
+}
+
+/* Title Section */
+.guardian-title-section {
+  margin-bottom: 32px;
+}
+
+.guardian-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: #000;
+  margin: 0 0 8px 0;
+}
+
+.guardian-description {
+  font-size: 15px;
+  color: #6b7280;
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* Network Warning */
+.guardian-network-warning {
+  margin-bottom: 24px;
+  background: #fff3cd;
+  border: 2px solid #ffc107;
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.guardian-network-warning-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.guardian-network-warning-text {
+  flex: 1;
+}
+
+.guardian-network-warning-title {
+  display: block;
+  color: #856404;
+  margin-bottom: 4px;
+}
+
+.guardian-network-warning-message {
+  margin: 0;
+  color: #856404;
+  font-size: 14px;
+}
+
+.guardian-switch-network-btn {
+  padding: 8px 16px;
+  background: #ffc107;
+  color: #000;
+  border: none;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  font-size: 14px;
+  transition: all 0.2s;
+}
+
+.guardian-switch-network-btn:hover {
+  background: #e0a800;
+}
+
+/* Connection Status */
+.guardian-connection-status {
+  margin-bottom: 24px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 16px;
+  text-align: center;
+}
+
+.guardian-connection-message {
+  margin: 0;
+  color: #6b7280;
+  font-size: 14px;
+}
+
+/* Help Steps */
+.guardian-help-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.guardian-help-step {
+  display: flex;
+  gap: 12px;
+}
+
+/* Step Number Badge */
+.guardian-step-number {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #000;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+/* Step Content */
+.guardian-step-content {
+  flex: 1;
+}
+
+.guardian-step-title {
+  display: block;
+  margin-bottom: 4px;
+  color: #111827;
+  font-size: 14px;
+}
+
+.guardian-step-text {
+  margin: 0 0 8px 0;
+  color: #6b7280;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.guardian-step-text-no-margin {
+  margin: 0;
+  color: #6b7280;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.guardian-step-list {
+  margin: 0;
+  padding-left: 20px;
+  color: #6b7280;
+  font-size: 13px;
+}
+
