@@ -135,8 +135,8 @@ export const RecoveryInitiator = ({ accountAddress: initialAccount, provider, si
   if (success) {
     return (
       <div className="recovery-success">
-        <h2>✅ Recovery Initiated Successfully!</h2>
-        
+        <h2>Recovery Initiated Successfully!</h2>
+
         <div className="recovery-details">
           <div className="detail-item">
             <strong>Account:</strong> {formatAddress(accountAddress)}
@@ -156,7 +156,7 @@ export const RecoveryInitiator = ({ accountAddress: initialAccount, provider, si
         </div>
 
         <div className="share-section">
-          <h3>📤 Share with Other Guardians:</h3>
+          <h3>Share with Other Guardians:</h3>
           <div className="link-box">
             <input
               type="text"
@@ -165,11 +165,11 @@ export const RecoveryInitiator = ({ accountAddress: initialAccount, provider, si
               className="link-input"
             />
             <button onClick={handleCopyLink} className="copy-button">
-              📋 Copy Link
+              Copy Link
             </button>
           </div>
           <p className="hint">
-            💡 Send this link to the other guardians so they can approve the recovery request.
+            Send this link to the other guardians so they can approve the recovery request.
           </p>
         </div>
       </div>
@@ -178,7 +178,7 @@ export const RecoveryInitiator = ({ accountAddress: initialAccount, provider, si
 
   return (
     <div className="recovery-initiator">
-      <h2>🆘 Initiate Account Recovery</h2>
+      <h2>Initiate Account Recovery</h2>
       <p className="description">
         Help a user recover their account by initiating the recovery process as their guardian.
       </p>
@@ -194,25 +194,25 @@ export const RecoveryInitiator = ({ accountAddress: initialAccount, provider, si
           disabled={!!initialAccount || verifying}
           className="input-field"
         />
-        {initialAccount && <p className="hint">✓ Pre-filled from URL</p>}
+        {initialAccount && <p className="hint">Pre-filled from URL</p>}
       </div>
 
       {/* Guardian Verification Status */}
       {verifying && (
         <div className="info-message">
-          🔍 Verifying guardian status...
+          Verifying guardian status...
         </div>
       )}
 
       {isVerifiedGuardian && (
         <>
           <div className="success-message">
-            ✅ You are a guardian for this account!
+            You are a guardian for this account!
           </div>
 
           {/* Account Info */}
           <div className="account-info">
-            <h3>📋 Current Account Info:</h3>
+            <h3>Current Account Info:</h3>
             <div className="info-grid">
               <div className="info-item">
                 <strong>Guardians:</strong> {guardians.length}
@@ -233,9 +233,9 @@ export const RecoveryInitiator = ({ accountAddress: initialAccount, provider, si
 
           {/* New Public Key Input */}
           <div className="form-section">
-            <h3>🔑 New Public Key (for user's new passkey):</h3>
+            <h3>New Public Key (for user's new passkey):</h3>
             <p className="hint">
-              ℹ️ The user should create a new passkey and provide you with the public key coordinates.
+              The user should create a new passkey and provide you with the public key coordinates.
             </p>
             
             <div className="form-group">
@@ -278,16 +278,16 @@ export const RecoveryInitiator = ({ accountAddress: initialAccount, provider, si
             disabled={loading || !newQx || !newQy || !newOwner}
             className="primary-button"
           >
-            {loading ? '🚀 Initiating...' : '🚀 Initiate Recovery'}
+            {loading ? 'Initiating...' : 'Initiate Recovery'}
           </button>
 
           <p className="warning">
-            ⚠️ This will start a 24-hour timelock period.
+            This will start a 24-hour timelock period.
           </p>
         </>
       )}
 
-      {error && <div className="error-message">⚠️ {error}</div>}
+      {error && <div className="error-message">{error}</div>}
     </div>
   )
 }

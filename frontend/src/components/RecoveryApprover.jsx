@@ -153,7 +153,7 @@ export const RecoveryApprover = ({ accountAddress, nonce, provider, signer, guar
     return (
       <div className="recovery-approver">
         <div className="info-message">
-          🔍 Loading recovery request...
+          Loading recovery request...
         </div>
       </div>
     )
@@ -163,7 +163,7 @@ export const RecoveryApprover = ({ accountAddress, nonce, provider, signer, guar
     return (
       <div className="recovery-approver">
         <div className="error-message">
-          ⚠️ {error || 'Unable to load recovery request'}
+          {error || 'Unable to load recovery request'}
         </div>
       </div>
     )
@@ -172,7 +172,7 @@ export const RecoveryApprover = ({ accountAddress, nonce, provider, signer, guar
   if (success && actionType === 'execute' && recoveryRequest.executed) {
     return (
       <div className="recovery-success">
-        <h2>✅ Recovery Executed Successfully!</h2>
+        <h2>Recovery Executed Successfully!</h2>
         <p className="description">
           The account has been recovered with the new public key and owner.
         </p>
@@ -184,7 +184,7 @@ export const RecoveryApprover = ({ accountAddress, nonce, provider, signer, guar
             <strong>New Owner:</strong> {formatAddress(recoveryRequest.newOwner)}
           </div>
           <div className="detail-item">
-            <strong>Status:</strong> ✅ Executed
+            <strong>Status:</strong> Executed
           </div>
         </div>
       </div>
@@ -193,14 +193,14 @@ export const RecoveryApprover = ({ accountAddress, nonce, provider, signer, guar
 
   return (
     <div className="recovery-approver">
-      <h2>🔐 Recovery Request #{nonce}</h2>
+      <h2>Recovery Request #{nonce}</h2>
       <p className="description">
         Review and approve this recovery request for the account.
       </p>
 
       {/* Recovery Details */}
       <div className="recovery-details">
-        <h3>📋 Recovery Details:</h3>
+        <h3>Recovery Details:</h3>
         
         <div className="detail-item">
           <strong>Account:</strong> {formatAddress(accountAddress)}
@@ -231,16 +231,16 @@ export const RecoveryApprover = ({ accountAddress, nonce, provider, signer, guar
         
         <div className="detail-item">
           <strong>Status:</strong>
-          {recoveryRequest.executed && ' ✅ Executed'}
-          {recoveryRequest.cancelled && ' ❌ Cancelled'}
-          {!recoveryRequest.executed && !recoveryRequest.cancelled && ' ⏳ Pending'}
+          {recoveryRequest.executed && ' Executed'}
+          {recoveryRequest.cancelled && ' Cancelled'}
+          {!recoveryRequest.executed && !recoveryRequest.cancelled && ' Pending'}
         </div>
       </div>
 
       {/* Your Status */}
       <div className={`status-box ${hasAlreadyApproved ? 'approved' : 'pending'}`}>
         <strong>Your Status:</strong>
-        {hasAlreadyApproved ? ' ✅ You have approved this request' : ' ⏳ Approval pending'}
+        {hasAlreadyApproved ? ' You have approved this request' : ' Approval pending'}
       </div>
 
       {/* Action Buttons */}
@@ -250,36 +250,36 @@ export const RecoveryApprover = ({ accountAddress, nonce, provider, signer, guar
           disabled={loading}
           className="primary-button"
         >
-          {loading && actionType === 'approve' ? '✅ Approving...' : '✅ Approve Recovery'}
+          {loading && actionType === 'approve' ? 'Approving...' : 'Approve Recovery'}
         </button>
       )}
 
       {canExecute && !recoveryRequest.executed && (
         <>
           <div className="success-message">
-            🎉 Threshold met and timelock passed! Ready to execute.
+            Threshold met and timelock passed! Ready to execute.
           </div>
           <button
             onClick={handleExecute}
             disabled={loading}
             className="execute-button"
           >
-            {loading && actionType === 'execute' ? '🚀 Executing...' : '🚀 Execute Recovery'}
+            {loading && actionType === 'execute' ? 'Executing...' : 'Execute Recovery'}
           </button>
         </>
       )}
 
       {success && actionType === 'approve' && (
         <div className="success-message">
-          ✅ Recovery approved successfully!
+          Recovery approved successfully!
         </div>
       )}
 
-      {error && <div className="error-message">⚠️ {error}</div>}
+      {error && <div className="error-message">{error}</div>}
 
       {!canExecute && hasAlreadyApproved && !recoveryRequest.executed && (
         <div className="info-message">
-          ℹ️ Waiting for more approvals or timelock to pass...
+          Waiting for more approvals or timelock to pass...
         </div>
       )}
     </div>

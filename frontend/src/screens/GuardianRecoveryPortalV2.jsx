@@ -9,6 +9,7 @@ import { RecoveryInitiator } from '../components/RecoveryInitiator'
 import { RecoveryApprover } from '../components/RecoveryApprover'
 import { wagmiConfig, chains } from '../config/wagmiConfig'
 import { NETWORKS } from '../lib/constants'
+import { useNetwork } from '../contexts/NetworkContext'
 import logo from '../assets/logo.svg'
 
 // Reuse existing app styles
@@ -26,10 +27,10 @@ const queryClient = new QueryClient()
  * 2. Approve (with nonce): /guardian-recovery?account=0x123&nonce=5
  */
 function GuardianRecoveryPortalContent() {
+  const { networkInfo } = useNetwork()
   const [mode, setMode] = useState(null) // 'initiate' or 'approve'
   const [accountAddress, setAccountAddress] = useState('')
   const [nonce, setNonce] = useState(null)
-  const [networkName, setNetworkName] = useState('sepolia')
 
   // Wallet connection state
   const [walletConnected, setWalletConnected] = useState(false)
@@ -41,9 +42,6 @@ function GuardianRecoveryPortalContent() {
     const urlParams = new URLSearchParams(window.location.search)
     const accountParam = urlParams.get('account')
     const nonceParam = urlParams.get('nonce')
-    const networkParam = urlParams.get('network') || 'sepolia'
-
-    setNetworkName(networkParam)
 
     if (nonceParam) {
       // Mode 2: Approve/Execute existing recovery
@@ -73,8 +71,6 @@ function GuardianRecoveryPortalContent() {
     setGuardianAddress(null)
   }
 
-  const network = NETWORKS[networkName] || NETWORKS.sepolia
-
   return (
     <div className="home-screen">
       {/* Header - Matching existing app header */}
@@ -94,7 +90,7 @@ function GuardianRecoveryPortalContent() {
           fontWeight: '500',
           color: '#111827'
         }}>
-          <span>🔐 Guardian Recovery Portal</span>
+          <span>Guardian Recovery Portal</span>
           <span style={{
             padding: '4px 8px',
             background: '#000',
@@ -103,7 +99,7 @@ function GuardianRecoveryPortalContent() {
             fontSize: '12px',
             fontWeight: '600'
           }}>
-            {network.name}
+            {networkInfo.name}
           </span>
         </div>
       </header>
@@ -119,7 +115,7 @@ function GuardianRecoveryPortalContent() {
               color: '#000',
               margin: '0 0 8px 0'
             }}>
-              {mode === 'approve' ? '🔐 Approve Recovery Request' : '🆘 Initiate Account Recovery'}
+              {mode === 'approve' ? 'Approve Recovery Request' : 'Initiate Account Recovery'}
             </h2>
             <p style={{
               fontSize: '15px',
@@ -138,7 +134,7 @@ function GuardianRecoveryPortalContent() {
             <GuardianWalletConnectorV2
               onConnect={handleWalletConnect}
               onDisconnect={handleWalletDisconnect}
-              requiredChainId={network.chainId}
+              requiredChainId={networkInfo.chainId}
             />
           </div>
 
@@ -170,7 +166,7 @@ function GuardianRecoveryPortalContent() {
         {/* Right Panel - Help Section */}
         <div className="right-panel">
           <div className="sidebar-card">
-            <h3 className="sidebar-title">ℹ️ How It Works</h3>
+            <h3 className="sidebar-title">How It Works</h3>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
               {/* Step 1 */}
@@ -297,7 +293,7 @@ function GuardianRecoveryPortalContent() {
               textAlign: 'center'
             }}>
               <p style={{ margin: '0 0 8px 0', fontSize: '13px', color: '#6b7280' }}>
-                🔒 Secure guardian-based recovery
+                Secure guardian-based recovery
               </p>
               <div style={{ fontSize: '13px', color: '#6b7280' }}>
                 <a

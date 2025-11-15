@@ -59,7 +59,6 @@ export const GuardianWalletConnectorV2 = ({ onConnect, onDisconnect, requiredCha
           padding: '16px'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <span style={{ fontSize: '24px', flexShrink: 0 }}>⚠️</span>
             <div style={{ flex: 1 }}>
               <strong style={{ display: 'block', color: '#856404', marginBottom: '4px' }}>
                 Wrong Network
@@ -106,7 +105,6 @@ export const GuardianWalletConnectorV2 = ({ onConnect, onDisconnect, requiredCha
           fontWeight: '600',
           fontSize: '14px'
         }}>
-          <span style={{ fontSize: '18px' }}>✅</span>
           <span>Connected to {networkName}</span>
         </div>
       )}
@@ -126,23 +124,23 @@ export const GuardianWalletConnectorV2 = ({ onConnect, onDisconnect, requiredCha
             color: '#111827',
             fontSize: '14px'
           }}>
-            🔗 Connect Your Wallet
+            Connect Your Wallet
           </p>
           <ul style={{
             margin: 0,
             paddingLeft: '20px',
-            listStyle: 'none',
+            listStyle: 'disc',
             fontSize: '13px',
             color: '#6b7280'
           }}>
             <li style={{ marginBottom: '8px' }}>
-              🦊 <strong>Browser Extension:</strong> MetaMask, Rainbow, Coinbase Wallet
+              <strong>Browser Extension:</strong> MetaMask, Rainbow, Coinbase Wallet
             </li>
             <li style={{ marginBottom: '8px' }}>
-              📱 <strong>Mobile Wallet:</strong> Scan QR code with WalletConnect
+              <strong>Mobile Wallet:</strong> Scan QR code with WalletConnect
             </li>
             <li style={{ marginBottom: 0 }}>
-              🔐 <strong>Hardware Wallet:</strong> Ledger, Trezor (via WalletConnect)
+              <strong>Hardware Wallet:</strong> Ledger, Trezor (via WalletConnect)
             </li>
           </ul>
         </div>
