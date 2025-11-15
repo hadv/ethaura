@@ -83,14 +83,83 @@ function GuardianRecoveryPortalContent() {
         <div className="header-right">
           <NetworkHealthStatus />
           <div style={{ marginLeft: '12px' }}>
-            <ConnectButton
-              chainStatus="icon"
-              showBalance={false}
-              accountStatus={{
-                smallScreen: 'avatar',
-                largeScreen: 'full',
+            <ConnectButton.Custom>
+              {({
+                account,
+                chain,
+                openAccountModal,
+                openChainModal,
+                openConnectModal,
+                authenticationStatus,
+                mounted,
+              }) => {
+                const ready = mounted && authenticationStatus !== 'loading'
+                const connected =
+                  ready &&
+                  account &&
+                  chain &&
+                  (!authenticationStatus ||
+                    authenticationStatus === 'authenticated')
+
+                return (
+                  <div
+                    {...(!ready && {
+                      'aria-hidden': true,
+                      'style': {
+                        opacity: 0,
+                        pointerEvents: 'none',
+                        userSelect: 'none',
+                      },
+                    })}
+                  >
+                    {(() => {
+                      if (!connected) {
+                        return (
+                          <button
+                            onClick={openConnectModal}
+                            type="button"
+                            style={{
+                              padding: '8px 16px',
+                              background: '#000',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '8px',
+                              fontWeight: '600',
+                              cursor: 'pointer',
+                              fontSize: '14px',
+                            }}
+                          >
+                            Connect
+                          </button>
+                        )
+                      }
+
+                      return (
+                        <button
+                          onClick={openAccountModal}
+                          type="button"
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            padding: '8px 12px',
+                            background: '#f9fafb',
+                            color: '#111827',
+                            border: '1px solid #e5e7eb',
+                            borderRadius: '8px',
+                            fontWeight: '500',
+                            cursor: 'pointer',
+                            fontSize: '14px',
+                          }}
+                        >
+                          {account.displayName}
+                        </button>
+                      )
+                    })()}
+                  </div>
+                )
               }}
-            />
+            </ConnectButton.Custom>
           </div>
         </div>
       </header>
