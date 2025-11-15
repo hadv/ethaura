@@ -67,6 +67,13 @@ export const P256_ACCOUNT_ABI = [
   'function cancelRecovery(uint256 requestNonce) external',
   'function recoveryNonce() view returns (uint256)',
   'function recoveryRequests(uint256) view returns (bytes32 newQx, bytes32 newQy, address newOwner, uint256 approvalCount, uint256 executeAfter, bool executed, bool cancelled)',
+  'function getRecoveryRequest(uint256 requestNonce) view returns (bytes32 newQx, bytes32 newQy, address newOwner, uint256 approvalCount, uint256 executeAfter, bool executed, bool cancelled)',
+  'function hasApprovedRecovery(uint256 requestNonce, address guardian) view returns (bool)',
+  // Recovery events
+  'event RecoveryInitiated(uint256 indexed nonce, address indexed initiator, bytes32 newQx, bytes32 newQy, address newOwner)',
+  'event RecoveryApproved(uint256 indexed nonce, address indexed guardian)',
+  'event RecoveryExecuted(uint256 indexed nonce)',
+  'event RecoveryCancelled(uint256 indexed nonce)',
 ]
 
 export const ENTRYPOINT_ABI = [

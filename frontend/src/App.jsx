@@ -11,11 +11,21 @@ import SignatureConfirmationScreen from './screens/SignatureConfirmationScreen'
 import TransactionResultScreen from './screens/TransactionResultScreen'
 import ViewAllTokensScreen from './screens/ViewAllTokensScreen'
 import ViewAllTransactionsScreen from './screens/ViewAllTransactionsScreen'
+import { GuardianRecoveryPortalV2 } from './screens/GuardianRecoveryPortalV2'
 import { retrievePasskeyCredential, storePasskeyCredential } from './lib/passkeyStorage'
 
 // Inner component that uses Web3Auth context
 function AppContent() {
   const { isConnected, isLoading, logout, signMessage, address } = useWeb3Auth()
+
+  // Check if this is the guardian recovery portal route
+  const isGuardianRecoveryRoute = window.location.pathname === '/guardian-recovery' ||
+                                   window.location.search.includes('guardian-recovery')
+
+  // If guardian recovery route, render portal directly (no Web3Auth needed)
+  if (isGuardianRecoveryRoute) {
+    return <GuardianRecoveryPortalV2 />
+  }
 
   // Navigation state
   const [currentScreen, setCurrentScreen] = useState('home') // 'home', 'wallet-detail', 'wallet-settings', 'add-wallet', 'new-wallet', 'send-transaction', 'signature-confirmation', 'transaction-result', 'view-all-tokens', 'view-all-transactions'
