@@ -193,11 +193,6 @@ export const RecoveryApprover = ({ accountAddress, nonce, provider, signer, guar
 
   return (
     <div className="recovery-approver">
-      <h2>Recovery Request #{nonce}</h2>
-      <p className="description">
-        Review and approve this recovery request for the account.
-      </p>
-
       {/* Recovery Details */}
       <div className="recovery-details">
         <h3>Recovery Details:</h3>

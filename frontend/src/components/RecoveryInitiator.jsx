@@ -178,11 +178,6 @@ export const RecoveryInitiator = ({ accountAddress: initialAccount, provider, si
 
   return (
     <div className="recovery-initiator">
-      <h2>Initiate Account Recovery</h2>
-      <p className="description">
-        Help a user recover their account by initiating the recovery process as their guardian.
-      </p>
-
       {/* Account Address Input */}
       <div className="form-group">
         <label>Account Address to Recover:</label>

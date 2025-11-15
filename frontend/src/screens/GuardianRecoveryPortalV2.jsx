@@ -175,7 +175,7 @@ function GuardianRecoveryPortalContent() {
               color: '#000',
               margin: '0 0 8px 0'
             }}>
-              {mode === 'approve' ? 'Approve Recovery Request' : 'Initiate Account Recovery'}
+              {mode === 'approve' ? `Recovery Request #${nonce}` : 'Initiate Account Recovery'}
             </h2>
             <p style={{
               fontSize: '15px',
@@ -184,7 +184,7 @@ function GuardianRecoveryPortalContent() {
               lineHeight: '1.5'
             }}>
               {mode === 'approve'
-                ? 'Review and approve a recovery request to help restore access to an account.'
+                ? 'Review and approve this recovery request to help restore access to the account.'
                 : 'Help a user recover their account by initiating the recovery process as their guardian.'}
             </p>
           </div>
