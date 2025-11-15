@@ -9,7 +9,7 @@ import {
   generateRecoveryLink,
 } from '../utils/recoveryUtils'
 import { isValidAddress, formatAddress } from '../utils/walletUtils'
-import '../styles/GuardianRecoveryPortal.css'
+import '../styles/GuardianRecovery.css'
 
 export const RecoveryInitiator = ({ accountAddress: initialAccount, provider, signer, guardianAddress }) => {
   const [accountAddress, setAccountAddress] = useState(initialAccount || '')

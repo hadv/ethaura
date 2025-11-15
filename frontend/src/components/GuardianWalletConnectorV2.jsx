@@ -2,11 +2,11 @@ import { useEffect } from 'react'
 import { ConnectButton } from '@rainbow-me/rainbowkit'
 import { useAccount, useChainId, useSwitchChain } from 'wagmi'
 import { useEthersSigner } from '../hooks/useEthersSigner'
-import '../styles/GuardianRecoveryPortal.css'
 
 /**
  * Enhanced wallet connector using RainbowKit for full WalletConnect support
  * Supports MetaMask, Rainbow, Coinbase Wallet, WalletConnect (QR code), and more
+ * Uses inline styles to match existing app design
  */
 export const GuardianWalletConnectorV2 = ({ onConnect, onDisconnect, requiredChainId = 11155111 }) => {
   const { address, isConnected } = useAccount()
@@ -31,10 +31,15 @@ export const GuardianWalletConnectorV2 = ({ onConnect, onDisconnect, requiredCha
   const networkName = requiredChainId === 11155111 ? 'Sepolia' : requiredChainId === 1 ? 'Mainnet' : `Chain ${requiredChainId}`
 
   return (
-    <div className="wallet-connector-v2">
+    <div style={{
+      background: 'white',
+      border: '1px solid #e5e7eb',
+      borderRadius: '12px',
+      padding: '24px'
+    }}>
       {/* RainbowKit Connect Button */}
-      <div className="rainbowkit-wrapper">
-        <ConnectButton 
+      <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '16px' }}>
+        <ConnectButton
           chainStatus="icon"
           showBalance={false}
           accountStatus={{
@@ -46,16 +51,38 @@ export const GuardianWalletConnectorV2 = ({ onConnect, onDisconnect, requiredCha
 
       {/* Network Warning */}
       {isConnected && !isCorrectNetwork && (
-        <div className="network-warning">
-          <div className="warning-content">
-            <span className="warning-icon">⚠️</span>
-            <div className="warning-text">
-              <strong>Wrong Network</strong>
-              <p>Please switch to {networkName}</p>
+        <div style={{
+          marginTop: '16px',
+          background: '#fff3cd',
+          border: '2px solid #ffc107',
+          borderRadius: '8px',
+          padding: '16px'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <span style={{ fontSize: '24px', flexShrink: 0 }}>⚠️</span>
+            <div style={{ flex: 1 }}>
+              <strong style={{ display: 'block', color: '#856404', marginBottom: '4px' }}>
+                Wrong Network
+              </strong>
+              <p style={{ margin: 0, color: '#856404', fontSize: '14px' }}>
+                Please switch to {networkName}
+              </p>
             </div>
             <button
               onClick={() => switchChain({ chainId: requiredChainId })}
-              className="switch-network-button-inline"
+              style={{
+                padding: '8px 16px',
+                background: '#ffc107',
+                color: '#000',
+                border: 'none',
+                borderRadius: '6px',
+                fontWeight: '600',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+                fontSize: '14px'
+              }}
+              onMouseOver={(e) => e.target.style.background = '#e0a800'}
+              onMouseOut={(e) => e.target.style.background = '#ffc107'}
             >
               Switch to {networkName}
             </button>
@@ -65,20 +92,58 @@ export const GuardianWalletConnectorV2 = ({ onConnect, onDisconnect, requiredCha
 
       {/* Connection Status */}
       {isConnected && isCorrectNetwork && (
-        <div className="connection-success">
-          <span className="success-icon">✅</span>
-          <span className="success-text">Connected to {networkName}</span>
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '8px',
+          marginTop: '16px',
+          padding: '12px',
+          background: '#d4edda',
+          border: '1px solid #c3e6cb',
+          borderRadius: '8px',
+          color: '#155724',
+          fontWeight: '600',
+          fontSize: '14px'
+        }}>
+          <span style={{ fontSize: '18px' }}>✅</span>
+          <span>Connected to {networkName}</span>
         </div>
       )}
 
       {/* Help Text */}
       {!isConnected && (
-        <div className="wallet-help">
-          <p className="help-title">🔗 Connect Your Wallet</p>
-          <ul className="help-list">
-            <li>🦊 <strong>Browser Extension:</strong> MetaMask, Rainbow, Coinbase Wallet</li>
-            <li>📱 <strong>Mobile Wallet:</strong> Scan QR code with WalletConnect</li>
-            <li>🔐 <strong>Hardware Wallet:</strong> Ledger, Trezor (via WalletConnect)</li>
+        <div style={{
+          marginTop: '16px',
+          padding: '16px',
+          background: '#f9fafb',
+          borderRadius: '8px',
+          border: '1px solid #e5e7eb'
+        }}>
+          <p style={{
+            margin: '0 0 12px 0',
+            fontWeight: '600',
+            color: '#111827',
+            fontSize: '14px'
+          }}>
+            🔗 Connect Your Wallet
+          </p>
+          <ul style={{
+            margin: 0,
+            paddingLeft: '20px',
+            listStyle: 'none',
+            fontSize: '13px',
+            color: '#6b7280'
+          }}>
+            <li style={{ marginBottom: '8px' }}>
+              🦊 <strong>Browser Extension:</strong> MetaMask, Rainbow, Coinbase Wallet
+            </li>
+            <li style={{ marginBottom: '8px' }}>
+              📱 <strong>Mobile Wallet:</strong> Scan QR code with WalletConnect
+            </li>
+            <li style={{ marginBottom: 0 }}>
+              🔐 <strong>Hardware Wallet:</strong> Ledger, Trezor (via WalletConnect)
+            </li>
           </ul>
         </div>
       )}

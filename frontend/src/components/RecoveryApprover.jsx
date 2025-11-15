@@ -9,7 +9,7 @@ import {
   executeRecovery,
 } from '../utils/recoveryUtils'
 import { formatAddress } from '../utils/walletUtils'
-import '../styles/GuardianRecoveryPortal.css'
+import '../styles/GuardianRecovery.css'
 
 export const RecoveryApprover = ({ accountAddress, nonce, provider, signer, guardianAddress }) => {
   const [loading, setLoading] = useState(false)
