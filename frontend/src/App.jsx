@@ -11,7 +11,7 @@ import SignatureConfirmationScreen from './screens/SignatureConfirmationScreen'
 import TransactionResultScreen from './screens/TransactionResultScreen'
 import ViewAllTokensScreen from './screens/ViewAllTokensScreen'
 import ViewAllTransactionsScreen from './screens/ViewAllTransactionsScreen'
-import { GuardianRecoveryPortalV2 } from './screens/GuardianRecoveryPortalV2'
+import { GuardianRecoveryPortal } from './screens/GuardianRecoveryPortal'
 import { retrievePasskeyCredential, storePasskeyCredential } from './lib/passkeyStorage'
 
 // Inner component that uses Web3Auth context
@@ -24,7 +24,7 @@ function AppContent() {
 
   // If guardian recovery route, render portal directly (no Web3Auth needed)
   if (isGuardianRecoveryRoute) {
-    return <GuardianRecoveryPortalV2 />
+    return <GuardianRecoveryPortal />
   }
 
   // Navigation state

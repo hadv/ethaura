@@ -22,7 +22,7 @@ import '../styles/Header.css'
 const queryClient = new QueryClient()
 
 /**
- * Guardian Recovery Portal V2 - Enhanced with full WalletConnect support
+ * Guardian Recovery Portal - Enhanced with full WalletConnect support
  * Uses existing app components and styling for consistency
  *
  * Modes:
@@ -409,7 +409,7 @@ const CustomAvatar = ({ address, size }) => {
 /**
  * Wrapper component with Wagmi and RainbowKit providers
  */
-export const GuardianRecoveryPortalV2 = () => {
+export const GuardianRecoveryPortal = () => {
   return (
     <WagmiProvider config={wagmiConfig}>
       <QueryClientProvider client={queryClient}>
