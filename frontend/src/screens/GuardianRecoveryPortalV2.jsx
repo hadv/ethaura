@@ -10,6 +10,7 @@ import { wagmiConfig, chains } from '../config/wagmiConfig'
 import { NETWORKS } from '../lib/constants'
 import { useNetwork } from '../contexts/NetworkContext'
 import { useEthersSigner } from '../hooks/useEthersSigner'
+import { Identicon } from '../utils/identicon'
 import NetworkHealthStatus from '../components/NetworkHealthStatus'
 import logo from '../assets/logo.svg'
 
@@ -152,6 +153,7 @@ function GuardianRecoveryPortalContent() {
                             fontSize: '14px',
                           }}
                         >
+                          <Identicon address={account.address} size={24} />
                           {account.displayName}
                         </button>
                       )
