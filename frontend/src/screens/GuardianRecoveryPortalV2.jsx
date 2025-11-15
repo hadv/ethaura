@@ -1,19 +1,21 @@
 import { useState, useEffect } from 'react'
-import { WagmiProvider } from 'wagmi'
+import { WagmiProvider, useAccount, useChainId, useSwitchChain } from 'wagmi'
 import { QueryClientProvider, QueryClient } from '@tanstack/react-query'
-import { RainbowKitProvider } from '@rainbow-me/rainbowkit'
+import { RainbowKitProvider, ConnectButton } from '@rainbow-me/rainbowkit'
 import '@rainbow-me/rainbowkit/styles.css'
 
-import { GuardianWalletConnectorV2 } from '../components/GuardianWalletConnectorV2'
 import { RecoveryInitiator } from '../components/RecoveryInitiator'
 import { RecoveryApprover } from '../components/RecoveryApprover'
 import { wagmiConfig, chains } from '../config/wagmiConfig'
 import { NETWORKS } from '../lib/constants'
 import { useNetwork } from '../contexts/NetworkContext'
+import { useEthersSigner } from '../hooks/useEthersSigner'
+import NetworkHealthStatus from '../components/NetworkHealthStatus'
 import logo from '../assets/logo.svg'
 
 // Reuse existing app styles
 import '../styles/HomeScreen.css'
+import '../styles/Header.css'
 
 // Create a client for React Query
 const queryClient = new QueryClient()
@@ -32,10 +34,11 @@ function GuardianRecoveryPortalContent() {
   const [accountAddress, setAccountAddress] = useState('')
   const [nonce, setNonce] = useState(null)
 
-  // Wallet connection state
-  const [walletConnected, setWalletConnected] = useState(false)
-  const [signer, setSigner] = useState(null)
-  const [guardianAddress, setGuardianAddress] = useState(null)
+  // Wagmi hooks for wallet connection
+  const { address, isConnected } = useAccount()
+  const chainId = useChainId()
+  const { switchChain } = useSwitchChain()
+  const signer = useEthersSigner()
 
   // Parse URL parameters on mount
   useEffect(() => {
@@ -59,48 +62,36 @@ function GuardianRecoveryPortalContent() {
     }
   }, [])
 
-  const handleWalletConnect = ({ address, signer: walletSigner }) => {
-    setWalletConnected(true)
-    setSigner(walletSigner)
-    setGuardianAddress(address)
-  }
-
-  const handleWalletDisconnect = () => {
-    setWalletConnected(false)
-    setSigner(null)
-    setGuardianAddress(null)
-  }
+  // Check if on correct network
+  const isCorrectNetwork = chainId === networkInfo.chainId
 
   return (
     <div className="home-screen">
       {/* Header - Matching existing app header */}
-      <header className="app-header" style={{ borderBottom: '1px solid #e5e7eb' }}>
+      <header className="app-header">
         <div className="brand-section" style={{ cursor: 'default' }}>
           <img src={logo} alt="EthAura" className="brand-logo" />
-        </div>
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '12px',
-          padding: '8px 16px',
-          background: '#f9fafb',
-          borderRadius: '24px',
-          border: '1px solid #e5e7eb',
-          fontSize: '14px',
-          fontWeight: '500',
-          color: '#111827'
-        }}>
-          <span>Guardian Recovery Portal</span>
           <span style={{
-            padding: '4px 8px',
-            background: '#000',
-            color: 'white',
-            borderRadius: '12px',
-            fontSize: '12px',
-            fontWeight: '600'
+            marginLeft: '12px',
+            fontSize: '14px',
+            fontWeight: '500',
+            color: '#6b7280'
           }}>
-            {networkInfo.name}
+            Guardian Recovery Portal
           </span>
+        </div>
+        <div className="header-right">
+          <NetworkHealthStatus />
+          <div style={{ marginLeft: '12px' }}>
+            <ConnectButton
+              chainStatus="icon"
+              showBalance={false}
+              accountStatus={{
+                smallScreen: 'avatar',
+                largeScreen: 'full',
+              }}
+            />
+          </div>
         </div>
       </header>
 
@@ -129,24 +120,69 @@ function GuardianRecoveryPortalContent() {
             </p>
           </div>
 
-          {/* Wallet Connection Section */}
-          <div style={{ marginBottom: '24px' }}>
-            <GuardianWalletConnectorV2
-              onConnect={handleWalletConnect}
-              onDisconnect={handleWalletDisconnect}
-              requiredChainId={networkInfo.chainId}
-            />
-          </div>
+          {/* Network Warning */}
+          {isConnected && !isCorrectNetwork && (
+            <div style={{
+              marginBottom: '24px',
+              background: '#fff3cd',
+              border: '2px solid #ffc107',
+              borderRadius: '12px',
+              padding: '16px'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{ flex: 1 }}>
+                  <strong style={{ display: 'block', color: '#856404', marginBottom: '4px' }}>
+                    Wrong Network
+                  </strong>
+                  <p style={{ margin: 0, color: '#856404', fontSize: '14px' }}>
+                    Please switch to {networkInfo.name}
+                  </p>
+                </div>
+                <button
+                  onClick={() => switchChain({ chainId: networkInfo.chainId })}
+                  style={{
+                    padding: '8px 16px',
+                    background: '#ffc107',
+                    color: '#000',
+                    border: 'none',
+                    borderRadius: '6px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap',
+                    fontSize: '14px'
+                  }}
+                >
+                  Switch to {networkInfo.name}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Connection Status */}
+          {!isConnected && (
+            <div style={{
+              marginBottom: '24px',
+              background: '#f9fafb',
+              border: '1px solid #e5e7eb',
+              borderRadius: '12px',
+              padding: '16px',
+              textAlign: 'center'
+            }}>
+              <p style={{ margin: 0, color: '#6b7280', fontSize: '14px' }}>
+                Please connect your wallet to continue
+              </p>
+            </div>
+          )}
 
           {/* Recovery Action */}
-          {walletConnected && signer && (
+          {isConnected && isCorrectNetwork && signer && (
             <div>
               {mode === 'initiate' && (
                 <RecoveryInitiator
                   accountAddress={accountAddress}
                   provider={signer.provider}
                   signer={signer}
-                  guardianAddress={guardianAddress}
+                  guardianAddress={address}
                 />
               )}
 
@@ -156,7 +192,7 @@ function GuardianRecoveryPortalContent() {
                   nonce={nonce}
                   provider={signer.provider}
                   signer={signer}
-                  guardianAddress={guardianAddress}
+                  guardianAddress={address}
                 />
               )}
             </div>
@@ -282,41 +318,6 @@ function GuardianRecoveryPortalContent() {
                     After threshold is met, wait 24 hours before executing recovery.
                   </p>
                 </div>
-              </div>
-            </div>
-
-            {/* Footer Links */}
-            <div style={{
-              marginTop: '24px',
-              paddingTop: '20px',
-              borderTop: '1px solid #e5e7eb',
-              textAlign: 'center'
-            }}>
-              <p style={{ margin: '0 0 8px 0', fontSize: '13px', color: '#6b7280' }}>
-                Secure guardian-based recovery
-              </p>
-              <div style={{ fontSize: '13px', color: '#6b7280' }}>
-                <a
-                  href="https://github.com/hadv/ethaura"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{ color: '#6b7280', textDecoration: 'none' }}
-                  onMouseOver={(e) => e.target.style.color = '#000'}
-                  onMouseOut={(e) => e.target.style.color = '#6b7280'}
-                >
-                  GitHub
-                </a>
-                {' • '}
-                <a
-                  href="https://ethaura.xyz"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{ color: '#6b7280', textDecoration: 'none' }}
-                  onMouseOver={(e) => e.target.style.color = '#000'}
-                  onMouseOut={(e) => e.target.style.color = '#6b7280'}
-                >
-                  Main App
-                </a>
               </div>
             </div>
           </div>

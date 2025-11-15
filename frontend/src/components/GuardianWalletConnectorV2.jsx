@@ -8,7 +8,7 @@ import { useEthersSigner } from '../hooks/useEthersSigner'
  * Supports MetaMask, Rainbow, Coinbase Wallet, WalletConnect (QR code), and more
  * Uses inline styles to match existing app design
  */
-export const GuardianWalletConnectorV2 = ({ onConnect, onDisconnect, requiredChainId = 11155111 }) => {
+export const GuardianWalletConnectorV2 = ({ onConnect, onDisconnect, requiredChainId = 11155111, networkName = 'Sepolia' }) => {
   const { address, isConnected } = useAccount()
   const chainId = useChainId()
   const { switchChain } = useSwitchChain()
@@ -28,7 +28,6 @@ export const GuardianWalletConnectorV2 = ({ onConnect, onDisconnect, requiredCha
   }, [isConnected, address, signer, chainId, onConnect, onDisconnect])
 
   const isCorrectNetwork = chainId === requiredChainId
-  const networkName = requiredChainId === 11155111 ? 'Sepolia' : requiredChainId === 1 ? 'Mainnet' : `Chain ${requiredChainId}`
 
   return (
     <div style={{

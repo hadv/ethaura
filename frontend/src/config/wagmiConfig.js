@@ -4,17 +4,17 @@
  */
 
 import { getDefaultConfig } from '@rainbow-me/rainbowkit'
-import { sepolia, mainnet } from 'wagmi/chains'
+import { sepolia, mainnet, holesky } from 'wagmi/chains'
 
 // Get WalletConnect project ID from environment
 const projectId = import.meta.env.VITE_WALLETCONNECT_PROJECT_ID || '898d49c09fafba3a87f7c3396aa79cf4'
 
 if (!projectId) {
-  console.warn('⚠️ WalletConnect Project ID not found. Please set VITE_WALLETCONNECT_PROJECT_ID in .env')
+  console.warn('WalletConnect Project ID not found. Please set VITE_WALLETCONNECT_PROJECT_ID in .env')
 }
 
-// Configure chains
-const chains = [sepolia, mainnet]
+// Configure all supported chains
+const chains = [sepolia, mainnet, holesky]
 
 // Create wagmi config with RainbowKit
 export const wagmiConfig = getDefaultConfig({
