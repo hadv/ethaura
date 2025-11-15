@@ -1,0 +1,294 @@
+/* Guardian Recovery Portal Styles - Matching existing app design */
+/* Uses black/white color scheme, no purple/gradients */
+
+/* Form Groups */
+.form-group {
+  margin-bottom: 20px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 600;
+  color: #111827;
+  font-size: 14px;
+}
+
+.input-field {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: inherit;
+  transition: border-color 0.2s;
+}
+
+.input-field:focus {
+  outline: none;
+  border-color: #000;
+}
+
+.input-field:disabled {
+  background: #f9fafb;
+  cursor: not-allowed;
+  color: #6b7280;
+}
+
+.hint {
+  font-size: 13px;
+  color: #6b7280;
+  margin-top: 6px;
+  margin-bottom: 0;
+}
+
+/* Messages */
+.error-message {
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 16px;
+  font-size: 14px;
+}
+
+.success-message {
+  background: #d4edda;
+  color: #155724;
+  border: 1px solid #c3e6cb;
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 16px;
+  font-size: 14px;
+}
+
+.info-message {
+  background: #e7f5ff;
+  color: #0c5460;
+  border: 1px solid #bee5eb;
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 16px;
+  font-size: 14px;
+}
+
+.warning {
+  background: #fff3cd;
+  color: #856404;
+  border: 1px solid #ffeaa7;
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 16px;
+  font-size: 14px;
+  text-align: center;
+}
+
+/* Buttons */
+.primary-button {
+  width: 100%;
+  padding: 14px 24px;
+  background: #000;
+  color: white;
+  border: none;
+  border-radius: 24px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.primary-button:hover:not(:disabled) {
+  background: #1f1f1f;
+  transform: translateY(-1px);
+}
+
+.primary-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.execute-button {
+  width: 100%;
+  padding: 14px 24px;
+  background: #000;
+  color: white;
+  border: none;
+  border-radius: 24px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-top: 16px;
+}
+
+.execute-button:hover:not(:disabled) {
+  background: #1f1f1f;
+  transform: translateY(-1px);
+}
+
+.execute-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.copy-button {
+  padding: 12px 20px;
+  background: #000;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  font-size: 14px;
+  transition: all 0.2s;
+}
+
+.copy-button:hover {
+  background: #1f1f1f;
+}
+
+/* Recovery Details */
+.recovery-details,
+.account-info {
+  background: #f9fafb;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.recovery-details h3,
+.account-info h3 {
+  margin-top: 0;
+  margin-bottom: 16px;
+  color: #111827;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.detail-item,
+.info-item {
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.detail-item:last-child,
+.info-item:last-child {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.detail-item strong,
+.info-item strong {
+  color: #111827;
+  display: block;
+  margin-bottom: 4px;
+  font-size: 13px;
+}
+
+.detail-item span,
+.info-item span {
+  font-family: monospace;
+  font-size: 13px;
+  color: #6b7280;
+  word-break: break-all;
+}
+
+/* Status Box */
+.status-box {
+  padding: 12px;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.status-box.approved {
+  background: #d4edda;
+  color: #155724;
+  border: 1px solid #c3e6cb;
+}
+
+.status-box.pending {
+  background: #fff3cd;
+  color: #856404;
+  border: 1px solid #ffeaa7;
+}
+
+/* Share Section */
+.share-section {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 20px;
+  margin-top: 24px;
+}
+
+.share-section h3 {
+  margin-top: 0;
+  margin-bottom: 16px;
+  color: #111827;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.link-box {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.link-input {
+  flex: 1;
+  padding: 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  font-family: monospace;
+  font-size: 13px;
+  background: white;
+}
+
+/* Description */
+.description {
+  color: #6b7280;
+  font-size: 14px;
+  margin-bottom: 24px;
+  line-height: 1.5;
+}
+
+/* Recovery Initiator/Approver */
+.recovery-initiator,
+.recovery-approver,
+.recovery-success {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 24px;
+}
+
+.recovery-initiator h2,
+.recovery-approver h2,
+.recovery-success h2 {
+  margin-top: 0;
+  margin-bottom: 12px;
+  color: #111827;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+/* Countdown */
+.countdown {
+  font-size: 24px;
+  font-weight: 700;
+  color: #000;
+  text-align: center;
+  padding: 16px;
+  background: #f9fafb;
+  border-radius: 8px;
+  margin: 16px 0;
+  font-family: monospace;
+}
+
