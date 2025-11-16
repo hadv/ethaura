@@ -32,6 +32,22 @@ function PasskeySettings({ accountAddress }) {
     'function disableTwoFactor()',
   ]
 
+  // Helper function to format time remaining
+  const formatTimeRemaining = (remainingSeconds) => {
+    if (remainingSeconds <= 0) return null
+
+    const days = Math.floor(remainingSeconds / 86400)
+    const hours = Math.floor((remainingSeconds % 86400) / 3600)
+    const minutes = Math.floor((remainingSeconds % 3600) / 60)
+
+    let parts = []
+    if (days > 0) parts.push(`${days}d`)
+    if (hours > 0) parts.push(`${hours}h`)
+    if (minutes > 0 || parts.length === 0) parts.push(`${minutes}m`)
+
+    return parts.join(' ')
+  }
+
   // Load account info when address, provider, or network changes
   useEffect(() => {
     // Reset ALL state when network changes to avoid showing stale data
@@ -545,7 +561,7 @@ For now, please use the contract directly on Etherscan or wait for this feature 
                         </button>
                       ) : (
                         <p className="small-text" style={{ marginTop: '8px' }}>
-                          ⏳ Can be executed in: {Math.floor(timeRemaining / 3600)} hours
+                          ⏳ Can be executed in: {formatTimeRemaining(timeRemaining)}
                         </p>
                       )}
                     </div>
