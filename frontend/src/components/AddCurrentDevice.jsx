@@ -17,6 +17,7 @@ function AddCurrentDevice({ accountAddress, onComplete, onCancel }) {
     'function qx() view returns (bytes32)',
     'function qy() view returns (bytes32)',
     'function proposePublicKeyUpdate(bytes32 _qx, bytes32 _qy) returns (bytes32)',
+    'event PublicKeyUpdateProposed(bytes32 indexed actionHash, bytes32 qx, bytes32 qy, uint256 executeAfter)',
   ]
 
   // Auto-detect device type
@@ -164,11 +165,16 @@ function AddCurrentDevice({ accountAddress, onComplete, onCancel }) {
           // Extract actionHash from the PublicKeyUpdateProposed event
           let actionHash = null
           try {
+            console.log('🔍 Parsing receipt logs to find PublicKeyUpdateProposed event...')
+            console.log('📋 Receipt logs count:', receipt.logs.length)
+
             const event = receipt.logs.find(log => {
               try {
                 const parsed = contractWithSigner.interface.parseLog(log)
+                console.log('📝 Parsed log:', parsed?.name)
                 return parsed && parsed.name === 'PublicKeyUpdateProposed'
-              } catch {
+              } catch (parseError) {
+                // Silently skip logs that don't match our ABI
                 return false
               }
             })
@@ -176,15 +182,30 @@ function AddCurrentDevice({ accountAddress, onComplete, onCancel }) {
             if (event) {
               const parsed = contractWithSigner.interface.parseLog(event)
               actionHash = parsed.args.actionHash
+              console.log('✅ Found PublicKeyUpdateProposed event!')
               console.log('📝 Proposal actionHash:', actionHash)
               console.log('📝 Proposal transaction hash:', receipt.hash)
+              console.log('📝 Device ID:', serializedCredential.id)
 
               // Update the device in database with actionHash and transaction hash
+              console.log('💾 Saving proposal hash to database...')
               await updateDeviceProposalHash(signMessage, ownerAddress, accountAddress, serializedCredential.id, actionHash, receipt.hash)
-              console.log('✅ Proposal hash saved to database')
+              console.log('✅ Proposal hash saved to database successfully!')
+            } else {
+              console.error('❌ PublicKeyUpdateProposed event not found in receipt logs!')
+              console.log('📋 All logs:', receipt.logs.map(log => {
+                try {
+                  const parsed = contractWithSigner.interface.parseLog(log)
+                  return parsed?.name || 'unknown'
+                } catch {
+                  return 'unparseable'
+                }
+              }))
             }
           } catch (eventError) {
             console.error('⚠️  Failed to extract or save actionHash:', eventError)
+            console.error('Error stack:', eventError.stack)
+            alert(`Warning: Proposal created but hash not saved: ${eventError.message}`)
             // Continue anyway - the proposal was successful
           }
 

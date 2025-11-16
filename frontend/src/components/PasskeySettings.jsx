@@ -31,6 +31,7 @@ function PasskeySettings({ accountAddress }) {
     'function getActivePendingActions() view returns (bytes32[] actionHashes, bytes32[] qxValues, bytes32[] qyValues, uint256[] executeAfters)',
     'function enableTwoFactor()',
     'function disableTwoFactor()',
+    'event PublicKeyUpdateProposed(bytes32 indexed actionHash, bytes32 qx, bytes32 qy, uint256 executeAfter)',
   ]
 
   // Helper function to format time remaining
