@@ -12,6 +12,7 @@ import TransactionResultScreen from './screens/TransactionResultScreen'
 import ViewAllTokensScreen from './screens/ViewAllTokensScreen'
 import ViewAllTransactionsScreen from './screens/ViewAllTransactionsScreen'
 import { GuardianRecoveryPortal } from './screens/GuardianRecoveryPortal'
+import RegisterDevicePage from './pages/RegisterDevicePage'
 import { retrievePasskeyCredential, storePasskeyCredential } from './lib/passkeyStorage'
 
 // Inner component that uses Web3Auth context
@@ -22,9 +23,18 @@ function AppContent() {
   const isGuardianRecoveryRoute = window.location.pathname === '/guardian-recovery' ||
                                    window.location.search.includes('guardian-recovery')
 
+  // Check if this is the register device route
+  const isRegisterDeviceRoute = window.location.pathname === '/register-device' ||
+                                 window.location.search.includes('session=')
+
   // If guardian recovery route, render portal directly (no Web3Auth needed)
   if (isGuardianRecoveryRoute) {
     return <GuardianRecoveryPortal />
+  }
+
+  // If register device route, render page directly (no Web3Auth needed)
+  if (isRegisterDeviceRoute) {
+    return <RegisterDevicePage />
   }
 
   // Navigation state

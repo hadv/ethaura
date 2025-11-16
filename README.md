@@ -25,6 +25,9 @@
 - 🔒 **Automatic 2FA**: Auto-enable 2FA after account deployment
 - 👤 **User Profile**: Display user info (name, email, profile picture)
 - 📱 **Biometric Auth**: Touch ID/Face ID for transaction signing
+- 📲 **Multi-Device Passkeys**: Register passkeys on multiple devices (desktop, mobile, tablet)
+- 📱 **QR Code Registration**: Add mobile passkeys by scanning QR code
+- 🔄 **Device Management**: View, add, and remove passkeys across devices
 - 🎨 **Modern UI**: React + Vite with clean interface
 
 ### Infrastructure Features

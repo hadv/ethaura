@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react'
-import { parsePublicKey } from '../utils/webauthn'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
 import { useNetwork } from '../contexts/NetworkContext'
 import { ethers } from 'ethers'
 import { NETWORKS } from '../lib/constants'
-import { storePasskeyCredential, retrievePasskeyCredential } from '../lib/passkeyStorage'
+import { retrievePasskeyCredential } from '../lib/passkeyStorage'
+import AddDeviceFlow from './AddDeviceFlow'
 import '../styles/PasskeySettings.css'
 
 function PasskeySettings({ accountAddress }) {
@@ -17,6 +17,7 @@ function PasskeySettings({ accountAddress }) {
   const [pendingActions, setPendingActions] = useState([])
   const [newPasskey, setNewPasskey] = useState(null)
   const [storedCredential, setStoredCredential] = useState(null) // Passkey from server/localStorage
+  const [showAddDevice, setShowAddDevice] = useState(false) // Show device selection flow
 
   // P256Account ABI (minimal for what we need)
   const accountABI = [
@@ -186,144 +187,7 @@ function PasskeySettings({ accountAddress }) {
     }
   }
 
-  const createPasskey = async () => {
-    setLoading(true)
-    setError('')
-    setStatus('Creating passkey...')
 
-    try {
-      // Check if WebAuthn is supported
-      if (!window.PublicKeyCredential) {
-        throw new Error('WebAuthn is not supported in this browser')
-      }
-
-      // Generate a random challenge
-      const challenge = new Uint8Array(32)
-      crypto.getRandomValues(challenge)
-
-      // Create a deterministic user ID based on account address (not owner)
-      // This ensures the passkey is tied to the smart account, not the owner
-      const userId = accountAddress
-        ? new TextEncoder().encode(accountAddress.toLowerCase()).slice(0, 16)
-        : crypto.getRandomValues(new Uint8Array(16))
-
-      console.log('👤 Creating passkey for account:', accountAddress)
-
-      // Create credential options
-      const createCredentialOptions = {
-        publicKey: {
-          challenge: challenge,
-          rp: {
-            name: 'ΞTHΛURΛ P256 Wallet',
-            id: window.location.hostname,
-          },
-          user: {
-            id: userId,
-            name: accountAddress ? `${accountAddress.slice(0, 6)}...${accountAddress.slice(-4)}@ethaura.wallet` : 'user@ethaura.wallet',
-            displayName: accountAddress ? `ΞTHΛURΛ Account (${accountAddress.slice(0, 6)}...${accountAddress.slice(-4)})` : 'ΞTHΛURΛ Account',
-          },
-          pubKeyCredParams: [
-            {
-              type: 'public-key',
-              alg: -7, // ES256 (P-256)
-            },
-          ],
-          authenticatorSelection: {
-            authenticatorAttachment: 'platform',
-            requireResidentKey: true,
-            residentKey: 'required',
-            userVerification: 'required',
-          },
-          timeout: 60000,
-          attestation: 'direct',
-        },
-      }
-
-      // Create the credential
-      const credential = await navigator.credentials.create(createCredentialOptions)
-
-      if (!credential) {
-        throw new Error('Failed to create credential')
-      }
-
-      // Parse the public key from the credential
-      const publicKey = parsePublicKey(credential.response.attestationObject)
-
-      console.log('✅ Passkey created:', {
-        id: credential.id,
-        publicKey: {
-          x: publicKey.x,
-          y: publicKey.y,
-          xLength: publicKey.x?.length,
-          yLength: publicKey.y?.length,
-        },
-      })
-
-      // Store credential info for server storage
-      const credentialInfo = {
-        id: credential.id,
-        rawId: credential.rawId,
-        publicKey: publicKey,
-        response: {
-          attestationObject: credential.response.attestationObject,
-          clientDataJSON: credential.response.clientDataJSON,
-        },
-      }
-
-      // Serialize credential for storage (convert ArrayBuffers to base64)
-      const serializedCredential = {
-        id: credentialInfo.id,
-        rawId: btoa(String.fromCharCode(...new Uint8Array(credentialInfo.rawId))),
-        publicKey: credentialInfo.publicKey,
-        response: {
-          attestationObject: btoa(String.fromCharCode(...new Uint8Array(credentialInfo.response.attestationObject))),
-          clientDataJSON: btoa(String.fromCharCode(...new Uint8Array(credentialInfo.response.clientDataJSON))),
-        },
-      }
-
-      // Save to server (account-specific)
-      try {
-        if (signMessage && ownerAddress && accountAddress) {
-          await storePasskeyCredential(signMessage, ownerAddress, accountAddress, serializedCredential)
-          console.log(`✅ Passkey credential saved to server for account: ${accountAddress}`)
-        }
-      } catch (serverError) {
-        console.error('⚠️  Failed to save to server:', serverError)
-        // Continue anyway - we'll save to localStorage as fallback
-      }
-
-      // Save to localStorage as backup (account-specific key)
-      const storageKey = `ethaura_passkey_credential_${accountAddress.toLowerCase()}`
-      localStorage.setItem(storageKey, JSON.stringify(serializedCredential))
-      console.log(`✅ Passkey credential saved to localStorage for account: ${accountAddress}`)
-
-      setNewPasskey(publicKey)
-
-      // Check if account is deployed before proposing on-chain update
-      const rpcUrl = networkInfo.rpcUrl
-      const provider = new ethers.JsonRpcProvider(rpcUrl)
-      const code = await provider.getCode(accountAddress)
-      const isDeployed = code !== '0x'
-
-      if (isDeployed) {
-        setStatus('Passkey created! Now proposing update to smart contract...')
-        // Propose the update to the smart contract
-        await proposePasskeyUpdate(publicKey)
-      } else {
-        setStatus('✅ Passkey created and saved! It will be used when you deploy this account with your first transaction.')
-        // Reload stored credential to update UI
-        await loadStoredCredential()
-        await loadAccountInfo()
-      }
-
-    } catch (err) {
-      console.error('Error creating passkey:', err)
-      setError(err.message || 'Failed to create passkey')
-      setStatus('')
-    } finally {
-      setLoading(false)
-    }
-  }
 
   const proposePasskeyUpdate = async (publicKey) => {
     if (!web3AuthProvider || !ownerAddress) {
@@ -338,8 +202,7 @@ function PasskeySettings({ accountAddress }) {
       const signer = await ethersProvider.getSigner()
       const contract = new ethers.Contract(accountAddress, accountABI, signer)
 
-      // Format public key for contract
-      // publicKey.x and publicKey.y already have '0x' prefix from parsePublicKey
+      // Format public key for contract (ensure '0x' prefix)
       const qx = publicKey.x.startsWith('0x') ? publicKey.x : '0x' + publicKey.x
       const qy = publicKey.y.startsWith('0x') ? publicKey.y : '0x' + publicKey.y
 
@@ -488,13 +351,26 @@ For now, please use the contract directly on Etherscan or wait for this feature 
                   ? ' The passkey will be used when you deploy this account with your first transaction.'
                   : ' This will require a 48-hour timelock before the passkey becomes active.'}
               </p>
-              <button
-                className="btn btn-primary"
-                onClick={createPasskey}
-                disabled={loading || !ownerAddress}
-              >
-                {loading ? 'Creating...' : 'Create & Propose Passkey'}
-              </button>
+              {showAddDevice ? (
+                <AddDeviceFlow
+                  accountAddress={accountAddress}
+                  onComplete={() => {
+                    setShowAddDevice(false)
+                    setStatus('✅ Passkey added successfully!')
+                    // Reload to reflect the new passkey
+                    setTimeout(() => window.location.reload(), 1500)
+                  }}
+                  onCancel={() => setShowAddDevice(false)}
+                />
+              ) : (
+                <button
+                  className="btn btn-primary"
+                  onClick={() => setShowAddDevice(true)}
+                  disabled={loading || !ownerAddress}
+                >
+                  Add Passkey
+                </button>
+              )}
             </div>
           ) : (
             <>
@@ -543,7 +419,7 @@ For now, please use the contract directly on Etherscan or wait for this feature 
               <div className="settings-section" style={{ marginTop: '24px' }}>
                 <h3>Update Passkey</h3>
                 <p className="section-description">
-                  Replace your current passkey with a new one on this device. This is useful if:
+                  Replace your current passkey with a new one. This is useful if:
                 </p>
                 <ul className="section-description" style={{ marginLeft: '20px', marginTop: '8px', marginBottom: '12px' }}>
                   <li>You're using a new device and need to register a passkey here</li>
@@ -554,14 +430,29 @@ For now, please use the contract directly on Etherscan or wait for this feature 
                   ⏱️ <strong>Note:</strong> The update requires a 48-hour timelock before the new passkey becomes active.
                   Your old passkey will continue to work until the new one is activated.
                 </p>
-                <button
-                  className="btn btn-secondary"
-                  onClick={createPasskey}
-                  disabled={loading || !ownerAddress}
-                >
-                  {loading ? 'Creating...' : '🔑 Create & Propose New Passkey'}
-                </button>
+                {showAddDevice ? (
+                  <AddDeviceFlow
+                    accountAddress={accountAddress}
+                    onComplete={() => {
+                      setShowAddDevice(false)
+                      setStatus('✅ New passkey proposed! Wait 48 hours then execute the update.')
+                      // Reload to reflect the new pending device
+                      setTimeout(() => window.location.reload(), 1500)
+                    }}
+                    onCancel={() => setShowAddDevice(false)}
+                  />
+                ) : (
+                  <button
+                    className="btn btn-secondary"
+                    onClick={() => setShowAddDevice(true)}
+                    disabled={loading || !ownerAddress}
+                  >
+                    🔑 Add New Device
+                  </button>
+                )}
               </div>
+
+
             </>
           )}
 

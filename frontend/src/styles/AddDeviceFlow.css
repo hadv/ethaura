@@ -1,0 +1,113 @@
+.add-device-flow {
+  padding: 24px;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.flow-header {
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.flow-header h2 {
+  margin: 0 0 8px 0;
+  font-size: 1.8rem;
+  color: #333;
+}
+
+.flow-header p {
+  margin: 0;
+  font-size: 1.1rem;
+  color: #666;
+}
+
+.option-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 24px;
+  margin-bottom: 24px;
+}
+
+.option-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 32px 24px;
+  background: white;
+  border: 2px solid #e0e0e0;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: center;
+}
+
+.option-card:hover {
+  border-color: #007bff;
+  box-shadow: 0 4px 12px rgba(0, 123, 255, 0.15);
+  transform: translateY(-2px);
+}
+
+.option-card:active {
+  transform: translateY(0);
+}
+
+.option-icon {
+  font-size: 3.5rem;
+  margin-bottom: 16px;
+  line-height: 1;
+}
+
+.option-card h3 {
+  margin: 0 0 8px 0;
+  font-size: 1.3rem;
+  color: #333;
+}
+
+.option-card > p {
+  margin: 0 0 16px 0;
+  font-size: 0.95rem;
+  color: #666;
+}
+
+.option-benefits {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  text-align: left;
+  width: 100%;
+}
+
+.option-benefits li {
+  padding: 6px 0;
+  font-size: 0.9rem;
+  color: #495057;
+  position: relative;
+  padding-left: 24px;
+}
+
+.option-benefits li::before {
+  content: '✓';
+  position: absolute;
+  left: 0;
+  color: #28a745;
+  font-weight: bold;
+}
+
+.flow-actions {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .option-cards {
+    grid-template-columns: 1fr;
+  }
+
+  .option-icon {
+    font-size: 3rem;
+  }
+}
+

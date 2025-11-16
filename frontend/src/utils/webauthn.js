@@ -96,66 +96,81 @@ export function parsePublicKey(attestationObject) {
 
 /**
  * Sign a message with passkey
- * @param {Object} credential - The credential info from passkey creation
+ * @param {Object|null} credential - The credential info from passkey creation (optional - if null, browser shows picker)
  * @param {Uint8Array} message - The message to sign (32 bytes)
- * @returns {Promise<Object>} Signature data including authenticatorData, clientDataJSON, and signature
+ * @param {boolean} useNativePicker - If true, don't specify allowCredentials to let browser show native picker
+ * @returns {Promise<Object>} Signature data including authenticatorData, clientDataJSON, signature, and credentialId
  */
-export async function signWithPasskey(credential, message) {
-  // Get the credential ID (support both old and new format)
-  const credentialId = credential.rawId || credential.credentialId
-
-  // Convert to Uint8Array if needed
-  let credentialIdBytes
-  if (credentialId instanceof ArrayBuffer) {
-    credentialIdBytes = new Uint8Array(credentialId)
-  } else if (Array.isArray(credentialId)) {
-    credentialIdBytes = new Uint8Array(credentialId)
-  } else if (typeof credentialId === 'string') {
-    // Handle base64-encoded string (from server/localStorage)
-    try {
-      const binaryString = atob(credentialId)
-      credentialIdBytes = new Uint8Array(binaryString.length)
-      for (let i = 0; i < binaryString.length; i++) {
-        credentialIdBytes[i] = binaryString.charCodeAt(i)
-      }
-    } catch (error) {
-      console.error('❌ Failed to decode base64 credential ID:', error)
-      throw new Error('Invalid credential ID format')
-    }
-  } else {
-    credentialIdBytes = credentialId
-  }
-
-  console.log('🔑 Signing with credential ID:', {
-    credentialIdHex: Array.from(credentialIdBytes).map(b => b.toString(16).padStart(2, '0')).join(''),
-    credentialIdLength: credentialIdBytes.length,
-  })
-
+export async function signWithPasskey(credential, message, useNativePicker = false) {
   // Create assertion options
   const getCredentialOptions = {
     publicKey: {
       challenge: message,
       rpId: window.location.hostname,
-      allowCredentials: [{
-        type: 'public-key',
-        id: credentialIdBytes,
-      }],
-      userVerification: 'preferred',
+      userVerification: 'required', // Changed from 'preferred' to 'required' for better security
       timeout: 60000,
     },
+  }
+
+  // If useNativePicker is true OR credential is null, don't specify allowCredentials
+  // This lets the browser show the native passkey picker for all available passkeys
+  if (!useNativePicker && credential) {
+    // Legacy mode: use specific credential ID
+    const credentialId = credential.rawId || credential.credentialId
+
+    // Convert to Uint8Array if needed
+    let credentialIdBytes
+    if (credentialId instanceof ArrayBuffer) {
+      credentialIdBytes = new Uint8Array(credentialId)
+    } else if (Array.isArray(credentialId)) {
+      credentialIdBytes = new Uint8Array(credentialId)
+    } else if (typeof credentialId === 'string') {
+      // Handle base64-encoded string (from server/localStorage)
+      try {
+        const binaryString = atob(credentialId)
+        credentialIdBytes = new Uint8Array(binaryString.length)
+        for (let i = 0; i < binaryString.length; i++) {
+          credentialIdBytes[i] = binaryString.charCodeAt(i)
+        }
+      } catch (error) {
+        console.error('❌ Failed to decode base64 credential ID:', error)
+        throw new Error('Invalid credential ID format')
+      }
+    } else {
+      credentialIdBytes = credentialId
+    }
+
+    console.log('🔑 Signing with specific credential ID:', {
+      credentialIdHex: Array.from(credentialIdBytes).map(b => b.toString(16).padStart(2, '0')).join(''),
+      credentialIdLength: credentialIdBytes.length,
+    })
+
+    getCredentialOptions.publicKey.allowCredentials = [{
+      type: 'public-key',
+      id: credentialIdBytes,
+    }]
+  } else {
+    console.log('🔑 Using browser native passkey picker (no allowCredentials specified)')
   }
 
   // Get assertion (sign)
   const assertion = await navigator.credentials.get(getCredentialOptions)
 
   if (!assertion) {
-    throw new Error('Failed to get assertion')
+    throw new Error('Failed to get assertion - user may have cancelled')
   }
+
+  console.log('✅ Passkey signature obtained:', {
+    credentialId: assertion.id,
+    credentialIdLength: assertion.id.length,
+  })
 
   return {
     authenticatorData: new Uint8Array(assertion.response.authenticatorData),
     clientDataJSON: new TextDecoder().decode(assertion.response.clientDataJSON),
     signature: new Uint8Array(assertion.response.signature),
+    credentialId: assertion.id, // Return the credential ID that was used
+    rawId: assertion.rawId, // Return the raw ID as well
   }
 }
 

@@ -1,8 +1,6 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { NodeGlobalsPolyfillPlugin } from '@esbuild-plugins/node-globals-polyfill'
-import { NodeModulesPolyfillPlugin } from '@esbuild-plugins/node-modules-polyfill'
-import rollupNodePolyFill from 'rollup-plugin-node-polyfills'
 import path from 'path'
 
 // Plugin to set COOP headers for Web3Auth popup support
@@ -22,6 +20,7 @@ export default defineConfig({
   plugins: [react(), coopPlugin()],
   server: {
     port: 3000,
+    host: '0.0.0.0', // Listen on all network interfaces for mobile testing
     open: true,
     fs: { allow: ['..'] }, // allow importing Foundry artifacts from repo root (../out)
   },
@@ -48,17 +47,10 @@ export default defineConfig({
           buffer: true,
           process: true,
         }),
-        // DO NOT use NodeModulesPolyfillPlugin - it polyfills 'events' which breaks WalletConnect
-        // See: https://github.com/WalletConnect/walletconnect-monorepo/issues/4064
-        // NodeModulesPolyfillPlugin(),
       ],
     },
   },
   build: {
-    rollupOptions: {
-      // DO NOT use rollupNodePolyFill - it polyfills 'events' which breaks WalletConnect
-      // plugins: [rollupNodePolyFill()],
-    },
+    rollupOptions: {},
   },
-})
-
+});

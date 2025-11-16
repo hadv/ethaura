@@ -14,6 +14,18 @@ import {
   getCredential,
   deleteCredential,
   getAllCredentials,
+  // Multi-device functions
+  addDevice,
+  getDevices,
+  getDeviceByCredentialId,
+  updateDeviceLastUsed,
+  removeDevice,
+  activateDevice,
+  // Session management
+  createSession,
+  getSession,
+  completeSession,
+  cleanupExpiredSessions,
   // Admin/maintenance
   createBackup,
   getDatabaseStats,
@@ -28,10 +40,39 @@ const PORT = process.env.PORT || 3001
 
 // Middleware
 app.use(helmet())
-app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+
+// CORS configuration - allow local network access for mobile testing
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps, Postman, curl)
+    if (!origin) return callback(null, true)
+
+    // Allow localhost and local network IPs
+    const allowedOrigins = [
+      'http://localhost:5173',
+      'http://localhost:3000',
+      'http://127.0.0.1:5173',
+      'http://127.0.0.1:3000',
+    ]
+
+    // Allow any origin from local network (192.168.x.x, 10.x.x.x, 172.16-31.x.x)
+    const localNetworkRegex = /^http:\/\/(192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2[0-9]|3[0-1])\.\d{1,3}\.\d{1,3})(:\d+)?$/
+
+    // Check if origin is in allowed list or matches local network pattern
+    if (allowedOrigins.includes(origin) || localNetworkRegex.test(origin)) {
+      callback(null, true)
+    } else if (process.env.FRONTEND_URL && origin === process.env.FRONTEND_URL) {
+      // Allow configured frontend URL (for production)
+      callback(null, true)
+    } else {
+      console.warn('⚠️ CORS blocked origin:', origin)
+      callback(new Error('Not allowed by CORS'))
+    }
+  },
   credentials: true,
-}))
+}
+
+app.use(cors(corsOptions))
 app.use(express.json({ limit: '1mb' }))
 
 // Rate limiting
@@ -247,6 +288,311 @@ app.delete('/api/passkeys', verifySignature, async (req, res) => {
   }
 })
 
+/*******************************************************************************
+ * MULTI-DEVICE API ENDPOINTS
+ ******************************************************************************/
+
+/**
+ * POST /api/devices
+ * Add a new device for an account
+ */
+app.post('/api/devices', verifySignature, async (req, res) => {
+  try {
+    const { deviceName, deviceType, credential } = req.body
+    const accountAddress = req.verifiedUserId
+
+    if (!deviceName || !deviceType || !credential) {
+      return res.status(400).json({
+        error: 'Missing required fields: deviceName, deviceType, credential',
+      })
+    }
+
+    // Validate credential structure
+    if (!credential.id || !credential.rawId || !credential.publicKey) {
+      return res.status(400).json({
+        error: 'Invalid credential structure',
+      })
+    }
+
+    // Generate device ID from credential ID
+    const deviceId = credential.id
+
+    console.log(`📱 Adding device: ${deviceName} (${deviceType}) for account ${accountAddress}`)
+
+    const result = await addDevice(accountAddress, {
+      deviceId,
+      deviceName,
+      deviceType,
+      credential,
+    })
+
+    res.json({
+      success: true,
+      message: 'Device added successfully',
+      ...result,
+    })
+  } catch (error) {
+    console.error('Error adding device:', error)
+    res.status(500).json({
+      error: 'Failed to add device',
+      details: error.message,
+    })
+  }
+})
+
+/**
+ * GET /api/devices/:accountAddress
+ * Get all devices for an account
+ */
+app.get('/api/devices/:accountAddress', async (req, res) => {
+  try {
+    const { accountAddress } = req.params
+    const { signature, message, timestamp, ownerAddress } = req.query
+
+    // Verify signature
+    if (!signature || !message || !timestamp || !ownerAddress) {
+      return res.status(400).json({
+        error: 'Missing authentication parameters',
+      })
+    }
+
+    // Check timestamp
+    const now = Date.now()
+    const timeDiff = Math.abs(now - parseInt(timestamp))
+    if (timeDiff > 5 * 60 * 1000) {
+      return res.status(401).json({
+        error: 'Authentication expired',
+      })
+    }
+
+    // Verify signature
+    const recoveredAddress = ethers.verifyMessage(message, signature)
+    if (recoveredAddress.toLowerCase() !== ownerAddress.toLowerCase()) {
+      return res.status(401).json({
+        error: 'Invalid signature',
+      })
+    }
+
+    console.log(`📱 Retrieving devices for account: ${accountAddress}`)
+
+    const devices = await getDevices(accountAddress)
+
+    res.json({
+      success: true,
+      devices,
+    })
+  } catch (error) {
+    console.error('Error retrieving devices:', error)
+    res.status(500).json({
+      error: 'Failed to retrieve devices',
+      details: error.message,
+    })
+  }
+})
+
+/**
+ * DELETE /api/devices/:accountAddress/:deviceId
+ * Remove a device
+ */
+app.delete('/api/devices/:accountAddress/:deviceId', verifySignature, async (req, res) => {
+  try {
+    const { accountAddress, deviceId } = req.params
+
+    // Verify the request is for the correct account
+    if (accountAddress.toLowerCase() !== req.verifiedUserId.toLowerCase()) {
+      return res.status(403).json({
+        error: 'Unauthorized: Account address mismatch',
+      })
+    }
+
+    console.log(`🗑️  Removing device: ${deviceId} from account ${accountAddress}`)
+
+    const deleted = await removeDevice(accountAddress, deviceId)
+
+    if (!deleted) {
+      return res.status(404).json({
+        error: 'Device not found',
+      })
+    }
+
+    res.json({
+      success: true,
+      message: 'Device removed successfully',
+    })
+  } catch (error) {
+    console.error('Error removing device:', error)
+    res.status(500).json({
+      error: 'Failed to remove device',
+      details: error.message,
+    })
+  }
+})
+
+/**
+ * POST /api/devices/:accountAddress/activate
+ * Activate a pending device after on-chain passkey update is executed
+ */
+app.post('/api/devices/:accountAddress/activate', verifySignature, async (req, res) => {
+  try {
+    const { accountAddress } = req.params
+    const { publicKeyX } = req.body
+
+    // Verify the request is for the correct account
+    if (accountAddress.toLowerCase() !== req.verifiedUserId.toLowerCase()) {
+      return res.status(403).json({
+        error: 'Unauthorized: Account address mismatch',
+      })
+    }
+
+    if (!publicKeyX) {
+      return res.status(400).json({
+        error: 'Missing required field: publicKeyX',
+      })
+    }
+
+    console.log(`✅ Activating device for account ${accountAddress} with public key ${publicKeyX.slice(0, 10)}...`)
+
+    const result = await activateDevice(accountAddress, publicKeyX)
+
+    res.json({
+      success: true,
+      message: 'Device activated successfully',
+      ...result,
+    })
+  } catch (error) {
+    console.error('Error activating device:', error)
+    res.status(500).json({
+      error: 'Failed to activate device',
+      details: error.message,
+    })
+  }
+})
+
+/*******************************************************************************
+ * DEVICE SESSION API (for cross-device registration via QR code)
+ ******************************************************************************/
+
+/**
+ * POST /api/sessions/create
+ * Create a new device registration session
+ */
+app.post('/api/sessions/create', verifySignature, async (req, res) => {
+  try {
+    const accountAddress = req.verifiedUserId
+    const ownerAddress = req.verifiedOwner
+    const { signature } = req.body
+
+    // Generate session ID
+    const sessionId = ethers.hexlify(ethers.randomBytes(32))
+
+    console.log(`🔐 Creating session: ${sessionId} for account ${accountAddress}`)
+
+    const session = await createSession({
+      sessionId,
+      accountAddress,
+      ownerAddress,
+      signature,
+    })
+
+    res.json({
+      success: true,
+      sessionId: session.sessionId,
+      expiresAt: session.expiresAt,
+    })
+  } catch (error) {
+    console.error('Error creating session:', error)
+    res.status(500).json({
+      error: 'Failed to create session',
+      details: error.message,
+    })
+  }
+})
+
+/**
+ * GET /api/sessions/:sessionId
+ * Get session status
+ */
+app.get('/api/sessions/:sessionId', async (req, res) => {
+  try {
+    const { sessionId } = req.params
+
+    console.log(`🔍 Retrieving session: ${sessionId}`)
+
+    const session = await getSession(sessionId)
+
+    if (!session) {
+      return res.status(404).json({
+        error: 'Session not found',
+      })
+    }
+
+    res.json({
+      success: true,
+      session,
+    })
+  } catch (error) {
+    console.error('Error retrieving session:', error)
+    res.status(500).json({
+      error: 'Failed to retrieve session',
+      details: error.message,
+    })
+  }
+})
+
+/**
+ * POST /api/sessions/:sessionId/complete
+ * Complete a session with device data (called from mobile)
+ */
+app.post('/api/sessions/:sessionId/complete', async (req, res) => {
+  try {
+    const { sessionId } = req.params
+    const { credential, deviceName, deviceType } = req.body
+
+    if (!credential || !deviceName || !deviceType) {
+      return res.status(400).json({
+        error: 'Missing required fields: credential, deviceName, deviceType',
+      })
+    }
+
+    // Validate credential
+    if (!credential.publicKey || !credential.publicKey.x || !credential.publicKey.y) {
+      return res.status(400).json({
+        error: 'Invalid credential: missing public key',
+      })
+    }
+
+    console.log(`✅ Completing session: ${sessionId}`)
+
+    const deviceData = {
+      qx: credential.publicKey.x,
+      qy: credential.publicKey.y,
+      deviceName,
+      deviceType,
+      credentialId: credential.id,
+      rawId: credential.rawId,
+    }
+
+    const completed = await completeSession(sessionId, deviceData)
+
+    if (!completed) {
+      return res.status(400).json({
+        error: 'Failed to complete session. Session may be expired or already completed.',
+      })
+    }
+
+    res.json({
+      success: true,
+      message: 'Session completed successfully',
+    })
+  } catch (error) {
+    console.error('Error completing session:', error)
+    res.status(500).json({
+      error: 'Failed to complete session',
+      details: error.message,
+    })
+  }
+})
+
 /**
  * GET /api/admin/credentials
  * Get all credentials (for debugging - should be protected in production)
@@ -337,6 +683,15 @@ app.listen(PORT, () => {
 
   // Start automatic backup scheduler
   startBackupScheduler()
+
+  // Clean up expired sessions every hour
+  setInterval(async () => {
+    try {
+      await cleanupExpiredSessions()
+    } catch (error) {
+      console.error('❌ Session cleanup failed:', error)
+    }
+  }, 60 * 60 * 1000) // 1 hour
 })
 
 // Note: Graceful shutdown is handled in database.js
