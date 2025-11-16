@@ -15,6 +15,7 @@ function DeviceManagement({ accountAddress, onAddDevice }) {
   const [removing, setRemoving] = useState(null)
   const [executing, setExecuting] = useState(null)
   const [cancelling, setCancelling] = useState(null)
+  const [proposalDetails, setProposalDetails] = useState({})
 
   // P256Account ABI (minimal for what we need)
   const accountABI = [
@@ -27,6 +28,16 @@ function DeviceManagement({ accountAddress, onAddDevice }) {
     loadDevices()
   }, [accountAddress, ownerAddress])
 
+  // Update timelock display every minute
+  useEffect(() => {
+    const interval = setInterval(() => {
+      // Force re-render to update timelock display
+      setProposalDetails(prev => ({ ...prev }))
+    }, 60000) // Update every minute
+
+    return () => clearInterval(interval)
+  }, [])
+
   const loadDevices = async () => {
     if (!accountAddress || !ownerAddress || !signMessage) {
       setLoading(false)
@@ -38,12 +49,43 @@ function DeviceManagement({ accountAddress, onAddDevice }) {
       setError('')
       const deviceList = await getDevices(signMessage, ownerAddress, accountAddress)
       setDevices(deviceList)
+
+      // Fetch proposal details for pending devices
+      await loadProposalDetails(deviceList)
     } catch (err) {
       console.error('Failed to load devices:', err)
       setError(err.message || 'Failed to load devices')
       setDevices([])
     } finally {
       setLoading(false)
+    }
+  }
+
+  const loadProposalDetails = async (deviceList) => {
+    if (!web3AuthProvider || !accountAddress) return
+
+    try {
+      const ethersProvider = new ethers.BrowserProvider(web3AuthProvider)
+      const contract = new ethers.Contract(accountAddress, accountABI, ethersProvider)
+
+      const details = {}
+      for (const device of deviceList) {
+        if (device.proposalHash) {
+          try {
+            const proposal = await contract.pendingPublicKeyUpdates(device.proposalHash)
+            details[device.proposalHash] = {
+              executeAfter: Number(proposal.executeAfter),
+              executed: proposal.executed,
+              cancelled: proposal.cancelled,
+            }
+          } catch (err) {
+            console.error(`Failed to fetch proposal details for ${device.proposalHash}:`, err)
+          }
+        }
+      }
+      setProposalDetails(details)
+    } catch (err) {
+      console.error('Failed to load proposal details:', err)
     }
   }
 
@@ -148,6 +190,33 @@ function DeviceManagement({ accountAddress, onAddDevice }) {
     })
   }
 
+  const formatTimeRemaining = (executeAfterTimestamp) => {
+    if (!executeAfterTimestamp) return null
+
+    const now = Math.floor(Date.now() / 1000) // Current time in seconds
+    const executeAfter = executeAfterTimestamp // Already in seconds
+    const remainingSeconds = executeAfter - now
+
+    if (remainingSeconds <= 0) {
+      return { text: 'Ready to execute', canExecute: true, className: 'ready' }
+    }
+
+    const days = Math.floor(remainingSeconds / 86400)
+    const hours = Math.floor((remainingSeconds % 86400) / 3600)
+    const minutes = Math.floor((remainingSeconds % 3600) / 60)
+
+    let parts = []
+    if (days > 0) parts.push(`${days}d`)
+    if (hours > 0) parts.push(`${hours}h`)
+    if (minutes > 0 || parts.length === 0) parts.push(`${minutes}m`)
+
+    return {
+      text: parts.join(' '),
+      canExecute: false,
+      className: 'waiting',
+    }
+  }
+
   const getDeviceIcon = (deviceType) => {
     switch (deviceType) {
       case 'mobile':
@@ -223,44 +292,73 @@ function DeviceManagement({ accountAddress, onAddDevice }) {
                   </code>
                 </div>
                 {device.proposalHash && (
-                  <div className="device-proposal-info">
-                    <span className="label">Proposal Hash:</span>
-                    <code className="key-preview">
-                      {device.proposalHash.slice(0, 10)}...{device.proposalHash.slice(-8)}
-                    </code>
-                    {device.proposalTxHash && (
-                      <a
-                        href={`${NETWORKS[networkInfo.name]?.blockExplorer}/tx/${device.proposalTxHash}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="explorer-link"
-                        title="View proposal transaction on explorer"
-                      >
-                        🔗
-                      </a>
+                  <>
+                    <div className="device-proposal-info">
+                      <span className="label">Proposal Hash:</span>
+                      <code className="key-preview">
+                        {device.proposalHash.slice(0, 10)}...{device.proposalHash.slice(-8)}
+                      </code>
+                      {device.proposalTxHash && (
+                        <a
+                          href={`${NETWORKS[networkInfo.name]?.blockExplorer}/tx/${device.proposalTxHash}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="explorer-link"
+                          title="View proposal transaction on explorer"
+                        >
+                          🔗
+                        </a>
+                      )}
+                    </div>
+                    {proposalDetails[device.proposalHash] && (
+                      <div className="device-timelock-info">
+                        {(() => {
+                          const timeInfo = formatTimeRemaining(proposalDetails[device.proposalHash].executeAfter)
+                          return timeInfo ? (
+                            <div className={`timelock-status ${timeInfo.className}`}>
+                              {timeInfo.canExecute ? (
+                                <span className="timelock-ready">✅ {timeInfo.text}</span>
+                              ) : (
+                                <span className="timelock-waiting">⏳ Can be executed in: {timeInfo.text}</span>
+                              )}
+                            </div>
+                          ) : null
+                        })()}
+                      </div>
                     )}
-                  </div>
+                  </>
                 )}
               </div>
               <div className="device-actions">
                 {device.proposalHash ? (
                   <div className="proposal-actions">
-                    <button
-                      className="btn btn-success btn-sm"
-                      onClick={() => handleExecuteProposal(device.proposalHash, device.deviceName)}
-                      disabled={executing === device.proposalHash}
-                      title="Execute this proposal (after 48h timelock)"
-                    >
-                      {executing === device.proposalHash ? 'Executing...' : 'Execute'}
-                    </button>
-                    <button
-                      className="btn btn-danger btn-sm"
-                      onClick={() => handleCancelProposal(device.proposalHash, device.deviceName)}
-                      disabled={cancelling === device.proposalHash}
-                      title="Cancel this proposal"
-                    >
-                      {cancelling === device.proposalHash ? 'Cancelling...' : 'Cancel'}
-                    </button>
+                    {(() => {
+                      const timeInfo = proposalDetails[device.proposalHash]
+                        ? formatTimeRemaining(proposalDetails[device.proposalHash].executeAfter)
+                        : null
+                      const canExecute = timeInfo?.canExecute ?? false
+
+                      return (
+                        <>
+                          <button
+                            className="btn btn-success btn-sm"
+                            onClick={() => handleExecuteProposal(device.proposalHash, device.deviceName)}
+                            disabled={executing === device.proposalHash || !canExecute}
+                            title={canExecute ? 'Execute this proposal' : 'Timelock not expired yet'}
+                          >
+                            {executing === device.proposalHash ? 'Executing...' : 'Execute'}
+                          </button>
+                          <button
+                            className="btn btn-danger btn-sm"
+                            onClick={() => handleCancelProposal(device.proposalHash, device.deviceName)}
+                            disabled={cancelling === device.proposalHash}
+                            title="Cancel this proposal"
+                          >
+                            {cancelling === device.proposalHash ? 'Cancelling...' : 'Cancel'}
+                          </button>
+                        </>
+                      )
+                    })()}
                   </div>
                 ) : (
                   <button

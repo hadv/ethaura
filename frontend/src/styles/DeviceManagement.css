@@ -180,6 +180,37 @@
   transform: scale(1.2);
 }
 
+.device-timelock-info {
+  margin-top: 8px;
+  font-size: 0.9rem;
+}
+
+.timelock-status {
+  padding: 6px 12px;
+  border-radius: 6px;
+  display: inline-block;
+}
+
+.timelock-status.ready {
+  background: #d4edda;
+  border: 1px solid #c3e6cb;
+}
+
+.timelock-status.waiting {
+  background: #fff3cd;
+  border: 1px solid #ffeaa7;
+}
+
+.timelock-ready {
+  color: #155724;
+  font-weight: 500;
+}
+
+.timelock-waiting {
+  color: #856404;
+  font-weight: 500;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .device-card {
