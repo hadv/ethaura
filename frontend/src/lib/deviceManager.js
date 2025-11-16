@@ -161,6 +161,51 @@ export async function removeDevice(signMessageFn, ownerAddress, accountAddress, 
   }
 }
 
+/**
+ * Update proposal hash for a device
+ * Call this after proposing a passkey update on-chain to link the device to the proposal
+ * @param {Function} signMessageFn - Sign message function
+ * @param {string} ownerAddress - Owner address
+ * @param {string} accountAddress - Smart account address
+ * @param {string} deviceId - Device ID (credential.id)
+ * @param {string} proposalHash - The actionHash from proposePublicKeyUpdate
+ * @returns {Promise<Object>} Response from server
+ */
+export async function updateDeviceProposalHash(signMessageFn, ownerAddress, accountAddress, deviceId, proposalHash) {
+  try {
+    console.log('📝 Updating proposal hash for device:', deviceId, proposalHash.slice(0, 10) + '...')
+
+    const auth = await createAuthSignature(signMessageFn, ownerAddress, accountAddress, 'Update Proposal Hash')
+
+    const response = await fetch(`${BACKEND_URL}/api/devices/${accountAddress}/${deviceId}/proposal-hash`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        userId: accountAddress,
+        ownerAddress,
+        signature: auth.signature,
+        message: auth.message,
+        timestamp: auth.timestamp,
+        proposalHash,
+      }),
+    })
+
+    if (!response.ok) {
+      const error = await response.json()
+      throw new Error(error.error || 'Failed to update proposal hash')
+    }
+
+    const result = await response.json()
+    console.log('✅ Proposal hash updated successfully')
+    return result
+  } catch (error) {
+    console.error('❌ Error updating proposal hash:', error)
+    throw error
+  }
+}
+
 /*******************************************************************************
  * DEVICE SESSION MANAGEMENT (for cross-device registration via QR code)
  ******************************************************************************/

@@ -153,6 +153,7 @@ await runAsync(`
     attestation_object TEXT,
     client_data_json TEXT,
     is_active BOOLEAN NOT NULL DEFAULT 1,
+    proposal_hash TEXT,
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL,
     last_used_at INTEGER,
@@ -164,6 +165,7 @@ await runAsync(`CREATE INDEX IF NOT EXISTS idx_account_address ON passkey_device
 await runAsync(`CREATE INDEX IF NOT EXISTS idx_device_id ON passkey_devices(device_id)`)
 await runAsync(`CREATE INDEX IF NOT EXISTS idx_credential_id_devices ON passkey_devices(credential_id)`)
 await runAsync(`CREATE INDEX IF NOT EXISTS idx_active_devices ON passkey_devices(account_address, is_active)`)
+await runAsync(`CREATE INDEX IF NOT EXISTS idx_proposal_hash ON passkey_devices(proposal_hash)`)
 
 // Session table for cross-device registration
 await runAsync(`
@@ -328,9 +330,10 @@ export async function getAllCredentials() {
  * @param {string} accountAddress - Smart account address
  * @param {Object} deviceInfo - Device information
  * @param {boolean} isActive - Whether this device is immediately active (default: true for first device)
+ * @param {string} proposalHash - Optional proposal hash from on-chain proposal
  * @returns {Object} Stored device info
  */
-export async function addDevice(accountAddress, deviceInfo, isActive = true) {
+export async function addDevice(accountAddress, deviceInfo, isActive = true, proposalHash = null) {
   const now = Date.now()
   const {
     deviceId,
@@ -359,8 +362,8 @@ export async function addDevice(accountAddress, deviceInfo, isActive = true) {
       account_address, device_id, device_name, device_type,
       credential_id, raw_id, public_key_x, public_key_y,
       attestation_object, client_data_json,
-      is_active, created_at, updated_at, last_used_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      is_active, proposal_hash, created_at, updated_at, last_used_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `, [
     accountAddress.toLowerCase(),
     deviceId,
@@ -373,12 +376,13 @@ export async function addDevice(accountAddress, deviceInfo, isActive = true) {
     credential.response?.attestationObject || null,
     credential.response?.clientDataJSON || null,
     deviceIsActive,
+    proposalHash,
     now,
     now,
     now,
   ])
 
-  console.log(`✅ Device added: ${deviceName} (${deviceType}) for account ${accountAddress}`)
+  console.log(`✅ Device added: ${deviceName} (${deviceType}) for account ${accountAddress}${proposalHash ? ` with proposal ${proposalHash.slice(0, 10)}...` : ''}`)
 
   return {
     success: true,
@@ -386,7 +390,35 @@ export async function addDevice(accountAddress, deviceInfo, isActive = true) {
     deviceId,
     deviceName,
     deviceType,
+    proposalHash,
   }
+}
+
+/**
+ * Update proposal hash for a device
+ * Call this after proposing a passkey update on-chain to link the device to the proposal
+ *
+ * @param {string} accountAddress - Smart account address
+ * @param {string} deviceId - Device ID (credential.id)
+ * @param {string} proposalHash - The actionHash from proposePublicKeyUpdate
+ * @returns {Object} Result
+ */
+export async function updateDeviceProposalHash(accountAddress, deviceId, proposalHash) {
+  const now = Date.now()
+
+  const result = await runAsync(`
+    UPDATE passkey_devices
+    SET proposal_hash = ?, updated_at = ?
+    WHERE account_address = ? AND device_id = ?
+  `, [proposalHash, now, accountAddress.toLowerCase(), deviceId])
+
+  if (result.changes === 0) {
+    throw new Error('Device not found')
+  }
+
+  console.log(`✅ Proposal hash updated for device ${deviceId}: ${proposalHash.slice(0, 10)}...`)
+
+  return { success: true, proposalHash }
 }
 
 /**

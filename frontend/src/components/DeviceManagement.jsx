@@ -1,14 +1,27 @@
 import { useState, useEffect } from 'react'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
+import { useNetwork } from '../contexts/NetworkContext'
+import { ethers } from 'ethers'
 import { getDevices, removeDevice } from '../lib/deviceManager'
+import { NETWORKS } from '../lib/constants'
 import '../styles/DeviceManagement.css'
 
 function DeviceManagement({ accountAddress, onAddDevice }) {
-  const { address: ownerAddress, signMessage } = useWeb3Auth()
+  const { address: ownerAddress, signMessage, provider: web3AuthProvider } = useWeb3Auth()
+  const { networkInfo } = useNetwork()
   const [devices, setDevices] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [removing, setRemoving] = useState(null)
+  const [executing, setExecuting] = useState(null)
+  const [cancelling, setCancelling] = useState(null)
+
+  // P256Account ABI (minimal for what we need)
+  const accountABI = [
+    'function executePublicKeyUpdate(bytes32 actionHash)',
+    'function cancelPendingAction(bytes32 actionHash)',
+    'function pendingPublicKeyUpdates(bytes32) view returns (bytes32 qx, bytes32 qy, uint256 executeAfter, bool executed, bool cancelled)',
+  ]
 
   useEffect(() => {
     loadDevices()
@@ -49,6 +62,78 @@ function DeviceManagement({ accountAddress, onAddDevice }) {
       setError(err.message || 'Failed to remove device')
     } finally {
       setRemoving(null)
+    }
+  }
+
+  const handleExecuteProposal = async (proposalHash, deviceName) => {
+    if (!web3AuthProvider || !ownerAddress) {
+      setError('Please connect your wallet')
+      return
+    }
+
+    if (!confirm(`Execute passkey update for "${deviceName}"? This will activate this device.`)) {
+      return
+    }
+
+    try {
+      setExecuting(proposalHash)
+      setError('')
+
+      const ethersProvider = new ethers.BrowserProvider(web3AuthProvider)
+      const signer = await ethersProvider.getSigner()
+      const contract = new ethers.Contract(accountAddress, accountABI, signer)
+
+      console.log('⚡ Executing proposal:', proposalHash)
+
+      const tx = await contract.executePublicKeyUpdate(proposalHash)
+      console.log('Transaction submitted:', tx.hash)
+
+      await tx.wait()
+      console.log('✅ Proposal executed successfully')
+
+      // Reload devices to show updated status
+      await loadDevices()
+    } catch (err) {
+      console.error('Failed to execute proposal:', err)
+      setError(err.message || 'Failed to execute proposal')
+    } finally {
+      setExecuting(null)
+    }
+  }
+
+  const handleCancelProposal = async (proposalHash, deviceName) => {
+    if (!web3AuthProvider || !ownerAddress) {
+      setError('Please connect your wallet')
+      return
+    }
+
+    if (!confirm(`Cancel passkey update for "${deviceName}"? This action cannot be undone.`)) {
+      return
+    }
+
+    try {
+      setCancelling(proposalHash)
+      setError('')
+
+      const ethersProvider = new ethers.BrowserProvider(web3AuthProvider)
+      const signer = await ethersProvider.getSigner()
+      const contract = new ethers.Contract(accountAddress, accountABI, signer)
+
+      console.log('❌ Cancelling proposal:', proposalHash)
+
+      const tx = await contract.cancelPendingAction(proposalHash)
+      console.log('Transaction submitted:', tx.hash)
+
+      await tx.wait()
+      console.log('✅ Proposal cancelled successfully')
+
+      // Reload devices to show updated status
+      await loadDevices()
+    } catch (err) {
+      console.error('Failed to cancel proposal:', err)
+      setError(err.message || 'Failed to cancel proposal')
+    } finally {
+      setCancelling(null)
     }
   }
 
@@ -115,8 +200,10 @@ function DeviceManagement({ accountAddress, onAddDevice }) {
                   <span className="device-type">{device.deviceType}</span>
                   {device.isActive ? (
                     <span className="badge badge-success">Active</span>
-                  ) : (
+                  ) : device.proposalHash ? (
                     <span className="badge badge-warning">Pending (48h timelock)</span>
+                  ) : (
+                    <span className="badge badge-secondary">Inactive</span>
                   )}
                 </div>
                 <div className="device-dates">
@@ -135,16 +222,45 @@ function DeviceManagement({ accountAddress, onAddDevice }) {
                     {device.publicKey.x.slice(0, 10)}...{device.publicKey.x.slice(-8)}
                   </code>
                 </div>
+                {device.proposalHash && (
+                  <div className="device-proposal-info">
+                    <span className="label">Proposal Hash:</span>
+                    <code className="key-preview">
+                      {device.proposalHash.slice(0, 10)}...{device.proposalHash.slice(-8)}
+                    </code>
+                  </div>
+                )}
               </div>
               <div className="device-actions">
-                <button
-                  className="btn btn-danger btn-sm"
-                  onClick={() => handleRemoveDevice(device.deviceId, device.deviceName)}
-                  disabled={removing === device.deviceId || device.isActive}
-                  title={device.isActive ? 'Cannot remove active device' : 'Remove this device'}
-                >
-                  {removing === device.deviceId ? 'Removing...' : 'Remove'}
-                </button>
+                {device.proposalHash ? (
+                  <div className="proposal-actions">
+                    <button
+                      className="btn btn-success btn-sm"
+                      onClick={() => handleExecuteProposal(device.proposalHash, device.deviceName)}
+                      disabled={executing === device.proposalHash}
+                      title="Execute this proposal (after 48h timelock)"
+                    >
+                      {executing === device.proposalHash ? 'Executing...' : 'Execute'}
+                    </button>
+                    <button
+                      className="btn btn-danger btn-sm"
+                      onClick={() => handleCancelProposal(device.proposalHash, device.deviceName)}
+                      disabled={cancelling === device.proposalHash}
+                      title="Cancel this proposal"
+                    >
+                      {cancelling === device.proposalHash ? 'Cancelling...' : 'Cancel'}
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    className="btn btn-danger btn-sm"
+                    onClick={() => handleRemoveDevice(device.deviceId, device.deviceName)}
+                    disabled={removing === device.deviceId || device.isActive}
+                    title={device.isActive ? 'Cannot remove active device' : 'Remove this device'}
+                  >
+                    {removing === device.deviceId ? 'Removing...' : 'Remove'}
+                  </button>
+                )}
               </div>
             </div>
           ))}

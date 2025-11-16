@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { ethers } from 'ethers'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
 import { parsePublicKey } from '../utils/webauthn'
-import { addDevice } from '../lib/deviceManager'
+import { addDevice, updateDeviceProposalHash } from '../lib/deviceManager'
 import '../styles/AddCurrentDevice.css'
 
 function AddCurrentDevice({ accountAddress, onComplete, onCancel }) {
@@ -158,7 +158,33 @@ function AddCurrentDevice({ accountAddress, onComplete, onCancel }) {
           const contractWithSigner = new ethers.Contract(accountAddress, accountABI, signer)
 
           const tx = await contractWithSigner.proposePublicKeyUpdate(publicKey.x, publicKey.y)
-          await tx.wait()
+          const receipt = await tx.wait()
+
+          // Extract actionHash from the PublicKeyUpdateProposed event
+          let actionHash = null
+          try {
+            const event = receipt.logs.find(log => {
+              try {
+                const parsed = contractWithSigner.interface.parseLog(log)
+                return parsed && parsed.name === 'PublicKeyUpdateProposed'
+              } catch {
+                return false
+              }
+            })
+
+            if (event) {
+              const parsed = contractWithSigner.interface.parseLog(event)
+              actionHash = parsed.args.actionHash
+              console.log('📝 Proposal actionHash:', actionHash)
+
+              // Update the device in database with actionHash
+              await updateDeviceProposalHash(signMessage, ownerAddress, accountAddress, serializedCredential.id, actionHash)
+              console.log('✅ Proposal hash saved to database')
+            }
+          } catch (eventError) {
+            console.error('⚠️  Failed to extract or save actionHash:', eventError)
+            // Continue anyway - the proposal was successful
+          }
 
           setStatus('✅ Passkey proposed! Wait 48 hours then execute the update.')
         } else {

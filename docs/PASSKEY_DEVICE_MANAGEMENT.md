@@ -154,6 +154,78 @@ Option B: Wait and execute Proposal 2 (Device C)
 
 **User can manually delete inactive devices** via the "Remove" button in Device Management UI.
 
+## Proposal Hash Tracking
+
+### Why Track Proposal Hashes?
+
+When `proposePublicKeyUpdate()` is called on the smart contract, it returns an `actionHash` that uniquely identifies the proposal. Tracking this hash provides significant UX improvements:
+
+**Without proposal hash tracking:**
+- ❌ Can't directly execute a specific proposal
+- ❌ Need to fetch all proposals and match by public key
+- ❌ Can't cancel a specific proposal easily
+- ❌ Can't show accurate proposal status
+- ❌ Extra RPC calls every time
+
+**With proposal hash tracking:**
+- ✅ Direct execution: `executePublicKeyUpdate(device.proposalHash)`
+- ✅ Direct cancellation: `cancelPendingAction(device.proposalHash)`
+- ✅ Show exact proposal details in UI
+- ✅ Verify proposal status on-chain
+- ✅ Better UX with per-device action buttons
+- ✅ Fewer RPC calls, better performance
+
+### How It Works
+
+1. **Propose passkey update** on smart contract:
+   ```javascript
+   const tx = await contract.proposePublicKeyUpdate(qx, qy)
+   const receipt = await tx.wait()
+   ```
+
+2. **Extract actionHash** from event:
+   ```javascript
+   const event = receipt.logs.find(log => {
+     const parsed = contract.interface.parseLog(log)
+     return parsed?.name === 'PublicKeyUpdateProposed'
+   })
+   const actionHash = contract.interface.parseLog(event).args.actionHash
+   ```
+
+3. **Save to database**:
+   ```javascript
+   await updateDeviceProposalHash(signMessage, ownerAddress, accountAddress, deviceId, actionHash)
+   ```
+
+4. **Use in UI**:
+   ```jsx
+   <button onClick={() => executeProposal(device.proposalHash)}>
+     Execute
+   </button>
+   <button onClick={() => cancelProposal(device.proposalHash)}>
+     Cancel
+   </button>
+   ```
+
+### Implementation Details
+
+**Smart Contract Event**:
+```solidity
+event PublicKeyUpdateProposed(
+  bytes32 indexed actionHash,
+  bytes32 qx,
+  bytes32 qy,
+  uint256 executeAfter
+);
+```
+
+**ActionHash Calculation**:
+```solidity
+bytes32 actionHash = keccak256(abi.encode("updatePublicKey", _qx, _qy, block.timestamp));
+```
+
+**Database Schema**: Added `proposal_hash TEXT` column to `passkey_devices` table
+
 ## API Endpoints
 
 ### POST /api/devices
@@ -169,6 +241,11 @@ Remove a device (only pending devices can be removed)
 Activate a pending device after executing on-chain update
 
 **Parameters**: `{ publicKeyX: "0x..." }`
+
+### PUT /api/devices/:accountAddress/:deviceId/proposal-hash
+Update proposal hash for a device after proposing on-chain
+
+**Parameters**: `{ proposalHash: "0x..." }`
 
 ## Database Schema
 
@@ -186,11 +263,14 @@ CREATE TABLE passkey_devices (
   attestation_object TEXT,
   client_data_json TEXT,
   is_active BOOLEAN NOT NULL,  -- 1 = active, 0 = pending
+  proposal_hash TEXT,          -- actionHash from proposePublicKeyUpdate (for pending devices)
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL,
   last_used_at INTEGER,
   UNIQUE(account_address, device_id)
 )
+
+CREATE INDEX idx_proposal_hash ON passkey_devices(proposal_hash);
 ```
 
 ## Security Considerations

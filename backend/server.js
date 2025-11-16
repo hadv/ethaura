@@ -21,6 +21,7 @@ import {
   updateDeviceLastUsed,
   removeDevice,
   activateDevice,
+  updateDeviceProposalHash,
   // Session management
   createSession,
   getSession,
@@ -463,6 +464,46 @@ app.post('/api/devices/:accountAddress/activate', verifySignature, async (req, r
     console.error('Error activating device:', error)
     res.status(500).json({
       error: 'Failed to activate device',
+      details: error.message,
+    })
+  }
+})
+
+/**
+ * PUT /api/devices/:accountAddress/:deviceId/proposal-hash
+ * Update proposal hash for a device after proposing on-chain
+ */
+app.put('/api/devices/:accountAddress/:deviceId/proposal-hash', verifySignature, async (req, res) => {
+  try {
+    const { accountAddress, deviceId } = req.params
+    const { proposalHash } = req.body
+
+    // Verify the request is for the correct account
+    if (accountAddress.toLowerCase() !== req.verifiedUserId.toLowerCase()) {
+      return res.status(403).json({
+        error: 'Unauthorized: Account address mismatch',
+      })
+    }
+
+    if (!proposalHash) {
+      return res.status(400).json({
+        error: 'Missing required field: proposalHash',
+      })
+    }
+
+    console.log(`✅ Updating proposal hash for device ${deviceId}: ${proposalHash.slice(0, 10)}...`)
+
+    const result = await updateDeviceProposalHash(accountAddress, deviceId, proposalHash)
+
+    res.json({
+      success: true,
+      message: 'Proposal hash updated successfully',
+      ...result,
+    })
+  } catch (error) {
+    console.error('Error updating proposal hash:', error)
+    res.status(500).json({
+      error: 'Failed to update proposal hash',
       details: error.message,
     })
   }

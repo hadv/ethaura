@@ -4,6 +4,7 @@ import { useNetwork } from '../contexts/NetworkContext'
 import { ethers } from 'ethers'
 import { NETWORKS } from '../lib/constants'
 import { retrievePasskeyCredential } from '../lib/passkeyStorage'
+import { updateDeviceProposalHash } from '../lib/deviceManager'
 import AddDeviceFlow from './AddDeviceFlow'
 import '../styles/PasskeySettings.css'
 
@@ -172,9 +173,10 @@ function PasskeySettings({ accountAddress }) {
 
     try {
       const publicKey = storedCredential.publicKey
-      console.log('📤 Proposing stored passkey:', publicKey)
+      const deviceId = storedCredential.id // credential.id is the device ID
+      console.log('📤 Proposing stored passkey:', publicKey, 'deviceId:', deviceId)
 
-      await proposePasskeyUpdate(publicKey)
+      await proposePasskeyUpdate(publicKey, deviceId)
 
       setStatus('✅ Passkey proposal submitted! Wait 48 hours, then execute the update.')
       await loadStoredCredential()
@@ -189,7 +191,7 @@ function PasskeySettings({ accountAddress }) {
 
 
 
-  const proposePasskeyUpdate = async (publicKey) => {
+  const proposePasskeyUpdate = async (publicKey, deviceId) => {
     if (!web3AuthProvider || !ownerAddress) {
       throw new Error('Please connect your wallet')
     }
@@ -213,6 +215,33 @@ function PasskeySettings({ accountAddress }) {
 
       const receipt = await tx.wait()
       console.log('✅ Proposal transaction confirmed:', receipt.hash)
+
+      // Extract actionHash from the PublicKeyUpdateProposed event
+      if (deviceId) {
+        try {
+          const event = receipt.logs.find(log => {
+            try {
+              const parsed = contract.interface.parseLog(log)
+              return parsed && parsed.name === 'PublicKeyUpdateProposed'
+            } catch {
+              return false
+            }
+          })
+
+          if (event) {
+            const parsed = contract.interface.parseLog(event)
+            const actionHash = parsed.args.actionHash
+            console.log('📝 Proposal actionHash:', actionHash)
+
+            // Update the device in database with actionHash
+            await updateDeviceProposalHash(signMessage, ownerAddress, accountAddress, deviceId, actionHash)
+            console.log('✅ Proposal hash saved to database')
+          }
+        } catch (eventError) {
+          console.error('⚠️  Failed to extract or save actionHash:', eventError)
+          // Continue anyway - the proposal was successful
+        }
+      }
 
       setStatus('Passkey update proposed! You must wait 48 hours before it can be executed.')
 
