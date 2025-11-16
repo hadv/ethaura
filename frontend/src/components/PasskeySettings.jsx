@@ -232,9 +232,10 @@ function PasskeySettings({ accountAddress }) {
             const parsed = contract.interface.parseLog(event)
             const actionHash = parsed.args.actionHash
             console.log('📝 Proposal actionHash:', actionHash)
+            console.log('📝 Proposal transaction hash:', receipt.hash)
 
-            // Update the device in database with actionHash
-            await updateDeviceProposalHash(signMessage, ownerAddress, accountAddress, deviceId, actionHash)
+            // Update the device in database with actionHash and transaction hash
+            await updateDeviceProposalHash(signMessage, ownerAddress, accountAddress, deviceId, actionHash, receipt.hash)
             console.log('✅ Proposal hash saved to database')
           }
         } catch (eventError) {

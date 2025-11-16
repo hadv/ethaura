@@ -228,6 +228,17 @@ function DeviceManagement({ accountAddress, onAddDevice }) {
                     <code className="key-preview">
                       {device.proposalHash.slice(0, 10)}...{device.proposalHash.slice(-8)}
                     </code>
+                    {device.proposalTxHash && (
+                      <a
+                        href={`${NETWORKS[networkInfo.name]?.blockExplorer}/tx/${device.proposalTxHash}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="explorer-link"
+                        title="View proposal transaction on explorer"
+                      >
+                        🔗
+                      </a>
+                    )}
                   </div>
                 )}
               </div>

@@ -476,7 +476,7 @@ app.post('/api/devices/:accountAddress/activate', verifySignature, async (req, r
 app.put('/api/devices/:accountAddress/:deviceId/proposal-hash', verifySignature, async (req, res) => {
   try {
     const { accountAddress, deviceId } = req.params
-    const { proposalHash } = req.body
+    const { proposalHash, proposalTxHash } = req.body
 
     // Verify the request is for the correct account
     if (accountAddress.toLowerCase() !== req.verifiedUserId.toLowerCase()) {
@@ -491,9 +491,9 @@ app.put('/api/devices/:accountAddress/:deviceId/proposal-hash', verifySignature,
       })
     }
 
-    console.log(`✅ Updating proposal hash for device ${deviceId}: ${proposalHash.slice(0, 10)}...`)
+    console.log(`✅ Updating proposal hash for device ${deviceId}: ${proposalHash.slice(0, 10)}...${proposalTxHash ? ` (tx: ${proposalTxHash.slice(0, 10)}...)` : ''}`)
 
-    const result = await updateDeviceProposalHash(accountAddress, deviceId, proposalHash)
+    const result = await updateDeviceProposalHash(accountAddress, deviceId, proposalHash, proposalTxHash)
 
     res.json({
       success: true,

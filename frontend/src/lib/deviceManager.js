@@ -169,11 +169,12 @@ export async function removeDevice(signMessageFn, ownerAddress, accountAddress, 
  * @param {string} accountAddress - Smart account address
  * @param {string} deviceId - Device ID (credential.id)
  * @param {string} proposalHash - The actionHash from proposePublicKeyUpdate
+ * @param {string} proposalTxHash - The transaction hash that created the proposal (optional)
  * @returns {Promise<Object>} Response from server
  */
-export async function updateDeviceProposalHash(signMessageFn, ownerAddress, accountAddress, deviceId, proposalHash) {
+export async function updateDeviceProposalHash(signMessageFn, ownerAddress, accountAddress, deviceId, proposalHash, proposalTxHash = null) {
   try {
-    console.log('📝 Updating proposal hash for device:', deviceId, proposalHash.slice(0, 10) + '...')
+    console.log('📝 Updating proposal hash for device:', deviceId, proposalHash.slice(0, 10) + '...', proposalTxHash ? `(tx: ${proposalTxHash.slice(0, 10)}...)` : '')
 
     const auth = await createAuthSignature(signMessageFn, ownerAddress, accountAddress, 'Update Proposal Hash')
 
@@ -189,6 +190,7 @@ export async function updateDeviceProposalHash(signMessageFn, ownerAddress, acco
         message: auth.message,
         timestamp: auth.timestamp,
         proposalHash,
+        proposalTxHash,
       }),
     })
 

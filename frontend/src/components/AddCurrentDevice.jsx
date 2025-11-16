@@ -176,9 +176,10 @@ function AddCurrentDevice({ accountAddress, onComplete, onCancel }) {
               const parsed = contractWithSigner.interface.parseLog(event)
               actionHash = parsed.args.actionHash
               console.log('📝 Proposal actionHash:', actionHash)
+              console.log('📝 Proposal transaction hash:', receipt.hash)
 
-              // Update the device in database with actionHash
-              await updateDeviceProposalHash(signMessage, ownerAddress, accountAddress, serializedCredential.id, actionHash)
+              // Update the device in database with actionHash and transaction hash
+              await updateDeviceProposalHash(signMessage, ownerAddress, accountAddress, serializedCredential.id, actionHash, receipt.hash)
               console.log('✅ Proposal hash saved to database')
             }
           } catch (eventError) {

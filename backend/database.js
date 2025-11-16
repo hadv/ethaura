@@ -154,6 +154,7 @@ await runAsync(`
     client_data_json TEXT,
     is_active BOOLEAN NOT NULL DEFAULT 1,
     proposal_hash TEXT,
+    proposal_tx_hash TEXT,
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL,
     last_used_at INTEGER,
@@ -401,24 +402,25 @@ export async function addDevice(accountAddress, deviceInfo, isActive = true, pro
  * @param {string} accountAddress - Smart account address
  * @param {string} deviceId - Device ID (credential.id)
  * @param {string} proposalHash - The actionHash from proposePublicKeyUpdate
+ * @param {string} proposalTxHash - The transaction hash that created the proposal (optional)
  * @returns {Object} Result
  */
-export async function updateDeviceProposalHash(accountAddress, deviceId, proposalHash) {
+export async function updateDeviceProposalHash(accountAddress, deviceId, proposalHash, proposalTxHash = null) {
   const now = Date.now()
 
   const result = await runAsync(`
     UPDATE passkey_devices
-    SET proposal_hash = ?, updated_at = ?
+    SET proposal_hash = ?, proposal_tx_hash = ?, updated_at = ?
     WHERE account_address = ? AND device_id = ?
-  `, [proposalHash, now, accountAddress.toLowerCase(), deviceId])
+  `, [proposalHash, proposalTxHash, now, accountAddress.toLowerCase(), deviceId])
 
   if (result.changes === 0) {
     throw new Error('Device not found')
   }
 
-  console.log(`✅ Proposal hash updated for device ${deviceId}: ${proposalHash.slice(0, 10)}...`)
+  console.log(`✅ Proposal hash updated for device ${deviceId}: ${proposalHash.slice(0, 10)}...${proposalTxHash ? ` (tx: ${proposalTxHash.slice(0, 10)}...)` : ''}`)
 
-  return { success: true, proposalHash }
+  return { success: true, proposalHash, proposalTxHash }
 }
 
 /**
