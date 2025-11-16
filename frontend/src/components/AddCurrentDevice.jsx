@@ -141,12 +141,13 @@ function AddCurrentDevice({ accountAddress, onComplete, onCancel }) {
       await addDevice(signMessage, ownerAddress, accountAddress, deviceName.trim(), deviceType, serializedCredential)
 
       // Check if account is deployed and needs proposal
-      const accountCode = await provider.getCode(accountAddress)
+      const ethersProvider = new ethers.BrowserProvider(provider)
+      const accountCode = await ethersProvider.getCode(accountAddress)
       const isDeployed = accountCode !== '0x'
 
       if (isDeployed) {
         setStatus('Checking if passkey needs to be proposed...')
-        const contract = new ethers.Contract(accountAddress, accountABI, provider)
+        const contract = new ethers.Contract(accountAddress, accountABI, ethersProvider)
         const [qx, qy] = await Promise.all([contract.qx(), contract.qy()])
 
         const needsProposal = qx === ethers.ZeroHash && qy === ethers.ZeroHash
@@ -154,7 +155,7 @@ function AddCurrentDevice({ accountAddress, onComplete, onCancel }) {
         if (needsProposal) {
           setStatus('Proposing passkey to smart contract (48-hour timelock)...')
 
-          const signer = await provider.getSigner()
+          const signer = await ethersProvider.getSigner()
           const contractWithSigner = new ethers.Contract(accountAddress, accountABI, signer)
 
           const tx = await contractWithSigner.proposePublicKeyUpdate(publicKey.x, publicKey.y)
