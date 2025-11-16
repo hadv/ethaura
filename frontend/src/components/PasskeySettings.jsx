@@ -4,7 +4,7 @@ import { useNetwork } from '../contexts/NetworkContext'
 import { ethers } from 'ethers'
 import { NETWORKS } from '../lib/constants'
 import { retrievePasskeyCredential } from '../lib/passkeyStorage'
-import { updateDeviceProposalHash } from '../lib/deviceManager'
+import { updateDeviceProposalHash, getDevices } from '../lib/deviceManager'
 import AddDeviceFlow from './AddDeviceFlow'
 import '../styles/PasskeySettings.css'
 
@@ -19,6 +19,7 @@ function PasskeySettings({ accountAddress }) {
   const [newPasskey, setNewPasskey] = useState(null)
   const [storedCredential, setStoredCredential] = useState(null) // Passkey from server/localStorage
   const [showAddDevice, setShowAddDevice] = useState(false) // Show device selection flow
+  const [devices, setDevices] = useState([]) // Devices from database
 
   // P256Account ABI (minimal for what we need)
   const accountABI = [
@@ -55,6 +56,7 @@ function PasskeySettings({ accountAddress }) {
     setPendingActions([])
     setNewPasskey(null)
     setStoredCredential(null)
+    setDevices([])
     setError('')
     setStatus('')
     setLoading(false)
@@ -62,7 +64,21 @@ function PasskeySettings({ accountAddress }) {
     // Load new data
     loadAccountInfo()
     loadStoredCredential()
+    loadDevices()
   }, [accountAddress, web3AuthProvider, networkInfo.chainId])
+
+  // Load devices from database
+  const loadDevices = async () => {
+    if (!accountAddress || !ownerAddress || !signMessage) return
+
+    try {
+      const deviceList = await getDevices(signMessage, ownerAddress, accountAddress)
+      setDevices(deviceList)
+      console.log('✅ Loaded devices:', deviceList.length)
+    } catch (error) {
+      console.error('Failed to load devices:', error)
+    }
+  }
 
   // Load stored credential from server/localStorage
   const loadStoredCredential = async () => {
@@ -544,11 +560,26 @@ For now, please use the contract directly on Etherscan or wait for this feature 
                   const canExecute = now >= action.executeAfter
                   const timeRemaining = action.executeAfter - now
 
+                  // Find matching device to get proposal transaction hash
+                  const matchingDevice = devices.find(d => d.proposalHash === action.actionHash)
+
                   return (
                     <div key={index} className="pending-action-card">
                       <h4>Pending Update #{index + 1}</h4>
-                      <p className="small-text">
-                        Action Hash: {action.actionHash.slice(0, 10)}...{action.actionHash.slice(-8)}
+                      <p className="small-text" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span>Action Hash: {action.actionHash.slice(0, 10)}...{action.actionHash.slice(-8)}</span>
+                        {matchingDevice?.proposalTxHash && (
+                          <a
+                            href={`${NETWORKS[networkInfo.name]?.blockExplorer}/tx/${matchingDevice.proposalTxHash}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="explorer-link"
+                            title="View proposal transaction on explorer"
+                            style={{ textDecoration: 'none', fontSize: '1rem' }}
+                          >
+                            🔗
+                          </a>
+                        )}
                       </p>
                       {canExecute ? (
                         <button
