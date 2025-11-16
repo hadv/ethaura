@@ -5,6 +5,7 @@ import { ethers } from 'ethers'
 import { NETWORKS } from '../lib/constants'
 import { retrievePasskeyCredential } from '../lib/passkeyStorage'
 import { updateDeviceProposalHash, getDevices } from '../lib/deviceManager'
+import { HiExternalLink } from 'react-icons/hi'
 import AddDeviceFlow from './AddDeviceFlow'
 import '../styles/PasskeySettings.css'
 
@@ -576,14 +577,14 @@ For now, please use the contract directly on Etherscan or wait for this feature 
                         <span>Action Hash: {action.actionHash.slice(0, 10)}...{action.actionHash.slice(-8)}</span>
                         {matchingDevice?.proposalTxHash && (
                           <a
-                            href={`${NETWORKS[networkInfo.name]?.blockExplorer}/tx/${matchingDevice.proposalTxHash}`}
+                            href={`${networkInfo.explorerUrl}/tx/${matchingDevice.proposalTxHash}`}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="explorer-link"
                             title="View proposal transaction on explorer"
                             style={{ textDecoration: 'none', fontSize: '1rem' }}
                           >
-                            🔗
+                            <HiExternalLink />
                           </a>
                         )}
                       </p>

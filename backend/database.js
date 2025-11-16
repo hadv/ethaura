@@ -476,6 +476,7 @@ export async function getDevices(accountAddress) {
     SELECT
       device_id, device_name, device_type, credential_id,
       public_key_x, public_key_y, is_active,
+      proposal_hash, proposal_tx_hash,
       created_at, updated_at, last_used_at
     FROM passkey_devices
     WHERE account_address = ?
@@ -492,6 +493,8 @@ export async function getDevices(accountAddress) {
       y: row.public_key_y,
     },
     isActive: Boolean(row.is_active),
+    proposalHash: row.proposal_hash,
+    proposalTxHash: row.proposal_tx_hash,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     lastUsedAt: row.last_used_at,

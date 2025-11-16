@@ -4,6 +4,7 @@ import { useNetwork } from '../contexts/NetworkContext'
 import { ethers } from 'ethers'
 import { getDevices, removeDevice } from '../lib/deviceManager'
 import { NETWORKS } from '../lib/constants'
+import { HiExternalLink } from 'react-icons/hi'
 import '../styles/DeviceManagement.css'
 
 function DeviceManagement({ accountAddress, onAddDevice }) {
@@ -300,13 +301,13 @@ function DeviceManagement({ accountAddress, onAddDevice }) {
                       </code>
                       {device.proposalTxHash && (
                         <a
-                          href={`${NETWORKS[networkInfo.name]?.blockExplorer}/tx/${device.proposalTxHash}`}
+                          href={`${networkInfo.explorerUrl}/tx/${device.proposalTxHash}`}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="explorer-link"
                           title="View proposal transaction on explorer"
                         >
-                          🔗
+                          <HiExternalLink />
                         </a>
                       )}
                     </div>
