@@ -38,6 +38,7 @@ dotenv.config()
 
 const app = express()
 const PORT = process.env.PORT || 3001
+const isDevelopment = process.env.NODE_ENV !== 'production'
 
 // Middleware
 app.use(helmet())
@@ -76,13 +77,20 @@ const corsOptions = {
 app.use(cors(corsOptions))
 app.use(express.json({ limit: '1mb' }))
 
-// Rate limiting
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limit each IP to 100 requests per windowMs
-  message: 'Too many requests from this IP, please try again later.',
-})
-app.use('/api/', limiter)
+// Rate limiting (disabled in development to avoid issues with React StrictMode)
+if (!isDevelopment) {
+  const limiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 100, // Limit each IP to 100 requests per windowMs
+    message: 'Too many requests from this IP, please try again later.',
+    standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+    legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+  })
+  app.use('/api/', limiter)
+  console.log('🛡️  Rate limiting enabled: 100 requests per 15 minutes')
+} else {
+  console.log('⚠️  Rate limiting DISABLED in development mode')
+}
 
 // Logging middleware
 app.use((req, res, next) => {

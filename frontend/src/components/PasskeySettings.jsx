@@ -75,6 +75,11 @@ function PasskeySettings({ accountAddress }) {
       const deviceList = await getDevices(signMessage, ownerAddress, accountAddress)
       setDevices(deviceList)
       console.log('✅ Loaded devices:', deviceList.length)
+      console.log('📱 Devices with proposal hashes:', deviceList.map(d => ({
+        deviceName: d.deviceName,
+        proposalHash: d.proposalHash,
+        proposalTxHash: d.proposalTxHash,
+      })))
     } catch (error) {
       console.error('Failed to load devices:', error)
     }
