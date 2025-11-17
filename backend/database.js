@@ -754,15 +754,38 @@ export async function optimizeDatabase() {
 /**
  * Close database connection gracefully
  */
+let isClosing = false
+let isClosed = false
+
 export function closeDatabase() {
   return new Promise((resolve, reject) => {
+    // Prevent double-closing
+    if (isClosing || isClosed) {
+      console.log('ℹ️  Database already closed or closing')
+      resolve()
+      return
+    }
+
+    isClosing = true
     console.log('🔒 Closing database connection...')
+
     db.close((err) => {
       if (err) {
-        console.error('❌ Error closing database:', err)
-        reject(err)
+        // Ignore SQLITE_MISUSE error if database is already closed
+        if (err.code === 'SQLITE_MISUSE') {
+          console.log('ℹ️  Database already closed')
+          isClosed = true
+          isClosing = false
+          resolve()
+        } else {
+          console.error('❌ Error closing database:', err)
+          isClosing = false
+          reject(err)
+        }
       } else {
         console.log('✅ Database connection closed')
+        isClosed = true
+        isClosing = false
         resolve()
       }
     })
@@ -806,19 +829,30 @@ export function stopBackupScheduler() {
 }
 
 // Graceful shutdown handler
-process.on('SIGINT', async () => {
-  console.log('\n🛑 Received SIGINT, shutting down gracefully...')
-  stopBackupScheduler()
-  await closeDatabase()
-  process.exit(0)
-})
+let isShuttingDown = false
 
-process.on('SIGTERM', async () => {
-  console.log('\n🛑 Received SIGTERM, shutting down gracefully...')
-  stopBackupScheduler()
-  await closeDatabase()
-  process.exit(0)
-})
+async function gracefulShutdown(signal) {
+  if (isShuttingDown) {
+    console.log('⚠️  Shutdown already in progress...')
+    return
+  }
+
+  isShuttingDown = true
+  console.log(`\n🛑 Received ${signal}, shutting down gracefully...`)
+
+  try {
+    stopBackupScheduler()
+    await closeDatabase()
+    console.log('✅ Graceful shutdown complete')
+    process.exit(0)
+  } catch (error) {
+    console.error('❌ Error during shutdown:', error)
+    process.exit(1)
+  }
+}
+
+process.on('SIGINT', () => gracefulShutdown('SIGINT'))
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'))
 
 export default {
   // Legacy single-device functions
