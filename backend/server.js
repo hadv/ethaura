@@ -41,7 +41,18 @@ const PORT = process.env.PORT || 3001
 const isDevelopment = process.env.NODE_ENV !== 'production'
 
 // Middleware
-app.use(helmet())
+// Configure helmet with relaxed settings for development
+if (isDevelopment) {
+  app.use(helmet({
+    crossOriginOpenerPolicy: false, // Disable COOP in development
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+    contentSecurityPolicy: false, // Disable CSP in development for easier testing
+  }))
+  console.log('⚠️  Helmet security headers relaxed for development')
+} else {
+  app.use(helmet())
+  console.log('🛡️  Helmet security headers enabled')
+}
 
 // CORS configuration - allow local network access for mobile testing
 const corsOptions = {
