@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
-import { createDeviceSession, pollSessionUntilComplete } from '../lib/deviceManager'
+import { createDeviceSession, pollSessionUntilComplete, addDevice } from '../lib/deviceManager'
 import '../styles/AddMobileDevice.css'
 
 function AddMobileDevice({ accountAddress, onComplete, onCancel }) {
@@ -51,6 +51,35 @@ function AddMobileDevice({ accountAddress, onComplete, onCancel }) {
       const completedSession = await pollSessionUntilComplete(sid, 10 * 60 * 1000, 2000)
 
       if (completedSession.status === 'completed') {
+        setStatus('Saving device to database...')
+
+        // Extract device data from completed session
+        const deviceData = completedSession.deviceData
+
+        if (!deviceData) {
+          throw new Error('No device data in completed session')
+        }
+
+        // Create credential object from device data
+        const credential = {
+          id: deviceData.credentialId,
+          rawId: deviceData.rawId,
+          publicKey: {
+            x: deviceData.qx,
+            y: deviceData.qy,
+          },
+        }
+
+        // Save device to database
+        await addDevice(
+          signMessage,
+          ownerAddress,
+          accountAddress,
+          deviceData.deviceName,
+          deviceData.deviceType,
+          credential
+        )
+
         setStatus('✅ Device registered successfully!')
         setTimeout(() => {
           onComplete()
