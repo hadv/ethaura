@@ -71,8 +71,15 @@ const corsOptions = {
     // Allow any origin from local network (192.168.x.x, 10.x.x.x, 172.16-31.x.x)
     const localNetworkRegex = /^http:\/\/(192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2[0-9]|3[0-1])\.\d{1,3}\.\d{1,3})(:\d+)?$/
 
-    // Check if origin is in allowed list or matches local network pattern
+    // Allow ngrok domains for mobile testing (development only)
+    const ngrokRegex = /^https:\/\/[a-z0-9-]+\.ngrok(-free)?\.(io|app|dev)$/
+
+    // Check if origin is in allowed list or matches local network pattern or ngrok
     if (allowedOrigins.includes(origin) || localNetworkRegex.test(origin)) {
+      callback(null, true)
+    } else if (isDevelopment && ngrokRegex.test(origin)) {
+      // Allow ngrok domains in development for mobile testing
+      console.log('✅ CORS allowed ngrok origin:', origin)
       callback(null, true)
     } else if (process.env.FRONTEND_URL && origin === process.env.FRONTEND_URL) {
       // Allow configured frontend URL (for production)
