@@ -27,16 +27,23 @@ function RegisterDevicePage() {
   const loadSession = async () => {
     try {
       setLoading(true)
+      console.log('🔍 Loading session:', sessionId)
+      console.log('🔍 Backend URL:', import.meta.env.VITE_BACKEND_URL || 'relative (via proxy)')
+      console.log('🔍 Full URL:', window.location.href)
+
       const sessionData = await getDeviceSession(sessionId)
+      console.log('✅ Session data loaded:', sessionData)
 
       if (sessionData.status === 'completed') {
-        setError('This session has already been used')
+        const msg = 'This session has already been used - please generate a new QR code'
+        setError(msg)
         setLoading(false)
         return
       }
 
       if (sessionData.status === 'expired') {
-        setError('This session has expired')
+        const msg = 'This session has expired - please generate a new QR code'
+        setError(msg)
         setLoading(false)
         return
       }
@@ -47,8 +54,23 @@ function RegisterDevicePage() {
       // Auto-generate device name
       setDeviceName(getDefaultDeviceName())
     } catch (err) {
-      console.error('Failed to load session:', err)
-      setError(err.message || 'Failed to load session')
+      console.error('❌ Failed to load session:', err)
+      console.error('Error type:', err.constructor.name)
+      console.error('Error message:', err.message)
+      console.error('Error stack:', err.stack)
+
+      let errorMsg = 'Load failed: '
+      if (err.message) {
+        errorMsg += err.message
+      } else {
+        errorMsg += 'Unknown error'
+      }
+
+      // Add more context
+      errorMsg += `\n\nSession ID: ${sessionId}`
+      errorMsg += `\nBackend: ${import.meta.env.VITE_BACKEND_URL || 'proxy'}`
+
+      setError(errorMsg)
       setLoading(false)
     }
   }
@@ -208,7 +230,38 @@ function RegisterDevicePage() {
         <div className="error-state">
           <div className="error-icon">❌</div>
           <h3>Registration Failed</h3>
-          <p>{error}</p>
+          <div style={{
+            textAlign: 'left',
+            backgroundColor: '#fff',
+            padding: '16px',
+            borderRadius: '8px',
+            marginTop: '16px',
+            fontSize: '0.85rem',
+            fontFamily: 'monospace',
+            whiteSpace: 'pre-wrap',
+            wordBreak: 'break-word',
+            maxWidth: '100%',
+            overflow: 'auto',
+            border: '1px solid #ddd'
+          }}>
+            {error}
+          </div>
+          <button
+            onClick={() => window.location.reload()}
+            style={{
+              marginTop: '20px',
+              padding: '12px 24px',
+              backgroundColor: '#6366f1',
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              fontSize: '1rem',
+              cursor: 'pointer',
+              fontWeight: '500'
+            }}
+          >
+            Retry
+          </button>
         </div>
       ) : session ? (
         <div className="registration-form">

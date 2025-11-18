@@ -262,28 +262,46 @@ export async function createDeviceSession(signMessageFn, ownerAddress, accountAd
  */
 export async function getDeviceSession(sessionId) {
   try {
-    console.log('🔍 Retrieving session:', sessionId)
+    const url = `${BACKEND_URL}/api/sessions/${sessionId}`
+    console.log('🔍 Retrieving session from:', url)
+    console.log('🔍 Session ID:', sessionId)
 
-    const response = await fetch(`${BACKEND_URL}/api/sessions/${sessionId}`, {
+    const response = await fetch(url, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
       },
     })
 
+    console.log('📡 Response status:', response.status, response.statusText)
+
     if (response.status === 404) {
-      throw new Error('Session not found or expired')
+      throw new Error('Session not found or expired. Please generate a new QR code.')
     }
 
     if (!response.ok) {
-      const error = await response.json()
-      throw new Error(error.error || 'Failed to retrieve session')
+      let errorMsg = 'Failed to retrieve session'
+      try {
+        const error = await response.json()
+        errorMsg = error.error || errorMsg
+      } catch (e) {
+        errorMsg = `HTTP ${response.status}: ${response.statusText}`
+      }
+      throw new Error(errorMsg)
     }
 
     const result = await response.json()
+    console.log('✅ Session retrieved:', result.session)
     return result.session
   } catch (error) {
     console.error('❌ Error retrieving session:', error)
+    console.error('Error type:', error.constructor.name)
+    console.error('Error message:', error.message)
+
+    // Re-throw with more context
+    if (error.message.includes('fetch')) {
+      throw new Error(`Network error: Cannot connect to backend. ${error.message}`)
+    }
     throw error
   }
 }
