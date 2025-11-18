@@ -51,6 +51,18 @@ function PasskeySettings({ accountAddress }) {
     return parts.join(' ')
   }
 
+  // Helper function to get device name from user agent
+  const getDeviceName = () => {
+    const ua = navigator.userAgent
+    if (ua.includes('Mac')) return 'MacBook'
+    if (ua.includes('Windows')) return 'Windows PC'
+    if (ua.includes('Linux')) return 'Linux PC'
+    if (ua.includes('iPhone')) return 'iPhone'
+    if (ua.includes('iPad')) return 'iPad'
+    if (ua.includes('Android')) return 'Android Device'
+    return 'This Device'
+  }
+
   // Load account info when address, provider, or network changes
   useEffect(() => {
     // Reset ALL state when network changes to avoid showing stale data
@@ -530,6 +542,107 @@ For now, please use the contract directly on Etherscan or wait for this feature 
                 )}
               </div>
 
+              {/* Registered Devices List */}
+              {(accountInfo.hasPasskey || storedCredential || devices.length > 0) && (
+                <div className="settings-section" style={{ marginTop: '24px' }}>
+                  <h3>Registered Devices</h3>
+                  <p className="section-description">
+                    View all devices registered with this account.
+                  </p>
+                  <div className="devices-list">
+                    {/* Show current passkey (for undeployed accounts) */}
+                    {storedCredential && !accountInfo.hasPasskey && (
+                      <div className="device-card" style={{ backgroundColor: '#f0f9ff', border: '1px solid #0ea5e9' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
+                          <div style={{ flex: 1 }}>
+                            <h4 style={{ margin: '0 0 4px 0', fontSize: '0.95rem' }}>
+                              {getDeviceName()} (Primary)
+                            </h4>
+                            <p className="small-text" style={{ margin: '4px 0', color: '#666' }}>
+                              This passkey will be used when you deploy this account
+                            </p>
+                            <p className="small-text" style={{ margin: '4px 0', fontSize: '0.8rem', color: '#888' }}>
+                              Credential ID: {storedCredential.id.slice(0, 12)}...{storedCredential.id.slice(-8)}
+                            </p>
+                          </div>
+                          <span className="status-badge badge-neutral" style={{ fontSize: '0.75rem' }}>
+                            Not Deployed
+                          </span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Show active on-chain passkey (for deployed accounts) */}
+                    {accountInfo.hasPasskey && (
+                      <div className="device-card" style={{ backgroundColor: '#f0fdf4', border: '1px solid #22c55e' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
+                          <div style={{ flex: 1 }}>
+                            <h4 style={{ margin: '0 0 4px 0', fontSize: '0.95rem' }}>Active Passkey</h4>
+                            <p className="small-text" style={{ margin: '4px 0', color: '#666' }}>
+                              Currently active on-chain
+                            </p>
+                            <p className="small-text" style={{ margin: '4px 0', fontSize: '0.8rem', color: '#888', wordBreak: 'break-all' }}>
+                              qx: {accountInfo.qx.slice(0, 10)}...{accountInfo.qx.slice(-8)}
+                            </p>
+                            <p className="small-text" style={{ margin: '4px 0', fontSize: '0.8rem', color: '#888', wordBreak: 'break-all' }}>
+                              qy: {accountInfo.qy.slice(0, 10)}...{accountInfo.qy.slice(-8)}
+                            </p>
+                          </div>
+                          <span className="status-badge badge-success" style={{ fontSize: '0.75rem' }}>
+                            Active
+                          </span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Show additional devices (for deployed accounts with multi-device) */}
+                    {devices.length > 0 && (
+                      <>
+                        <h4 style={{ margin: '16px 0 8px 0', fontSize: '0.9rem', color: '#666' }}>
+                          Additional Devices ({devices.length})
+                        </h4>
+                        {devices.map((device, index) => (
+                          <div key={index} className="device-card" style={{ backgroundColor: '#fefce8', border: '1px solid #eab308' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
+                              <div style={{ flex: 1 }}>
+                                <h4 style={{ margin: '0 0 4px 0', fontSize: '0.95rem' }}>
+                                  {device.deviceName || `Device ${index + 1}`}
+                                </h4>
+                                <p className="small-text" style={{ margin: '4px 0', color: '#666' }}>
+                                  {device.deviceType ? `${device.deviceType.charAt(0).toUpperCase()}${device.deviceType.slice(1)}` : 'Unknown type'}
+                                </p>
+                                <p className="small-text" style={{ margin: '4px 0', fontSize: '0.8rem', color: '#888' }}>
+                                  Credential ID: {device.credentialId.slice(0, 12)}...{device.credentialId.slice(-8)}
+                                </p>
+                                {device.proposalHash && (
+                                  <p className="small-text" style={{ margin: '4px 0', fontSize: '0.8rem', color: '#888', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                    <span>Proposal: {device.proposalHash.slice(0, 10)}...{device.proposalHash.slice(-8)}</span>
+                                    {device.proposalTxHash && (
+                                      <a
+                                        href={`${networkInfo.explorerUrl}/tx/${device.proposalTxHash}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="explorer-link"
+                                        title="View proposal transaction"
+                                        style={{ textDecoration: 'none', fontSize: '0.9rem' }}
+                                      >
+                                        <HiExternalLink />
+                                      </a>
+                                    )}
+                                  </p>
+                                )}
+                              </div>
+                              <span className="status-badge badge-warning" style={{ fontSize: '0.75rem' }}>
+                                Pending
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
 
             </>
           )}
@@ -565,99 +678,6 @@ For now, please use the contract directly on Etherscan or wait for this feature 
               </div>
             </div>
           </div>
-
-          {/* Registered Devices */}
-          {(accountInfo.hasPasskey || storedCredential || devices.length > 0) && (
-            <div className="settings-section">
-              <h3>Registered Devices</h3>
-              <div className="devices-list">
-                {/* Show current passkey (for undeployed accounts) */}
-                {storedCredential && !accountInfo.hasPasskey && (
-                  <div className="device-card" style={{ backgroundColor: '#f0f9ff', border: '1px solid #0ea5e9' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
-                      <div>
-                        <h4 style={{ margin: '0 0 4px 0', fontSize: '0.95rem' }}>Current Device</h4>
-                        <p className="small-text" style={{ margin: '4px 0', color: '#666' }}>
-                          Primary passkey (will be used during deployment)
-                        </p>
-                        <p className="small-text" style={{ margin: '4px 0', fontSize: '0.8rem', color: '#888' }}>
-                          ID: {storedCredential.id.slice(0, 12)}...{storedCredential.id.slice(-8)}
-                        </p>
-                      </div>
-                      <span className="status-badge badge-neutral" style={{ fontSize: '0.75rem' }}>
-                        Not Deployed
-                      </span>
-                    </div>
-                  </div>
-                )}
-
-                {/* Show active on-chain passkey (for deployed accounts) */}
-                {accountInfo.hasPasskey && (
-                  <div className="device-card" style={{ backgroundColor: '#f0fdf4', border: '1px solid #22c55e' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
-                      <div>
-                        <h4 style={{ margin: '0 0 4px 0', fontSize: '0.95rem' }}>Active Passkey</h4>
-                        <p className="small-text" style={{ margin: '4px 0', color: '#666' }}>
-                          Currently active on-chain
-                        </p>
-                        <p className="small-text" style={{ margin: '4px 0', fontSize: '0.8rem', color: '#888', wordBreak: 'break-all' }}>
-                          qx: {accountInfo.qx.slice(0, 10)}...{accountInfo.qx.slice(-8)}
-                        </p>
-                        <p className="small-text" style={{ margin: '4px 0', fontSize: '0.8rem', color: '#888', wordBreak: 'break-all' }}>
-                          qy: {accountInfo.qy.slice(0, 10)}...{accountInfo.qy.slice(-8)}
-                        </p>
-                      </div>
-                      <span className="status-badge badge-success" style={{ fontSize: '0.75rem' }}>
-                        Active
-                      </span>
-                    </div>
-                  </div>
-                )}
-
-                {/* Show additional devices (for deployed accounts with multi-device) */}
-                {devices.length > 0 && (
-                  <>
-                    <h4 style={{ margin: '16px 0 8px 0', fontSize: '0.9rem', color: '#666' }}>Additional Devices ({devices.length})</h4>
-                    {devices.map((device, index) => (
-                      <div key={index} className="device-card" style={{ backgroundColor: '#fefce8', border: '1px solid #eab308' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
-                          <div>
-                            <h4 style={{ margin: '0 0 4px 0', fontSize: '0.95rem' }}>{device.deviceName || `Device ${index + 1}`}</h4>
-                            <p className="small-text" style={{ margin: '4px 0', color: '#666' }}>
-                              {device.deviceType || 'Unknown type'}
-                            </p>
-                            <p className="small-text" style={{ margin: '4px 0', fontSize: '0.8rem', color: '#888' }}>
-                              ID: {device.credentialId.slice(0, 12)}...{device.credentialId.slice(-8)}
-                            </p>
-                            {device.proposalHash && (
-                              <p className="small-text" style={{ margin: '4px 0', fontSize: '0.8rem', color: '#888', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                <span>Proposal: {device.proposalHash.slice(0, 10)}...{device.proposalHash.slice(-8)}</span>
-                                {device.proposalTxHash && (
-                                  <a
-                                    href={`${networkInfo.explorerUrl}/tx/${device.proposalTxHash}`}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="explorer-link"
-                                    title="View proposal transaction"
-                                    style={{ textDecoration: 'none', fontSize: '0.9rem' }}
-                                  >
-                                    <HiExternalLink />
-                                  </a>
-                                )}
-                              </p>
-                            )}
-                          </div>
-                          <span className="status-badge badge-warning" style={{ fontSize: '0.75rem' }}>
-                            Pending
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                  </>
-                )}
-              </div>
-            </div>
-          )}
 
           {/* Pending Passkey Updates */}
           {pendingActions.length > 0 && (
