@@ -3,7 +3,9 @@
  * Handles communication with backend for multi-device passkey management
  */
 
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001'
+// If VITE_BACKEND_URL is empty, use empty string (same origin via Vite proxy)
+// This allows ngrok to work without CORS issues
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || ''
 
 /**
  * Create authentication signature for API requests

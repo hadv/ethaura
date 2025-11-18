@@ -23,6 +23,19 @@ export default defineConfig({
     host: '0.0.0.0', // Listen on all network interfaces for mobile testing
     open: true,
     fs: { allow: ['..'] }, // allow importing Foundry artifacts from repo root (../out)
+    allowedHosts: [
+      '.ngrok-free.app',
+      '.ngrok-free.dev',
+      '.ngrok.io',
+      '.ngrok.app',
+    ],
+    proxy: {
+      '/api': {
+        target: 'http://192.168.1.4:3001',
+        changeOrigin: true,
+        secure: false,
+      },
+    },
   },
   resolve: {
     alias: {
