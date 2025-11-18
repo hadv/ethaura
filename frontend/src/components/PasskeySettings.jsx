@@ -499,7 +499,14 @@ For now, please use the contract directly on Etherscan or wait for this feature 
                   ⏱️ <strong>Note:</strong> The update requires a 48-hour timelock before the new passkey becomes active.
                   Your old passkey will continue to work until the new one is activated.
                 </p>
-                {showAddDevice ? (
+                {!accountInfo?.isDeployed ? (
+                  <div className="info-message" style={{ padding: '12px', backgroundColor: '#fff3cd', border: '1px solid #ffc107', borderRadius: '4px', marginBottom: '12px' }}>
+                    <p style={{ margin: 0, fontSize: '0.9rem', color: '#856404' }}>
+                      ⚠️ <strong>Account Not Deployed:</strong> You can only have one passkey before deployment.
+                      Additional passkeys can be added after your account is deployed (with your first transaction).
+                    </p>
+                  </div>
+                ) : showAddDevice ? (
                   <AddDeviceFlow
                     accountAddress={accountAddress}
                     onComplete={() => {
