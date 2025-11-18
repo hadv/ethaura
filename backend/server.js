@@ -615,7 +615,16 @@ app.post('/api/sessions/:sessionId/complete', async (req, res) => {
     const { sessionId } = req.params
     const { credential, deviceName, deviceType } = req.body
 
+    console.log(`📱 Session completion request:`, {
+      sessionId,
+      hasCredential: !!credential,
+      deviceName,
+      deviceType,
+      credentialId: credential?.id,
+    })
+
     if (!credential || !deviceName || !deviceType) {
+      console.error('❌ Missing required fields:', { credential: !!credential, deviceName, deviceType })
       return res.status(400).json({
         error: 'Missing required fields: credential, deviceName, deviceType',
       })
@@ -623,6 +632,7 @@ app.post('/api/sessions/:sessionId/complete', async (req, res) => {
 
     // Validate credential
     if (!credential.publicKey || !credential.publicKey.x || !credential.publicKey.y) {
+      console.error('❌ Invalid credential structure:', credential)
       return res.status(400).json({
         error: 'Invalid credential: missing public key',
       })
@@ -642,17 +652,20 @@ app.post('/api/sessions/:sessionId/complete', async (req, res) => {
     const completed = await completeSession(sessionId, deviceData)
 
     if (!completed) {
+      console.error('❌ Failed to complete session:', sessionId)
       return res.status(400).json({
         error: 'Failed to complete session. Session may be expired or already completed.',
       })
     }
 
+    console.log('✅ Session completed successfully:', sessionId)
     res.json({
       success: true,
       message: 'Session completed successfully',
     })
   } catch (error) {
-    console.error('Error completing session:', error)
+    console.error('❌ Error completing session:', error)
+    console.error('Error stack:', error.stack)
     res.status(500).json({
       error: 'Failed to complete session',
       details: error.message,

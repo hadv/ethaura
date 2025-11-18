@@ -83,6 +83,8 @@ function RegisterDevicePage() {
     setStatus('Creating passkey...')
 
     try {
+      console.log('🔐 Starting passkey creation for session:', sessionId)
+      console.log('📱 Device info:', { deviceName: deviceName.trim(), deviceType: getDeviceType() })
       // Generate a random challenge
       const challenge = new Uint8Array(32)
       crypto.getRandomValues(challenge)
@@ -159,10 +161,15 @@ function RegisterDevicePage() {
       setLoading(false)
 
     } catch (err) {
-      console.error('Error creating passkey:', err)
-      setError(err.message || 'Failed to create passkey')
+      console.error('❌ Error creating passkey:', err)
+      console.error('Error stack:', err.stack)
+      const errorMessage = err.message || 'Failed to create passkey'
+      setError(`Error: ${errorMessage}`)
       setStatus('')
       setLoading(false)
+
+      // Show detailed error info
+      alert(`Failed to create passkey:\n\n${errorMessage}\n\nCheck the page for more details.`)
     }
   }
 
@@ -224,6 +231,20 @@ function RegisterDevicePage() {
           </div>
 
           {status && <div className="status-message">{status}</div>}
+          {error && (
+            <div className="error-message" style={{
+              backgroundColor: '#fee',
+              border: '1px solid #fcc',
+              padding: '12px',
+              borderRadius: '8px',
+              marginBottom: '16px',
+              color: '#c00',
+              fontSize: '0.9rem',
+              wordBreak: 'break-word'
+            }}>
+              <strong>Error:</strong> {error}
+            </div>
+          )}
 
           <button
             className="btn btn-primary btn-large"
