@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react'
-import { parsePublicKey } from '../utils/webauthn'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
 import { useNetwork } from '../contexts/NetworkContext'
 import { ethers } from 'ethers'
 import { NETWORKS } from '../lib/constants'
-import { storePasskeyCredential, retrievePasskeyCredential } from '../lib/passkeyStorage'
+import { retrievePasskeyCredential } from '../lib/passkeyStorage'
+import { updateDeviceProposalHash, getDevices } from '../lib/deviceManager'
+import { HiExternalLink } from 'react-icons/hi'
+import AddDeviceFlow from './AddDeviceFlow'
 import '../styles/PasskeySettings.css'
 
 function PasskeySettings({ accountAddress }) {
@@ -17,6 +19,8 @@ function PasskeySettings({ accountAddress }) {
   const [pendingActions, setPendingActions] = useState([])
   const [newPasskey, setNewPasskey] = useState(null)
   const [storedCredential, setStoredCredential] = useState(null) // Passkey from server/localStorage
+  const [showAddDevice, setShowAddDevice] = useState(false) // Show device selection flow
+  const [devices, setDevices] = useState([]) // Devices from database
 
   // P256Account ABI (minimal for what we need)
   const accountABI = [
@@ -28,7 +32,36 @@ function PasskeySettings({ accountAddress }) {
     'function getActivePendingActions() view returns (bytes32[] actionHashes, bytes32[] qxValues, bytes32[] qyValues, uint256[] executeAfters)',
     'function enableTwoFactor()',
     'function disableTwoFactor()',
+    'event PublicKeyUpdateProposed(bytes32 indexed actionHash, bytes32 qx, bytes32 qy, uint256 executeAfter)',
   ]
+
+  // Helper function to format time remaining
+  const formatTimeRemaining = (remainingSeconds) => {
+    if (remainingSeconds <= 0) return null
+
+    const days = Math.floor(remainingSeconds / 86400)
+    const hours = Math.floor((remainingSeconds % 86400) / 3600)
+    const minutes = Math.floor((remainingSeconds % 3600) / 60)
+
+    let parts = []
+    if (days > 0) parts.push(`${days}d`)
+    if (hours > 0) parts.push(`${hours}h`)
+    if (minutes > 0 || parts.length === 0) parts.push(`${minutes}m`)
+
+    return parts.join(' ')
+  }
+
+  // Helper function to get device name from user agent
+  const getDeviceName = () => {
+    const ua = navigator.userAgent
+    if (ua.includes('Mac')) return 'MacBook'
+    if (ua.includes('Windows')) return 'Windows PC'
+    if (ua.includes('Linux')) return 'Linux PC'
+    if (ua.includes('iPhone')) return 'iPhone'
+    if (ua.includes('iPad')) return 'iPad'
+    if (ua.includes('Android')) return 'Android Device'
+    return 'This Device'
+  }
 
   // Load account info when address, provider, or network changes
   useEffect(() => {
@@ -37,6 +70,7 @@ function PasskeySettings({ accountAddress }) {
     setPendingActions([])
     setNewPasskey(null)
     setStoredCredential(null)
+    setDevices([])
     setError('')
     setStatus('')
     setLoading(false)
@@ -44,7 +78,26 @@ function PasskeySettings({ accountAddress }) {
     // Load new data
     loadAccountInfo()
     loadStoredCredential()
+    loadDevices()
   }, [accountAddress, web3AuthProvider, networkInfo.chainId])
+
+  // Load devices from database
+  const loadDevices = async () => {
+    if (!accountAddress || !ownerAddress || !signMessage) return
+
+    try {
+      const deviceList = await getDevices(signMessage, ownerAddress, accountAddress)
+      setDevices(deviceList)
+      console.log('✅ Loaded devices:', deviceList.length)
+      console.log('📱 Devices with proposal hashes:', deviceList.map(d => ({
+        deviceName: d.deviceName,
+        proposalHash: d.proposalHash,
+        proposalTxHash: d.proposalTxHash,
+      })))
+    } catch (error) {
+      console.error('Failed to load devices:', error)
+    }
+  }
 
   // Load stored credential from server/localStorage
   const loadStoredCredential = async () => {
@@ -171,9 +224,10 @@ function PasskeySettings({ accountAddress }) {
 
     try {
       const publicKey = storedCredential.publicKey
-      console.log('📤 Proposing stored passkey:', publicKey)
+      const deviceId = storedCredential.id // credential.id is the device ID
+      console.log('📤 Proposing stored passkey:', publicKey, 'deviceId:', deviceId)
 
-      await proposePasskeyUpdate(publicKey)
+      await proposePasskeyUpdate(publicKey, deviceId)
 
       setStatus('✅ Passkey proposal submitted! Wait 48 hours, then execute the update.')
       await loadStoredCredential()
@@ -186,146 +240,9 @@ function PasskeySettings({ accountAddress }) {
     }
   }
 
-  const createPasskey = async () => {
-    setLoading(true)
-    setError('')
-    setStatus('Creating passkey...')
 
-    try {
-      // Check if WebAuthn is supported
-      if (!window.PublicKeyCredential) {
-        throw new Error('WebAuthn is not supported in this browser')
-      }
 
-      // Generate a random challenge
-      const challenge = new Uint8Array(32)
-      crypto.getRandomValues(challenge)
-
-      // Create a deterministic user ID based on account address (not owner)
-      // This ensures the passkey is tied to the smart account, not the owner
-      const userId = accountAddress
-        ? new TextEncoder().encode(accountAddress.toLowerCase()).slice(0, 16)
-        : crypto.getRandomValues(new Uint8Array(16))
-
-      console.log('👤 Creating passkey for account:', accountAddress)
-
-      // Create credential options
-      const createCredentialOptions = {
-        publicKey: {
-          challenge: challenge,
-          rp: {
-            name: 'ΞTHΛURΛ P256 Wallet',
-            id: window.location.hostname,
-          },
-          user: {
-            id: userId,
-            name: accountAddress ? `${accountAddress.slice(0, 6)}...${accountAddress.slice(-4)}@ethaura.wallet` : 'user@ethaura.wallet',
-            displayName: accountAddress ? `ΞTHΛURΛ Account (${accountAddress.slice(0, 6)}...${accountAddress.slice(-4)})` : 'ΞTHΛURΛ Account',
-          },
-          pubKeyCredParams: [
-            {
-              type: 'public-key',
-              alg: -7, // ES256 (P-256)
-            },
-          ],
-          authenticatorSelection: {
-            authenticatorAttachment: 'platform',
-            requireResidentKey: true,
-            residentKey: 'required',
-            userVerification: 'required',
-          },
-          timeout: 60000,
-          attestation: 'direct',
-        },
-      }
-
-      // Create the credential
-      const credential = await navigator.credentials.create(createCredentialOptions)
-
-      if (!credential) {
-        throw new Error('Failed to create credential')
-      }
-
-      // Parse the public key from the credential
-      const publicKey = parsePublicKey(credential.response.attestationObject)
-
-      console.log('✅ Passkey created:', {
-        id: credential.id,
-        publicKey: {
-          x: publicKey.x,
-          y: publicKey.y,
-          xLength: publicKey.x?.length,
-          yLength: publicKey.y?.length,
-        },
-      })
-
-      // Store credential info for server storage
-      const credentialInfo = {
-        id: credential.id,
-        rawId: credential.rawId,
-        publicKey: publicKey,
-        response: {
-          attestationObject: credential.response.attestationObject,
-          clientDataJSON: credential.response.clientDataJSON,
-        },
-      }
-
-      // Serialize credential for storage (convert ArrayBuffers to base64)
-      const serializedCredential = {
-        id: credentialInfo.id,
-        rawId: btoa(String.fromCharCode(...new Uint8Array(credentialInfo.rawId))),
-        publicKey: credentialInfo.publicKey,
-        response: {
-          attestationObject: btoa(String.fromCharCode(...new Uint8Array(credentialInfo.response.attestationObject))),
-          clientDataJSON: btoa(String.fromCharCode(...new Uint8Array(credentialInfo.response.clientDataJSON))),
-        },
-      }
-
-      // Save to server (account-specific)
-      try {
-        if (signMessage && ownerAddress && accountAddress) {
-          await storePasskeyCredential(signMessage, ownerAddress, accountAddress, serializedCredential)
-          console.log(`✅ Passkey credential saved to server for account: ${accountAddress}`)
-        }
-      } catch (serverError) {
-        console.error('⚠️  Failed to save to server:', serverError)
-        // Continue anyway - we'll save to localStorage as fallback
-      }
-
-      // Save to localStorage as backup (account-specific key)
-      const storageKey = `ethaura_passkey_credential_${accountAddress.toLowerCase()}`
-      localStorage.setItem(storageKey, JSON.stringify(serializedCredential))
-      console.log(`✅ Passkey credential saved to localStorage for account: ${accountAddress}`)
-
-      setNewPasskey(publicKey)
-
-      // Check if account is deployed before proposing on-chain update
-      const rpcUrl = networkInfo.rpcUrl
-      const provider = new ethers.JsonRpcProvider(rpcUrl)
-      const code = await provider.getCode(accountAddress)
-      const isDeployed = code !== '0x'
-
-      if (isDeployed) {
-        setStatus('Passkey created! Now proposing update to smart contract...')
-        // Propose the update to the smart contract
-        await proposePasskeyUpdate(publicKey)
-      } else {
-        setStatus('✅ Passkey created and saved! It will be used when you deploy this account with your first transaction.')
-        // Reload stored credential to update UI
-        await loadStoredCredential()
-        await loadAccountInfo()
-      }
-
-    } catch (err) {
-      console.error('Error creating passkey:', err)
-      setError(err.message || 'Failed to create passkey')
-      setStatus('')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const proposePasskeyUpdate = async (publicKey) => {
+  const proposePasskeyUpdate = async (publicKey, deviceId) => {
     if (!web3AuthProvider || !ownerAddress) {
       throw new Error('Please connect your wallet')
     }
@@ -338,8 +255,7 @@ function PasskeySettings({ accountAddress }) {
       const signer = await ethersProvider.getSigner()
       const contract = new ethers.Contract(accountAddress, accountABI, signer)
 
-      // Format public key for contract
-      // publicKey.x and publicKey.y already have '0x' prefix from parsePublicKey
+      // Format public key for contract (ensure '0x' prefix)
       const qx = publicKey.x.startsWith('0x') ? publicKey.x : '0x' + publicKey.x
       const qy = publicKey.y.startsWith('0x') ? publicKey.y : '0x' + publicKey.y
 
@@ -350,6 +266,34 @@ function PasskeySettings({ accountAddress }) {
 
       const receipt = await tx.wait()
       console.log('✅ Proposal transaction confirmed:', receipt.hash)
+
+      // Extract actionHash from the PublicKeyUpdateProposed event
+      if (deviceId) {
+        try {
+          const event = receipt.logs.find(log => {
+            try {
+              const parsed = contract.interface.parseLog(log)
+              return parsed && parsed.name === 'PublicKeyUpdateProposed'
+            } catch {
+              return false
+            }
+          })
+
+          if (event) {
+            const parsed = contract.interface.parseLog(event)
+            const actionHash = parsed.args.actionHash
+            console.log('📝 Proposal actionHash:', actionHash)
+            console.log('📝 Proposal transaction hash:', receipt.hash)
+
+            // Update the device in database with actionHash and transaction hash
+            await updateDeviceProposalHash(signMessage, ownerAddress, accountAddress, deviceId, actionHash, receipt.hash)
+            console.log('✅ Proposal hash saved to database')
+          }
+        } catch (eventError) {
+          console.error('⚠️  Failed to extract or save actionHash:', eventError)
+          // Continue anyway - the proposal was successful
+        }
+      }
 
       setStatus('Passkey update proposed! You must wait 48 hours before it can be executed.')
 
@@ -488,13 +432,26 @@ For now, please use the contract directly on Etherscan or wait for this feature 
                   ? ' The passkey will be used when you deploy this account with your first transaction.'
                   : ' This will require a 48-hour timelock before the passkey becomes active.'}
               </p>
-              <button
-                className="btn btn-primary"
-                onClick={createPasskey}
-                disabled={loading || !ownerAddress}
-              >
-                {loading ? 'Creating...' : 'Create & Propose Passkey'}
-              </button>
+              {showAddDevice ? (
+                <AddDeviceFlow
+                  accountAddress={accountAddress}
+                  onComplete={() => {
+                    setShowAddDevice(false)
+                    setStatus('✅ Passkey added successfully!')
+                    // Reload to reflect the new passkey
+                    setTimeout(() => window.location.reload(), 1500)
+                  }}
+                  onCancel={() => setShowAddDevice(false)}
+                />
+              ) : (
+                <button
+                  className="btn btn-primary"
+                  onClick={() => setShowAddDevice(true)}
+                  disabled={loading || !ownerAddress}
+                >
+                  Add Passkey
+                </button>
+              )}
             </div>
           ) : (
             <>
@@ -543,25 +500,151 @@ For now, please use the contract directly on Etherscan or wait for this feature 
               <div className="settings-section" style={{ marginTop: '24px' }}>
                 <h3>Update Passkey</h3>
                 <p className="section-description">
-                  Replace your current passkey with a new one on this device. This is useful if:
+                  Replace your current passkey with a new one. This is useful if:
                 </p>
                 <ul className="section-description" style={{ marginLeft: '20px', marginTop: '8px', marginBottom: '12px' }}>
                   <li>You're using a new device and need to register a passkey here</li>
                   <li>You lost access to your previous passkey</li>
                   <li>You want to update your biometric authentication</li>
                 </ul>
-                <p className="section-description" style={{ fontSize: '0.85rem', color: '#666', marginBottom: '12px' }}>
-                  ⏱️ <strong>Note:</strong> The update requires a 48-hour timelock before the new passkey becomes active.
-                  Your old passkey will continue to work until the new one is activated.
-                </p>
-                <button
-                  className="btn btn-secondary"
-                  onClick={createPasskey}
-                  disabled={loading || !ownerAddress}
-                >
-                  {loading ? 'Creating...' : '🔑 Create & Propose New Passkey'}
-                </button>
+                {!accountInfo?.isDeployed ? (
+                  <p className="section-description" style={{ fontSize: '0.85rem', color: '#666', marginBottom: '12px' }}>
+                    ℹ️ <strong>Note:</strong> For undeployed accounts, adding a new passkey will replace the existing one.
+                    The latest passkey will be used when you deploy this account.
+                  </p>
+                ) : (
+                  <p className="section-description" style={{ fontSize: '0.85rem', color: '#666', marginBottom: '12px' }}>
+                    ⏱️ <strong>Note:</strong> The update requires a 48-hour timelock before the new passkey becomes active.
+                    Your old passkey will continue to work until the new one is activated.
+                  </p>
+                )}
+                {showAddDevice ? (
+                  <AddDeviceFlow
+                    accountAddress={accountAddress}
+                    onComplete={() => {
+                      setShowAddDevice(false)
+                      setStatus(accountInfo?.isDeployed
+                        ? '✅ New passkey proposed! Wait 48 hours then execute the update.'
+                        : '✅ Passkey saved! It will be used when you deploy this account.')
+                      // Reload to reflect the new pending device
+                      setTimeout(() => window.location.reload(), 1500)
+                    }}
+                    onCancel={() => setShowAddDevice(false)}
+                  />
+                ) : (
+                  <button
+                    className="btn btn-secondary"
+                    onClick={() => setShowAddDevice(true)}
+                    disabled={loading || !ownerAddress}
+                  >
+                    🔑 Add New Device
+                  </button>
+                )}
               </div>
+
+              {/* Registered Devices List */}
+              {(accountInfo.hasPasskey || storedCredential || devices.length > 0) && (
+                <div className="settings-section" style={{ marginTop: '24px' }}>
+                  <h3>Registered Devices</h3>
+                  <p className="section-description">
+                    View all devices registered with this account.
+                  </p>
+                  <div className="devices-list">
+                    {/* Show current passkey (for undeployed accounts) */}
+                    {storedCredential && !accountInfo.hasPasskey && (
+                      <div className="device-card" style={{ backgroundColor: '#f0f9ff', border: '1px solid #0ea5e9' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
+                          <div style={{ flex: 1 }}>
+                            <h4 style={{ margin: '0 0 4px 0', fontSize: '0.95rem' }}>
+                              {storedCredential.deviceName || getDeviceName()} (Primary)
+                            </h4>
+                            <p className="small-text" style={{ margin: '4px 0', color: '#666' }}>
+                              {storedCredential.deviceType ? `${storedCredential.deviceType.charAt(0).toUpperCase()}${storedCredential.deviceType.slice(1)} • ` : ''}
+                              This passkey will be used when you deploy this account
+                            </p>
+                            <p className="small-text" style={{ margin: '4px 0', fontSize: '0.8rem', color: '#888' }}>
+                              Credential ID: {storedCredential.id.slice(0, 12)}...{storedCredential.id.slice(-8)}
+                            </p>
+                          </div>
+                          <span className="status-badge badge-neutral" style={{ fontSize: '0.75rem' }}>
+                            Not Deployed
+                          </span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Show active on-chain passkey (for deployed accounts) */}
+                    {accountInfo.hasPasskey && (
+                      <div className="device-card" style={{ backgroundColor: '#f0fdf4', border: '1px solid #22c55e' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
+                          <div style={{ flex: 1 }}>
+                            <h4 style={{ margin: '0 0 4px 0', fontSize: '0.95rem' }}>Active Passkey</h4>
+                            <p className="small-text" style={{ margin: '4px 0', color: '#666' }}>
+                              Currently active on-chain
+                            </p>
+                            <p className="small-text" style={{ margin: '4px 0', fontSize: '0.8rem', color: '#888', wordBreak: 'break-all' }}>
+                              qx: {accountInfo.qx.slice(0, 10)}...{accountInfo.qx.slice(-8)}
+                            </p>
+                            <p className="small-text" style={{ margin: '4px 0', fontSize: '0.8rem', color: '#888', wordBreak: 'break-all' }}>
+                              qy: {accountInfo.qy.slice(0, 10)}...{accountInfo.qy.slice(-8)}
+                            </p>
+                          </div>
+                          <span className="status-badge badge-success" style={{ fontSize: '0.75rem' }}>
+                            Active
+                          </span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Show additional devices (for deployed accounts with multi-device) */}
+                    {devices.length > 0 && (
+                      <>
+                        <h4 style={{ margin: '16px 0 8px 0', fontSize: '0.9rem', color: '#666' }}>
+                          Additional Devices ({devices.length})
+                        </h4>
+                        {devices.map((device, index) => (
+                          <div key={index} className="device-card" style={{ backgroundColor: '#fefce8', border: '1px solid #eab308' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
+                              <div style={{ flex: 1 }}>
+                                <h4 style={{ margin: '0 0 4px 0', fontSize: '0.95rem' }}>
+                                  {device.deviceName || `Device ${index + 1}`}
+                                </h4>
+                                <p className="small-text" style={{ margin: '4px 0', color: '#666' }}>
+                                  {device.deviceType ? `${device.deviceType.charAt(0).toUpperCase()}${device.deviceType.slice(1)}` : 'Unknown type'}
+                                </p>
+                                <p className="small-text" style={{ margin: '4px 0', fontSize: '0.8rem', color: '#888' }}>
+                                  Credential ID: {device.credentialId.slice(0, 12)}...{device.credentialId.slice(-8)}
+                                </p>
+                                {device.proposalHash && (
+                                  <p className="small-text" style={{ margin: '4px 0', fontSize: '0.8rem', color: '#888', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                    <span>Proposal: {device.proposalHash.slice(0, 10)}...{device.proposalHash.slice(-8)}</span>
+                                    {device.proposalTxHash && (
+                                      <a
+                                        href={`${networkInfo.explorerUrl}/tx/${device.proposalTxHash}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="explorer-link"
+                                        title="View proposal transaction"
+                                        style={{ textDecoration: 'none', fontSize: '0.9rem' }}
+                                      >
+                                        <HiExternalLink />
+                                      </a>
+                                    )}
+                                  </p>
+                                )}
+                              </div>
+                              <span className="status-badge badge-warning" style={{ fontSize: '0.75rem' }}>
+                                Pending
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
+
             </>
           )}
 
@@ -607,11 +690,26 @@ For now, please use the contract directly on Etherscan or wait for this feature 
                   const canExecute = now >= action.executeAfter
                   const timeRemaining = action.executeAfter - now
 
+                  // Find matching device to get proposal transaction hash
+                  const matchingDevice = devices.find(d => d.proposalHash === action.actionHash)
+
                   return (
                     <div key={index} className="pending-action-card">
                       <h4>Pending Update #{index + 1}</h4>
-                      <p className="small-text">
-                        Action Hash: {action.actionHash.slice(0, 10)}...{action.actionHash.slice(-8)}
+                      <p className="small-text" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span>Action Hash: {action.actionHash.slice(0, 10)}...{action.actionHash.slice(-8)}</span>
+                        {matchingDevice?.proposalTxHash && (
+                          <a
+                            href={`${networkInfo.explorerUrl}/tx/${matchingDevice.proposalTxHash}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="explorer-link"
+                            title="View proposal transaction on explorer"
+                            style={{ textDecoration: 'none', fontSize: '1rem' }}
+                          >
+                            <HiExternalLink />
+                          </a>
+                        )}
                       </p>
                       {canExecute ? (
                         <button
@@ -624,7 +722,7 @@ For now, please use the contract directly on Etherscan or wait for this feature 
                         </button>
                       ) : (
                         <p className="small-text" style={{ marginTop: '8px' }}>
-                          ⏳ Can be executed in: {Math.floor(timeRemaining / 3600)} hours
+                          ⏳ Can be executed in: {formatTimeRemaining(timeRemaining)}
                         </p>
                       )}
                     </div>

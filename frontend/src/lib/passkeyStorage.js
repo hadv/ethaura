@@ -54,11 +54,13 @@ async function createAuthSignature(signMessageFn, ownerAddress, accountAddress, 
  * @param {string} ownerAddress - Owner address (Web3Auth social login address)
  * @param {string} accountAddress - Smart account address
  * @param {Object} credential - Passkey credential to store
+ * @param {string} deviceName - Device name (optional)
+ * @param {string} deviceType - Device type (optional)
  * @returns {Promise<Object>} Response from server
  */
-export async function storePasskeyCredential(signMessageFn, ownerAddress, accountAddress, credential) {
+export async function storePasskeyCredential(signMessageFn, ownerAddress, accountAddress, credential, deviceName = null, deviceType = null) {
   try {
-    console.log('🔐 Storing passkey credential on server for account:', accountAddress)
+    console.log('🔐 Storing passkey credential on server for account:', accountAddress, { deviceName, deviceType })
 
     // Create authentication signature
     const auth = await createAuthSignature(signMessageFn, ownerAddress, accountAddress, 'storage')
@@ -71,6 +73,8 @@ export async function storePasskeyCredential(signMessageFn, ownerAddress, accoun
       message: auth.message,
       timestamp: auth.timestamp,
       credential,
+      deviceName,
+      deviceType,
     }
 
     console.log('📤 Sending request to backend:', `${BACKEND_URL}/api/passkeys`)

@@ -1,0 +1,73 @@
+.add-current-device {
+  padding: 24px;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.form-group {
+  margin-bottom: 24px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 500;
+  color: #333;
+}
+
+.form-control {
+  width: 100%;
+  padding: 10px 12px;
+  font-size: 1rem;
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+  transition: border-color 0.15s;
+}
+
+.form-control:focus {
+  outline: none;
+  border-color: #007bff;
+  box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+}
+
+.form-control:disabled {
+  background-color: #e9ecef;
+  cursor: not-allowed;
+}
+
+.form-text {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.875rem;
+  color: #6c757d;
+}
+
+.status-message {
+  padding: 12px;
+  background: #d1ecf1;
+  border: 1px solid #bee5eb;
+  border-radius: 4px;
+  color: #0c5460;
+  margin-bottom: 16px;
+}
+
+.error-message {
+  padding: 12px;
+  background: #f8d7da;
+  border: 1px solid #f5c6cb;
+  border-radius: 4px;
+  color: #721c24;
+  margin-bottom: 16px;
+}
+
+.flow-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.flow-actions button {
+  flex: 1;
+}
+
