@@ -27,6 +27,11 @@ function AddMobileDevice({ accountAddress, onComplete, onCancel }) {
     setStatus('Creating registration session...')
 
     try {
+      // Verify we have required context
+      if (!ownerAddress || !signMessage) {
+        throw new Error('Not logged in. Please refresh the page and try again.')
+      }
+
       const session = await createDeviceSession(signMessage, ownerAddress, accountAddress)
       setSessionId(session.sessionId)
 
@@ -72,15 +77,24 @@ function AddMobileDevice({ accountAddress, onComplete, onCancel }) {
           },
         }
 
-        // Check if account is deployed
+        // Check if account is deployed (using public RPC, no wallet needed)
         setStatus('Checking account deployment...')
-        const provider = new ethers.BrowserProvider(web3AuthProvider)
-        const code = await provider.getCode(accountAddress)
+
+        // Use public RPC to check deployment (no wallet/provider needed)
+        const publicProvider = new ethers.JsonRpcProvider(networkInfo.rpcUrl)
+        const code = await publicProvider.getCode(accountAddress)
         const isDeployed = code !== '0x'
+
+        console.log('🔍 Account deployment status:', { accountAddress, isDeployed })
 
         if (isDeployed) {
           // For DEPLOYED accounts: Save to multi-device table and create proposal
           setStatus('Saving device to database...')
+
+          // Verify we have a provider for signing transactions
+          if (!web3AuthProvider) {
+            throw new Error('Web3Auth provider not available. Please refresh the page and try again.')
+          }
 
           // Save device to database
           await addDevice(
@@ -102,6 +116,7 @@ function AddMobileDevice({ accountAddress, onComplete, onCancel }) {
             'event PublicKeyUpdateProposed(bytes32 indexed actionHash, bytes32 qx, bytes32 qy, uint256 executeAfter)',
           ]
 
+          const provider = new ethers.BrowserProvider(web3AuthProvider)
           const signer = await provider.getSigner()
           const accountContract = new ethers.Contract(accountAddress, accountABI, signer)
 
@@ -160,6 +175,7 @@ function AddMobileDevice({ accountAddress, onComplete, onCancel }) {
           setStatus('✅ Device registered and proposal created! Wait 48 hours then execute.')
         } else {
           // For UNDEPLOYED accounts: Save to single passkey table (overwrites existing)
+          // NO on-chain transaction needed!
           setStatus('Saving passkey to database...')
           console.log('📝 Saving passkey for undeployed account:', {
             accountAddress,
