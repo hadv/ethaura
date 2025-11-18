@@ -495,23 +495,25 @@ For now, please use the contract directly on Etherscan or wait for this feature 
                   <li>You lost access to your previous passkey</li>
                   <li>You want to update your biometric authentication</li>
                 </ul>
-                <p className="section-description" style={{ fontSize: '0.85rem', color: '#666', marginBottom: '12px' }}>
-                  ⏱️ <strong>Note:</strong> The update requires a 48-hour timelock before the new passkey becomes active.
-                  Your old passkey will continue to work until the new one is activated.
-                </p>
                 {!accountInfo?.isDeployed ? (
-                  <div className="info-message" style={{ padding: '12px', backgroundColor: '#fff3cd', border: '1px solid #ffc107', borderRadius: '4px', marginBottom: '12px' }}>
-                    <p style={{ margin: 0, fontSize: '0.9rem', color: '#856404' }}>
-                      ⚠️ <strong>Account Not Deployed:</strong> You can only have one passkey before deployment.
-                      Additional passkeys can be added after your account is deployed (with your first transaction).
-                    </p>
-                  </div>
-                ) : showAddDevice ? (
+                  <p className="section-description" style={{ fontSize: '0.85rem', color: '#666', marginBottom: '12px' }}>
+                    ℹ️ <strong>Note:</strong> For undeployed accounts, adding a new passkey will replace the existing one.
+                    The latest passkey will be used when you deploy this account.
+                  </p>
+                ) : (
+                  <p className="section-description" style={{ fontSize: '0.85rem', color: '#666', marginBottom: '12px' }}>
+                    ⏱️ <strong>Note:</strong> The update requires a 48-hour timelock before the new passkey becomes active.
+                    Your old passkey will continue to work until the new one is activated.
+                  </p>
+                )}
+                {showAddDevice ? (
                   <AddDeviceFlow
                     accountAddress={accountAddress}
                     onComplete={() => {
                       setShowAddDevice(false)
-                      setStatus('✅ New passkey proposed! Wait 48 hours then execute the update.')
+                      setStatus(accountInfo?.isDeployed
+                        ? '✅ New passkey proposed! Wait 48 hours then execute the update.'
+                        : '✅ Passkey saved! It will be used when you deploy this account.')
                       // Reload to reflect the new pending device
                       setTimeout(() => window.location.reload(), 1500)
                     }}

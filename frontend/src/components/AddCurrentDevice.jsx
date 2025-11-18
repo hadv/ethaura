@@ -3,6 +3,7 @@ import { ethers } from 'ethers'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
 import { parsePublicKey } from '../utils/webauthn'
 import { addDevice, updateDeviceProposalHash } from '../lib/deviceManager'
+import { storePasskeyCredential } from '../lib/passkeyStorage'
 import '../styles/AddCurrentDevice.css'
 
 function AddCurrentDevice({ accountAddress, onComplete, onCancel }) {
@@ -136,18 +137,18 @@ function AddCurrentDevice({ accountAddress, onComplete, onCancel }) {
       setStatus('Saving passkey locally...')
       localStorage.setItem(`passkey_${accountAddress}`, JSON.stringify(serializedCredential))
 
-      // Save to database
-      setStatus('Saving to database...')
-      const deviceType = getDeviceType()
-      await addDevice(signMessage, ownerAddress, accountAddress, deviceName.trim(), deviceType, serializedCredential)
-
-      // Check if account is deployed and needs proposal
+      // Check if account is deployed
       const ethersProvider = new ethers.BrowserProvider(provider)
       const accountCode = await ethersProvider.getCode(accountAddress)
       const isDeployed = accountCode !== '0x'
 
       if (isDeployed) {
-        // For deployed accounts, ALWAYS create a proposal for the new passkey
+        // For DEPLOYED accounts: Save to multi-device table and create proposal
+        setStatus('Saving to database...')
+        const deviceType = getDeviceType()
+        await addDevice(signMessage, ownerAddress, accountAddress, deviceName.trim(), deviceType, serializedCredential)
+
+        // Create on-chain proposal for the new passkey
         setStatus('Proposing passkey to smart contract (48-hour timelock)...')
 
         const signer = await ethersProvider.getSigner()
@@ -205,6 +206,9 @@ function AddCurrentDevice({ accountAddress, onComplete, onCancel }) {
 
         setStatus('✅ Passkey proposed! Wait 48 hours then execute the update.')
       } else {
+        // For UNDEPLOYED accounts: Save to single passkey table (overwrites existing)
+        setStatus('Saving to database...')
+        await storePasskeyCredential(signMessage, ownerAddress, accountAddress, serializedCredential)
         setStatus('✅ Passkey saved! It will be used when you deploy this account.')
       }
 
