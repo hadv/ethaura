@@ -179,7 +179,7 @@ app.get('/health', (req, res) => {
  */
 app.post('/api/passkeys', verifySignature, async (req, res) => {
   try {
-    const { credential } = req.body
+    const { credential, deviceName, deviceType } = req.body
     const userId = req.verifiedUserId
 
     if (!credential) {
@@ -201,9 +201,9 @@ app.post('/api/passkeys', verifySignature, async (req, res) => {
       })
     }
 
-    console.log(`📝 Storing passkey for user: ${userId}`)
+    console.log(`📝 Storing passkey for user: ${userId}`, { deviceName, deviceType })
 
-    const result = await storeCredential(userId, credential)
+    const result = await storeCredential(userId, credential, deviceName, deviceType)
 
     res.json({
       success: true,

@@ -130,6 +130,8 @@ await runAsync(`
     public_key_y TEXT NOT NULL,
     attestation_object TEXT,
     client_data_json TEXT,
+    device_name TEXT,
+    device_type TEXT,
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL
   )
@@ -137,6 +139,20 @@ await runAsync(`
 
 await runAsync(`CREATE INDEX IF NOT EXISTS idx_user_id ON passkey_credentials(user_id)`)
 await runAsync(`CREATE INDEX IF NOT EXISTS idx_credential_id ON passkey_credentials(credential_id)`)
+
+// Add device_name and device_type columns if they don't exist (migration)
+try {
+  await runAsync(`ALTER TABLE passkey_credentials ADD COLUMN device_name TEXT`)
+  console.log('✅ Added device_name column to passkey_credentials')
+} catch (err) {
+  // Column already exists, ignore
+}
+try {
+  await runAsync(`ALTER TABLE passkey_credentials ADD COLUMN device_type TEXT`)
+  console.log('✅ Added device_type column to passkey_credentials')
+} catch (err) {
+  // Column already exists, ignore
+}
 
 // New multi-device table
 await runAsync(`
@@ -194,9 +210,11 @@ console.log('✅ Database initialized:', DB_PATH)
  * Store or update a passkey credential
  * @param {string} userId - User identifier (owner address)
  * @param {Object} credential - Credential data
+ * @param {string} deviceName - Device name (optional)
+ * @param {string} deviceType - Device type (optional)
  * @returns {Object} Stored credential
  */
-export async function storeCredential(userId, credential) {
+export async function storeCredential(userId, credential, deviceName = null, deviceType = null) {
   const now = Date.now()
 
   // Check if credential exists
@@ -212,6 +230,8 @@ export async function storeCredential(userId, credential) {
         public_key_y = ?,
         attestation_object = ?,
         client_data_json = ?,
+        device_name = ?,
+        device_type = ?,
         updated_at = ?
       WHERE user_id = ?
     `, [
@@ -221,6 +241,8 @@ export async function storeCredential(userId, credential) {
       credential.publicKey.y,
       credential.response?.attestationObject || null,
       credential.response?.clientDataJSON || null,
+      deviceName,
+      deviceType,
       now,
       userId
     ])
@@ -229,8 +251,9 @@ export async function storeCredential(userId, credential) {
     await runAsync(`
       INSERT INTO passkey_credentials (
         user_id, credential_id, raw_id, public_key_x, public_key_y,
-        attestation_object, client_data_json, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        attestation_object, client_data_json, device_name, device_type,
+        created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
       userId,
       credential.id,
@@ -239,6 +262,8 @@ export async function storeCredential(userId, credential) {
       credential.publicKey.y,
       credential.response?.attestationObject || null,
       credential.response?.clientDataJSON || null,
+      deviceName,
+      deviceType,
       now,
       now
     ])
@@ -282,6 +307,8 @@ export async function getCredential(userId) {
       attestationObject: row.attestation_object,
       clientDataJSON: row.client_data_json,
     } : null,
+    deviceName: row.device_name,
+    deviceType: row.device_type,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }

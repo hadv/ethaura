@@ -556,9 +556,10 @@ For now, please use the contract directly on Etherscan or wait for this feature 
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
                           <div style={{ flex: 1 }}>
                             <h4 style={{ margin: '0 0 4px 0', fontSize: '0.95rem' }}>
-                              {getDeviceName()} (Primary)
+                              {storedCredential.deviceName || getDeviceName()} (Primary)
                             </h4>
                             <p className="small-text" style={{ margin: '4px 0', color: '#666' }}>
+                              {storedCredential.deviceType ? `${storedCredential.deviceType.charAt(0).toUpperCase()}${storedCredential.deviceType.slice(1)} • ` : ''}
                               This passkey will be used when you deploy this account
                             </p>
                             <p className="small-text" style={{ margin: '4px 0', fontSize: '0.8rem', color: '#888' }}>

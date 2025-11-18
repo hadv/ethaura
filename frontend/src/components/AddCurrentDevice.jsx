@@ -208,7 +208,8 @@ function AddCurrentDevice({ accountAddress, onComplete, onCancel }) {
       } else {
         // For UNDEPLOYED accounts: Save to single passkey table (overwrites existing)
         setStatus('Saving to database...')
-        await storePasskeyCredential(signMessage, ownerAddress, accountAddress, serializedCredential)
+        const deviceType = getDeviceType()
+        await storePasskeyCredential(signMessage, ownerAddress, accountAddress, serializedCredential, deviceName.trim(), deviceType)
         setStatus('✅ Passkey saved! It will be used when you deploy this account.')
       }
 

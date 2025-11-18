@@ -181,8 +181,10 @@ function AddMobileDevice({ accountAddress, onComplete, onCancel }) {
             accountAddress,
             ownerAddress,
             credentialId: credential.id,
+            deviceName: deviceData.deviceName,
+            deviceType: deviceData.deviceType,
           })
-          await storePasskeyCredential(signMessage, ownerAddress, accountAddress, credential)
+          await storePasskeyCredential(signMessage, ownerAddress, accountAddress, credential, deviceData.deviceName, deviceData.deviceType)
           console.log('✅ Passkey saved successfully')
           setStatus('✅ Passkey saved! It will be used when you deploy this account.')
         }
