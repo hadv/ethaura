@@ -147,72 +147,63 @@ function AddCurrentDevice({ accountAddress, onComplete, onCancel }) {
       const isDeployed = accountCode !== '0x'
 
       if (isDeployed) {
-        setStatus('Checking if passkey needs to be proposed...')
-        const contract = new ethers.Contract(accountAddress, accountABI, ethersProvider)
-        const [qx, qy] = await Promise.all([contract.qx(), contract.qy()])
+        // For deployed accounts, ALWAYS create a proposal for the new passkey
+        setStatus('Proposing passkey to smart contract (48-hour timelock)...')
 
-        const needsProposal = qx === ethers.ZeroHash && qy === ethers.ZeroHash
+        const signer = await ethersProvider.getSigner()
+        const contractWithSigner = new ethers.Contract(accountAddress, accountABI, signer)
 
-        if (needsProposal) {
-          setStatus('Proposing passkey to smart contract (48-hour timelock)...')
+        const tx = await contractWithSigner.proposePublicKeyUpdate(publicKey.x, publicKey.y)
+        const receipt = await tx.wait()
 
-          const signer = await ethersProvider.getSigner()
-          const contractWithSigner = new ethers.Contract(accountAddress, accountABI, signer)
+        // Extract actionHash from the PublicKeyUpdateProposed event
+        let actionHash = null
+        try {
+          console.log('🔍 Parsing receipt logs to find PublicKeyUpdateProposed event...')
+          console.log('📋 Receipt logs count:', receipt.logs.length)
 
-          const tx = await contractWithSigner.proposePublicKeyUpdate(publicKey.x, publicKey.y)
-          const receipt = await tx.wait()
+          const event = receipt.logs.find(log => {
+            try {
+              const parsed = contractWithSigner.interface.parseLog(log)
+              console.log('📝 Parsed log:', parsed?.name)
+              return parsed && parsed.name === 'PublicKeyUpdateProposed'
+            } catch (parseError) {
+              // Silently skip logs that don't match our ABI
+              return false
+            }
+          })
 
-          // Extract actionHash from the PublicKeyUpdateProposed event
-          let actionHash = null
-          try {
-            console.log('🔍 Parsing receipt logs to find PublicKeyUpdateProposed event...')
-            console.log('📋 Receipt logs count:', receipt.logs.length)
+          if (event) {
+            const parsed = contractWithSigner.interface.parseLog(event)
+            actionHash = parsed.args.actionHash
+            console.log('✅ Found PublicKeyUpdateProposed event!')
+            console.log('📝 Proposal actionHash:', actionHash)
+            console.log('📝 Proposal transaction hash:', receipt.hash)
+            console.log('📝 Device ID:', serializedCredential.id)
 
-            const event = receipt.logs.find(log => {
+            // Update the device in database with actionHash and transaction hash
+            console.log('💾 Saving proposal hash to database...')
+            await updateDeviceProposalHash(signMessage, ownerAddress, accountAddress, serializedCredential.id, actionHash, receipt.hash)
+            console.log('✅ Proposal hash saved to database successfully!')
+          } else {
+            console.error('❌ PublicKeyUpdateProposed event not found in receipt logs!')
+            console.log('📋 All logs:', receipt.logs.map(log => {
               try {
                 const parsed = contractWithSigner.interface.parseLog(log)
-                console.log('📝 Parsed log:', parsed?.name)
-                return parsed && parsed.name === 'PublicKeyUpdateProposed'
-              } catch (parseError) {
-                // Silently skip logs that don't match our ABI
-                return false
+                return parsed?.name || 'unknown'
+              } catch {
+                return 'unparseable'
               }
-            })
-
-            if (event) {
-              const parsed = contractWithSigner.interface.parseLog(event)
-              actionHash = parsed.args.actionHash
-              console.log('✅ Found PublicKeyUpdateProposed event!')
-              console.log('📝 Proposal actionHash:', actionHash)
-              console.log('📝 Proposal transaction hash:', receipt.hash)
-              console.log('📝 Device ID:', serializedCredential.id)
-
-              // Update the device in database with actionHash and transaction hash
-              console.log('💾 Saving proposal hash to database...')
-              await updateDeviceProposalHash(signMessage, ownerAddress, accountAddress, serializedCredential.id, actionHash, receipt.hash)
-              console.log('✅ Proposal hash saved to database successfully!')
-            } else {
-              console.error('❌ PublicKeyUpdateProposed event not found in receipt logs!')
-              console.log('📋 All logs:', receipt.logs.map(log => {
-                try {
-                  const parsed = contractWithSigner.interface.parseLog(log)
-                  return parsed?.name || 'unknown'
-                } catch {
-                  return 'unparseable'
-                }
-              }))
-            }
-          } catch (eventError) {
-            console.error('⚠️  Failed to extract or save actionHash:', eventError)
-            console.error('Error stack:', eventError.stack)
-            alert(`Warning: Proposal created but hash not saved: ${eventError.message}`)
-            // Continue anyway - the proposal was successful
+            }))
           }
-
-          setStatus('✅ Passkey proposed! Wait 48 hours then execute the update.')
-        } else {
-          setStatus('✅ Passkey saved! (Account already has a passkey on-chain)')
+        } catch (eventError) {
+          console.error('⚠️  Failed to extract or save actionHash:', eventError)
+          console.error('Error stack:', eventError.stack)
+          alert(`Warning: Proposal created but hash not saved: ${eventError.message}`)
+          // Continue anyway - the proposal was successful
         }
+
+        setStatus('✅ Passkey proposed! Wait 48 hours then execute the update.')
       } else {
         setStatus('✅ Passkey saved! It will be used when you deploy this account.')
       }
