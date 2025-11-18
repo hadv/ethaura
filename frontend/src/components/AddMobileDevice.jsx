@@ -161,7 +161,13 @@ function AddMobileDevice({ accountAddress, onComplete, onCancel }) {
         } else {
           // For UNDEPLOYED accounts: Save to single passkey table (overwrites existing)
           setStatus('Saving passkey to database...')
+          console.log('📝 Saving passkey for undeployed account:', {
+            accountAddress,
+            ownerAddress,
+            credentialId: credential.id,
+          })
           await storePasskeyCredential(signMessage, ownerAddress, accountAddress, credential)
+          console.log('✅ Passkey saved successfully')
           setStatus('✅ Passkey saved! It will be used when you deploy this account.')
         }
 
