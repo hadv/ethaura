@@ -2,8 +2,7 @@ import { useState, useEffect } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
 import { useNetwork } from '../contexts/NetworkContext'
-import { createDeviceSession, pollSessionUntilComplete, addDevice } from '../lib/deviceManager'
-import { saveProposalHash } from '../lib/deviceManager'
+import { createDeviceSession, pollSessionUntilComplete, addDevice, updateDeviceProposalHash } from '../lib/deviceManager'
 import { ethers } from 'ethers'
 import '../styles/AddMobileDevice.css'
 
@@ -145,7 +144,7 @@ function AddMobileDevice({ accountAddress, onComplete, onCancel }) {
 
           if (actionHash) {
             // Save proposal hash to database
-            await saveProposalHash(
+            await updateDeviceProposalHash(
               signMessage,
               ownerAddress,
               accountAddress,
