@@ -368,6 +368,7 @@ export async function getDevices(accountAddress) {
       device_id, device_name, device_type, credential_id,
       public_key_x, public_key_y, is_active,
       proposal_hash, proposal_tx_hash,
+      aaguid, attestation_format, is_hardware_backed, authenticator_name,
       created_at, updated_at, last_used_at
     FROM passkey_devices
     WHERE account_address = ?
@@ -386,6 +387,11 @@ export async function getDevices(accountAddress) {
     isActive: Boolean(row.is_active),
     proposalHash: row.proposal_hash,
     proposalTxHash: row.proposal_tx_hash,
+    // Phase 1: Attestation metadata
+    aaguid: row.aaguid,
+    attestationFormat: row.attestation_format,
+    isHardwareBacked: Boolean(row.is_hardware_backed),
+    authenticatorName: row.authenticator_name,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     lastUsedAt: row.last_used_at,

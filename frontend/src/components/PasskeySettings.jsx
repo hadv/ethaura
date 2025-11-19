@@ -608,13 +608,22 @@ For now, please use the contract directly on Etherscan or wait for this feature 
                               <div style={{ flex: 1 }}>
                                 <h4 style={{ margin: '0 0 4px 0', fontSize: '0.95rem' }}>
                                   {device.deviceName || `Device ${index + 1}`}
+                                  {device.isHardwareBacked && (
+                                    <span style={{ marginLeft: '8px', fontSize: '0.75rem', color: '#22c55e' }}>🔒 Hardware</span>
+                                  )}
                                 </h4>
                                 <p className="small-text" style={{ margin: '4px 0', color: '#666' }}>
                                   {device.deviceType ? `${device.deviceType.charAt(0).toUpperCase()}${device.deviceType.slice(1)}` : 'Unknown type'}
+                                  {device.authenticatorName && ` • ${device.authenticatorName}`}
                                 </p>
                                 <p className="small-text" style={{ margin: '4px 0', fontSize: '0.8rem', color: '#888' }}>
                                   Credential ID: {device.credentialId.slice(0, 12)}...{device.credentialId.slice(-8)}
                                 </p>
+                                {device.aaguid && (
+                                  <p className="small-text" style={{ margin: '4px 0', fontSize: '0.8rem', color: '#888' }}>
+                                    AAGUID: {device.aaguid}
+                                  </p>
+                                )}
                                 {device.proposalHash && (
                                   <p className="small-text" style={{ margin: '4px 0', fontSize: '0.8rem', color: '#888', display: 'flex', alignItems: 'center', gap: '4px' }}>
                                     <span>Proposal: {device.proposalHash.slice(0, 10)}...{device.proposalHash.slice(-8)}</span>
