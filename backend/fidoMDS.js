@@ -301,3 +301,48 @@ export async function getMDSStats() {
   }
 }
 
+/**
+ * Backfill MDS metadata for devices that don't have it
+ * This is useful for devices registered before Phase 2
+ *
+ * @param {Array} devices - Array of device objects
+ * @returns {Array} Devices with updated MDS metadata
+ */
+export function backfillMDSMetadata(devices) {
+  if (!devices || devices.length === 0) {
+    return devices
+  }
+
+  return devices.map(device => {
+    // Skip if device already has MDS metadata
+    if (device.isFido2Certified !== null && device.certificationLevel) {
+      return device
+    }
+
+    // Skip if no AAGUID
+    if (!device.aaguid) {
+      return device
+    }
+
+    // Lookup MDS metadata
+    const metadata = lookupAuthenticatorWithFallback(device.aaguid)
+
+    console.log(`🔄 Backfilling MDS metadata for device ${device.deviceName || device.deviceId}:`, {
+      aaguid: device.aaguid,
+      foundMetadata: !!metadata,
+      certificationLevel: metadata.certificationLevel,
+      isFido2Certified: metadata.isFido2Certified,
+    })
+
+    // Update device with MDS metadata (in-memory only, not persisted)
+    return {
+      ...device,
+      authenticatorName: device.authenticatorName || metadata.name,
+      authenticatorDescription: metadata.description,
+      isFido2Certified: metadata.isFido2Certified,
+      certificationLevel: metadata.certificationLevel,
+      // Keep existing isHardwareBacked if already set
+      isHardwareBacked: device.isHardwareBacked !== null ? device.isHardwareBacked : metadata.isHardwareBacked,
+    }
+  })
+}

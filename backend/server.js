@@ -37,6 +37,7 @@ import {
   refreshMDSBlob,
   lookupAuthenticatorWithFallback,
   getMDSStats,
+  backfillMDSMetadata,
   stopMDS,
 } from './fidoMDS.js'
 
@@ -310,7 +311,11 @@ app.get('/api/devices/:accountAddress', async (req, res) => {
 
     console.log(`📱 Retrieving devices for account: ${accountAddress}`)
 
-    const devices = await getDevices(accountAddress)
+    let devices = await getDevices(accountAddress)
+
+    // Phase 2: Backfill MDS metadata for devices that don't have it
+    // This updates devices in-memory with MDS data without persisting to database
+    devices = backfillMDSMetadata(devices)
 
     res.json({
       success: true,
