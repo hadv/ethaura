@@ -81,13 +81,13 @@ function AddCurrentDevice({ accountAddress, onComplete, onCancel }) {
         publicKey: {
           challenge: challenge,
           rp: {
-            name: 'ΞTHΛURΛ P256 Wallet',
+            name: 'EthAura P256 Wallet',
             id: window.location.hostname,
           },
           user: {
             id: userId,
-            name: `${accountAddress.slice(0, 6)}...${accountAddress.slice(-4)}@ethaura.wallet`,
-            displayName: `ΞTHΛURΛ Account (${accountAddress.slice(0, 6)}...${accountAddress.slice(-4)})`,
+            name: accountAddress.toLowerCase(),
+            displayName: `EthAura Account ${accountAddress.slice(0, 6)}...${accountAddress.slice(-4)}`,
           },
           pubKeyCredParams: [
             {

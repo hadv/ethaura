@@ -126,8 +126,8 @@ function RegisterDevicePage() {
           },
           user: {
             id: userId,
-            name: `${session.accountAddress.slice(0, 6)}...${session.accountAddress.slice(-4)}@ethaura.wallet`,
-            displayName: `ΞTHΛURΛ Account (${session.accountAddress.slice(0, 6)}...${session.accountAddress.slice(-4)})`,
+            name: session.accountAddress.toLowerCase(),
+            displayName: `EthAura Account ${session.accountAddress.slice(0, 6)}...${session.accountAddress.slice(-4)}`,
           },
           pubKeyCredParams: [
             {
