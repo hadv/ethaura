@@ -742,49 +742,42 @@ For now, please use the contract directly on Etherscan or wait for this feature 
           {/* FIDO Certification Levels Info */}
           <div className="status-box" style={{ marginTop: '16px' }}>
             <h3>FIDO2 Certification</h3>
-            <div style={{ fontSize: '0.8rem', color: '#6b7280', marginBottom: '12px' }}>
-              Security certification levels
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
               <div style={{
-                padding: '6px 10px',
-                backgroundColor: '#f9fafb',
-                borderRadius: '4px',
-                borderLeft: '3px solid #22c55e',
                 fontSize: '0.8rem',
-                color: '#374151'
+                color: '#374151',
+                display: 'flex',
+                alignItems: 'center'
               }}>
-                <strong style={{ color: '#166534' }}>L1</strong> - Basic security requirements
+                <strong style={{ color: '#166534', minWidth: '35px' }}>L1</strong>
+                <span>Basic security requirements</span>
               </div>
               <div style={{
-                padding: '6px 10px',
-                backgroundColor: '#f9fafb',
-                borderRadius: '4px',
-                borderLeft: '3px solid #16a34a',
                 fontSize: '0.8rem',
-                color: '#374151'
+                color: '#374151',
+                display: 'flex',
+                alignItems: 'center'
               }}>
-                <strong style={{ color: '#166534' }}>L2</strong> - Hardware-backed, biometric
+                <strong style={{ color: '#166534', minWidth: '35px' }}>L2</strong>
+                <span>Hardware-backed, biometric</span>
               </div>
               <div style={{
-                padding: '6px 10px',
-                backgroundColor: '#f9fafb',
-                borderRadius: '4px',
-                borderLeft: '3px solid #15803d',
                 fontSize: '0.8rem',
-                color: '#374151'
+                color: '#374151',
+                display: 'flex',
+                alignItems: 'center'
               }}>
-                <strong style={{ color: '#166534' }}>L3</strong> - Government-grade security
+                <strong style={{ color: '#166534', minWidth: '35px' }}>L3</strong>
+                <span>Government-grade security</span>
               </div>
               <div style={{
-                padding: '6px 10px',
-                backgroundColor: '#f9fafb',
-                borderRadius: '4px',
-                borderLeft: '3px solid #14532d',
                 fontSize: '0.8rem',
-                color: '#374151'
+                color: '#374151',
+                display: 'flex',
+                alignItems: 'center'
               }}>
-                <strong style={{ color: '#166534' }}>L3+</strong> - Military-grade security
+                <strong style={{ color: '#166534', minWidth: '35px' }}>L3+</strong>
+                <span>Military-grade security</span>
               </div>
             </div>
           </div>
