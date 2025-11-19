@@ -25,24 +25,73 @@ const CACHE_TTL_MS = 24 * 60 * 60 * 1000 // 24 hours
 let mdsCache = null
 let refreshTimer = null
 
-// Phase 1 hardcoded AAGUIDs for fallback
+// Phase 1 hardcoded AAGUIDs for fallback (with Phase 2 certification info)
 const KNOWN_HARDWARE_AAGUIDS = {
-  // Apple
-  'fbfc3007-154e-4ecc-8c0b-6e020557d7bd': 'iCloud Keychain (Secure Enclave)',
-  '08987058-cadc-4b81-b6e1-30de50dcbe96': 'Touch ID (Mac)',
-  'dd4ec289-e01d-41c9-bb89-70fa845d4bf2': 'Face ID (iPhone/iPad)',
-  'adce0002-35bc-c60a-648b-0b25f1f05503': 'Touch ID (Mac)',
-  // Windows Hello
-  '6028b017-b1d4-4c02-b4b3-afcdafc96bb2': 'Windows Hello (TPM)',
-  '08987058-cadc-4b81-b6e1-30de50dcbe96': 'Windows Hello (Software)',
-  // YubiKey
-  'cb69481e-8ff7-4039-93ec-0a2729a154a8': 'YubiKey 5 Series',
-  '2fc0579f-8113-47ea-b116-bb5a8db9202a': 'YubiKey 5 FIPS Series',
-  'c5ef55ff-ad9a-4b9f-b580-adebafe026d0': 'YubiKey 5Ci',
-  // Google
-  'ea9b8d66-4d01-1d21-3ce4-b6b48cb575d4': 'Google Titan Security Key',
-  // Microsoft
-  '9ddd1817-af5a-4672-a2b9-3e3dd95000a9': 'Windows Hello (Hardware)',
+  // Apple - All Apple Secure Enclave devices are FIDO2 L2 certified
+  'fbfc3007-154e-4ecc-8c0b-6e020557d7bd': {
+    name: 'iCloud Keychain (Secure Enclave)',
+    certificationLevel: 'FIDO_CERTIFIED_L2',
+    isFido2Certified: true,
+    isHardwareBacked: true,
+  },
+  '08987058-cadc-4b81-b6e1-30de50dcbe96': {
+    name: 'Touch ID (Mac)',
+    certificationLevel: 'FIDO_CERTIFIED_L2',
+    isFido2Certified: true,
+    isHardwareBacked: true,
+  },
+  'dd4ec289-e01d-41c9-bb89-70fa845d4bf2': {
+    name: 'Face ID (iPhone/iPad)',
+    certificationLevel: 'FIDO_CERTIFIED_L2',
+    isFido2Certified: true,
+    isHardwareBacked: true,
+  },
+  'adce0002-35bc-c60a-648b-0b25f1f05503': {
+    name: 'Touch ID (Mac)',
+    certificationLevel: 'FIDO_CERTIFIED_L2',
+    isFido2Certified: true,
+    isHardwareBacked: true,
+  },
+  // Windows Hello - TPM-backed is L1 certified
+  '6028b017-b1d4-4c02-b4b3-afcdafc96bb2': {
+    name: 'Windows Hello (TPM)',
+    certificationLevel: 'FIDO_CERTIFIED_L1',
+    isFido2Certified: true,
+    isHardwareBacked: true,
+  },
+  // YubiKey - All YubiKey 5 series are L1 certified
+  'cb69481e-8ff7-4039-93ec-0a2729a154a8': {
+    name: 'YubiKey 5 Series',
+    certificationLevel: 'FIDO_CERTIFIED_L1',
+    isFido2Certified: true,
+    isHardwareBacked: true,
+  },
+  '2fc0579f-8113-47ea-b116-bb5a8db9202a': {
+    name: 'YubiKey 5 FIPS Series',
+    certificationLevel: 'FIDO_CERTIFIED_L1',
+    isFido2Certified: true,
+    isHardwareBacked: true,
+  },
+  'c5ef55ff-ad9a-4b9f-b580-adebafe026d0': {
+    name: 'YubiKey 5Ci',
+    certificationLevel: 'FIDO_CERTIFIED_L1',
+    isFido2Certified: true,
+    isHardwareBacked: true,
+  },
+  // Google Titan - L1 certified
+  'ea9b8d66-4d01-1d21-3ce4-b6b48cb575d4': {
+    name: 'Google Titan Security Key',
+    certificationLevel: 'FIDO_CERTIFIED_L1',
+    isFido2Certified: true,
+    isHardwareBacked: true,
+  },
+  // Microsoft Windows Hello Hardware - L1 certified
+  '9ddd1817-af5a-4672-a2b9-3e3dd95000a9': {
+    name: 'Windows Hello (Hardware)',
+    certificationLevel: 'FIDO_CERTIFIED_L1',
+    isFido2Certified: true,
+    isHardwareBacked: true,
+  },
 }
 
 /**
@@ -248,14 +297,17 @@ export function lookupAuthenticatorWithFallback(aaguid) {
   // Try MDS cache first
   let metadata = lookupAuthenticator(aaguid)
 
-  // Fallback to Phase 1 hardcoded AAGUIDs
-  if (!metadata && KNOWN_HARDWARE_AAGUIDS[aaguid.toLowerCase()]) {
-    metadata = {
-      name: KNOWN_HARDWARE_AAGUIDS[aaguid.toLowerCase()],
-      description: null,
-      certificationLevel: null,
-      isFido2Certified: false,
-      isHardwareBacked: true, // Assume hardware for known AAGUIDs
+  // Fallback to Phase 1 hardcoded AAGUIDs (now with certification info)
+  if (!metadata) {
+    const knownDevice = KNOWN_HARDWARE_AAGUIDS[aaguid.toLowerCase()]
+    if (knownDevice) {
+      metadata = {
+        name: knownDevice.name,
+        description: null,
+        certificationLevel: knownDevice.certificationLevel,
+        isFido2Certified: knownDevice.isFido2Certified,
+        isHardwareBacked: knownDevice.isHardwareBacked,
+      }
     }
   }
 
