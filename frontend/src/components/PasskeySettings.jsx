@@ -83,19 +83,32 @@ function PasskeySettings({ accountAddress }) {
 
   // Load devices from database
   const loadDevices = async () => {
-    if (!accountAddress || !ownerAddress || !signMessage) return
+    if (!accountAddress || !ownerAddress || !signMessage) {
+      console.log('⏭️  Skipping loadDevices - missing required params:', {
+        accountAddress: !!accountAddress,
+        ownerAddress: !!ownerAddress,
+        signMessage: !!signMessage,
+      })
+      return
+    }
 
     try {
+      console.log('🔄 Loading devices for account:', accountAddress)
       const deviceList = await getDevices(signMessage, ownerAddress, accountAddress)
       setDevices(deviceList)
       console.log('✅ Loaded devices:', deviceList.length)
-      console.log('📱 Devices with proposal hashes:', deviceList.map(d => ({
+      console.log('📱 Device details:', deviceList.map(d => ({
         deviceName: d.deviceName,
+        deviceType: d.deviceType,
+        isHardwareBacked: d.isHardwareBacked,
+        authenticatorName: d.authenticatorName,
+        aaguid: d.aaguid,
         proposalHash: d.proposalHash,
         proposalTxHash: d.proposalTxHash,
       })))
     } catch (error) {
-      console.error('Failed to load devices:', error)
+      console.error('❌ Failed to load devices:', error)
+      console.error('Error details:', error.message, error.stack)
     }
   }
 
