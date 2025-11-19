@@ -654,7 +654,7 @@ For now, please use the contract directly on Etherscan or wait for this feature 
                                         borderRadius: '4px',
                                         fontWeight: '500'
                                       }}
-                                      title={`FIDO2 Certified: ${device.certificationLevel}`}
+                                      title={`FIDO2 Certification Levels:\n• L1: Basic security requirements\n• L2: Enhanced security (hardware-backed, biometric)\n• L3: Advanced security (government-grade)\n• L3+: Highest security (military-grade)\n\nThis device: ${device.certificationLevel}`}
                                     >
                                       {device.certificationLevel.replace('FIDO_CERTIFIED_', 'FIDO2 L').replace('FIDO_CERTIFIED', 'FIDO2')}
                                     </span>

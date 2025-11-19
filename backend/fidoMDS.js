@@ -310,24 +310,31 @@ export async function getMDSStats() {
  */
 export function backfillMDSMetadata(devices) {
   if (!devices || devices.length === 0) {
+    console.log('⏭️  No devices to backfill')
     return devices
   }
+
+  console.log(`🔄 Backfilling MDS metadata for ${devices.length} device(s)`)
 
   return devices.map(device => {
     // Skip if device already has MDS metadata (certificationLevel is the key indicator)
     if (device.certificationLevel !== null && device.certificationLevel !== undefined) {
+      console.log(`⏭️  Skipping device ${device.deviceName || device.deviceId} - already has certificationLevel:`, device.certificationLevel)
       return device
     }
 
     // Skip if no AAGUID
     if (!device.aaguid) {
+      console.log(`⚠️  Skipping device ${device.deviceName || device.deviceId} - no AAGUID`)
       return device
     }
+
+    console.log(`🔍 Looking up AAGUID for device ${device.deviceName || device.deviceId}:`, device.aaguid)
 
     // Lookup MDS metadata
     const metadata = lookupAuthenticatorWithFallback(device.aaguid)
 
-    console.log(`🔄 Backfilling MDS metadata for device ${device.deviceName || device.deviceId}:`, {
+    console.log(`✅ Backfilled MDS metadata for device ${device.deviceName || device.deviceId}:`, {
       aaguid: device.aaguid,
       foundMetadata: !!metadata,
       certificationLevel: metadata.certificationLevel,

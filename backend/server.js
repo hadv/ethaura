@@ -686,6 +686,31 @@ app.post('/api/admin/mds/refresh', async (req, res) => {
   }
 })
 
+/**
+ * GET /api/admin/mds/lookup/:aaguid
+ * Debug endpoint to test AAGUID lookup
+ */
+app.get('/api/admin/mds/lookup/:aaguid', async (req, res) => {
+  try {
+    const { aaguid } = req.params
+    console.log('🔍 Looking up AAGUID:', aaguid)
+
+    const metadata = lookupAuthenticatorWithFallback(aaguid)
+
+    res.json({
+      success: true,
+      aaguid,
+      metadata,
+    })
+  } catch (error) {
+    console.error('Error looking up AAGUID:', error)
+    res.status(500).json({
+      error: 'Failed to lookup AAGUID',
+      details: error.message,
+    })
+  }
+})
+
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error('Unhandled error:', err)
