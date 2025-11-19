@@ -652,12 +652,10 @@ For now, please use the contract directly on Etherscan or wait for this feature 
                                         color: '#166534',
                                         border: 'none',
                                         borderRadius: '4px',
-                                        fontWeight: '500',
-                                        cursor: 'help'
+                                        fontWeight: '500'
                                       }}
-                                      title={`FIDO2 Certification Levels: L1 (Basic security), L2 (Enhanced security with hardware-backed biometric), L3 (Advanced government-grade), L3+ (Highest military-grade). This device: ${device.certificationLevel}`}
                                     >
-                                      {device.certificationLevel.replace('FIDO_CERTIFIED_L', 'L').replace('FIDO_CERTIFIED', 'Certified')}
+                                      {device.certificationLevel.replace('FIDO_CERTIFIED_L', 'FIDO L').replace('FIDO_CERTIFIED', 'FIDO Certified')}
                                     </span>
                                   )}
                                 </div>
@@ -741,7 +739,24 @@ For now, please use the contract directly on Etherscan or wait for this feature 
             </div>
           </div>
 
-          {/* Removed: Device Security sidebar - certification info now shown in main device list */}
+          {/* FIDO Certification Levels Info */}
+          <div className="status-box" style={{ marginTop: '16px' }}>
+            <h3>FIDO2 Certification Levels</h3>
+            <div style={{ fontSize: '0.85rem', lineHeight: '1.6', color: '#374151' }}>
+              <div style={{ marginBottom: '8px' }}>
+                <strong style={{ color: '#166534' }}>L1:</strong> Basic security requirements
+              </div>
+              <div style={{ marginBottom: '8px' }}>
+                <strong style={{ color: '#166534' }}>L2:</strong> Enhanced security (hardware-backed, biometric)
+              </div>
+              <div style={{ marginBottom: '8px' }}>
+                <strong style={{ color: '#166534' }}>L3:</strong> Advanced security (government-grade)
+              </div>
+              <div>
+                <strong style={{ color: '#166534' }}>L3+:</strong> Highest security (military-grade)
+              </div>
+            </div>
+          </div>
 
           {/* Pending Passkey Updates */}
           {pendingActions.length > 0 && (
