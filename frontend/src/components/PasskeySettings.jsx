@@ -102,6 +102,11 @@ function PasskeySettings({ accountAddress }) {
         isHardwareBacked: d.isHardwareBacked,
         authenticatorName: d.authenticatorName,
         aaguid: d.aaguid,
+        // Phase 2: MDS metadata
+        isFido2Certified: d.isFido2Certified,
+        certificationLevel: d.certificationLevel,
+        authenticatorDescription: d.authenticatorDescription,
+        mdsLastUpdated: d.mdsLastUpdated,
         proposalHash: d.proposalHash,
         proposalTxHash: d.proposalTxHash,
       })))
@@ -618,24 +623,40 @@ For now, please use the contract directly on Etherscan or wait for this feature 
                                   {device.authenticatorName || 'Unknown Authenticator'}
                                 </p>
 
-                                {/* Phase 2: Show certification badges */}
+                                {/* Phase 2: Show certification badges - ALWAYS show if data exists */}
                                 <div style={{ display: 'flex', gap: '6px', margin: '6px 0', flexWrap: 'wrap' }}>
-                                  {device.isFido2Certified && device.certificationLevel && (
-                                    <span
-                                      className="badge badge-success"
-                                      style={{ fontSize: '0.7rem', padding: '2px 6px' }}
-                                      title={`FIDO2 Certified: ${device.certificationLevel}`}
-                                    >
-                                      {device.certificationLevel.replace('FIDO_CERTIFIED_', 'FIDO2 L')}
-                                    </span>
-                                  )}
                                   {device.isHardwareBacked && (
                                     <span
-                                      className="badge badge-info"
-                                      style={{ fontSize: '0.7rem', padding: '2px 6px', backgroundColor: '#22c55e', color: 'white' }}
+                                      className="badge"
+                                      style={{
+                                        fontSize: '0.7rem',
+                                        padding: '3px 8px',
+                                        backgroundColor: '#dbeafe',
+                                        color: '#1e40af',
+                                        border: 'none',
+                                        borderRadius: '4px',
+                                        fontWeight: '500'
+                                      }}
                                       title="Hardware-backed authenticator"
                                     >
                                       Hardware-Backed
+                                    </span>
+                                  )}
+                                  {device.isFido2Certified && device.certificationLevel && (
+                                    <span
+                                      className="badge"
+                                      style={{
+                                        fontSize: '0.7rem',
+                                        padding: '3px 8px',
+                                        backgroundColor: '#dcfce7',
+                                        color: '#166534',
+                                        border: 'none',
+                                        borderRadius: '4px',
+                                        fontWeight: '500'
+                                      }}
+                                      title={`FIDO2 Certified: ${device.certificationLevel}`}
+                                    >
+                                      {device.certificationLevel.replace('FIDO_CERTIFIED_', 'FIDO2 L').replace('FIDO_CERTIFIED', 'FIDO2')}
                                     </span>
                                   )}
                                 </div>
@@ -719,44 +740,7 @@ For now, please use the contract directly on Etherscan or wait for this feature 
             </div>
           </div>
 
-          {/* Phase 2: Device Security Info */}
-          {devices.length > 0 && devices.some(d => d.isFido2Certified || d.isHardwareBacked) && (
-            <div className="status-box" style={{ marginTop: '16px' }}>
-              <h3>Device Security</h3>
-              <div className="status-grid">
-                {devices.map((device, index) => (
-                  <div key={index} style={{ marginBottom: '12px', paddingBottom: '12px', borderBottom: index < devices.length - 1 ? '1px solid #e5e7eb' : 'none' }}>
-                    <div style={{ fontSize: '0.85rem', fontWeight: '500', marginBottom: '4px', color: '#374151' }}>
-                      {device.deviceName || `Device ${index + 1}`}
-                    </div>
-                    <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '4px' }}>
-                      {device.authenticatorName || 'Unknown Authenticator'}
-                    </div>
-                    <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
-                      {device.isFido2Certified && device.certificationLevel && (
-                        <span
-                          className="badge badge-success"
-                          style={{ fontSize: '0.65rem', padding: '2px 4px' }}
-                          title={`FIDO2 Certified: ${device.certificationLevel}`}
-                        >
-                          {device.certificationLevel.replace('FIDO_CERTIFIED_', 'L')}
-                        </span>
-                      )}
-                      {device.isHardwareBacked && (
-                        <span
-                          className="badge badge-info"
-                          style={{ fontSize: '0.65rem', padding: '2px 4px', backgroundColor: '#22c55e', color: 'white' }}
-                          title="Hardware-backed authenticator"
-                        >
-                          HW
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+          {/* Removed: Device Security sidebar - certification info now shown in main device list */}
 
           {/* Pending Passkey Updates */}
           {pendingActions.length > 0 && (
