@@ -741,19 +741,62 @@ For now, please use the contract directly on Etherscan or wait for this feature 
 
           {/* FIDO Certification Levels Info */}
           <div className="status-box" style={{ marginTop: '16px' }}>
-            <h3>FIDO2 Certification Levels</h3>
-            <div style={{ fontSize: '0.85rem', lineHeight: '1.6', color: '#374151' }}>
-              <div style={{ marginBottom: '8px' }}>
-                <strong style={{ color: '#166534' }}>L1:</strong> Basic security requirements
+            <h3>FIDO2 Certification</h3>
+            <div style={{ fontSize: '0.8rem', color: '#6b7280', marginBottom: '12px' }}>
+              Security certification levels for authenticators
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <div style={{
+                padding: '8px 10px',
+                backgroundColor: '#f9fafb',
+                borderRadius: '6px',
+                borderLeft: '3px solid #22c55e'
+              }}>
+                <div style={{ fontSize: '0.85rem', fontWeight: '600', color: '#166534', marginBottom: '2px' }}>
+                  L1 - Basic
+                </div>
+                <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
+                  Basic security requirements
+                </div>
               </div>
-              <div style={{ marginBottom: '8px' }}>
-                <strong style={{ color: '#166534' }}>L2:</strong> Enhanced security (hardware-backed, biometric)
+              <div style={{
+                padding: '8px 10px',
+                backgroundColor: '#f9fafb',
+                borderRadius: '6px',
+                borderLeft: '3px solid #16a34a'
+              }}>
+                <div style={{ fontSize: '0.85rem', fontWeight: '600', color: '#166534', marginBottom: '2px' }}>
+                  L2 - Enhanced
+                </div>
+                <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
+                  Hardware-backed, biometric
+                </div>
               </div>
-              <div style={{ marginBottom: '8px' }}>
-                <strong style={{ color: '#166534' }}>L3:</strong> Advanced security (government-grade)
+              <div style={{
+                padding: '8px 10px',
+                backgroundColor: '#f9fafb',
+                borderRadius: '6px',
+                borderLeft: '3px solid #15803d'
+              }}>
+                <div style={{ fontSize: '0.85rem', fontWeight: '600', color: '#166534', marginBottom: '2px' }}>
+                  L3 - Advanced
+                </div>
+                <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
+                  Government-grade security
+                </div>
               </div>
-              <div>
-                <strong style={{ color: '#166534' }}>L3+:</strong> Highest security (military-grade)
+              <div style={{
+                padding: '8px 10px',
+                backgroundColor: '#f9fafb',
+                borderRadius: '6px',
+                borderLeft: '3px solid #14532d'
+              }}>
+                <div style={{ fontSize: '0.85rem', fontWeight: '600', color: '#166534', marginBottom: '2px' }}>
+                  L3+ - Highest
+                </div>
+                <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
+                  Military-grade security
+                </div>
               </div>
             </div>
           </div>
