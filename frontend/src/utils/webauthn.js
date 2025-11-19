@@ -42,6 +42,37 @@ export function extractAAGUID(authData) {
 }
 
 /**
+ * Known hardware-backed authenticator AAGUIDs
+ * These authenticators use hardware security modules (Secure Enclave, TPM, etc.)
+ * even when they return attestation format "none" for privacy
+ */
+const KNOWN_HARDWARE_AAGUIDS = {
+  // Apple devices
+  'fbfc3007-154e-4ecc-8c0b-6e020557d7bd': 'iCloud Keychain (Secure Enclave)',
+  '08987058-cadc-4b81-b6e1-30de50dcbe96': 'Touch ID (Mac)',
+  'dd4ec289-e01d-41c9-bb89-70fa845d4bf2': 'Face ID (iPhone/iPad)',
+
+  // Windows Hello
+  '6028b017-b1d4-4c02-b4b3-afcdafc96bb2': 'Windows Hello (TPM)',
+  '08987058-cadc-4b81-b6e1-30de50dcbe96': 'Windows Hello Software',
+
+  // Hardware security keys
+  'cb69481e-8ff7-4039-93ec-0a2729a154a8': 'YubiKey 5 Series',
+  '2fc0579f-8113-47ea-b116-bb5a8db9202a': 'YubiKey 5 NFC',
+  'c5ef55ff-ad9a-4b9f-b580-adebafe026d0': 'YubiKey 5Ci',
+  'fa2b99dc-9e39-4257-8f92-4a30d23c4118': 'YubiKey 5 Nano',
+  'ee882879-721c-4913-9775-3dfcce97072a': 'YubiKey 5C',
+  '73bb0cd4-e502-49b8-9c6f-b59445bf720b': 'YubiKey 5C Nano',
+
+  // Google Titan
+  'ea9b8d66-4d01-1d21-3ce4-b6b48cb575d4': 'Google Titan Security Key',
+
+  // Chrome/Android
+  'adce0002-35bc-c60a-648b-0b25f1f05503': 'Chrome on Mac (TPM)',
+  'bada5566-a7aa-401f-bd96-45619a55120d': 'Android (Keystore)',
+}
+
+/**
  * Verify WebAuthn attestation object and extract metadata
  * @param {ArrayBuffer} attestationObject - The attestation object from credential creation
  * @param {ArrayBuffer} clientDataJSON - The client data JSON
@@ -62,36 +93,56 @@ export function verifyAttestation(attestationObject, clientDataJSON) {
     // Extract AAGUID
     const aaguid = extractAAGUID(authData)
 
-    // Determine if hardware-backed based on attestation format
+    // Determine if hardware-backed based on attestation format and AAGUID
     let isHardwareBacked = true // Default assumption
-
-    if (fmt === 'none') {
-      // "none" format means no attestation provided (privacy-focused)
-      isHardwareBacked = null // Unknown
-      console.log('ℹ️ Attestation format is "none" - hardware status unknown')
-    } else if (fmt === 'packed') {
-      // "packed" format with attestation statement indicates hardware-backed
-      if (attStmt && Object.keys(attStmt).length > 0) {
-        isHardwareBacked = true
-        console.log('✅ Packed attestation detected - likely hardware-backed')
-      } else {
-        // Self-attestation (no certificate)
-        isHardwareBacked = null
-        console.log('ℹ️ Self-attestation detected - hardware status unknown')
-      }
-    }
+    const authenticatorName = KNOWN_HARDWARE_AAGUIDS[aaguid] || null
 
     // Check if AAGUID is all zeros (indicates no specific authenticator)
     if (aaguid === '00000000-0000-0000-0000-000000000000') {
       isHardwareBacked = null
-      console.log('ℹ️ AAGUID is all zeros - hardware status unknown')
+      console.log('⚠️  AAGUID is all zeros - unknown authenticator')
     }
+    // Format "none" - check against known hardware AAGUIDs
+    else if (fmt === 'none') {
+      if (authenticatorName) {
+        isHardwareBacked = true
+        console.log(`✅ Recognized hardware authenticator: ${authenticatorName}`)
+      } else {
+        isHardwareBacked = null
+        console.log('⚠️  Unknown AAGUID with format "none" - cannot determine hardware backing')
+      }
+    }
+    // Format "packed" - check attestation statement
+    else if (fmt === 'packed') {
+      if (attStmt && Object.keys(attStmt).length > 0) {
+        isHardwareBacked = true
+        console.log('✅ Packed attestation with statement - hardware-backed')
+      } else {
+        // Self-attestation (no attStmt) - check known AAGUIDs
+        if (authenticatorName) {
+          isHardwareBacked = true
+          console.log(`✅ Recognized hardware authenticator: ${authenticatorName}`)
+        } else {
+          isHardwareBacked = null
+          console.log('⚠️  Packed format without attestation statement - cannot determine hardware backing')
+        }
+      }
+    }
+    // Other formats (fido-u2f, android-key, etc.)
+    else {
+      // Assume hardware-backed for other attestation formats
+      isHardwareBacked = true
+      console.log(`✅ Attestation format "${fmt}" - assumed hardware-backed`)
+    }
+
+    console.log(`🔒 Final determination: isHardwareBacked = ${isHardwareBacked}`)
 
     const result = {
       verified: true,
       aaguid: aaguid,
       format: fmt,
       isHardwareBacked: isHardwareBacked,
+      authenticatorName: authenticatorName,
     }
 
     console.log('✅ Attestation verification result:', result)
@@ -104,6 +155,7 @@ export function verifyAttestation(attestationObject, clientDataJSON) {
       aaguid: '00000000-0000-0000-0000-000000000000',
       format: 'unknown',
       isHardwareBacked: null,
+      authenticatorName: null,
       error: error.message,
     }
   }

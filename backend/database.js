@@ -177,6 +177,7 @@ await runAsync(`
     aaguid TEXT,
     attestation_format TEXT,
     is_hardware_backed BOOLEAN DEFAULT 1,
+    authenticator_name TEXT,
     UNIQUE(account_address, device_id)
   )
 `)
@@ -391,6 +392,7 @@ export async function addDevice(accountAddress, deviceInfo, isActive = true, pro
   // Extract attestation metadata (Phase 1)
   const aaguid = attestationMetadata?.aaguid || null
   const attestationFormat = attestationMetadata?.format || null
+  const authenticatorName = attestationMetadata?.authenticatorName || null
   const isHardwareBacked = attestationMetadata?.isHardwareBacked !== null
     ? (attestationMetadata.isHardwareBacked ? 1 : 0)
     : 1 // Default to true if unknown
@@ -402,8 +404,8 @@ export async function addDevice(accountAddress, deviceInfo, isActive = true, pro
       credential_id, raw_id, public_key_x, public_key_y,
       attestation_object, client_data_json,
       is_active, proposal_hash, created_at, updated_at, last_used_at,
-      aaguid, attestation_format, is_hardware_backed
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      aaguid, attestation_format, is_hardware_backed, authenticator_name
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `, [
     accountAddress.toLowerCase(),
     deviceId,
@@ -423,6 +425,7 @@ export async function addDevice(accountAddress, deviceInfo, isActive = true, pro
     aaguid,
     attestationFormat,
     isHardwareBacked,
+    authenticatorName,
   ])
 
   console.log(`✅ Device added: ${deviceName} (${deviceType}) for account ${accountAddress}${proposalHash ? ` with proposal ${proposalHash.slice(0, 10)}...` : ''}`)
