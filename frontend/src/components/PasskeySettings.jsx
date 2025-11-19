@@ -3,7 +3,6 @@ import { useWeb3Auth } from '../contexts/Web3AuthContext'
 import { useNetwork } from '../contexts/NetworkContext'
 import { ethers } from 'ethers'
 import { NETWORKS } from '../lib/constants'
-import { retrievePasskeyCredential } from '../lib/passkeyStorage'
 import { updateDeviceProposalHash, getDevices } from '../lib/deviceManager'
 import { HiExternalLink } from 'react-icons/hi'
 import AddDeviceFlow from './AddDeviceFlow'
@@ -112,29 +111,16 @@ function PasskeySettings({ accountAddress }) {
     }
   }
 
-  // Load stored credential from server/localStorage
+  // Load stored credential from localStorage (legacy support)
   const loadStoredCredential = async () => {
-    if (!accountAddress || !ownerAddress || !signMessage) return
+    if (!accountAddress) return
 
-    try {
-      // Try to load from server first
-      const credential = await retrievePasskeyCredential(signMessage, ownerAddress, accountAddress)
-      if (credential) {
-        console.log('✅ Loaded passkey credential from server for account:', accountAddress)
-        setStoredCredential(credential)
-        return
-      }
-    } catch (error) {
-      console.log('⚠️ Failed to load from server, trying localStorage:', error.message)
-    }
-
-    // Fallback to localStorage
     try {
       const storageKey = `ethaura_passkey_credential_${accountAddress.toLowerCase()}`
       const stored = localStorage.getItem(storageKey)
       if (stored) {
         const credential = JSON.parse(stored)
-        console.log('✅ Loaded passkey credential from localStorage for account:', accountAddress)
+        console.log('✅ Loaded legacy passkey credential from localStorage for account:', accountAddress)
         setStoredCredential(credential)
       }
     } catch (error) {
