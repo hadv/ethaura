@@ -4,7 +4,7 @@ Utility scripts for development and testing.
 
 ## start-local-network.sh
 
-Automatically configures and starts EthAura with local network access for mobile testing.
+Automatically starts EthAura backend and frontend services.
 
 ### Usage
 
@@ -19,17 +19,16 @@ Automatically configures and starts EthAura with local network access for mobile
    - Linux: Uses `hostname -I`
    - Windows: Prompts for manual entry
 
-2. **Updates frontend/.env** with the correct backend URL
-   - Sets `VITE_BACKEND_URL=http://YOUR_IP:3001`
-
-3. **Displays access URLs**
+2. **Displays access URLs**
    - Desktop: `http://YOUR_IP:5173`
    - Backend: `http://YOUR_IP:3001`
    - Health check: `http://YOUR_IP:3001/health`
 
-4. **Optionally starts services**
+3. **Optionally starts services**
    - Backend on port 3001
    - Frontend on port 5173 with `--host` flag
+
+**Note:** VITE_BACKEND_URL is kept empty to use Vite proxy. Mobile testing requires HTTPS (use ngrok instead of local network).
 
 ### Example Output
 
@@ -42,9 +41,8 @@ Automatically configures and starts EthAura with local network access for mobile
 🔍 Finding local IP address...
 ✅ Local IP: 192.168.1.4
 
-📝 Updating frontend/.env...
-✅ Updated frontend/.env
-   VITE_BACKEND_URL=http://192.168.1.4:3001
+ℹ️  VITE_BACKEND_URL is kept empty (uses Vite proxy)
+   Mobile testing requires HTTPS (use ngrok instead)
 
 🌐 Access URLs:
    Desktop: http://192.168.1.4:5173
@@ -56,9 +54,9 @@ Start backend and frontend now? (y/n)
 
 ### When to use
 
-- Testing multi-device passkey feature
-- Adding passkeys via QR code from mobile
-- Any scenario requiring mobile device access to local development server
+- Starting backend and frontend services quickly
+- Desktop development and testing
+- For mobile testing, use ngrok for HTTPS support (WebAuthn requires HTTPS)
 
 ### Requirements
 

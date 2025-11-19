@@ -50,29 +50,9 @@ fi
 echo "✅ Local IP: $LOCAL_IP"
 echo ""
 
-# Update frontend .env
-echo "📝 Updating frontend/.env..."
-FRONTEND_ENV="frontend/.env"
-
-# Create or update .env file
-if [ -f "$FRONTEND_ENV" ]; then
-    # Update VITE_BACKEND_URL
-    if grep -q "VITE_BACKEND_URL" "$FRONTEND_ENV"; then
-        if [ "$MACHINE" = "Mac" ]; then
-            sed -i '' "s|VITE_BACKEND_URL=.*|VITE_BACKEND_URL=http://$LOCAL_IP:3001|" "$FRONTEND_ENV"
-        else
-            sed -i "s|VITE_BACKEND_URL=.*|VITE_BACKEND_URL=http://$LOCAL_IP:3001|" "$FRONTEND_ENV"
-        fi
-    else
-        echo "VITE_BACKEND_URL=http://$LOCAL_IP:3001" >> "$FRONTEND_ENV"
-    fi
-else
-    # Create new file
-    echo "VITE_BACKEND_URL=http://$LOCAL_IP:3001" > "$FRONTEND_ENV"
-fi
-
-echo "✅ Updated $FRONTEND_ENV"
-echo "   VITE_BACKEND_URL=http://$LOCAL_IP:3001"
+# Note: VITE_BACKEND_URL is kept empty to use Vite proxy
+echo "ℹ️  VITE_BACKEND_URL is kept empty (uses Vite proxy)"
+echo "   Mobile testing requires HTTPS (use ngrok instead)"
 echo ""
 
 # Show access URLs
