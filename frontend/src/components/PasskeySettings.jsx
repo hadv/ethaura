@@ -436,7 +436,7 @@ For now, please use the contract directly on Etherscan or wait for this feature 
         {/* Main Content - Left Column */}
         <div className="passkey-main">
           {/* Add/Manage Passkey */}
-          {!accountInfo.hasPasskey && !storedCredential ? (
+          {!accountInfo.hasPasskey && !storedCredential && devices.length === 0 ? (
             <div className="settings-section">
               <h3>Add Passkey</h3>
               <p className="section-description">
