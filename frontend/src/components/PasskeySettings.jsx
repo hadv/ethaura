@@ -755,18 +755,29 @@ For now, please use the contract directly on Etherscan or wait for this feature 
               textTransform: 'uppercase',
               letterSpacing: '0.5px'
             }}>
-              FIDO2 Certification Levels
+              🔐 FIDO2 Security Levels
             </div>
             <div style={{
               fontSize: '0.8rem',
               color: '#713f12',
-              lineHeight: '1.6',
-              fontFamily: 'monospace'
+              lineHeight: '1.7'
             }}>
-              <div>L1  - Basic security requirements</div>
-              <div>L2  - Hardware-backed, biometric</div>
-              <div>L3  - Government-grade security</div>
-              <div>L3+ - Military-grade security</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontWeight: '600', minWidth: '28px' }}>L1</span>
+                <span>→ Basic security</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontWeight: '600', minWidth: '28px' }}>L2</span>
+                <span>→ Enhanced (hardware + biometric) ⭐</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontWeight: '600', minWidth: '28px' }}>L3</span>
+                <span>→ Government-grade</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontWeight: '600', minWidth: '28px' }}>L3+</span>
+                <span>→ Military-grade (highest)</span>
+              </div>
             </div>
           </div>
 
