@@ -314,8 +314,8 @@ export function backfillMDSMetadata(devices) {
   }
 
   return devices.map(device => {
-    // Skip if device already has MDS metadata
-    if (device.isFido2Certified !== null && device.certificationLevel) {
+    // Skip if device already has MDS metadata (certificationLevel is the key indicator)
+    if (device.certificationLevel !== null && device.certificationLevel !== undefined) {
       return device
     }
 
@@ -332,6 +332,7 @@ export function backfillMDSMetadata(devices) {
       foundMetadata: !!metadata,
       certificationLevel: metadata.certificationLevel,
       isFido2Certified: metadata.isFido2Certified,
+      authenticatorName: metadata.name,
     })
 
     // Update device with MDS metadata (in-memory only, not persisted)
