@@ -716,26 +716,26 @@ For now, please use the contract directly on Etherscan or wait for this feature 
         <div className="passkey-sidebar">
           {/* Passkey Status */}
           <div className="status-box" style={{
-            backgroundColor: '#fce7f3',
-            border: '1px solid #f9a8d4',
+            backgroundColor: '#fef5f8',
+            border: '1px solid #fecdd3',
             borderRadius: '8px'
           }}>
-            <h3 style={{ color: '#9f1239' }}>Passkey Status</h3>
+            <h3 style={{ color: '#be123c' }}>Passkey Status</h3>
             <div className="status-grid">
               <div className="status-item">
-                <span className="status-label" style={{ color: '#9f1239' }}>Passkey Configured</span>
+                <span className="status-label" style={{ color: '#be123c' }}>Passkey Configured</span>
                 <span className={`status-badge ${(accountInfo.hasPasskey || storedCredential || devices.length > 0) ? 'badge-success' : 'badge-warning'}`}>
                   {(accountInfo.hasPasskey || storedCredential || devices.length > 0) ? 'Yes' : 'No'}
                 </span>
               </div>
               <div className="status-item">
-                <span className="status-label" style={{ color: '#9f1239' }}>Status</span>
+                <span className="status-label" style={{ color: '#be123c' }}>Status</span>
                 <span className={`status-badge ${accountInfo.hasPasskey ? 'badge-success' : 'badge-neutral'}`}>
                   {accountInfo.hasPasskey ? 'Active On-Chain' : (storedCredential || devices.length > 0) ? 'Stored (Not Deployed)' : 'Not Configured'}
                 </span>
               </div>
               <div className="status-item">
-                <span className="status-label" style={{ color: '#9f1239' }}>2FA Status</span>
+                <span className="status-label" style={{ color: '#be123c' }}>2FA Status</span>
                 <span className={`status-badge ${accountInfo.twoFactorEnabled ? 'badge-success' : 'badge-neutral'}`}>
                   {accountInfo.twoFactorEnabled ? 'Enabled' : 'Disabled'}
                 </span>
