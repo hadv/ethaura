@@ -28,14 +28,17 @@ export default defineConfig({
       '.ngrok-free.dev',
       '.ngrok.io',
       '.ngrok.app',
+      'ethersafe.ngrok.app', // Specific ngrok domain for production
     ],
-    proxy: {
-      '/api': {
-        target: 'http://192.168.1.4:3001',
-        changeOrigin: true,
-        secure: false,
-      },
-    },
+    // Proxy disabled when using ngrok - frontend calls backend directly via VITE_BACKEND_URL
+    // Uncomment for local development without ngrok:
+    // proxy: {
+    //   '/api': {
+    //     target: 'http://localhost:3001',
+    //     changeOrigin: true,
+    //     secure: false,
+    //   },
+    // },
   },
   resolve: {
     alias: {

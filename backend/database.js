@@ -173,7 +173,43 @@ await runAsync(`CREATE INDEX IF NOT EXISTS idx_session_id ON device_sessions(ses
 await runAsync(`CREATE INDEX IF NOT EXISTS idx_session_status ON device_sessions(status)`)
 await runAsync(`CREATE INDEX IF NOT EXISTS idx_session_expires ON device_sessions(expires_at)`)
 
+// Phase 2: FIDO MDS cache table
+await runAsync(`
+  CREATE TABLE IF NOT EXISTS fido_mds_cache (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    blob_data TEXT NOT NULL,
+    last_updated INTEGER NOT NULL,
+    next_update TEXT,
+    blob_number INTEGER,
+    created_at INTEGER DEFAULT (strftime('%s', 'now'))
+  )
+`)
+
 console.log('✅ Database initialized:', DB_PATH)
+
+// Phase 2: Add MDS metadata columns to passkey_devices if they don't exist
+// These columns store FIDO MDS metadata for each device
+const addColumnIfNotExists = async (tableName, columnName, columnDef) => {
+  try {
+    // Check if column exists
+    const tableInfo = await allAsync(`PRAGMA table_info(${tableName})`)
+    const columnExists = tableInfo.some(col => col.name === columnName)
+
+    if (!columnExists) {
+      await runAsync(`ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${columnDef}`)
+      console.log(`✅ Added column ${columnName} to ${tableName}`)
+    }
+  } catch (error) {
+    // Column might already exist, ignore error
+    console.log(`ℹ️  Column ${columnName} already exists in ${tableName}`)
+  }
+}
+
+// Add Phase 2 MDS metadata columns
+await addColumnIfNotExists('passkey_devices', 'authenticator_description', 'TEXT')
+await addColumnIfNotExists('passkey_devices', 'is_fido2_certified', 'BOOLEAN DEFAULT 0')
+await addColumnIfNotExists('passkey_devices', 'certification_level', 'TEXT')
+await addColumnIfNotExists('passkey_devices', 'mds_last_updated', 'INTEGER')
 
 // Legacy functions removed - use multi-device functions instead:
 // - addDevice() instead of storeCredential()
@@ -369,6 +405,7 @@ export async function getDevices(accountAddress) {
       public_key_x, public_key_y, is_active,
       proposal_hash, proposal_tx_hash,
       aaguid, attestation_format, is_hardware_backed, authenticator_name,
+      authenticator_description, is_fido2_certified, certification_level, mds_last_updated,
       created_at, updated_at, last_used_at
     FROM passkey_devices
     WHERE account_address = ?
@@ -392,6 +429,11 @@ export async function getDevices(accountAddress) {
     attestationFormat: row.attestation_format,
     isHardwareBacked: Boolean(row.is_hardware_backed),
     authenticatorName: row.authenticator_name,
+    // Phase 2: FIDO MDS metadata
+    authenticatorDescription: row.authenticator_description,
+    isFido2Certified: Boolean(row.is_fido2_certified),
+    certificationLevel: row.certification_level,
+    mdsLastUpdated: row.mds_last_updated,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     lastUsedAt: row.last_used_at,
@@ -751,6 +793,113 @@ async function gracefulShutdown(signal) {
 process.on('SIGINT', () => gracefulShutdown('SIGINT'))
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'))
 
+/*******************************************************************************
+ * FIDO MDS CACHE MANAGEMENT (Phase 2)
+ ******************************************************************************/
+
+/**
+ * Store FIDO MDS blob in database
+ * @param {Object} payload - MDS blob payload (already verified)
+ * @returns {Object} Result
+ */
+export async function storeMDSCache(payload) {
+  const now = Math.floor(Date.now() / 1000)
+
+  await runAsync(`
+    INSERT INTO fido_mds_cache (blob_data, last_updated, next_update, blob_number)
+    VALUES (?, ?, ?, ?)
+  `, [
+    JSON.stringify(payload),
+    now,
+    payload.nextUpdate || null,
+    payload.no || null,
+  ])
+
+  console.log(`✅ MDS cache stored: ${payload.entries?.length || 0} entries, blob #${payload.no}`)
+
+  return {
+    success: true,
+    entriesCount: payload.entries?.length || 0,
+    blobNumber: payload.no,
+    nextUpdate: payload.nextUpdate,
+  }
+}
+
+/**
+ * Load FIDO MDS blob from database
+ * @returns {Object|null} MDS payload or null if not found
+ */
+export async function loadMDSCache() {
+  const row = await getAsync(`
+    SELECT blob_data, last_updated, next_update, blob_number
+    FROM fido_mds_cache
+    ORDER BY id DESC
+    LIMIT 1
+  `)
+
+  if (!row) return null
+
+  return {
+    payload: JSON.parse(row.blob_data),
+    lastUpdated: row.last_updated,
+    nextUpdate: row.next_update,
+    blobNumber: row.blob_number,
+  }
+}
+
+/**
+ * Get age of MDS cache in seconds
+ * @returns {number|null} Age in seconds or null if no cache
+ */
+export async function getMDSCacheAge() {
+  const row = await getAsync(`
+    SELECT last_updated FROM fido_mds_cache
+    ORDER BY id DESC
+    LIMIT 1
+  `)
+
+  if (!row) return null
+
+  const now = Math.floor(Date.now() / 1000)
+  return now - row.last_updated
+}
+
+/**
+ * Update device with MDS metadata
+ * @param {string} accountAddress - Smart account address
+ * @param {string} deviceId - Device ID
+ * @param {Object} metadata - MDS metadata
+ * @returns {Object} Result
+ */
+export async function updateDeviceMetadata(accountAddress, deviceId, metadata) {
+  const now = Math.floor(Date.now() / 1000)
+
+  await runAsync(`
+    UPDATE passkey_devices
+    SET
+      authenticator_name = ?,
+      authenticator_description = ?,
+      is_fido2_certified = ?,
+      certification_level = ?,
+      mds_last_updated = ?,
+      updated_at = ?
+    WHERE account_address = ? AND device_id = ?
+  `, [
+    metadata.name || null,
+    metadata.description || null,
+    metadata.isFido2Certified ? 1 : 0,
+    metadata.certificationLevel || null,
+    now,
+    Date.now(),
+    accountAddress.toLowerCase(),
+    deviceId,
+  ])
+
+  console.log(`✅ Device metadata updated: ${deviceId} - ${metadata.name}`)
+
+  return { success: true }
+}
+
 export default {
   // Multi-device functions
   addDevice,
@@ -765,6 +914,11 @@ export default {
   getSession,
   completeSession,
   cleanupExpiredSessions,
+  // FIDO MDS cache (Phase 2)
+  storeMDSCache,
+  loadMDSCache,
+  getMDSCacheAge,
+  updateDeviceMetadata,
   // Admin/maintenance
   closeDatabase,
   createBackup,

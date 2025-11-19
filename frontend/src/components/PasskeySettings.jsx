@@ -611,22 +611,49 @@ For now, please use the contract directly on Etherscan or wait for this feature 
                               <div style={{ flex: 1 }}>
                                 <h4 style={{ margin: '0 0 4px 0', fontSize: '0.95rem' }}>
                                   {device.deviceName || `Device ${index + 1}`}
-                                  {device.isHardwareBacked && (
-                                    <span style={{ marginLeft: '8px', fontSize: '0.75rem', color: '#22c55e' }}>🔒 Hardware</span>
-                                  )}
                                 </h4>
+
+                                {/* Phase 2: Show authenticator name from MDS */}
                                 <p className="small-text" style={{ margin: '4px 0', color: '#666' }}>
-                                  {device.deviceType ? `${device.deviceType.charAt(0).toUpperCase()}${device.deviceType.slice(1)}` : 'Unknown type'}
-                                  {device.authenticatorName && ` • ${device.authenticatorName}`}
+                                  {device.authenticatorName || 'Unknown Authenticator'}
                                 </p>
+
+                                {/* Phase 2: Show certification badges */}
+                                <div style={{ display: 'flex', gap: '6px', margin: '6px 0', flexWrap: 'wrap' }}>
+                                  {device.isFido2Certified && device.certificationLevel && (
+                                    <span
+                                      className="badge badge-success"
+                                      style={{ fontSize: '0.7rem', padding: '2px 6px' }}
+                                      title={`FIDO2 Certified: ${device.certificationLevel}`}
+                                    >
+                                      {device.certificationLevel.replace('FIDO_CERTIFIED_', 'FIDO2 L')}
+                                    </span>
+                                  )}
+                                  {device.isHardwareBacked && (
+                                    <span
+                                      className="badge badge-info"
+                                      style={{ fontSize: '0.7rem', padding: '2px 6px', backgroundColor: '#22c55e', color: 'white' }}
+                                      title="Hardware-backed authenticator"
+                                    >
+                                      Hardware-Backed
+                                    </span>
+                                  )}
+                                </div>
+
+                                <p className="small-text" style={{ margin: '4px 0', fontSize: '0.8rem', color: '#888' }}>
+                                  {device.deviceType ? `${device.deviceType.charAt(0).toUpperCase()}${device.deviceType.slice(1)}` : 'Unknown type'}
+                                </p>
+
                                 <p className="small-text" style={{ margin: '4px 0', fontSize: '0.8rem', color: '#888' }}>
                                   Credential ID: {device.credentialId.slice(0, 12)}...{device.credentialId.slice(-8)}
                                 </p>
+
                                 {device.aaguid && (
                                   <p className="small-text" style={{ margin: '4px 0', fontSize: '0.8rem', color: '#888' }}>
                                     AAGUID: {device.aaguid}
                                   </p>
                                 )}
+
                                 {device.proposalHash && (
                                   <p className="small-text" style={{ margin: '4px 0', fontSize: '0.8rem', color: '#888', display: 'flex', alignItems: 'center', gap: '4px' }}>
                                     <span>Proposal: {device.proposalHash.slice(0, 10)}...{device.proposalHash.slice(-8)}</span>
@@ -691,6 +718,45 @@ For now, please use the contract directly on Etherscan or wait for this feature 
               </div>
             </div>
           </div>
+
+          {/* Phase 2: Device Security Info */}
+          {devices.length > 0 && devices.some(d => d.isFido2Certified || d.isHardwareBacked) && (
+            <div className="status-box" style={{ marginTop: '16px' }}>
+              <h3>Device Security</h3>
+              <div className="status-grid">
+                {devices.map((device, index) => (
+                  <div key={index} style={{ marginBottom: '12px', paddingBottom: '12px', borderBottom: index < devices.length - 1 ? '1px solid #e5e7eb' : 'none' }}>
+                    <div style={{ fontSize: '0.85rem', fontWeight: '500', marginBottom: '4px', color: '#374151' }}>
+                      {device.deviceName || `Device ${index + 1}`}
+                    </div>
+                    <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '4px' }}>
+                      {device.authenticatorName || 'Unknown Authenticator'}
+                    </div>
+                    <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                      {device.isFido2Certified && device.certificationLevel && (
+                        <span
+                          className="badge badge-success"
+                          style={{ fontSize: '0.65rem', padding: '2px 4px' }}
+                          title={`FIDO2 Certified: ${device.certificationLevel}`}
+                        >
+                          {device.certificationLevel.replace('FIDO_CERTIFIED_', 'L')}
+                        </span>
+                      )}
+                      {device.isHardwareBacked && (
+                        <span
+                          className="badge badge-info"
+                          style={{ fontSize: '0.65rem', padding: '2px 4px', backgroundColor: '#22c55e', color: 'white' }}
+                          title="Hardware-backed authenticator"
+                        >
+                          HW
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Pending Passkey Updates */}
           {pendingActions.length > 0 && (
