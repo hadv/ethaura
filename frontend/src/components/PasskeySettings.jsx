@@ -743,14 +743,14 @@ For now, please use the contract directly on Etherscan or wait for this feature 
           <div style={{
             marginTop: '16px',
             padding: '12px 14px',
-            backgroundColor: '#fefce8',
-            border: '1px solid #fde047',
+            backgroundColor: '#dcfce7',
+            border: '1px solid #86efac',
             borderRadius: '8px'
           }}>
             <div style={{
               fontSize: '0.75rem',
               fontWeight: '600',
-              color: '#854d0e',
+              color: '#166534',
               marginBottom: '8px',
               textTransform: 'uppercase',
               letterSpacing: '0.5px'
@@ -759,7 +759,7 @@ For now, please use the contract directly on Etherscan or wait for this feature 
             </div>
             <div style={{
               fontSize: '0.8rem',
-              color: '#713f12',
+              color: '#166534',
               lineHeight: '1.7'
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
