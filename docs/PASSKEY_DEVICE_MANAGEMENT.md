@@ -14,6 +14,7 @@ EthAura uses a **single on-chain passkey** per account, but allows users to crea
 - **Device metadata**: Stores credential ID, device name, device type, public key
 - **Active vs Pending**: Tracks which device is currently active on-chain
 - **Credential storage**: Needed for `navigator.credentials.get()` to request passkey from browser
+- **Attestation metadata** (Phase 1): AAGUID, attestation format, hardware-backed status (see [ATTESTATION_VERIFICATION.md](./ATTESTATION_VERIFICATION.md))
 
 ## Device States
 

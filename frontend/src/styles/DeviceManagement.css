@@ -124,6 +124,28 @@
   margin-left: 4px;
 }
 
+/* Attestation Info (Phase 1) */
+.device-attestation-info {
+  font-size: 0.85rem;
+  color: #666;
+  margin-top: 4px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.device-attestation-info .label {
+  font-weight: 500;
+  color: #495057;
+}
+
+.attestation-format {
+  font-size: 0.75rem;
+  color: #6b7280;
+  font-style: italic;
+  margin-left: 4px;
+}
+
 .device-actions {
   display: flex;
   flex-direction: column;
@@ -155,6 +177,34 @@
 .badge-success {
   background: #d4edda;
   color: #155724;
+}
+
+.badge-warning {
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  color: #92400e;
+  border-color: #fcd34d;
+  border: 1px solid;
+}
+
+.badge-secondary {
+  background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
+  color: #374151;
+  border-color: #d1d5db;
+  border: 1px solid;
+}
+
+.badge-info {
+  background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+  color: #1e40af;
+  border-color: #93c5fd;
+  border: 1px solid;
+}
+
+.badge-neutral {
+  background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
+  color: #374151;
+  border-color: #d1d5db;
+  border: 1px solid;
 }
 
 .device-proposal-info {

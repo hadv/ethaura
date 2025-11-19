@@ -104,13 +104,13 @@ function PasskeyManager({ onCredentialCreated, credential }) {
         publicKey: {
           challenge: challenge,
           rp: {
-            name: 'ΞTHΛURΛ P256 Wallet',
+            name: 'EthAura P256 Wallet',
             id: window.location.hostname,
           },
           user: {
             id: userId,
-            name: ownerAddress ? `${ownerAddress.slice(0, 6)}...${ownerAddress.slice(-4)}@ethaura.wallet` : 'user@ethaura.wallet',
-            displayName: ownerAddress ? `ΞTHΛURΛ User (${ownerAddress.slice(0, 6)}...${ownerAddress.slice(-4)})` : 'ΞTHΛURΛ User',
+            name: ownerAddress ? ownerAddress.toLowerCase() : 'user',
+            displayName: ownerAddress ? `EthAura User ${ownerAddress.slice(0, 6)}...${ownerAddress.slice(-4)}` : 'EthAura User',
           },
           pubKeyCredParams: [
             {

@@ -3,7 +3,6 @@ import { QRCodeSVG } from 'qrcode.react'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
 import { useNetwork } from '../contexts/NetworkContext'
 import { createDeviceSession, pollSessionUntilComplete, addDevice, updateDeviceProposalHash } from '../lib/deviceManager'
-import { storePasskeyCredential } from '../lib/passkeyStorage'
 import { ethers } from 'ethers'
 import '../styles/AddMobileDevice.css'
 
@@ -77,6 +76,9 @@ function AddMobileDevice({ accountAddress, onComplete, onCancel }) {
           },
         }
 
+        // Extract attestation metadata (Phase 1)
+        const attestationMetadata = deviceData.attestationMetadata || null
+
         // Check if account is deployed (using public RPC, no wallet needed)
         setStatus('Checking account deployment...')
 
@@ -103,7 +105,8 @@ function AddMobileDevice({ accountAddress, onComplete, onCancel }) {
             accountAddress,
             deviceData.deviceName,
             deviceData.deviceType,
-            credential
+            credential,
+            attestationMetadata // NEW: Phase 1 - pass attestation metadata
           )
 
           // Create on-chain proposal
@@ -174,19 +177,21 @@ function AddMobileDevice({ accountAddress, onComplete, onCancel }) {
 
           setStatus('✅ Device registered and proposal created! Wait 48 hours then execute.')
         } else {
-          // For UNDEPLOYED accounts: Save to single passkey table (overwrites existing)
+          // For UNDEPLOYED accounts: Save to multi-device table
           // NO on-chain transaction needed!
-          setStatus('Saving passkey to database...')
-          console.log('📝 Saving passkey for undeployed account:', {
+          setStatus('Saving device to database...')
+          console.log('📝 Saving device for undeployed account:', {
             accountAddress,
             ownerAddress,
             credentialId: credential.id,
             deviceName: deviceData.deviceName,
             deviceType: deviceData.deviceType,
           })
-          await storePasskeyCredential(signMessage, ownerAddress, accountAddress, credential, deviceData.deviceName, deviceData.deviceType)
-          console.log('✅ Passkey saved successfully')
-          setStatus('✅ Passkey saved! It will be used when you deploy this account.')
+
+          // Use addDevice() which supports attestation metadata
+          await addDevice(signMessage, ownerAddress, accountAddress, deviceData.deviceName, deviceData.deviceType, credential, deviceData.attestationMetadata)
+          console.log('✅ Device saved successfully')
+          setStatus('✅ Device saved! It will be used when you deploy this account.')
         }
 
         setTimeout(() => {

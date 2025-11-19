@@ -13,7 +13,7 @@ import ViewAllTokensScreen from './screens/ViewAllTokensScreen'
 import ViewAllTransactionsScreen from './screens/ViewAllTransactionsScreen'
 import { GuardianRecoveryPortal } from './screens/GuardianRecoveryPortal'
 import RegisterDevicePage from './pages/RegisterDevicePage'
-import { retrievePasskeyCredential, storePasskeyCredential } from './lib/passkeyStorage'
+import { storePasskeyCredential } from './lib/passkeyStorage'
 
 // Inner component that uses Web3Auth context
 function AppContent() {
@@ -135,31 +135,7 @@ function AppContent() {
         console.log(`🔍 Loading passkey credential for account: ${accountAddress}`)
         setCredentialLoading(true)
 
-        // Try to load from server first
-        let serverCredential = null
-        try {
-          console.log(`📡 Attempting to load from server...`)
-          serverCredential = await retrievePasskeyCredential(signMessage, address, accountAddress)
-        } catch (serverError) {
-          console.warn('⚠️  Failed to load from server, will try localStorage:', serverError.message)
-        }
-
-        if (serverCredential) {
-          console.log(`✅ Loaded passkey credential from server for account: ${accountAddress}`)
-          console.log(`🔑 Credential details:`, {
-            id: serverCredential.id,
-            hasPublicKey: !!serverCredential.publicKey,
-            publicKeyX: serverCredential.publicKey?.x?.slice(0, 20) + '...',
-            publicKeyY: serverCredential.publicKey?.y?.slice(0, 20) + '...',
-          })
-          setPasskeyCredential(serverCredential)
-          setCredentialLoading(false)
-          return
-        } else {
-          console.log('⚠️  Server returned null/undefined credential, trying localStorage...')
-        }
-
-        // Fallback to localStorage
+        // Load from localStorage (legacy support)
         const storageKey = `ethaura_passkey_credential_${accountAddress.toLowerCase()}`
         console.log(`💾 Checking localStorage with key: ${storageKey}`)
         const stored = localStorage.getItem(storageKey)

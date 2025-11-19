@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { getDeviceSession, completeDeviceSession } from '../lib/deviceManager'
-import { parsePublicKey } from '../utils/webauthn'
+import { parsePublicKey, verifyAttestation } from '../utils/webauthn'
 import '../styles/RegisterDevicePage.css'
 
 function RegisterDevicePage() {
@@ -121,13 +121,13 @@ function RegisterDevicePage() {
         publicKey: {
           challenge: challenge,
           rp: {
-            name: 'ΞTHΛURΛ P256 Wallet',
+            name: 'EthAura P256 Wallet',
             id: window.location.hostname,
           },
           user: {
             id: userId,
-            name: `${session.accountAddress.slice(0, 6)}...${session.accountAddress.slice(-4)}@ethaura.wallet`,
-            displayName: `ΞTHΛURΛ Account (${session.accountAddress.slice(0, 6)}...${session.accountAddress.slice(-4)})`,
+            name: session.accountAddress.toLowerCase(),
+            displayName: `EthAura Account ${session.accountAddress.slice(0, 6)}...${session.accountAddress.slice(-4)}`,
           },
           pubKeyCredParams: [
             {
@@ -156,9 +156,17 @@ function RegisterDevicePage() {
       // Parse the public key
       const publicKey = parsePublicKey(credential.response.attestationObject)
 
+      // Verify attestation and extract metadata (Phase 1)
+      setStatus('Verifying device attestation...')
+      const attestationResult = verifyAttestation(
+        credential.response.attestationObject,
+        credential.response.clientDataJSON
+      )
+
       console.log('✅ Passkey created:', {
         id: credential.id,
         publicKey,
+        attestation: attestationResult,
       })
 
       // Serialize credential for storage
@@ -176,7 +184,7 @@ function RegisterDevicePage() {
 
       // Complete the session
       const deviceType = getDeviceType()
-      await completeDeviceSession(sessionId, serializedCredential, deviceName.trim(), deviceType)
+      await completeDeviceSession(sessionId, serializedCredential, deviceName.trim(), deviceType, attestationResult)
 
       setStatus('✅ Device registered successfully!')
       setCompleted(true)

@@ -1,9 +1,8 @@
 import { useState } from 'react'
 import { ethers } from 'ethers'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
-import { parsePublicKey } from '../utils/webauthn'
+import { parsePublicKey, verifyAttestation } from '../utils/webauthn'
 import { addDevice, updateDeviceProposalHash } from '../lib/deviceManager'
-import { storePasskeyCredential } from '../lib/passkeyStorage'
 import '../styles/AddCurrentDevice.css'
 
 function AddCurrentDevice({ accountAddress, onComplete, onCancel }) {
@@ -82,13 +81,13 @@ function AddCurrentDevice({ accountAddress, onComplete, onCancel }) {
         publicKey: {
           challenge: challenge,
           rp: {
-            name: 'ΞTHΛURΛ P256 Wallet',
+            name: 'EthAura P256 Wallet',
             id: window.location.hostname,
           },
           user: {
             id: userId,
-            name: `${accountAddress.slice(0, 6)}...${accountAddress.slice(-4)}@ethaura.wallet`,
-            displayName: `ΞTHΛURΛ Account (${accountAddress.slice(0, 6)}...${accountAddress.slice(-4)})`,
+            name: accountAddress.toLowerCase(),
+            displayName: `EthAura Account ${accountAddress.slice(0, 6)}...${accountAddress.slice(-4)}`,
           },
           pubKeyCredParams: [
             {
@@ -117,9 +116,17 @@ function AddCurrentDevice({ accountAddress, onComplete, onCancel }) {
       // Parse the public key
       const publicKey = parsePublicKey(credential.response.attestationObject)
 
+      // Verify attestation and extract metadata (Phase 1)
+      setStatus('Verifying device attestation...')
+      const attestationResult = verifyAttestation(
+        credential.response.attestationObject,
+        credential.response.clientDataJSON
+      )
+
       console.log('✅ Passkey created:', {
         id: credential.id,
         publicKey,
+        attestation: attestationResult,
       })
 
       // Serialize credential for storage
@@ -146,7 +153,15 @@ function AddCurrentDevice({ accountAddress, onComplete, onCancel }) {
         // For DEPLOYED accounts: Save to multi-device table and create proposal
         setStatus('Saving to database...')
         const deviceType = getDeviceType()
-        await addDevice(signMessage, ownerAddress, accountAddress, deviceName.trim(), deviceType, serializedCredential)
+        await addDevice(
+          signMessage,
+          ownerAddress,
+          accountAddress,
+          deviceName.trim(),
+          deviceType,
+          serializedCredential,
+          attestationResult // NEW: Phase 1 - pass attestation metadata
+        )
 
         // Create on-chain proposal for the new passkey
         setStatus('Proposing passkey to smart contract (48-hour timelock)...')
@@ -206,11 +221,19 @@ function AddCurrentDevice({ accountAddress, onComplete, onCancel }) {
 
         setStatus('✅ Passkey proposed! Wait 48 hours then execute the update.')
       } else {
-        // For UNDEPLOYED accounts: Save to single passkey table (overwrites existing)
+        // For UNDEPLOYED accounts: Save to multi-device table
         setStatus('Saving to database...')
         const deviceType = getDeviceType()
-        await storePasskeyCredential(signMessage, ownerAddress, accountAddress, serializedCredential, deviceName.trim(), deviceType)
-        setStatus('✅ Passkey saved! It will be used when you deploy this account.')
+        await addDevice(
+          signMessage,
+          ownerAddress,
+          accountAddress,
+          deviceName.trim(),
+          deviceType,
+          serializedCredential,
+          attestationResult // Phase 1 - pass attestation metadata
+        )
+        setStatus('✅ Device saved! It will be used when you deploy this account.')
       }
 
       // Wait a moment then complete

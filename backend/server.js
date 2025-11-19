@@ -10,10 +10,6 @@ import rateLimit from 'express-rate-limit'
 import dotenv from 'dotenv'
 import { ethers } from 'ethers'
 import {
-  storeCredential,
-  getCredential,
-  deleteCredential,
-  getAllCredentials,
   // Multi-device functions
   addDevice,
   getDevices,
@@ -171,150 +167,6 @@ app.get('/health', (req, res) => {
   })
 })
 
-// API Routes
-
-/**
- * POST /api/passkeys
- * Store a passkey credential
- */
-app.post('/api/passkeys', verifySignature, async (req, res) => {
-  try {
-    const { credential, deviceName, deviceType } = req.body
-    const userId = req.verifiedUserId
-
-    if (!credential) {
-      return res.status(400).json({
-        error: 'Missing credential data',
-      })
-    }
-
-    // Validate credential structure
-    if (!credential.id || !credential.rawId || !credential.publicKey) {
-      return res.status(400).json({
-        error: 'Invalid credential structure. Must include id, rawId, and publicKey',
-      })
-    }
-
-    if (!credential.publicKey.x || !credential.publicKey.y) {
-      return res.status(400).json({
-        error: 'Invalid publicKey. Must include x and y coordinates',
-      })
-    }
-
-    console.log(`📝 Storing passkey for user: ${userId}`, { deviceName, deviceType })
-
-    const result = await storeCredential(userId, credential, deviceName, deviceType)
-
-    res.json({
-      success: true,
-      message: 'Passkey credential stored successfully',
-      userId: result.userId,
-      credentialId: result.credentialId,
-    })
-  } catch (error) {
-    console.error('Error storing credential:', error)
-    res.status(500).json({
-      error: 'Failed to store credential',
-      details: error.message,
-    })
-  }
-})
-
-/**
- * GET /api/passkeys/:userId
- * Retrieve a passkey credential
- * userId = smart account address
- * ownerAddress = owner address (signer)
- */
-app.get('/api/passkeys/:userId', async (req, res) => {
-  try {
-    const { userId } = req.params
-    const { signature, message, timestamp, ownerAddress } = req.query
-
-    // Verify signature for GET request
-    if (!signature || !message || !timestamp || !ownerAddress) {
-      return res.status(400).json({
-        error: 'Missing authentication parameters',
-      })
-    }
-
-    // Check timestamp
-    const now = Date.now()
-    const timeDiff = Math.abs(now - parseInt(timestamp))
-    if (timeDiff > 5 * 60 * 1000) {
-      return res.status(401).json({
-        error: 'Authentication expired',
-      })
-    }
-
-    // Verify signature - should be signed by owner
-    const recoveredAddress = ethers.verifyMessage(message, signature)
-
-    if (recoveredAddress.toLowerCase() !== ownerAddress.toLowerCase()) {
-      return res.status(401).json({
-        error: 'Invalid signature. Owner address mismatch.',
-      })
-    }
-
-    console.log(`🔍 Retrieving passkey for account: ${userId} (owner: ${ownerAddress})`)
-
-    const normalizedUserId = userId.toLowerCase()
-    console.log(`🔍 Normalized userId: ${normalizedUserId}`)
-
-    const credential = await getCredential(normalizedUserId)
-
-    if (!credential) {
-      console.log(`❌ Credential not found for userId: ${normalizedUserId}`)
-      return res.status(404).json({
-        error: 'Credential not found',
-      })
-    }
-
-    console.log(`✅ Credential found for userId: ${normalizedUserId}`)
-    res.json({
-      success: true,
-      credential,
-    })
-  } catch (error) {
-    console.error('Error retrieving credential:', error)
-    res.status(500).json({
-      error: 'Failed to retrieve credential',
-      details: error.message,
-    })
-  }
-})
-
-/**
- * DELETE /api/passkeys
- * Delete a passkey credential
- */
-app.delete('/api/passkeys', verifySignature, async (req, res) => {
-  try {
-    const userId = req.verifiedUserId
-
-    console.log(`🗑️  Deleting passkey for user: ${userId}`)
-
-    const deleted = await deleteCredential(userId)
-
-    if (!deleted) {
-      return res.status(404).json({
-        error: 'Credential not found',
-      })
-    }
-
-    res.json({
-      success: true,
-      message: 'Passkey credential deleted successfully',
-    })
-  } catch (error) {
-    console.error('Error deleting credential:', error)
-    res.status(500).json({
-      error: 'Failed to delete credential',
-      details: error.message,
-    })
-  }
-})
-
 /*******************************************************************************
  * MULTI-DEVICE API ENDPOINTS
  ******************************************************************************/
@@ -325,7 +177,7 @@ app.delete('/api/passkeys', verifySignature, async (req, res) => {
  */
 app.post('/api/devices', verifySignature, async (req, res) => {
   try {
-    const { deviceName, deviceType, credential } = req.body
+    const { deviceName, deviceType, credential, attestationMetadata } = req.body
     const accountAddress = req.verifiedUserId
 
     if (!deviceName || !deviceType || !credential) {
@@ -346,11 +198,17 @@ app.post('/api/devices', verifySignature, async (req, res) => {
 
     console.log(`📱 Adding device: ${deviceName} (${deviceType}) for account ${accountAddress}`)
 
+    // Log attestation metadata if provided (Phase 1)
+    if (attestationMetadata) {
+      console.log(`   Attestation: AAGUID=${attestationMetadata.aaguid}, Format=${attestationMetadata.format}, Hardware-backed=${attestationMetadata.isHardwareBacked}`)
+    }
+
     const result = await addDevice(accountAddress, {
       deviceId,
       deviceName,
       deviceType,
       credential,
+      attestationMetadata, // NEW: Phase 1 - pass attestation metadata
     })
 
     res.json({
@@ -613,7 +471,7 @@ app.get('/api/sessions/:sessionId', async (req, res) => {
 app.post('/api/sessions/:sessionId/complete', async (req, res) => {
   try {
     const { sessionId } = req.params
-    const { credential, deviceName, deviceType } = req.body
+    const { credential, deviceName, deviceType, attestationMetadata } = req.body
 
     console.log(`📱 Session completion request:`, {
       sessionId,
@@ -621,6 +479,7 @@ app.post('/api/sessions/:sessionId/complete', async (req, res) => {
       deviceName,
       deviceType,
       credentialId: credential?.id,
+      hasAttestation: !!attestationMetadata,
     })
 
     if (!credential || !deviceName || !deviceType) {
@@ -638,6 +497,11 @@ app.post('/api/sessions/:sessionId/complete', async (req, res) => {
       })
     }
 
+    // Log attestation metadata if provided (Phase 1)
+    if (attestationMetadata) {
+      console.log(`   Attestation: AAGUID=${attestationMetadata.aaguid}, Format=${attestationMetadata.format}, Hardware-backed=${attestationMetadata.isHardwareBacked}`)
+    }
+
     console.log(`✅ Completing session: ${sessionId}`)
 
     const deviceData = {
@@ -647,6 +511,7 @@ app.post('/api/sessions/:sessionId/complete', async (req, res) => {
       deviceType,
       credentialId: credential.id,
       rawId: credential.rawId,
+      attestationMetadata, // NEW: Phase 1 - include attestation metadata
     }
 
     const completed = await completeSession(sessionId, deviceData)
@@ -673,31 +538,7 @@ app.post('/api/sessions/:sessionId/complete', async (req, res) => {
   }
 })
 
-/**
- * GET /api/admin/credentials
- * Get all credentials (for debugging - should be protected in production)
- */
-app.get('/api/admin/credentials', async (req, res) => {
-  if (process.env.NODE_ENV === 'production') {
-    return res.status(403).json({
-      error: 'Admin endpoint disabled in production',
-    })
-  }
-
-  try {
-    const credentials = await getAllCredentials()
-    res.json({
-      success: true,
-      count: credentials.length,
-      credentials,
-    })
-  } catch (error) {
-    console.error('Error getting all credentials:', error)
-    res.status(500).json({
-      error: 'Failed to retrieve credentials',
-    })
-  }
-})
+// Legacy admin endpoint removed - use /api/admin/stats instead
 
 /**
  * GET /api/admin/stats

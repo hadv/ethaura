@@ -3,9 +3,8 @@ import { useWeb3Auth } from '../contexts/Web3AuthContext'
 import { useNetwork } from '../contexts/NetworkContext'
 import { ethers } from 'ethers'
 import { NETWORKS } from '../lib/constants'
-import { retrievePasskeyCredential } from '../lib/passkeyStorage'
 import { updateDeviceProposalHash, getDevices } from '../lib/deviceManager'
-import { HiExternalLink } from 'react-icons/hi'
+import { HiExternalLink, HiInformationCircle, HiKey } from 'react-icons/hi'
 import AddDeviceFlow from './AddDeviceFlow'
 import '../styles/PasskeySettings.css'
 
@@ -83,45 +82,45 @@ function PasskeySettings({ accountAddress }) {
 
   // Load devices from database
   const loadDevices = async () => {
-    if (!accountAddress || !ownerAddress || !signMessage) return
+    if (!accountAddress || !ownerAddress || !signMessage) {
+      console.log('⏭️  Skipping loadDevices - missing required params:', {
+        accountAddress: !!accountAddress,
+        ownerAddress: !!ownerAddress,
+        signMessage: !!signMessage,
+      })
+      return
+    }
 
     try {
+      console.log('🔄 Loading devices for account:', accountAddress)
       const deviceList = await getDevices(signMessage, ownerAddress, accountAddress)
       setDevices(deviceList)
       console.log('✅ Loaded devices:', deviceList.length)
-      console.log('📱 Devices with proposal hashes:', deviceList.map(d => ({
+      console.log('📱 Device details:', deviceList.map(d => ({
         deviceName: d.deviceName,
+        deviceType: d.deviceType,
+        isHardwareBacked: d.isHardwareBacked,
+        authenticatorName: d.authenticatorName,
+        aaguid: d.aaguid,
         proposalHash: d.proposalHash,
         proposalTxHash: d.proposalTxHash,
       })))
     } catch (error) {
-      console.error('Failed to load devices:', error)
+      console.error('❌ Failed to load devices:', error)
+      console.error('Error details:', error.message, error.stack)
     }
   }
 
-  // Load stored credential from server/localStorage
+  // Load stored credential from localStorage (legacy support)
   const loadStoredCredential = async () => {
-    if (!accountAddress || !ownerAddress || !signMessage) return
+    if (!accountAddress) return
 
-    try {
-      // Try to load from server first
-      const credential = await retrievePasskeyCredential(signMessage, ownerAddress, accountAddress)
-      if (credential) {
-        console.log('✅ Loaded passkey credential from server for account:', accountAddress)
-        setStoredCredential(credential)
-        return
-      }
-    } catch (error) {
-      console.log('⚠️ Failed to load from server, trying localStorage:', error.message)
-    }
-
-    // Fallback to localStorage
     try {
       const storageKey = `ethaura_passkey_credential_${accountAddress.toLowerCase()}`
       const stored = localStorage.getItem(storageKey)
       if (stored) {
         const credential = JSON.parse(stored)
-        console.log('✅ Loaded passkey credential from localStorage for account:', accountAddress)
+        console.log('✅ Loaded legacy passkey credential from localStorage for account:', accountAddress)
         setStoredCredential(credential)
       }
     } catch (error) {
@@ -423,7 +422,7 @@ For now, please use the contract directly on Etherscan or wait for this feature 
         {/* Main Content - Left Column */}
         <div className="passkey-main">
           {/* Add/Manage Passkey */}
-          {!accountInfo.hasPasskey && !storedCredential ? (
+          {!accountInfo.hasPasskey && !storedCredential && devices.length === 0 ? (
             <div className="settings-section">
               <h3>Add Passkey</h3>
               <p className="section-description">
@@ -492,12 +491,13 @@ For now, please use the contract directly on Etherscan or wait for this feature 
                 <div className="settings-section">
                   <h3>Two-Factor Authentication</h3>
                   <p className="section-description">
-                    ℹ️ 2FA settings will be available after your account is deployed. Your account will be deployed automatically with your first transaction.
+                    <HiInformationCircle style={{ display: 'inline', verticalAlign: 'middle', marginRight: '4px' }} />
+                    2FA settings will be available after your account is deployed. Your account will be deployed automatically with your first transaction.
                   </p>
                 </div>
               )}
 
-              <div className="settings-section" style={{ marginTop: '24px' }}>
+              <div className="settings-section">
                 <h3>Update Passkey</h3>
                 <p className="section-description">
                   Replace your current passkey with a new one. This is useful if:
@@ -509,12 +509,14 @@ For now, please use the contract directly on Etherscan or wait for this feature 
                 </ul>
                 {!accountInfo?.isDeployed ? (
                   <p className="section-description" style={{ fontSize: '0.85rem', color: '#666', marginBottom: '12px' }}>
-                    ℹ️ <strong>Note:</strong> For undeployed accounts, adding a new passkey will replace the existing one.
+                    <HiInformationCircle style={{ display: 'inline', verticalAlign: 'middle', marginRight: '4px' }} />
+                    <strong>Note:</strong> For undeployed accounts, adding a new passkey will replace the existing one.
                     The latest passkey will be used when you deploy this account.
                   </p>
                 ) : (
                   <p className="section-description" style={{ fontSize: '0.85rem', color: '#666', marginBottom: '12px' }}>
-                    ⏱️ <strong>Note:</strong> The update requires a 48-hour timelock before the new passkey becomes active.
+                    <HiInformationCircle style={{ display: 'inline', verticalAlign: 'middle', marginRight: '4px' }} />
+                    <strong>Note:</strong> The update requires a 48-hour timelock before the new passkey becomes active.
                     Your old passkey will continue to work until the new one is activated.
                   </p>
                 )}
@@ -533,11 +535,12 @@ For now, please use the contract directly on Etherscan or wait for this feature 
                   />
                 ) : (
                   <button
-                    className="btn btn-secondary"
+                    className="btn btn-primary"
                     onClick={() => setShowAddDevice(true)}
                     disabled={loading || !ownerAddress}
                   >
-                    🔑 Add New Device
+                    <HiKey style={{ display: 'inline', verticalAlign: 'middle', marginRight: '6px' }} />
+                    Add New Device
                   </button>
                 )}
               </div>
@@ -608,13 +611,22 @@ For now, please use the contract directly on Etherscan or wait for this feature 
                               <div style={{ flex: 1 }}>
                                 <h4 style={{ margin: '0 0 4px 0', fontSize: '0.95rem' }}>
                                   {device.deviceName || `Device ${index + 1}`}
+                                  {device.isHardwareBacked && (
+                                    <span style={{ marginLeft: '8px', fontSize: '0.75rem', color: '#22c55e' }}>🔒 Hardware</span>
+                                  )}
                                 </h4>
                                 <p className="small-text" style={{ margin: '4px 0', color: '#666' }}>
                                   {device.deviceType ? `${device.deviceType.charAt(0).toUpperCase()}${device.deviceType.slice(1)}` : 'Unknown type'}
+                                  {device.authenticatorName && ` • ${device.authenticatorName}`}
                                 </p>
                                 <p className="small-text" style={{ margin: '4px 0', fontSize: '0.8rem', color: '#888' }}>
                                   Credential ID: {device.credentialId.slice(0, 12)}...{device.credentialId.slice(-8)}
                                 </p>
+                                {device.aaguid && (
+                                  <p className="small-text" style={{ margin: '4px 0', fontSize: '0.8rem', color: '#888' }}>
+                                    AAGUID: {device.aaguid}
+                                  </p>
+                                )}
                                 {device.proposalHash && (
                                   <p className="small-text" style={{ margin: '4px 0', fontSize: '0.8rem', color: '#888', display: 'flex', alignItems: 'center', gap: '4px' }}>
                                     <span>Proposal: {device.proposalHash.slice(0, 10)}...{device.proposalHash.slice(-8)}</span>
@@ -661,14 +673,14 @@ For now, please use the contract directly on Etherscan or wait for this feature 
             <div className="status-grid">
               <div className="status-item">
                 <span className="status-label">Passkey Configured</span>
-                <span className={`status-badge ${(accountInfo.hasPasskey || storedCredential) ? 'badge-success' : 'badge-warning'}`}>
-                  {(accountInfo.hasPasskey || storedCredential) ? 'Yes' : 'No'}
+                <span className={`status-badge ${(accountInfo.hasPasskey || storedCredential || devices.length > 0) ? 'badge-success' : 'badge-warning'}`}>
+                  {(accountInfo.hasPasskey || storedCredential || devices.length > 0) ? 'Yes' : 'No'}
                 </span>
               </div>
               <div className="status-item">
                 <span className="status-label">Status</span>
                 <span className={`status-badge ${accountInfo.hasPasskey ? 'badge-success' : 'badge-neutral'}`}>
-                  {accountInfo.hasPasskey ? 'Active On-Chain' : storedCredential ? 'Stored (Not Deployed)' : 'Not Configured'}
+                  {accountInfo.hasPasskey ? 'Active On-Chain' : (storedCredential || devices.length > 0) ? 'Stored (Not Deployed)' : 'Not Configured'}
                 </span>
               </div>
               <div className="status-item">

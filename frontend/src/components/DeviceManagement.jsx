@@ -275,6 +275,17 @@ function DeviceManagement({ accountAddress, onAddDevice }) {
                   ) : (
                     <span className="badge badge-secondary">Inactive</span>
                   )}
+                  {/* Attestation badges (Phase 1) */}
+                  {device.isHardwareBacked === true && (
+                    <span className="badge badge-info" title="Hardware-backed authenticator">
+                      🔒 Hardware
+                    </span>
+                  )}
+                  {device.isHardwareBacked === false && (
+                    <span className="badge badge-neutral" title="Software authenticator">
+                      Software
+                    </span>
+                  )}
                 </div>
                 <div className="device-dates">
                   <div>
@@ -292,6 +303,20 @@ function DeviceManagement({ accountAddress, onAddDevice }) {
                     {device.publicKey.x.slice(0, 10)}...{device.publicKey.x.slice(-8)}
                   </code>
                 </div>
+                {/* Attestation info (Phase 1) */}
+                {device.aaguid && device.aaguid !== '00000000-0000-0000-0000-000000000000' && (
+                  <div className="device-attestation-info">
+                    <span className="label">Authenticator:</span>
+                    <code className="key-preview" title={`AAGUID: ${device.aaguid}`}>
+                      {device.aaguid.slice(0, 8)}...{device.aaguid.slice(-12)}
+                    </code>
+                    {device.attestationFormat && (
+                      <span className="attestation-format" title="Attestation format">
+                        ({device.attestationFormat})
+                      </span>
+                    )}
+                  </div>
+                )}
                 {device.proposalHash && (
                   <>
                     <div className="device-proposal-info">
