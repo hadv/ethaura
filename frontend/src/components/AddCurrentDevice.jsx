@@ -3,7 +3,6 @@ import { ethers } from 'ethers'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
 import { parsePublicKey, verifyAttestation } from '../utils/webauthn'
 import { addDevice, updateDeviceProposalHash } from '../lib/deviceManager'
-import { storePasskeyCredential } from '../lib/passkeyStorage'
 import '../styles/AddCurrentDevice.css'
 
 function AddCurrentDevice({ accountAddress, onComplete, onCancel }) {
@@ -222,11 +221,19 @@ function AddCurrentDevice({ accountAddress, onComplete, onCancel }) {
 
         setStatus('✅ Passkey proposed! Wait 48 hours then execute the update.')
       } else {
-        // For UNDEPLOYED accounts: Save to single passkey table (overwrites existing)
+        // For UNDEPLOYED accounts: Save to multi-device table
         setStatus('Saving to database...')
         const deviceType = getDeviceType()
-        await storePasskeyCredential(signMessage, ownerAddress, accountAddress, serializedCredential, deviceName.trim(), deviceType)
-        setStatus('✅ Passkey saved! It will be used when you deploy this account.')
+        await addDevice(
+          signMessage,
+          ownerAddress,
+          accountAddress,
+          deviceName.trim(),
+          deviceType,
+          serializedCredential,
+          attestationResult // Phase 1 - pass attestation metadata
+        )
+        setStatus('✅ Device saved! It will be used when you deploy this account.')
       }
 
       // Wait a moment then complete
