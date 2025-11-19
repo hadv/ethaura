@@ -121,7 +121,7 @@ function RegisterDevicePage() {
         publicKey: {
           challenge: challenge,
           rp: {
-            name: 'ΞTHΛURΛ P256 Wallet',
+            name: 'EthAura P256 Wallet',
             id: window.location.hostname,
           },
           user: {
