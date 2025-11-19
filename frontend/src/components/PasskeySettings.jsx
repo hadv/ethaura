@@ -669,14 +669,14 @@ For now, please use the contract directly on Etherscan or wait for this feature 
             <div className="status-grid">
               <div className="status-item">
                 <span className="status-label">Passkey Configured</span>
-                <span className={`status-badge ${(accountInfo.hasPasskey || storedCredential) ? 'badge-success' : 'badge-warning'}`}>
-                  {(accountInfo.hasPasskey || storedCredential) ? 'Yes' : 'No'}
+                <span className={`status-badge ${(accountInfo.hasPasskey || storedCredential || devices.length > 0) ? 'badge-success' : 'badge-warning'}`}>
+                  {(accountInfo.hasPasskey || storedCredential || devices.length > 0) ? 'Yes' : 'No'}
                 </span>
               </div>
               <div className="status-item">
                 <span className="status-label">Status</span>
                 <span className={`status-badge ${accountInfo.hasPasskey ? 'badge-success' : 'badge-neutral'}`}>
-                  {accountInfo.hasPasskey ? 'Active On-Chain' : storedCredential ? 'Stored (Not Deployed)' : 'Not Configured'}
+                  {accountInfo.hasPasskey ? 'Active On-Chain' : (storedCredential || devices.length > 0) ? 'Stored (Not Deployed)' : 'Not Configured'}
                 </span>
               </div>
               <div className="status-item">
