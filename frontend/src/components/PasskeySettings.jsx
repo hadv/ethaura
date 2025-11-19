@@ -497,7 +497,7 @@ For now, please use the contract directly on Etherscan or wait for this feature 
                 </div>
               )}
 
-              <div className="settings-section" style={{ marginTop: '24px' }}>
+              <div className="settings-section">
                 <h3>Update Passkey</h3>
                 <p className="section-description">
                   Replace your current passkey with a new one. This is useful if:
@@ -535,7 +535,7 @@ For now, please use the contract directly on Etherscan or wait for this feature 
                   />
                 ) : (
                   <button
-                    className="btn btn-secondary"
+                    className="btn btn-primary"
                     onClick={() => setShowAddDevice(true)}
                     disabled={loading || !ownerAddress}
                   >
