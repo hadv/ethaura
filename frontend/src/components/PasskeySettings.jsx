@@ -740,45 +740,33 @@ For now, please use the contract directly on Etherscan or wait for this feature 
           </div>
 
           {/* FIDO Certification Levels Info */}
-          <div className="status-box" style={{ marginTop: '16px' }}>
-            <h3>FIDO2 Certification</h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <div style={{
-                fontSize: '0.8rem',
-                color: '#374151',
-                display: 'flex',
-                alignItems: 'center'
-              }}>
-                <strong style={{ color: '#166534', minWidth: '35px' }}>L1</strong>
-                <span>Basic security requirements</span>
-              </div>
-              <div style={{
-                fontSize: '0.8rem',
-                color: '#374151',
-                display: 'flex',
-                alignItems: 'center'
-              }}>
-                <strong style={{ color: '#166534', minWidth: '35px' }}>L2</strong>
-                <span>Hardware-backed, biometric</span>
-              </div>
-              <div style={{
-                fontSize: '0.8rem',
-                color: '#374151',
-                display: 'flex',
-                alignItems: 'center'
-              }}>
-                <strong style={{ color: '#166534', minWidth: '35px' }}>L3</strong>
-                <span>Government-grade security</span>
-              </div>
-              <div style={{
-                fontSize: '0.8rem',
-                color: '#374151',
-                display: 'flex',
-                alignItems: 'center'
-              }}>
-                <strong style={{ color: '#166534', minWidth: '35px' }}>L3+</strong>
-                <span>Military-grade security</span>
-              </div>
+          <div style={{
+            marginTop: '16px',
+            padding: '12px 14px',
+            backgroundColor: '#fefce8',
+            border: '1px solid #fde047',
+            borderRadius: '8px'
+          }}>
+            <div style={{
+              fontSize: '0.75rem',
+              fontWeight: '600',
+              color: '#854d0e',
+              marginBottom: '8px',
+              textTransform: 'uppercase',
+              letterSpacing: '0.5px'
+            }}>
+              FIDO2 Certification Levels
+            </div>
+            <div style={{
+              fontSize: '0.8rem',
+              color: '#713f12',
+              lineHeight: '1.6',
+              fontFamily: 'monospace'
+            }}>
+              <div>L1  - Basic security requirements</div>
+              <div>L2  - Hardware-backed, biometric</div>
+              <div>L3  - Government-grade security</div>
+              <div>L3+ - Military-grade security</div>
             </div>
           </div>
 
