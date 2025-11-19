@@ -715,8 +715,7 @@ For now, please use the contract directly on Etherscan or wait for this feature 
         {/* Sidebar - Right Column */}
         <div className="passkey-sidebar">
           {/* Passkey Status */}
-          <div className="status-box" style={{
-            backgroundColor: '#fef5f8',
+          <div className="status-box status-box-rose" style={{
             border: '1px solid #fecdd3',
             borderRadius: '8px'
           }}>
