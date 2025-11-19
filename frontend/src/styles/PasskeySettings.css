@@ -249,6 +249,18 @@
   transform: translateY(-1px);
 }
 
+.btn-secondary {
+  background: #f3f4f6;
+  color: #1f2937;
+  border: 1px solid #d1d5db;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: #e5e7eb;
+  border-color: #9ca3af;
+  transform: translateY(-1px);
+}
+
 .btn-success {
   background: #10b981;
   color: white;

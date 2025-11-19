@@ -4,7 +4,7 @@ import { useNetwork } from '../contexts/NetworkContext'
 import { ethers } from 'ethers'
 import { NETWORKS } from '../lib/constants'
 import { updateDeviceProposalHash, getDevices } from '../lib/deviceManager'
-import { HiExternalLink } from 'react-icons/hi'
+import { HiExternalLink, HiInformationCircle, HiKey } from 'react-icons/hi'
 import AddDeviceFlow from './AddDeviceFlow'
 import '../styles/PasskeySettings.css'
 
@@ -491,7 +491,8 @@ For now, please use the contract directly on Etherscan or wait for this feature 
                 <div className="settings-section">
                   <h3>Two-Factor Authentication</h3>
                   <p className="section-description">
-                    ℹ️ 2FA settings will be available after your account is deployed. Your account will be deployed automatically with your first transaction.
+                    <HiInformationCircle style={{ display: 'inline', verticalAlign: 'middle', marginRight: '4px' }} />
+                    2FA settings will be available after your account is deployed. Your account will be deployed automatically with your first transaction.
                   </p>
                 </div>
               )}
@@ -508,12 +509,14 @@ For now, please use the contract directly on Etherscan or wait for this feature 
                 </ul>
                 {!accountInfo?.isDeployed ? (
                   <p className="section-description" style={{ fontSize: '0.85rem', color: '#666', marginBottom: '12px' }}>
-                    ℹ️ <strong>Note:</strong> For undeployed accounts, adding a new passkey will replace the existing one.
+                    <HiInformationCircle style={{ display: 'inline', verticalAlign: 'middle', marginRight: '4px' }} />
+                    <strong>Note:</strong> For undeployed accounts, adding a new passkey will replace the existing one.
                     The latest passkey will be used when you deploy this account.
                   </p>
                 ) : (
                   <p className="section-description" style={{ fontSize: '0.85rem', color: '#666', marginBottom: '12px' }}>
-                    ⏱️ <strong>Note:</strong> The update requires a 48-hour timelock before the new passkey becomes active.
+                    <HiInformationCircle style={{ display: 'inline', verticalAlign: 'middle', marginRight: '4px' }} />
+                    <strong>Note:</strong> The update requires a 48-hour timelock before the new passkey becomes active.
                     Your old passkey will continue to work until the new one is activated.
                   </p>
                 )}
@@ -536,7 +539,8 @@ For now, please use the contract directly on Etherscan or wait for this feature 
                     onClick={() => setShowAddDevice(true)}
                     disabled={loading || !ownerAddress}
                   >
-                    🔑 Add New Device
+                    <HiKey style={{ display: 'inline', verticalAlign: 'middle', marginRight: '6px' }} />
+                    Add New Device
                   </button>
                 )}
               </div>
