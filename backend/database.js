@@ -119,42 +119,7 @@ function allAsync(sql, params = []) {
 }
 
 // Create tables
-// Legacy table for backward compatibility
-await runAsync(`
-  CREATE TABLE IF NOT EXISTS passkey_credentials (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id TEXT NOT NULL UNIQUE,
-    credential_id TEXT NOT NULL,
-    raw_id TEXT NOT NULL,
-    public_key_x TEXT NOT NULL,
-    public_key_y TEXT NOT NULL,
-    attestation_object TEXT,
-    client_data_json TEXT,
-    device_name TEXT,
-    device_type TEXT,
-    created_at INTEGER NOT NULL,
-    updated_at INTEGER NOT NULL
-  )
-`)
-
-await runAsync(`CREATE INDEX IF NOT EXISTS idx_user_id ON passkey_credentials(user_id)`)
-await runAsync(`CREATE INDEX IF NOT EXISTS idx_credential_id ON passkey_credentials(credential_id)`)
-
-// Add device_name and device_type columns if they don't exist (migration)
-try {
-  await runAsync(`ALTER TABLE passkey_credentials ADD COLUMN device_name TEXT`)
-  console.log('✅ Added device_name column to passkey_credentials')
-} catch (err) {
-  // Column already exists, ignore
-}
-try {
-  await runAsync(`ALTER TABLE passkey_credentials ADD COLUMN device_type TEXT`)
-  console.log('✅ Added device_type column to passkey_credentials')
-} catch (err) {
-  // Column already exists, ignore
-}
-
-// New multi-device table
+// Multi-device table with Phase 1 attestation support
 await runAsync(`
   CREATE TABLE IF NOT EXISTS passkey_devices (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -210,137 +175,10 @@ await runAsync(`CREATE INDEX IF NOT EXISTS idx_session_expires ON device_session
 
 console.log('✅ Database initialized:', DB_PATH)
 
-/**
- * Store or update a passkey credential
- * @param {string} userId - User identifier (owner address)
- * @param {Object} credential - Credential data
- * @param {string} deviceName - Device name (optional)
- * @param {string} deviceType - Device type (optional)
- * @returns {Object} Stored credential
- */
-export async function storeCredential(userId, credential, deviceName = null, deviceType = null) {
-  const now = Date.now()
-
-  // Check if credential exists
-  const existing = await getAsync(`SELECT id FROM passkey_credentials WHERE user_id = ?`, [userId])
-
-  if (existing) {
-    // Update existing
-    await runAsync(`
-      UPDATE passkey_credentials SET
-        credential_id = ?,
-        raw_id = ?,
-        public_key_x = ?,
-        public_key_y = ?,
-        attestation_object = ?,
-        client_data_json = ?,
-        device_name = ?,
-        device_type = ?,
-        updated_at = ?
-      WHERE user_id = ?
-    `, [
-      credential.id,
-      credential.rawId,
-      credential.publicKey.x,
-      credential.publicKey.y,
-      credential.response?.attestationObject || null,
-      credential.response?.clientDataJSON || null,
-      deviceName,
-      deviceType,
-      now,
-      userId
-    ])
-  } else {
-    // Insert new
-    await runAsync(`
-      INSERT INTO passkey_credentials (
-        user_id, credential_id, raw_id, public_key_x, public_key_y,
-        attestation_object, client_data_json, device_name, device_type,
-        created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `, [
-      userId,
-      credential.id,
-      credential.rawId,
-      credential.publicKey.x,
-      credential.publicKey.y,
-      credential.response?.attestationObject || null,
-      credential.response?.clientDataJSON || null,
-      deviceName,
-      deviceType,
-      now,
-      now
-    ])
-  }
-
-  return {
-    success: true,
-    userId,
-    credentialId: credential.id,
-  }
-}
-
-/**
- * Retrieve a passkey credential by user ID
- * @param {string} userId - User identifier
- * @returns {Object|null} Credential data or null if not found
- */
-export async function getCredential(userId) {
-  console.log(`🔍 DB: Querying for userId: ${userId}`)
-  const row = await getAsync(`SELECT * FROM passkey_credentials WHERE user_id = ?`, [userId])
-
-  if (!row) {
-    console.log(`❌ DB: No row found for userId: ${userId}`)
-    return null
-  }
-
-  console.log(`✅ DB: Found credential for userId: ${userId}`, {
-    credential_id: row.credential_id,
-    has_public_key_x: !!row.public_key_x,
-    has_public_key_y: !!row.public_key_y,
-  })
-
-  return {
-    id: row.credential_id,
-    rawId: row.raw_id,
-    publicKey: {
-      x: row.public_key_x,
-      y: row.public_key_y,
-    },
-    response: row.attestation_object && row.client_data_json ? {
-      attestationObject: row.attestation_object,
-      clientDataJSON: row.client_data_json,
-    } : null,
-    deviceName: row.device_name,
-    deviceType: row.device_type,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-  }
-}
-
-/**
- * Delete a passkey credential
- * @param {string} userId - User identifier
- * @returns {boolean} True if deleted, false if not found
- */
-export async function deleteCredential(userId) {
-  const result = await runAsync(`DELETE FROM passkey_credentials WHERE user_id = ?`, [userId])
-  return result.changes > 0
-}
-
-/**
- * Get all credentials (for admin/debugging)
- * @returns {Array} All credentials
- */
-export async function getAllCredentials() {
-  const rows = await allAsync(`
-    SELECT user_id, credential_id, public_key_x, public_key_y, created_at, updated_at
-    FROM passkey_credentials
-    ORDER BY created_at DESC
-  `)
-
-  return rows || []
-}
+// Legacy functions removed - use multi-device functions instead:
+// - addDevice() instead of storeCredential()
+// - getDevices() instead of getCredential()
+// - removeDevice() instead of deleteCredential()
 
 /*******************************************************************************
  * MULTI-DEVICE PASSKEY MANAGEMENT
@@ -775,7 +613,7 @@ export async function getDatabaseStats() {
       COUNT(*) as total_credentials,
       MIN(created_at) as oldest_credential,
       MAX(created_at) as newest_credential
-    FROM passkey_credentials
+    FROM passkey_devices
   `)
 
   return {
@@ -908,17 +746,14 @@ process.on('SIGINT', () => gracefulShutdown('SIGINT'))
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'))
 
 export default {
-  // Legacy single-device functions
-  storeCredential,
-  getCredential,
-  deleteCredential,
-  getAllCredentials,
   // Multi-device functions
   addDevice,
   getDevices,
   getDeviceByCredentialId,
   updateDeviceLastUsed,
   removeDevice,
+  activateDevice,
+  updateDeviceProposalHash,
   // Session management
   createSession,
   getSession,
