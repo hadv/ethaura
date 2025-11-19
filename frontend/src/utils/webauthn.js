@@ -5,6 +5,111 @@
 import { decode } from 'cbor-x'
 
 /**
+ * Extract AAGUID from authenticator data
+ * @param {Uint8Array} authData - The authenticator data
+ * @returns {string} AAGUID in UUID format (8-4-4-4-12)
+ */
+export function extractAAGUID(authData) {
+  // AAGUID is at bytes 37-52 in authData
+  // AuthData structure:
+  // - rpIdHash: 32 bytes (0-31)
+  // - flags: 1 byte (32)
+  // - signCount: 4 bytes (33-36)
+  // - AAGUID: 16 bytes (37-52)
+
+  if (authData.length < 53) {
+    console.warn('⚠️ AuthData too short to contain AAGUID')
+    return '00000000-0000-0000-0000-000000000000'
+  }
+
+  const aaguidBytes = authData.slice(37, 53)
+
+  // Convert to UUID format: 8-4-4-4-12
+  const hex = Array.from(aaguidBytes)
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('')
+
+  const aaguid = [
+    hex.slice(0, 8),
+    hex.slice(8, 12),
+    hex.slice(12, 16),
+    hex.slice(16, 20),
+    hex.slice(20, 32)
+  ].join('-')
+
+  console.log('🔑 Extracted AAGUID:', aaguid)
+  return aaguid
+}
+
+/**
+ * Verify WebAuthn attestation object and extract metadata
+ * @param {ArrayBuffer} attestationObject - The attestation object from credential creation
+ * @param {ArrayBuffer} clientDataJSON - The client data JSON
+ * @returns {Object} Attestation verification result with metadata
+ */
+export function verifyAttestation(attestationObject, clientDataJSON) {
+  try {
+    // Decode CBOR attestation object
+    const attestation = decode(new Uint8Array(attestationObject))
+
+    console.log('🔍 Attestation object:', attestation)
+
+    // Extract components
+    const authData = attestation.authData
+    const fmt = attestation.fmt // Attestation format: "packed", "none", etc.
+    const attStmt = attestation.attStmt
+
+    // Extract AAGUID
+    const aaguid = extractAAGUID(authData)
+
+    // Determine if hardware-backed based on attestation format
+    let isHardwareBacked = true // Default assumption
+
+    if (fmt === 'none') {
+      // "none" format means no attestation provided (privacy-focused)
+      isHardwareBacked = null // Unknown
+      console.log('ℹ️ Attestation format is "none" - hardware status unknown')
+    } else if (fmt === 'packed') {
+      // "packed" format with attestation statement indicates hardware-backed
+      if (attStmt && Object.keys(attStmt).length > 0) {
+        isHardwareBacked = true
+        console.log('✅ Packed attestation detected - likely hardware-backed')
+      } else {
+        // Self-attestation (no certificate)
+        isHardwareBacked = null
+        console.log('ℹ️ Self-attestation detected - hardware status unknown')
+      }
+    }
+
+    // Check if AAGUID is all zeros (indicates no specific authenticator)
+    if (aaguid === '00000000-0000-0000-0000-000000000000') {
+      isHardwareBacked = null
+      console.log('ℹ️ AAGUID is all zeros - hardware status unknown')
+    }
+
+    const result = {
+      verified: true,
+      aaguid: aaguid,
+      format: fmt,
+      isHardwareBacked: isHardwareBacked,
+    }
+
+    console.log('✅ Attestation verification result:', result)
+    return result
+
+  } catch (error) {
+    console.error('❌ Attestation verification failed:', error)
+    return {
+      verified: false,
+      aaguid: '00000000-0000-0000-0000-000000000000',
+      format: 'unknown',
+      isHardwareBacked: null,
+      error: error.message,
+    }
+  }
+}
+
+/**
  * Parse public key from attestation object
  * @param {ArrayBuffer} attestationObject - The attestation object from credential creation
  * @returns {Object} Public key with x and y coordinates as hex strings

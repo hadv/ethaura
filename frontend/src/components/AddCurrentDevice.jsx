@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { ethers } from 'ethers'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
-import { parsePublicKey } from '../utils/webauthn'
+import { parsePublicKey, verifyAttestation } from '../utils/webauthn'
 import { addDevice, updateDeviceProposalHash } from '../lib/deviceManager'
 import { storePasskeyCredential } from '../lib/passkeyStorage'
 import '../styles/AddCurrentDevice.css'
@@ -117,9 +117,17 @@ function AddCurrentDevice({ accountAddress, onComplete, onCancel }) {
       // Parse the public key
       const publicKey = parsePublicKey(credential.response.attestationObject)
 
+      // Verify attestation and extract metadata (Phase 1)
+      setStatus('Verifying device attestation...')
+      const attestationResult = verifyAttestation(
+        credential.response.attestationObject,
+        credential.response.clientDataJSON
+      )
+
       console.log('✅ Passkey created:', {
         id: credential.id,
         publicKey,
+        attestation: attestationResult,
       })
 
       // Serialize credential for storage
@@ -146,7 +154,15 @@ function AddCurrentDevice({ accountAddress, onComplete, onCancel }) {
         // For DEPLOYED accounts: Save to multi-device table and create proposal
         setStatus('Saving to database...')
         const deviceType = getDeviceType()
-        await addDevice(signMessage, ownerAddress, accountAddress, deviceName.trim(), deviceType, serializedCredential)
+        await addDevice(
+          signMessage,
+          ownerAddress,
+          accountAddress,
+          deviceName.trim(),
+          deviceType,
+          serializedCredential,
+          attestationResult // NEW: Phase 1 - pass attestation metadata
+        )
 
         // Create on-chain proposal for the new passkey
         setStatus('Proposing passkey to smart contract (48-hour timelock)...')

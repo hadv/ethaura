@@ -77,6 +77,9 @@ function AddMobileDevice({ accountAddress, onComplete, onCancel }) {
           },
         }
 
+        // Extract attestation metadata (Phase 1)
+        const attestationMetadata = deviceData.attestationMetadata || null
+
         // Check if account is deployed (using public RPC, no wallet needed)
         setStatus('Checking account deployment...')
 
@@ -103,7 +106,8 @@ function AddMobileDevice({ accountAddress, onComplete, onCancel }) {
             accountAddress,
             deviceData.deviceName,
             deviceData.deviceType,
-            credential
+            credential,
+            attestationMetadata // NEW: Phase 1 - pass attestation metadata
           )
 
           // Create on-chain proposal

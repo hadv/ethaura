@@ -36,11 +36,15 @@ async function createAuthSignature(signMessageFn, ownerAddress, accountAddress, 
  * @param {string} deviceName - Device name
  * @param {string} deviceType - Device type (desktop, mobile, tablet)
  * @param {Object} credential - Passkey credential
+ * @param {Object} attestationMetadata - Attestation metadata (Phase 1)
  * @returns {Promise<Object>} Response from server
  */
-export async function addDevice(signMessageFn, ownerAddress, accountAddress, deviceName, deviceType, credential) {
+export async function addDevice(signMessageFn, ownerAddress, accountAddress, deviceName, deviceType, credential, attestationMetadata = null) {
   try {
     console.log('📱 Adding device:', deviceName, deviceType)
+    if (attestationMetadata) {
+      console.log('   Attestation metadata:', attestationMetadata)
+    }
 
     const auth = await createAuthSignature(signMessageFn, ownerAddress, accountAddress, 'Add Device')
 
@@ -58,6 +62,7 @@ export async function addDevice(signMessageFn, ownerAddress, accountAddress, dev
         deviceName,
         deviceType,
         credential,
+        attestationMetadata, // NEW: Phase 1 - include attestation metadata
       }),
     })
 
@@ -312,11 +317,15 @@ export async function getDeviceSession(sessionId) {
  * @param {Object} credential - Passkey credential
  * @param {string} deviceName - Device name
  * @param {string} deviceType - Device type
+ * @param {Object} attestationMetadata - Attestation metadata (Phase 1)
  * @returns {Promise<Object>} Response from server
  */
-export async function completeDeviceSession(sessionId, credential, deviceName, deviceType) {
+export async function completeDeviceSession(sessionId, credential, deviceName, deviceType, attestationMetadata = null) {
   try {
     console.log('✅ Completing session:', sessionId)
+    if (attestationMetadata) {
+      console.log('   Attestation metadata:', attestationMetadata)
+    }
 
     const response = await fetch(`${BACKEND_URL}/api/sessions/${sessionId}/complete`, {
       method: 'POST',
@@ -327,6 +336,7 @@ export async function completeDeviceSession(sessionId, credential, deviceName, d
         credential,
         deviceName,
         deviceType,
+        attestationMetadata, // NEW: Phase 1 - include attestation metadata
       }),
     })
 

@@ -325,7 +325,7 @@ app.delete('/api/passkeys', verifySignature, async (req, res) => {
  */
 app.post('/api/devices', verifySignature, async (req, res) => {
   try {
-    const { deviceName, deviceType, credential } = req.body
+    const { deviceName, deviceType, credential, attestationMetadata } = req.body
     const accountAddress = req.verifiedUserId
 
     if (!deviceName || !deviceType || !credential) {
@@ -346,11 +346,17 @@ app.post('/api/devices', verifySignature, async (req, res) => {
 
     console.log(`📱 Adding device: ${deviceName} (${deviceType}) for account ${accountAddress}`)
 
+    // Log attestation metadata if provided (Phase 1)
+    if (attestationMetadata) {
+      console.log(`   Attestation: AAGUID=${attestationMetadata.aaguid}, Format=${attestationMetadata.format}, Hardware-backed=${attestationMetadata.isHardwareBacked}`)
+    }
+
     const result = await addDevice(accountAddress, {
       deviceId,
       deviceName,
       deviceType,
       credential,
+      attestationMetadata, // NEW: Phase 1 - pass attestation metadata
     })
 
     res.json({
@@ -613,7 +619,7 @@ app.get('/api/sessions/:sessionId', async (req, res) => {
 app.post('/api/sessions/:sessionId/complete', async (req, res) => {
   try {
     const { sessionId } = req.params
-    const { credential, deviceName, deviceType } = req.body
+    const { credential, deviceName, deviceType, attestationMetadata } = req.body
 
     console.log(`📱 Session completion request:`, {
       sessionId,
@@ -621,6 +627,7 @@ app.post('/api/sessions/:sessionId/complete', async (req, res) => {
       deviceName,
       deviceType,
       credentialId: credential?.id,
+      hasAttestation: !!attestationMetadata,
     })
 
     if (!credential || !deviceName || !deviceType) {
@@ -638,6 +645,11 @@ app.post('/api/sessions/:sessionId/complete', async (req, res) => {
       })
     }
 
+    // Log attestation metadata if provided (Phase 1)
+    if (attestationMetadata) {
+      console.log(`   Attestation: AAGUID=${attestationMetadata.aaguid}, Format=${attestationMetadata.format}, Hardware-backed=${attestationMetadata.isHardwareBacked}`)
+    }
+
     console.log(`✅ Completing session: ${sessionId}`)
 
     const deviceData = {
@@ -647,6 +659,7 @@ app.post('/api/sessions/:sessionId/complete', async (req, res) => {
       deviceType,
       credentialId: credential.id,
       rawId: credential.rawId,
+      attestationMetadata, // NEW: Phase 1 - include attestation metadata
     }
 
     const completed = await completeSession(sessionId, deviceData)

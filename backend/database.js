@@ -174,6 +174,9 @@ await runAsync(`
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL,
     last_used_at INTEGER,
+    aaguid TEXT,
+    attestation_format TEXT,
+    is_hardware_backed BOOLEAN DEFAULT 1,
     UNIQUE(account_address, device_id)
   )
 `)
@@ -368,6 +371,7 @@ export async function addDevice(accountAddress, deviceInfo, isActive = true, pro
     deviceName,
     deviceType,
     credential,
+    attestationMetadata, // NEW: Phase 1 - attestation metadata
   } = deviceInfo
 
   // Check if there's already an active device
@@ -384,14 +388,22 @@ export async function addDevice(accountAddress, deviceInfo, isActive = true, pro
   // Each pending device corresponds to an on-chain proposal
   // User can execute any of them (or none)
 
+  // Extract attestation metadata (Phase 1)
+  const aaguid = attestationMetadata?.aaguid || null
+  const attestationFormat = attestationMetadata?.format || null
+  const isHardwareBacked = attestationMetadata?.isHardwareBacked !== null
+    ? (attestationMetadata.isHardwareBacked ? 1 : 0)
+    : 1 // Default to true if unknown
+
   // Insert the new device
   await runAsync(`
     INSERT INTO passkey_devices (
       account_address, device_id, device_name, device_type,
       credential_id, raw_id, public_key_x, public_key_y,
       attestation_object, client_data_json,
-      is_active, proposal_hash, created_at, updated_at, last_used_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      is_active, proposal_hash, created_at, updated_at, last_used_at,
+      aaguid, attestation_format, is_hardware_backed
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `, [
     accountAddress.toLowerCase(),
     deviceId,
@@ -408,9 +420,15 @@ export async function addDevice(accountAddress, deviceInfo, isActive = true, pro
     now,
     now,
     now,
+    aaguid,
+    attestationFormat,
+    isHardwareBacked,
   ])
 
   console.log(`✅ Device added: ${deviceName} (${deviceType}) for account ${accountAddress}${proposalHash ? ` with proposal ${proposalHash.slice(0, 10)}...` : ''}`)
+  if (aaguid) {
+    console.log(`   AAGUID: ${aaguid}, Format: ${attestationFormat}, Hardware-backed: ${isHardwareBacked}`)
+  }
 
   return {
     success: true,
@@ -419,6 +437,11 @@ export async function addDevice(accountAddress, deviceInfo, isActive = true, pro
     deviceName,
     deviceType,
     proposalHash,
+    attestationMetadata: {
+      aaguid,
+      attestationFormat,
+      isHardwareBacked,
+    },
   }
 }
 
