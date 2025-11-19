@@ -23,11 +23,23 @@ import {
   getSession,
   completeSession,
   cleanupExpiredSessions,
+  // FIDO MDS cache (Phase 2)
+  updateDeviceMetadata,
   // Admin/maintenance
   createBackup,
   getDatabaseStats,
   startBackupScheduler,
 } from './database.js'
+
+// Phase 2: FIDO MDS Integration
+import {
+  initMDS,
+  refreshMDSBlob,
+  lookupAuthenticatorWithFallback,
+  getMDSStats,
+  backfillMDSMetadata,
+  stopMDS,
+} from './fidoMDS.js'
 
 // Load environment variables
 dotenv.config()
@@ -54,7 +66,10 @@ if (isDevelopment) {
 const corsOptions = {
   origin: function (origin, callback) {
     // Allow requests with no origin (like mobile apps, Postman, curl)
-    if (!origin) return callback(null, true)
+    if (!origin) {
+      console.log('✅ CORS allowed: no origin (mobile app/curl)')
+      return callback(null, true)
+    }
 
     // Allow localhost and local network IPs
     const allowedOrigins = [
@@ -67,21 +82,32 @@ const corsOptions = {
     // Allow any origin from local network (192.168.x.x, 10.x.x.x, 172.16-31.x.x)
     const localNetworkRegex = /^http:\/\/(192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2[0-9]|3[0-1])\.\d{1,3}\.\d{1,3})(:\d+)?$/
 
-    // Allow ngrok domains for mobile testing (development only)
+    // Allow ngrok domains for mobile testing
     const ngrokRegex = /^https:\/\/[a-z0-9-]+\.ngrok(-free)?\.(io|app|dev)$/
 
-    // Check if origin is in allowed list or matches local network pattern or ngrok
-    if (allowedOrigins.includes(origin) || localNetworkRegex.test(origin)) {
+    // Check if origin is in allowed list
+    if (allowedOrigins.includes(origin)) {
+      console.log('✅ CORS allowed: localhost origin:', origin)
       callback(null, true)
-    } else if (isDevelopment && ngrokRegex.test(origin)) {
-      // Allow ngrok domains in development for mobile testing
-      console.log('✅ CORS allowed ngrok origin:', origin)
+    } else if (localNetworkRegex.test(origin)) {
+      console.log('✅ CORS allowed: local network origin:', origin)
       callback(null, true)
+    } else if (ngrokRegex.test(origin)) {
+      // Allow ngrok domains in development, or if explicitly configured
+      if (isDevelopment || (process.env.FRONTEND_URL && origin === process.env.FRONTEND_URL)) {
+        console.log('✅ CORS allowed: ngrok origin:', origin)
+        callback(null, true)
+      } else {
+        console.warn('⚠️ CORS blocked: ngrok origin not in FRONTEND_URL:', origin)
+        callback(new Error('Not allowed by CORS'))
+      }
     } else if (process.env.FRONTEND_URL && origin === process.env.FRONTEND_URL) {
       // Allow configured frontend URL (for production)
+      console.log('✅ CORS allowed: configured FRONTEND_URL:', origin)
       callback(null, true)
     } else {
       console.warn('⚠️ CORS blocked origin:', origin)
+      console.warn('   Expected FRONTEND_URL:', process.env.FRONTEND_URL || 'not set')
       callback(new Error('Not allowed by CORS'))
     }
   },
@@ -203,18 +229,43 @@ app.post('/api/devices', verifySignature, async (req, res) => {
       console.log(`   Attestation: AAGUID=${attestationMetadata.aaguid}, Format=${attestationMetadata.format}, Hardware-backed=${attestationMetadata.isHardwareBacked}`)
     }
 
+    // Phase 2: Lookup authenticator metadata from FIDO MDS
+    let mdsMetadata = null
+    if (attestationMetadata?.aaguid) {
+      mdsMetadata = lookupAuthenticatorWithFallback(attestationMetadata.aaguid)
+      console.log(`   MDS Lookup: ${mdsMetadata.name}${mdsMetadata.certificationLevel ? ` (${mdsMetadata.certificationLevel})` : ''}`)
+    }
+
     const result = await addDevice(accountAddress, {
       deviceId,
       deviceName,
       deviceType,
       credential,
-      attestationMetadata, // NEW: Phase 1 - pass attestation metadata
+      attestationMetadata, // Phase 1 - pass attestation metadata
     })
+
+    // Phase 2: Update device with MDS metadata if available
+    if (mdsMetadata && attestationMetadata?.aaguid) {
+      try {
+        await updateDeviceMetadata(accountAddress, deviceId, mdsMetadata)
+      } catch (error) {
+        console.error('⚠️  Failed to update device with MDS metadata:', error.message)
+        // Don't fail the request if MDS update fails
+      }
+    }
 
     res.json({
       success: true,
       message: 'Device added successfully',
       ...result,
+      // Include MDS metadata in response
+      mdsMetadata: mdsMetadata ? {
+        name: mdsMetadata.name,
+        description: mdsMetadata.description,
+        certificationLevel: mdsMetadata.certificationLevel,
+        isFido2Certified: mdsMetadata.isFido2Certified,
+        isHardwareBacked: mdsMetadata.isHardwareBacked,
+      } : null,
     })
   } catch (error) {
     console.error('Error adding device:', error)
@@ -260,7 +311,11 @@ app.get('/api/devices/:accountAddress', async (req, res) => {
 
     console.log(`📱 Retrieving devices for account: ${accountAddress}`)
 
-    const devices = await getDevices(accountAddress)
+    let devices = await getDevices(accountAddress)
+
+    // Phase 2: Backfill MDS metadata for devices that don't have it
+    // This updates devices in-memory with MDS data without persisting to database
+    devices = backfillMDSMetadata(devices)
 
     res.json({
       success: true,
@@ -587,6 +642,75 @@ app.post('/api/admin/backup', async (req, res) => {
   }
 })
 
+/**
+ * GET /api/admin/mds/stats
+ * Get FIDO MDS cache statistics (Phase 2)
+ */
+app.get('/api/admin/mds/stats', async (req, res) => {
+  try {
+    const stats = await getMDSStats()
+    res.json({
+      success: true,
+      stats,
+    })
+  } catch (error) {
+    console.error('Error getting MDS stats:', error)
+    res.status(500).json({
+      error: 'Failed to retrieve MDS stats',
+      details: error.message,
+    })
+  }
+})
+
+/**
+ * POST /api/admin/mds/refresh
+ * Manually trigger FIDO MDS refresh (Phase 2)
+ */
+app.post('/api/admin/mds/refresh', async (req, res) => {
+  try {
+    console.log('🔄 Manual MDS refresh triggered')
+    await refreshMDSBlob()
+
+    const stats = await getMDSStats()
+    res.json({
+      success: true,
+      message: 'MDS cache refreshed successfully',
+      stats,
+    })
+  } catch (error) {
+    console.error('Error refreshing MDS:', error)
+    res.status(500).json({
+      error: 'Failed to refresh MDS cache',
+      details: error.message,
+    })
+  }
+})
+
+/**
+ * GET /api/admin/mds/lookup/:aaguid
+ * Debug endpoint to test AAGUID lookup
+ */
+app.get('/api/admin/mds/lookup/:aaguid', async (req, res) => {
+  try {
+    const { aaguid } = req.params
+    console.log('🔍 Looking up AAGUID:', aaguid)
+
+    const metadata = lookupAuthenticatorWithFallback(aaguid)
+
+    res.json({
+      success: true,
+      aaguid,
+      metadata,
+    })
+  } catch (error) {
+    console.error('Error looking up AAGUID:', error)
+    res.status(500).json({
+      error: 'Failed to lookup AAGUID',
+      details: error.message,
+    })
+  }
+})
+
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error('Unhandled error:', err)
@@ -597,13 +721,16 @@ app.use((err, req, res, next) => {
 })
 
 // Start server
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`🚀 EthAura Backend Server running on port ${PORT}`)
   console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`)
   console.log(`🌐 CORS enabled for: ${process.env.FRONTEND_URL || 'http://localhost:5173'}`)
 
   // Start automatic backup scheduler
   startBackupScheduler()
+
+  // Phase 2: Initialize FIDO MDS
+  await initMDS()
 
   // Clean up expired sessions every hour
   setInterval(async () => {

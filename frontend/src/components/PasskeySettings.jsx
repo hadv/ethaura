@@ -102,6 +102,11 @@ function PasskeySettings({ accountAddress }) {
         isHardwareBacked: d.isHardwareBacked,
         authenticatorName: d.authenticatorName,
         aaguid: d.aaguid,
+        // Phase 2: MDS metadata
+        isFido2Certified: d.isFido2Certified,
+        certificationLevel: d.certificationLevel,
+        authenticatorDescription: d.authenticatorDescription,
+        mdsLastUpdated: d.mdsLastUpdated,
         proposalHash: d.proposalHash,
         proposalTxHash: d.proposalTxHash,
       })))
@@ -611,22 +616,64 @@ For now, please use the contract directly on Etherscan or wait for this feature 
                               <div style={{ flex: 1 }}>
                                 <h4 style={{ margin: '0 0 4px 0', fontSize: '0.95rem' }}>
                                   {device.deviceName || `Device ${index + 1}`}
-                                  {device.isHardwareBacked && (
-                                    <span style={{ marginLeft: '8px', fontSize: '0.75rem', color: '#22c55e' }}>🔒 Hardware</span>
-                                  )}
                                 </h4>
+
+                                {/* Phase 2: Show authenticator name from MDS */}
                                 <p className="small-text" style={{ margin: '4px 0', color: '#666' }}>
-                                  {device.deviceType ? `${device.deviceType.charAt(0).toUpperCase()}${device.deviceType.slice(1)}` : 'Unknown type'}
-                                  {device.authenticatorName && ` • ${device.authenticatorName}`}
+                                  {device.authenticatorName || 'Unknown Authenticator'}
                                 </p>
+
+                                {/* Phase 2: Show certification badges - ALWAYS show if data exists */}
+                                <div style={{ display: 'flex', gap: '6px', margin: '6px 0', flexWrap: 'wrap' }}>
+                                  {device.isHardwareBacked && (
+                                    <span
+                                      className="badge"
+                                      style={{
+                                        fontSize: '0.7rem',
+                                        padding: '3px 8px',
+                                        backgroundColor: '#dbeafe',
+                                        color: '#1e40af',
+                                        border: 'none',
+                                        borderRadius: '4px',
+                                        fontWeight: '500'
+                                      }}
+                                      title="Hardware-backed authenticator"
+                                    >
+                                      Hardware-Backed
+                                    </span>
+                                  )}
+                                  {device.isFido2Certified && device.certificationLevel && (
+                                    <span
+                                      className="badge"
+                                      style={{
+                                        fontSize: '0.7rem',
+                                        padding: '3px 8px',
+                                        backgroundColor: '#dcfce7',
+                                        color: '#166534',
+                                        border: 'none',
+                                        borderRadius: '4px',
+                                        fontWeight: '500'
+                                      }}
+                                    >
+                                      {device.certificationLevel.replace('FIDO_CERTIFIED_L', 'FIDO L').replace('FIDO_CERTIFIED', 'FIDO Certified')}
+                                    </span>
+                                  )}
+                                </div>
+
+                                <p className="small-text" style={{ margin: '4px 0', fontSize: '0.8rem', color: '#888' }}>
+                                  {device.deviceType ? `${device.deviceType.charAt(0).toUpperCase()}${device.deviceType.slice(1)}` : 'Unknown type'}
+                                </p>
+
                                 <p className="small-text" style={{ margin: '4px 0', fontSize: '0.8rem', color: '#888' }}>
                                   Credential ID: {device.credentialId.slice(0, 12)}...{device.credentialId.slice(-8)}
                                 </p>
+
                                 {device.aaguid && (
                                   <p className="small-text" style={{ margin: '4px 0', fontSize: '0.8rem', color: '#888' }}>
                                     AAGUID: {device.aaguid}
                                   </p>
                                 )}
+
                                 {device.proposalHash && (
                                   <p className="small-text" style={{ margin: '4px 0', fontSize: '0.8rem', color: '#888', display: 'flex', alignItems: 'center', gap: '4px' }}>
                                     <span>Proposal: {device.proposalHash.slice(0, 10)}...{device.proposalHash.slice(-8)}</span>
@@ -668,26 +715,71 @@ For now, please use the contract directly on Etherscan or wait for this feature 
         {/* Sidebar - Right Column */}
         <div className="passkey-sidebar">
           {/* Passkey Status */}
-          <div className="status-box">
-            <h3>Passkey Status</h3>
+          <div className="status-box status-box-rose" style={{
+            border: '1px solid #fecdd3',
+            borderRadius: '8px'
+          }}>
+            <h3 style={{ color: '#be123c' }}>Passkey Status</h3>
             <div className="status-grid">
               <div className="status-item">
-                <span className="status-label">Passkey Configured</span>
+                <span className="status-label" style={{ color: '#be123c' }}>Passkey Configured</span>
                 <span className={`status-badge ${(accountInfo.hasPasskey || storedCredential || devices.length > 0) ? 'badge-success' : 'badge-warning'}`}>
                   {(accountInfo.hasPasskey || storedCredential || devices.length > 0) ? 'Yes' : 'No'}
                 </span>
               </div>
               <div className="status-item">
-                <span className="status-label">Status</span>
+                <span className="status-label" style={{ color: '#be123c' }}>Status</span>
                 <span className={`status-badge ${accountInfo.hasPasskey ? 'badge-success' : 'badge-neutral'}`}>
                   {accountInfo.hasPasskey ? 'Active On-Chain' : (storedCredential || devices.length > 0) ? 'Stored (Not Deployed)' : 'Not Configured'}
                 </span>
               </div>
               <div className="status-item">
-                <span className="status-label">2FA Status</span>
+                <span className="status-label" style={{ color: '#be123c' }}>2FA Status</span>
                 <span className={`status-badge ${accountInfo.twoFactorEnabled ? 'badge-success' : 'badge-neutral'}`}>
                   {accountInfo.twoFactorEnabled ? 'Enabled' : 'Disabled'}
                 </span>
+              </div>
+            </div>
+          </div>
+
+          {/* FIDO Certification Levels Info */}
+          <div style={{
+            marginTop: '16px',
+            padding: '12px 14px',
+            backgroundColor: '#dcfce7',
+            border: '1px solid #86efac',
+            borderRadius: '8px'
+          }}>
+            <div style={{
+              fontSize: '0.75rem',
+              fontWeight: '600',
+              color: '#166534',
+              marginBottom: '8px',
+              textTransform: 'uppercase',
+              letterSpacing: '0.5px'
+            }}>
+              🔐 FIDO2 Security Levels
+            </div>
+            <div style={{
+              fontSize: '0.8rem',
+              color: '#166534',
+              lineHeight: '1.7'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontWeight: '600', minWidth: '28px' }}>L1</span>
+                <span>→ Basic security</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontWeight: '600', minWidth: '28px' }}>L2</span>
+                <span>→ Enhanced (hardware + biometric) ⭐</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontWeight: '600', minWidth: '28px' }}>L3</span>
+                <span>→ Government-grade</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontWeight: '600', minWidth: '28px' }}>L3+</span>
+                <span>→ Military-grade (highest)</span>
               </div>
             </div>
           </div>

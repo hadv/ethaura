@@ -46,13 +46,65 @@ is_hardware_backed BOOLEAN      -- 1 = hardware, 0 = software, NULL = unknown
 - `database.js` - Updated schema and `addDevice()` function
 - `server.js` - Updated device registration endpoints
 
-### Phase 2: FIDO MDS Integration (Planned)
+### Phase 2: FIDO MDS Integration ✅ COMPLETED
+
+**Status**: Implemented
 
 **Features**:
-- Lookup authenticator metadata from FIDO Alliance Metadata Service
-- Verify certificate chains for "packed" format
-- Store authenticator name, icon, and certification status
-- Display authenticator model in UI
+- ✅ Lookup authenticator metadata from FIDO Alliance Metadata Service (MDS)
+- ✅ Database caching with 24-hour background refresh
+- ✅ Store authenticator name, description, and certification status
+- ✅ Display authenticator model and security badges in UI
+- ✅ Graceful degradation with fallback to Phase 1 hardcoded AAGUIDs
+- ⏳ Certificate chain verification (planned for Phase 3)
+
+**Database Schema**:
+```sql
+-- MDS cache table
+CREATE TABLE IF NOT EXISTS fido_mds_cache (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  blob_data TEXT NOT NULL,           -- Full MDS JSON payload
+  last_updated INTEGER NOT NULL,     -- Unix timestamp
+  next_update TEXT,                  -- ISO date from MDS
+  blob_number INTEGER,               -- MDS blob sequence number
+  created_at INTEGER DEFAULT (strftime('%s', 'now'))
+);
+
+-- Added to passkey_devices table
+authenticator_description TEXT,     -- Full authenticator description
+is_fido2_certified BOOLEAN,         -- FIDO2 certification status
+certification_level TEXT,           -- e.g., "FIDO_CERTIFIED_L2"
+mds_last_updated INTEGER            -- When MDS metadata was last updated
+```
+
+**Backend Modules**:
+- `fidoMDS.js` - FIDO MDS integration module
+  - `initMDS()` - Initialize MDS on server startup
+  - `refreshMDSBlob()` - Background refresh every 24 hours
+  - `lookupAuthenticator(aaguid)` - Lookup from local cache
+  - `lookupAuthenticatorWithFallback(aaguid)` - With graceful degradation
+  - `getMDSStats()` - Get cache statistics
+
+**API Endpoints**:
+- `GET /api/admin/mds/stats` - Get MDS cache statistics
+- `POST /api/admin/mds/refresh` - Manually trigger MDS refresh
+- `POST /api/devices` - Updated to lookup and store MDS metadata
+- `GET /api/devices/:accountAddress` - Returns MDS metadata with devices
+
+**Frontend Components Updated**:
+- `PasskeySettings.jsx` - Display authenticator names and certification badges
+  - Shows FIDO2 certification level (L1/L2/L3/L3+)
+  - Shows hardware-backed badge
+  - Device Security sidebar with per-device metadata
+
+**Architecture**:
+- **No real-time dependency** on FIDO MDS service
+- **Background refresh** every 24 hours
+- **Local database cache** for fast lookups
+- **Graceful degradation** if MDS unavailable
+
+**Documentation**:
+- See [FIDO_MDS_INTEGRATION.md](./FIDO_MDS_INTEGRATION.md) for detailed documentation
 
 ### Phase 3: Policy Enforcement (Planned)
 
