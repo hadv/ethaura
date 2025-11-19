@@ -652,11 +652,12 @@ For now, please use the contract directly on Etherscan or wait for this feature 
                                         color: '#166534',
                                         border: 'none',
                                         borderRadius: '4px',
-                                        fontWeight: '500'
+                                        fontWeight: '500',
+                                        cursor: 'help'
                                       }}
-                                      title={`FIDO2 Certification Levels:\n• L1: Basic security requirements\n• L2: Enhanced security (hardware-backed, biometric)\n• L3: Advanced security (government-grade)\n• L3+: Highest security (military-grade)\n\nThis device: ${device.certificationLevel}`}
+                                      title={`FIDO2 Certification Levels: L1 (Basic security), L2 (Enhanced security with hardware-backed biometric), L3 (Advanced government-grade), L3+ (Highest military-grade). This device: ${device.certificationLevel}`}
                                     >
-                                      {device.certificationLevel.replace('FIDO_CERTIFIED_', 'FIDO2 L').replace('FIDO_CERTIFIED', 'FIDO2')}
+                                      {device.certificationLevel.replace('FIDO_CERTIFIED_L', 'L').replace('FIDO_CERTIFIED', 'Certified')}
                                     </span>
                                   )}
                                 </div>
