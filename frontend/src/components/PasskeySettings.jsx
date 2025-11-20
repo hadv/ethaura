@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { Lock, Star } from 'lucide-react'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
 import { useNetwork } from '../contexts/NetworkContext'
 import { ethers } from 'ethers'
@@ -777,8 +778,7 @@ For now, please use the contract directly on Etherscan or wait for this feature 
           </div>
 
           {/* FIDO Certification Levels Info */}
-          <div style={{
-            marginTop: '16px',
+          <div className="settings-section" style={{
             padding: '12px 14px',
             backgroundColor: '#dcfce7',
             border: '1px solid #86efac',
@@ -790,9 +790,13 @@ For now, please use the contract directly on Etherscan or wait for this feature 
               color: '#166534',
               marginBottom: '8px',
               textTransform: 'uppercase',
-              letterSpacing: '0.5px'
+              letterSpacing: '0.5px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
             }}>
-              🔐 FIDO2 Security Levels
+              <Lock size={14} style={{ color: '#166534' }} />
+              FIDO2 Security Levels
             </div>
             <div style={{
               fontSize: '0.8rem',
@@ -805,7 +809,10 @@ For now, please use the contract directly on Etherscan or wait for this feature 
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <span style={{ fontWeight: '600', minWidth: '28px' }}>L2</span>
-                <span>→ Enhanced (hardware + biometric) ⭐</span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  → Enhanced (hardware + biometric)
+                  <Star size={14} style={{ color: '#eab308', fill: '#eab308' }} />
+                </span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <span style={{ fontWeight: '600', minWidth: '28px' }}>L3</span>

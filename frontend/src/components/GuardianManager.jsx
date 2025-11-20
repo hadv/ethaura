@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { XCircle, Lightbulb } from 'lucide-react'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
 import { useP256SDK } from '../hooks/useP256SDK'
 import { signWithPasskey } from '../utils/webauthn'
@@ -345,7 +346,12 @@ function GuardianManager({ accountAddress, credential, onGuardiansUpdated }) {
 
           {/* Status Messages */}
           {status && <div className="status-message success">{status}</div>}
-          {error && <div className="status-message error">❌ {error}</div>}
+          {error && (
+            <div className="status-message error" style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+              <XCircle size={16} style={{ flexShrink: 0, marginTop: '2px' }} />
+              {error}
+            </div>
+          )}
         </div>
 
         {/* Sidebar - Right Column */}
@@ -385,7 +391,10 @@ function GuardianManager({ accountAddress, credential, onGuardiansUpdated }) {
 
               {/* Tips inside the same section */}
               <div className="tips-section">
-                <p className="tips-title"><strong>💡 Tips:</strong></p>
+                <p className="tips-title" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Lightbulb size={16} style={{ color: '#f59e0b' }} />
+                  <strong>Tips:</strong>
+                </p>
                 <ul className="tips-list">
                   <li>Add trusted contacts (family, friends) as guardians</li>
                   <li>Recommended: 2-3 guardians with threshold of 2</li>

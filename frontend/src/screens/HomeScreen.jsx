@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { TrendingUp, TrendingDown, AlertTriangle, Lightbulb } from 'lucide-react'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
 import { useNetwork } from '../contexts/NetworkContext'
 import { useP256SDK } from '../hooks/useP256SDK'
@@ -86,7 +87,7 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onLogo
         const tokenService = createTokenBalanceService(provider, networkInfo.name)
         const txService = createTransactionHistoryService(provider, networkInfo.name)
 
-        console.log(`🚀 Starting background preload for ${wallets.length} wallets`)
+        console.log(`Starting background preload for ${wallets.length} wallets`)
 
         // Preload data for all wallets in background with progressive updates
         // The callback will be called after each wallet is loaded, updating the portfolio incrementally
@@ -414,7 +415,7 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onLogo
         expectedSalt: `keccak256(${ownerAddress}, ${saltBigInt.toString()})`,
       })
 
-      console.log('⏳ Calling sdk.createAccount...')
+      console.log('Calling sdk.createAccount...')
 
       // Add timeout to prevent indefinite hanging
       const createAccountPromise = sdk.createAccount(
@@ -429,7 +430,7 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onLogo
       )
 
       const accountData = await Promise.race([createAccountPromise, timeoutPromise])
-      console.log('✅ sdk.createAccount completed')
+      console.log('sdk.createAccount completed')
 
       console.log('📍 New wallet created:', {
         address: accountData.address,
@@ -440,7 +441,7 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onLogo
       })
 
       // Verify: same salt should give same address
-      console.log('✅ Address determinism check:', {
+      console.log('Address determinism check:', {
         message: 'Same owner + same salt should ALWAYS give this address',
         address: accountData.address,
         formula: `CREATE2(factory, keccak256(owner=${ownerAddress}, salt=${indexNum}), initCodeHash)`,
@@ -463,7 +464,7 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onLogo
       }
 
       // Fetch balance for the new wallet
-      console.log('⏳ Fetching balance...')
+      console.log('Fetching balance...')
       const provider = new ethers.JsonRpcProvider(networkInfo.rpcUrl)
       const tokenService = createTokenBalanceService(provider, networkInfo.name)
 
@@ -481,9 +482,9 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onLogo
         const ethToken = tokenBalances.find(t => t.symbol === 'ETH')
         balanceEth = ethToken ? ethToken.amount.toString() : '0'
 
-        console.log('✅ Balance fetched:', balanceEth, 'ETH, Total USD:', totalBalanceUSD)
+        console.log('Balance fetched:', balanceEth, 'ETH, Total USD:', totalBalanceUSD)
       } catch (balanceError) {
-        console.warn('⚠️ Failed to fetch balance, using 0.0:', balanceError.message)
+        console.warn('Failed to fetch balance, using 0.0:', balanceError.message)
         // Continue with 0 balance instead of failing the whole operation
       }
 
@@ -641,8 +642,9 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onLogo
               <span className="balance-currency">$</span>
               <span className="balance-amount">{getTotalBalance()}</span>
               <span className="balance-decimals">.{getTotalBalanceDecimals()}</span>
-              <span className={`balance-change ${getTotalPercentChange().startsWith('+') ? 'positive' : 'negative'}`}>
-                {getTotalPercentChange().startsWith('+') ? '▲' : '▼'} {getTotalPercentChange()}%
+              <span className={`balance-change ${getTotalPercentChange().startsWith('+') ? 'positive' : 'negative'}`} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                {getTotalPercentChange().startsWith('+') ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
+                {getTotalPercentChange()}%
               </span>
             </div>
 
@@ -707,8 +709,9 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onLogo
                     <div className="wallet-item-right">
                       <div className="wallet-balance-info" onClick={() => onWalletClick(wallet)}>
                         <div className="wallet-balance">${formatBalance(wallet.balanceUSD)}</div>
-                        <div className={`wallet-change ${parseFloat(wallet.percentChange) >= 0 ? 'positive' : 'negative'}`}>
-                          {parseFloat(wallet.percentChange) >= 0 ? '▲' : '▼'} {Math.abs(parseFloat(wallet.percentChange)).toFixed(2)}%
+                        <div className={`wallet-change ${parseFloat(wallet.percentChange) >= 0 ? 'positive' : 'negative'}`} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          {parseFloat(wallet.percentChange) >= 0 ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
+                          {Math.abs(parseFloat(wallet.percentChange)).toFixed(2)}%
                         </div>
                       </div>
                       <div className="wallet-menu-container" ref={openMenuId === wallet.id ? menuRef : null}>
@@ -906,8 +909,9 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onLogo
                             ) : null
                           })()}
 
-                          <div className="tooltip-section tooltip-tip">
-                            💡 If you previously created wallets on another device, use "Import Existing" tab.
+                          <div className="tooltip-section tooltip-tip" style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                            <Lightbulb size={16} style={{ flexShrink: 0, marginTop: '2px', color: '#f59e0b' }} />
+                            <span>If you previously created wallets on another device, use "Import Existing" tab.</span>
                           </div>
                         </div>
                       </div>
@@ -929,8 +933,9 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onLogo
               )}
 
               {addError && (
-                <div className="error-message">
-                  ⚠️ {addError}
+                <div className="error-message" style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                  <AlertTriangle size={16} style={{ flexShrink: 0, marginTop: '2px' }} />
+                  {addError}
                 </div>
               )}
 

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { Clock, CheckCircle, AlertTriangle, ShieldCheck } from 'lucide-react'
 import TransactionSender from '../components/TransactionSender'
 import Header from '../components/Header'
 import SubHeader from '../components/SubHeader'
@@ -112,7 +113,10 @@ function SendTransactionScreen({ wallet, selectedToken, onBack, onHome, onSettin
               <div className="sidebar-content">
                 {accountInfo.error ? (
                   <div className="sidebar-info-item error">
-                    <span className="sidebar-info-label">⚠️ Network Status:</span>
+                    <span className="sidebar-info-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <AlertTriangle size={14} />
+                      Network Status:
+                    </span>
                     <span className="sidebar-info-value">
                       {accountInfo.error}
                     </span>
@@ -121,14 +125,27 @@ function SendTransactionScreen({ wallet, selectedToken, onBack, onHome, onSettin
                   <>
                     <div className="sidebar-info-item">
                       <span className="sidebar-info-label">Status:</span>
-                      <span className="sidebar-info-value">
-                        {accountInfo.isDeployed ? '✅ Deployed' : '⏳ Will deploy on first transaction'}
+                      <span className="sidebar-info-value" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        {accountInfo.isDeployed ? (
+                          <>
+                            <CheckCircle size={16} style={{ color: '#10b981' }} />
+                            Deployed
+                          </>
+                        ) : (
+                          <>
+                            <Clock size={16} style={{ color: '#f59e0b' }} />
+                            Will deploy on first transaction
+                          </>
+                        )}
                       </span>
                     </div>
                     {accountInfo.twoFactorEnabled && (
                       <div className="sidebar-info-item">
                         <span className="sidebar-info-label">Security:</span>
-                        <span className="sidebar-info-value">🔒 2FA Enabled</span>
+                        <span className="sidebar-info-value" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <ShieldCheck size={16} style={{ color: '#10b981' }} />
+                          2FA Enabled
+                        </span>
                       </div>
                     )}
                   </>

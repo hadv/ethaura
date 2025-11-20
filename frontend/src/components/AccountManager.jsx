@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { CheckCircle, Clock, RefreshCw } from 'lucide-react'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
 import { useNetwork } from '../contexts/NetworkContext'
 import { useP256SDK } from '../hooks/useP256SDK'
@@ -459,16 +460,37 @@ function AccountManager({ credential, onAccountCreated, accountAddress, accountC
           {accountInfo && (
             <div className="mt-3">
               <div className="status status-info" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span>
-                  <strong>Status:</strong> {accountInfo.deployed ? '✅ Deployed' : '⏳ Not deployed yet (counterfactual)'}
+                <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <strong>Status:</strong>
+                  {accountInfo.deployed ? (
+                    <>
+                      <CheckCircle size={16} style={{ color: '#10b981' }} />
+                      Deployed
+                    </>
+                  ) : (
+                    <>
+                      <Clock size={16} style={{ color: '#f59e0b' }} />
+                      Not deployed yet (counterfactual)
+                    </>
+                  )}
                 </span>
                 <button
                   className="button button-secondary"
                   onClick={refreshAccountInfo}
                   disabled={refreshing}
-                  style={{ fontSize: '0.75rem', padding: '4px 8px' }}
+                  style={{ fontSize: '0.75rem', padding: '4px 8px', display: 'flex', alignItems: 'center', gap: '6px' }}
                 >
-                  {refreshing ? '⏳ Refreshing...' : '🔄 Refresh'}
+                  {refreshing ? (
+                    <>
+                      <Clock size={14} />
+                      Refreshing...
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw size={14} />
+                      Refresh
+                    </>
+                  )}
                 </button>
               </div>
 

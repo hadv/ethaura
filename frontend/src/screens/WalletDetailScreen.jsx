@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
+import { TrendingUp, TrendingDown } from 'lucide-react'
 import { ethers } from 'ethers'
 import { HiArrowUp, HiArrowDown } from 'react-icons/hi'
 import { BiTransfer } from 'react-icons/bi'
@@ -304,8 +305,9 @@ function WalletDetailScreen({ wallet, onBack, onHome, onSettings, onSend, onLogo
                 <span className="balance-currency">$</span>
                 <span className="balance-amount">{formatBalanceParts(balanceUSD).whole}</span>
                 <span className="balance-decimals">.{formatBalanceParts(balanceUSD).decimal}</span>
-                <span className={`balance-change ${balanceChange.startsWith('+') ? 'positive' : 'negative'}`}>
-                  {balanceChange.startsWith('+') ? '▲' : '▼'} {balanceChange}
+                <span className={`balance-change ${balanceChange.startsWith('+') ? 'positive' : 'negative'}`} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                  {balanceChange.startsWith('+') ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
+                  {balanceChange}
                 </span>
               </div>
             </div>

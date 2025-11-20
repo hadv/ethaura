@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { CheckCircle, Rocket, Clock, Shield, ShieldOff, AlertTriangle } from 'lucide-react'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
 import { useP256SDK } from '../hooks/useP256SDK'
 import { useNetwork } from '../contexts/NetworkContext'
@@ -588,8 +589,9 @@ function RecoveryManager({ accountAddress, credential }) {
             <div className="recovery-section">
               <h3>Account Recovery</h3>
               <div className="info-box info-box-warning">
-                <p>
-                  <strong>⚠️ Not a Guardian</strong>
+                <p style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <AlertTriangle size={16} style={{ color: '#f59e0b', flexShrink: 0 }} />
+                  <strong>Not a Guardian</strong>
                 </p>
                 <p>
                   You need to be a guardian to propose recovery. Only guardians can initiate the recovery process.
@@ -620,8 +622,18 @@ function RecoveryManager({ accountAddress, credential }) {
                 </div>
                 <div className="status-item">
                   <span className="status-label">Your Status</span>
-                  <span className={`status-badge ${isGuardian ? 'badge-success' : 'badge-neutral'}`}>
-                    {isGuardian ? '🛡️ Guardian' : 'Not a Guardian'}
+                  <span className={`status-badge ${isGuardian ? 'badge-success' : 'badge-neutral'}`} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                    {isGuardian ? (
+                      <>
+                        <Shield size={14} />
+                        Guardian
+                      </>
+                    ) : (
+                      <>
+                        <ShieldOff size={14} />
+                        Not a Guardian
+                      </>
+                    )}
                   </span>
                 </div>
               </div>
@@ -672,8 +684,10 @@ function RecoveryManager({ accountAddress, credential }) {
                           onClick={() => handleApproveRecovery(recovery.nonce)}
                           disabled={loading}
                           className="btn btn-secondary"
+                          style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
                         >
-                          ✅ Approve
+                          <CheckCircle size={16} />
+                          Approve
                         </button>
                       )}
 
@@ -683,13 +697,18 @@ function RecoveryManager({ accountAddress, credential }) {
                             onClick={() => handleExecuteRecovery(recovery.nonce)}
                             disabled={loading}
                             className="btn btn-success"
+                            style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
                           >
-                            🚀 Execute
+                            <Rocket size={16} />
+                            Execute
                           </button>
                         )}
 
                       {recovery.executeAfter > Math.floor(Date.now() / 1000) && (
-                        <span className="status-badge badge-warning">⏳ Locked</span>
+                        <span className="status-badge badge-warning" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                          <Clock size={14} />
+                          Locked
+                        </span>
                       )}
 
                       {/* Owner can cancel any pending recovery */}
