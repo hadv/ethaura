@@ -29,6 +29,7 @@ export default defineConfig({
       '.ngrok.io',
       '.ngrok.app',
       'ethersafe.ngrok.app', // Specific ngrok domain for production
+      '.a.free.pinggy.link', // Pinggy wildcard domain
     ],
     // Proxy disabled when using ngrok - frontend calls backend directly via VITE_BACKEND_URL
     // Uncomment for local development without ngrok:

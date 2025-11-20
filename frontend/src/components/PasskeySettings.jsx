@@ -93,10 +93,27 @@ function PasskeySettings({ accountAddress }) {
 
     try {
       console.log('🔄 Loading devices for account:', accountAddress)
+
+      // Check if account is deployed
+      const provider = new ethers.JsonRpcProvider(networkInfo.rpcUrl)
+      const code = await provider.getCode(accountAddress)
+      const isDeployed = code !== '0x'
+
       const deviceList = await getDevices(signMessage, ownerAddress, accountAddress)
-      setDevices(deviceList)
-      console.log('✅ Loaded devices:', deviceList.length)
-      console.log('📱 Device details:', deviceList.map(d => ({
+
+      // For undeployed accounts, only keep the most recent device
+      // (only the last device will be deployed with the account)
+      let filteredDevices = deviceList
+      if (!isDeployed && deviceList.length > 0) {
+        // Sort by created_at descending and keep only the first one
+        const sortedDevices = [...deviceList].sort((a, b) => b.createdAt - a.createdAt)
+        filteredDevices = [sortedDevices[0]]
+        console.log('⚠️ Account not deployed - showing only latest device:', filteredDevices[0].deviceName)
+      }
+
+      setDevices(filteredDevices)
+      console.log('✅ Loaded devices:', filteredDevices.length)
+      console.log('📱 Device details:', filteredDevices.map(d => ({
         deviceName: d.deviceName,
         deviceType: d.deviceType,
         isHardwareBacked: d.isHardwareBacked,
@@ -607,6 +624,20 @@ For now, please use the contract directly on Etherscan or wait for this feature 
                     {/* Show additional devices (for deployed accounts with multi-device) */}
                     {devices.length > 0 && (
                       <>
+                        {!accountInfo.isDeployed && (
+                          <div style={{
+                            margin: '16px 0 12px 0',
+                            padding: '12px',
+                            backgroundColor: '#e3f2fd',
+                            borderLeft: '4px solid #2196f3',
+                            borderRadius: '4px'
+                          }}>
+                            <strong style={{ fontSize: '0.9rem' }}>Account not yet deployed</strong>
+                            <p style={{ margin: '6px 0 0 0', fontSize: '0.85rem', color: '#555' }}>
+                              This device will become active when you make your first transaction. Only the most recent device is shown.
+                            </p>
+                          </div>
+                        )}
                         <h4 style={{ margin: '16px 0 8px 0', fontSize: '0.9rem', color: '#666' }}>
                           Additional Devices ({devices.length})
                         </h4>
@@ -669,7 +700,7 @@ For now, please use the contract directly on Etherscan or wait for this feature 
                                 </p>
 
                                 {device.aaguid && (
-                                  <p className="small-text" style={{ margin: '4px 0', fontSize: '0.8rem', color: '#888' }}>
+                                  <p className="small-text" style={{ margin: '4px 0', fontSize: '0.8rem', color: '#888', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                     AAGUID: {device.aaguid}
                                   </p>
                                 )}
@@ -692,8 +723,11 @@ For now, please use the contract directly on Etherscan or wait for this feature 
                                   </p>
                                 )}
                               </div>
-                              <span className="status-badge badge-warning" style={{ fontSize: '0.75rem' }}>
-                                Pending
+                              <span
+                                className={`status-badge ${!accountInfo.isDeployed ? 'badge-info' : 'badge-warning'}`}
+                                style={{ fontSize: '0.75rem', whiteSpace: 'nowrap' }}
+                              >
+                                {!accountInfo.isDeployed ? 'Pending deployment' : 'Pending'}
                               </span>
                             </div>
                           </div>
