@@ -17,6 +17,7 @@ function DeviceManagement({ accountAddress, onAddDevice }) {
   const [executing, setExecuting] = useState(null)
   const [cancelling, setCancelling] = useState(null)
   const [proposalDetails, setProposalDetails] = useState({})
+  const [isAccountDeployed, setIsAccountDeployed] = useState(true) // Track deployment status
 
   // P256Account ABI (minimal for what we need)
   const accountABI = [
@@ -48,11 +49,34 @@ function DeviceManagement({ accountAddress, onAddDevice }) {
     try {
       setLoading(true)
       setError('')
-      const deviceList = await getDevices(signMessage, ownerAddress, accountAddress)
-      setDevices(deviceList)
 
-      // Fetch proposal details for pending devices
-      await loadProposalDetails(deviceList)
+      // Check if account is deployed
+      const networkInfo = JSON.parse(localStorage.getItem('ethaura_network') || '{"name":"sepolia","rpcUrl":"https://rpc.sepolia.org"}')
+      const provider = new ethers.JsonRpcProvider(networkInfo.rpcUrl)
+      const code = await provider.getCode(accountAddress)
+      const isDeployed = code !== '0x'
+
+      console.log('🔍 Account deployment status:', { accountAddress, isDeployed })
+      setIsAccountDeployed(isDeployed)
+
+      const deviceList = await getDevices(signMessage, ownerAddress, accountAddress)
+
+      // For undeployed accounts, only keep the most recent device
+      // (only the last device will be deployed with the account)
+      if (!isDeployed && deviceList.length > 0) {
+        // Sort by created_at descending and keep only the first one
+        const sortedDevices = [...deviceList].sort((a, b) => b.createdAt - a.createdAt)
+        const latestDevice = sortedDevices[0]
+        console.log('⚠️ Account not deployed - showing only latest device:', latestDevice.deviceName)
+        setDevices([latestDevice])
+      } else {
+        setDevices(deviceList)
+      }
+
+      // Fetch proposal details for pending devices (only for deployed accounts)
+      if (isDeployed) {
+        await loadProposalDetails(deviceList)
+      }
     } catch (err) {
       console.error('Failed to load devices:', err)
       setError(err.message || 'Failed to load devices')
@@ -254,6 +278,15 @@ function DeviceManagement({ accountAddress, onAddDevice }) {
 
       {error && <div className="error-message">{error}</div>}
 
+      {!isAccountDeployed && devices.length > 0 && (
+        <div className="info-message" style={{ marginBottom: '1rem', padding: '0.75rem', backgroundColor: '#e3f2fd', borderLeft: '4px solid #2196f3', borderRadius: '4px' }}>
+          <strong>Account not yet deployed</strong>
+          <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.9rem' }}>
+            This device will become active when you make your first transaction. Only the most recent device is shown.
+          </p>
+        </div>
+      )}
+
       {devices.length === 0 ? (
         <div className="no-devices">
           <p>No devices registered yet.</p>
@@ -268,7 +301,9 @@ function DeviceManagement({ accountAddress, onAddDevice }) {
                 <h4>{device.deviceName}</h4>
                 <div className="device-meta">
                   <span className="device-type">{device.deviceType}</span>
-                  {device.isActive ? (
+                  {!isAccountDeployed ? (
+                    <span className="badge badge-info">Will be active on deployment</span>
+                  ) : device.isActive ? (
                     <span className="badge badge-success">Active</span>
                   ) : device.proposalHash ? (
                     <span className="badge badge-warning">Pending (48h timelock)</span>
