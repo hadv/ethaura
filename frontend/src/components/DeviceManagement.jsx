@@ -302,7 +302,7 @@ function DeviceManagement({ accountAddress, onAddDevice }) {
                 <div className="device-meta">
                   <span className="device-type">{device.deviceType}</span>
                   {!isAccountDeployed ? (
-                    <span className="badge badge-info">Will be active on deployment</span>
+                    <span className="badge badge-info" style={{ whiteSpace: 'nowrap' }}>Pending deployment</span>
                   ) : device.isActive ? (
                     <span className="badge badge-success">Active</span>
                   ) : device.proposalHash ? (

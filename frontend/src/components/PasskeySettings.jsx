@@ -725,9 +725,9 @@ For now, please use the contract directly on Etherscan or wait for this feature 
                               </div>
                               <span
                                 className={`status-badge ${!accountInfo.isDeployed ? 'badge-info' : 'badge-warning'}`}
-                                style={{ fontSize: '0.75rem' }}
+                                style={{ fontSize: '0.75rem', whiteSpace: 'nowrap' }}
                               >
-                                {!accountInfo.isDeployed ? 'Will be active on deployment' : 'Pending'}
+                                {!accountInfo.isDeployed ? 'Pending deployment' : 'Pending'}
                               </span>
                             </div>
                           </div>
