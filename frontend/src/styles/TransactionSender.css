@@ -308,6 +308,9 @@
 
 /* Messages */
 .error-message {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
   padding: 16px 20px;
   background: #fef2f2;
   border: 1px solid #fecaca;
@@ -328,6 +331,9 @@
 }
 
 .success-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-size: 18px;
   font-weight: 600;
   color: #16a34a;

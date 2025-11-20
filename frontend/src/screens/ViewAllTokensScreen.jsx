@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { ethers } from 'ethers'
 import { HiOutlineCurrencyDollar } from 'react-icons/hi2'
 import { useNetwork } from '../contexts/NetworkContext'
@@ -6,7 +6,6 @@ import { useWeb3Auth } from '../contexts/Web3AuthContext'
 import { createTokenBalanceService } from '../lib/tokenService'
 import Header from '../components/Header'
 import SubHeader from '../components/SubHeader'
-import { WalletConnectModal } from '../components/WalletConnectModal'
 import '../styles/ViewAllTokensScreen.css'
 
 function ViewAllTokensScreen({ wallet, onBack, onHome, onLogout, onSettings, onWalletChange, onSend }) {
@@ -19,8 +18,6 @@ function ViewAllTokensScreen({ wallet, onBack, onHome, onLogout, onSettings, onW
   const [totalValue, setTotalValue] = useState(0)
   const [searchQuery, setSearchQuery] = useState('')
   const [hideZeroBalances, setHideZeroBalances] = useState(false)
-  const [showWalletConnectModal, setShowWalletConnectModal] = useState(false)
-  const walletConnectButtonRef = useRef(null)
 
   // Load all wallets from localStorage
   useEffect(() => {
@@ -111,7 +108,7 @@ function ViewAllTokensScreen({ wallet, onBack, onHome, onLogout, onSettings, onW
       {/* Header */}
       <Header userInfo={userInfo} onLogout={onLogout} onHome={onHome} />
 
-      {/* SubHeader with wallet dropdown, network selector, title, total value, and WalletConnect */}
+      {/* SubHeader with wallet dropdown, network selector, title, and total value */}
       <SubHeader
         wallet={selectedWallet}
         onBack={onBack}
@@ -123,9 +120,6 @@ function ViewAllTokensScreen({ wallet, onBack, onHome, onLogout, onSettings, onW
         title="All Assets"
         rightLabel="Total Value"
         rightValue={`$${totalValue.toFixed(2)}`}
-        showWalletConnect={true}
-        onWalletConnectClick={() => setShowWalletConnectModal(true)}
-        walletConnectButtonRef={walletConnectButtonRef}
       />
 
       <div className="view-all-tokens-container">
@@ -219,14 +213,6 @@ function ViewAllTokensScreen({ wallet, onBack, onHome, onLogout, onSettings, onW
           </div>
         </div>
       </div>
-
-      {/* WalletConnect Modal */}
-      {showWalletConnectModal && (
-        <WalletConnectModal
-          onClose={() => setShowWalletConnectModal(false)}
-          triggerRef={walletConnectButtonRef}
-        />
-      )}
     </div>
   )
 }

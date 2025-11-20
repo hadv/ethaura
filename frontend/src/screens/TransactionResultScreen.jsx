@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { Clock, CheckCircle, XCircle } from 'lucide-react'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
 import { useNetwork } from '../contexts/NetworkContext'
 import { useP256SDK } from '../hooks/useP256SDK'
@@ -133,13 +134,13 @@ function TransactionResultScreen({
   const getStatusIcon = () => {
     switch (status) {
       case 'pending':
-        return '⏳'
+        return <Clock size={48} style={{ color: '#f59e0b' }} />
       case 'confirmed':
-        return '✅'
+        return <CheckCircle size={48} style={{ color: '#10b981' }} />
       case 'failed':
-        return '❌'
+        return <XCircle size={48} style={{ color: '#ef4444' }} />
       default:
-        return '⏳'
+        return <Clock size={48} style={{ color: '#f59e0b' }} />
     }
   }
 
@@ -213,10 +214,25 @@ function TransactionResultScreen({
 
               <div className="detail-row">
               <span className="detail-label">Status</span>
-              <span className={`detail-value status-badge ${status}`}>
-                {status === 'pending' && '⏳ Pending'}
-                {status === 'confirmed' && '✅ Confirmed'}
-                {status === 'failed' && '❌ Failed'}
+              <span className={`detail-value status-badge ${status}`} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                {status === 'pending' && (
+                  <>
+                    <Clock size={16} style={{ color: '#f59e0b' }} />
+                    Pending
+                  </>
+                )}
+                {status === 'confirmed' && (
+                  <>
+                    <CheckCircle size={16} style={{ color: '#10b981' }} />
+                    Confirmed
+                  </>
+                )}
+                {status === 'failed' && (
+                  <>
+                    <XCircle size={16} style={{ color: '#ef4444' }} />
+                    Failed
+                  </>
+                )}
               </span>
             </div>
 

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Lightbulb } from 'lucide-react'
 import { parsePublicKey } from '../utils/webauthn'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
 import { deletePasskeyCredential } from '../lib/passkeyStorage'
@@ -203,8 +204,9 @@ function PasskeyManager({ onCredentialCreated, credential }) {
       </p>
 
       <div className="mb-4 p-3" style={{ backgroundColor: '#f3f4f6', borderRadius: '8px' }}>
-        <p className="text-sm" style={{ marginBottom: '8px' }}>
-          <strong>💡 What is a Passkey?</strong>
+        <p className="text-sm" style={{ marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <Lightbulb size={16} style={{ color: '#f59e0b', flexShrink: 0 }} />
+          <strong>What is a Passkey?</strong>
         </p>
         <ul className="text-xs" style={{ marginLeft: '20px', lineHeight: '1.6' }}>
           <li>Uses your device's biometric authentication (fingerprint, face recognition)</li>

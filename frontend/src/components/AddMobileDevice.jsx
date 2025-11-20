@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { CheckCircle } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
 import { useNetwork } from '../contexts/NetworkContext'
@@ -190,8 +191,8 @@ function AddMobileDevice({ accountAddress, onComplete, onCancel }) {
 
           // Use addDevice() which supports attestation metadata
           await addDevice(signMessage, ownerAddress, accountAddress, deviceData.deviceName, deviceData.deviceType, credential, deviceData.attestationMetadata)
-          console.log('✅ Device saved successfully')
-          setStatus('✅ Device saved! It will be used when you deploy this account.')
+          console.log('Device saved successfully')
+          setStatus('Device saved! It will be used when you deploy this account.')
         }
 
         setTimeout(() => {

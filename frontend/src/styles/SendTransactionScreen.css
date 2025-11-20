@@ -176,6 +176,9 @@
   font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .sidebar-info-item.error .sidebar-info-label {
@@ -186,6 +189,9 @@
   font-size: 14px;
   color: #111827;
   font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .sidebar-info-item.error .sidebar-info-value {

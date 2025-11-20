@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { Smartphone, Tablet, Monitor, Key, CheckCircle, Clock } from 'lucide-react'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
 import { useNetwork } from '../contexts/NetworkContext'
 import { ethers } from 'ethers'
@@ -243,15 +244,16 @@ function DeviceManagement({ accountAddress, onAddDevice }) {
   }
 
   const getDeviceIcon = (deviceType) => {
+    const iconProps = { size: 24, strokeWidth: 1.5 }
     switch (deviceType) {
       case 'mobile':
-        return '📱'
+        return <Smartphone {...iconProps} />
       case 'tablet':
-        return '📱'
+        return <Tablet {...iconProps} />
       case 'desktop':
-        return '💻'
+        return <Monitor {...iconProps} />
       default:
-        return '🔑'
+        return <Key {...iconProps} />
     }
   }
 
@@ -378,9 +380,15 @@ function DeviceManagement({ accountAddress, onAddDevice }) {
                           return timeInfo ? (
                             <div className={`timelock-status ${timeInfo.className}`}>
                               {timeInfo.canExecute ? (
-                                <span className="timelock-ready">✅ {timeInfo.text}</span>
+                                <span className="timelock-ready" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                                  <CheckCircle size={14} />
+                                  {timeInfo.text}
+                                </span>
                               ) : (
-                                <span className="timelock-waiting">⏳ Can be executed in: {timeInfo.text}</span>
+                                <span className="timelock-waiting" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                                  <Clock size={14} />
+                                  Can be executed in: {timeInfo.text}
+                                </span>
                               )}
                             </div>
                           ) : null

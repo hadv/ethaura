@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { XCircle, CheckCircle } from 'lucide-react'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
 import { useNetwork } from '../contexts/NetworkContext'
 import { signWithPasskey } from '../utils/webauthn'
@@ -541,14 +542,14 @@ function TransactionSender({ accountAddress, credential, accountConfig, onSignat
         // Check if we have the passkey credential
         if (!credentialToUse) {
           setError(
-            `❌ PASSKEY REQUIRED BUT NOT FOUND!\n\n` +
+            `PASSKEY REQUIRED BUT NOT FOUND!\n\n` +
             `This account requires a passkey to sign transactions, but you don't have the passkey on this device/browser.\n\n` +
-            `📱 Passkeys are device-specific and stored in your device's secure enclave (Touch ID/Face ID).\n\n` +
-            `💡 Solutions:\n` +
+            `Passkeys are device-specific and stored in your device's secure enclave (Touch ID/Face ID).\n\n` +
+            `Solutions:\n` +
             `1. Switch to the device/browser where you created this wallet's passkey\n` +
             `2. Go to Settings → Security → Initiate account recovery to set a new passkey\n` +
             `3. Go to Settings → Security → Disable 2FA (requires 48-hour timelock)\n\n` +
-            `🔍 On-chain state:\n` +
+            `On-chain state:\n` +
             `  Account: ${accountAddress}\n` +
             `  Has passkey: Yes (qx: ${onChainQx.slice(0, 20)}...)\n` +
             `  2FA enabled: ${onChainTwoFactorEnabled}`
@@ -1241,13 +1242,17 @@ function TransactionSender({ accountAddress, credential, accountConfig, onSignat
       {/* Status Messages */}
       {error && (
         <div className="error-message">
-          ❌ {error}
+          <XCircle size={16} style={{ flexShrink: 0 }} />
+          {error}
         </div>
       )}
 
       {txHash && (
         <div className="success-message">
-          <div className="success-title">✅ Transaction Successful!</div>
+          <div className="success-title">
+            <CheckCircle size={16} style={{ flexShrink: 0 }} />
+            Transaction Successful!
+          </div>
           <div className="tx-hash-label">Transaction Hash:</div>
           <div className="tx-hash">{txHash}</div>
           <a

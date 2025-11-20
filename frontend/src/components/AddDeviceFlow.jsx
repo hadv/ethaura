@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Monitor, Smartphone } from 'lucide-react'
 import AddCurrentDevice from './AddCurrentDevice'
 import AddMobileDevice from './AddMobileDevice'
 import '../styles/AddDeviceFlow.css'
@@ -20,7 +21,9 @@ function AddDeviceFlow({ accountAddress, onComplete, onCancel }) {
             className="option-card"
             onClick={() => setSelectedOption('current')}
           >
-            <div className="option-icon">💻</div>
+            <div className="option-icon">
+              <Monitor size={48} strokeWidth={1.5} />
+            </div>
             <h3>This Device</h3>
             <p>Add a passkey on this browser/device</p>
             <ul className="option-benefits">
@@ -35,7 +38,9 @@ function AddDeviceFlow({ accountAddress, onComplete, onCancel }) {
             className="option-card"
             onClick={() => setSelectedOption('mobile')}
           >
-            <div className="option-icon">📱</div>
+            <div className="option-icon">
+              <Smartphone size={48} strokeWidth={1.5} />
+            </div>
             <h3>Mobile / Tablet</h3>
             <p>Scan QR code to add passkey on another device</p>
             <ul className="option-benefits">
