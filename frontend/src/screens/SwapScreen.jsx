@@ -354,16 +354,17 @@ function SwapScreen({ wallet, onBack, onHome, onSettings, onLogout, onWalletChan
       />
 
       {/* Main Content */}
-      <div className="swap-content">
-        <div className="swap-container">
-          {/* Page Title */}
-          <div className="swap-header">
-            <h1 className="swap-title">Swap Tokens</h1>
-            <p className="swap-subtitle">Trade tokens instantly via Uniswap V3</p>
-          </div>
+      <div className="swap-content-wrapper">
+        <div className="swap-main">
+          {/* Swap Form Card */}
+          <div className="swap-form-card">
+            {/* Page Title */}
+            <div className="page-header">
+              <h1 className="page-title">Swap</h1>
+            </div>
 
-          {/* Swap Card */}
-          <div className="swap-card">
+            {/* Swap Card */}
+            <div className="swap-card">
             {/* Token In Section */}
             <div className="swap-input-section">
               <div className="swap-input-header">
@@ -638,6 +639,44 @@ function SwapScreen({ wallet, onBack, onHome, onSettings, onLogout, onWalletChan
           </div>
         </div>
       </div>
+
+      {/* Right Panel - Swap Info */}
+      <div className="swap-sidebar">
+        {quote && (
+          <div className="sidebar-section">
+            <h3 className="sidebar-title">Swap Details</h3>
+            <div className="sidebar-content">
+              <div className="sidebar-info-item">
+                <span className="sidebar-info-label">Exchange Rate:</span>
+                <span className="sidebar-info-value">
+                  1 {tokenIn === 'ETH' ? 'ETH' : tokenIn.symbol} ≈ {quote.rate.toFixed(6)} {tokenOut === 'ETH' ? 'ETH' : tokenOut.symbol}
+                </span>
+              </div>
+              <div className="sidebar-info-item">
+                <span className="sidebar-info-label">Price Impact:</span>
+                <span className="sidebar-info-value" style={{ color: quote.priceImpact > 5 ? '#dc2626' : '#10b981' }}>
+                  {quote.priceImpact.toFixed(2)}%
+                </span>
+              </div>
+              <div className="sidebar-info-item">
+                <span className="sidebar-info-label">Minimum Received:</span>
+                <span className="sidebar-info-value">
+                  {ethers.formatUnits(quote.amountOutMinimum, tokenOut === 'ETH' ? 18 : tokenOut.decimals)} {tokenOut === 'ETH' ? 'ETH' : tokenOut.symbol}
+                </span>
+              </div>
+              <div className="sidebar-info-item">
+                <span className="sidebar-info-label">Slippage Tolerance:</span>
+                <span className="sidebar-info-value">{slippage}%</span>
+              </div>
+              <div className="sidebar-info-item">
+                <span className="sidebar-info-label">Fee Tier:</span>
+                <span className="sidebar-info-value">0.3%</span>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
     </div>
   )
 }
