@@ -285,7 +285,7 @@ function SwapScreen({ wallet, onBack, onHome, onSettings, onLogout, onWalletChan
     }
   }
 
-  // Get token balance display
+  // Get token balance display (max 6 decimals)
   const getTokenBalance = (token) => {
     if (!token) return '0'
 
@@ -296,7 +296,8 @@ function SwapScreen({ wallet, onBack, onHome, onSettings, onLogout, onWalletChan
     if (!balance) return '0'
 
     const decimals = token === 'ETH' ? 18 : token.decimals
-    return ethers.formatUnits(balance, decimals)
+    const formatted = ethers.formatUnits(balance, decimals)
+    return parseFloat(formatted).toFixed(6)
   }
 
   // Get formatted token balances for TokenSelector component
@@ -480,10 +481,10 @@ function SwapScreen({ wallet, onBack, onHome, onSettings, onLogout, onWalletChan
                   {quoteLoading ? (
                     <Loader className="quote-loader" size={20} />
                   ) : quote && tokenOut ? (
-                    ethers.formatUnits(
+                    parseFloat(ethers.formatUnits(
                       quote.amountOut,
                       tokenOut === 'ETH' ? 18 : tokenOut.decimals
-                    )
+                    )).toFixed(6)
                   ) : (
                     '0.0'
                   )}
@@ -512,10 +513,10 @@ function SwapScreen({ wallet, onBack, onHome, onSettings, onLogout, onWalletChan
                 <div className="quote-row">
                   <span className="quote-label">Minimum Received</span>
                   <span className="quote-value">
-                    {ethers.formatUnits(
+                    {parseFloat(ethers.formatUnits(
                       new UniswapV3Service(sdk.provider, sdk.chainId).calculateMinimumOutput(quote.amountOut, slippage),
                       tokenOut === 'ETH' ? 18 : tokenOut.decimals
-                    )}{' '}
+                    )).toFixed(6)}{' '}
                     {tokenOut === 'ETH' ? 'ETH' : tokenOut.symbol}
                   </span>
                 </div>
@@ -576,7 +577,7 @@ function SwapScreen({ wallet, onBack, onHome, onSettings, onLogout, onWalletChan
               <div className="sidebar-info-item">
                 <span className="sidebar-info-label">You Receive:</span>
                 <span className="sidebar-info-value">
-                  {ethers.formatUnits(quote.amountOut, tokenOut === 'ETH' ? 18 : tokenOut.decimals)} {tokenOut === 'ETH' ? 'ETH' : tokenOut.symbol}
+                  {parseFloat(ethers.formatUnits(quote.amountOut, tokenOut === 'ETH' ? 18 : tokenOut.decimals)).toFixed(6)} {tokenOut === 'ETH' ? 'ETH' : tokenOut.symbol}
                 </span>
               </div>
               <div className="sidebar-info-item">
