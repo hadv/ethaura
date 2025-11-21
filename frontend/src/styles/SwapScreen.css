@@ -43,6 +43,13 @@
   border-right: 1px solid #e5e5e5;
 }
 
+.swap-settings-bar {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
 .swap-form-card {
   background: white;
   border-radius: 12px;
