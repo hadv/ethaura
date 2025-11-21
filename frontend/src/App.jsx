@@ -245,6 +245,12 @@ function AppContent() {
     setCurrentScreen('send-transaction')
   }
 
+  const handleSwapFromHome = (wallet) => {
+    setSelectedWallet(wallet)
+    setPreviousScreen(currentScreen)
+    setCurrentScreen('swap')
+  }
+
   const handleWalletChange = (wallet) => {
     setSelectedWallet(wallet)
   }
@@ -381,6 +387,7 @@ function AppContent() {
         <HomeScreen
           onWalletClick={handleWalletClick}
           onSend={handleSendFromHome}
+          onSwap={handleSwapFromHome}
           onLogout={handleLogout}
         />
       )}

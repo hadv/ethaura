@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { TrendingUp, TrendingDown, AlertTriangle, Lightbulb } from 'lucide-react'
+import { TrendingUp, TrendingDown, AlertTriangle, Lightbulb, ArrowLeftRight } from 'lucide-react'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
 import { useNetwork } from '../contexts/NetworkContext'
 import { useP256SDK } from '../hooks/useP256SDK'
@@ -18,7 +18,7 @@ import { createTransactionHistoryService } from '../lib/transactionService'
 import '../styles/HomeScreen.css'
 import logo from '../assets/logo.svg'
 
-function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onLogout }) {
+function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onSwap, onLogout }) {
   const { userInfo, address: ownerAddress } = useWeb3Auth()
   const { networkInfo } = useNetwork()
   const sdk = useP256SDK()
@@ -622,6 +622,15 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onLogo
     onSend(wallets[0])
   }
 
+  // Swap handler - use first wallet
+  const handleSwapClick = () => {
+    if (wallets.length === 0) {
+      return
+    }
+    // Use the first wallet as the selected one
+    onSwap(wallets[0])
+  }
+
   return (
     <div className="home-screen">
       {/* Header */}
@@ -661,6 +670,14 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onLogo
               <button className="action-btn receive-btn" onClick={handleReceiveClick}>
                 <HiArrowDown className="btn-icon" />
                 Receive
+              </button>
+              <button
+                className="action-btn swap-btn"
+                onClick={handleSwapClick}
+                disabled={wallets.length === 0}
+              >
+                <ArrowLeftRight className="btn-icon" size={18} />
+                Swap
               </button>
             </div>
           </div>
