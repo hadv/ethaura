@@ -9,8 +9,9 @@ import { ethers } from 'ethers'
 import { buildSendEthUserOp, getUserOpHash, signUserOperation, signUserOperationOwnerOnly, packAccountGasLimits, packGasFees, encodeExecute } from '../lib/userOperation'
 import { getUserFriendlyMessage, getSuggestedAction, isRetryableError } from '../lib/errors'
 import { formatPublicKeyForContract } from '../lib/accountManager'
-import { SUPPORTED_TOKENS, ERC20_ABI, ethIcon } from '../lib/constants'
+import { SUPPORTED_TOKENS, ERC20_ABI } from '../lib/constants'
 import { walletDataCache } from '../lib/walletDataCache'
+import TokenSelector from './TokenSelector'
 import '../styles/TransactionSender.css'
 
 function TransactionSender({ accountAddress, credential, accountConfig, onSignatureRequest, preSelectedToken, onTransactionBroadcast, onAccountInfoChange }) {
@@ -34,7 +35,6 @@ function TransactionSender({ accountAddress, credential, accountConfig, onSignat
   // Token-related state
   const [selectedToken, setSelectedToken] = useState(null) // null = ETH, otherwise token object
   const [tokenBalances, setTokenBalances] = useState({}) // Map of token address -> balance
-  const [showTokenDropdown, setShowTokenDropdown] = useState(false)
   const [availableTokens, setAvailableTokens] = useState([])
 
   // Helper function to request signature with user confirmation via screen navigation
@@ -1090,8 +1090,29 @@ function TransactionSender({ accountAddress, credential, accountConfig, onSignat
   // Handle token selection
   const handleTokenSelect = (token) => {
     setSelectedToken(token)
-    setShowTokenDropdown(false)
     setAmount('') // Clear amount when switching tokens
+  }
+
+  // Get formatted token balances for TokenSelector component
+  const getFormattedTokenBalances = () => {
+    const formatted = {}
+
+    for (const token of availableTokens) {
+      const balance = tokenBalances[token.address]
+      if (balance) {
+        formatted[token.address] = parseFloat(balance).toFixed(4)
+      } else {
+        formatted[token.address] = '0.0000'
+      }
+    }
+
+    return formatted
+  }
+
+  // Get formatted ETH balance for TokenSelector component
+  const getFormattedEthBalance = () => {
+    if (!balanceInfo?.accountBalance) return '0.0000'
+    return parseFloat(balanceInfo.accountBalance).toFixed(4)
   }
 
   // Load token balances when account address or available tokens change
@@ -1132,83 +1153,14 @@ function TransactionSender({ accountAddress, credential, accountConfig, onSignat
       </div>
 
       {/* Token Selector */}
-      <div className="token-selector" onClick={() => setShowTokenDropdown(!showTokenDropdown)}>
-        <div className="token-info">
-          {selectedToken ? (
-            <>
-              <div className="token-icon">
-                <img src={selectedToken.icon} alt={selectedToken.symbol} />
-              </div>
-              <div className="token-details">
-                <div className="token-name">{selectedToken.name}</div>
-                <div className="token-available">
-                  Available: {tokenBalances[selectedToken.address] || '0.0000'} {selectedToken.symbol}
-                </div>
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="token-icon">
-                <img src={ethIcon} alt="ETH" />
-              </div>
-              <div className="token-details">
-                <div className="token-name">Ether</div>
-                <div className="token-available">
-                  Available: {balanceInfo ? parseFloat(balanceInfo.accountBalance).toFixed(4) : '0.0000'} ETH
-                </div>
-              </div>
-            </>
-          )}
-        </div>
-        <div className="token-dropdown-icon">▼</div>
-
-        {/* Token Dropdown */}
-        {showTokenDropdown && (
-          <div className="token-dropdown" onClick={(e) => e.stopPropagation()}>
-            {/* ETH Option */}
-            <div
-              className={`token-dropdown-item ${!selectedToken ? 'selected' : ''}`}
-              onClick={() => handleTokenSelect(null)}
-            >
-              <div className="token-icon">
-                <img src={ethIcon} alt="ETH" />
-              </div>
-              <div className="token-dropdown-details">
-                <div className="token-dropdown-name">Ether</div>
-                <div className="token-dropdown-symbol">ETH</div>
-              </div>
-              <div className="token-dropdown-balance">
-                {balanceInfo ? parseFloat(balanceInfo.accountBalance).toFixed(4) : '0.0000'}
-              </div>
-            </div>
-
-            {/* ERC-20 Token Options - Only show tokens with balance > 0 */}
-            {availableTokens
-              .filter((token) => {
-                const balance = parseFloat(tokenBalances[token.address] || '0')
-                return balance > 0
-              })
-              .map((token) => (
-                <div
-                  key={token.address}
-                  className={`token-dropdown-item ${selectedToken?.address === token.address ? 'selected' : ''}`}
-                  onClick={() => handleTokenSelect(token)}
-                >
-                  <div className="token-icon">
-                    <img src={token.icon} alt={token.symbol} />
-                  </div>
-                  <div className="token-dropdown-details">
-                    <div className="token-dropdown-name">{token.name}</div>
-                    <div className="token-dropdown-symbol">{token.symbol}</div>
-                  </div>
-                  <div className="token-dropdown-balance">
-                    {tokenBalances[token.address] || '0.0000'}
-                  </div>
-                </div>
-              ))}
-          </div>
-        )}
-      </div>
+      <TokenSelector
+        selectedToken={selectedToken}
+        onTokenSelect={handleTokenSelect}
+        availableTokens={availableTokens}
+        tokenBalances={getFormattedTokenBalances()}
+        ethBalance={getFormattedEthBalance()}
+        showAllTokens={false}
+      />
 
       {/* To Address Section */}
       <div className="to-section">
