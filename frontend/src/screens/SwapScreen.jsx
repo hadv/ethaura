@@ -642,28 +642,36 @@ function SwapScreen({ wallet, onBack, onHome, onSettings, onLogout, onWalletChan
 
       {/* Right Panel - Swap Info */}
       <div className="swap-sidebar">
-        {quote && (
+        {quote && tokenIn && tokenOut && amountIn && (
           <div className="sidebar-section">
             <h3 className="sidebar-title">Swap Details</h3>
             <div className="sidebar-content">
               <div className="sidebar-info-item">
+                <span className="sidebar-info-label">You Pay:</span>
+                <span className="sidebar-info-value">
+                  {parseFloat(amountIn).toFixed(6)} {tokenIn === 'ETH' ? 'ETH' : tokenIn.symbol}
+                </span>
+              </div>
+              <div className="sidebar-info-item">
+                <span className="sidebar-info-label">You Receive:</span>
+                <span className="sidebar-info-value">
+                  {ethers.formatUnits(quote.amountOut, tokenOut === 'ETH' ? 18 : tokenOut.decimals)} {tokenOut === 'ETH' ? 'ETH' : tokenOut.symbol}
+                </span>
+              </div>
+              <div className="sidebar-info-item">
                 <span className="sidebar-info-label">Exchange Rate:</span>
                 <span className="sidebar-info-value">
-                  1 {tokenIn === 'ETH' ? 'ETH' : tokenIn.symbol} ≈ {quote.rate.toFixed(6)} {tokenOut === 'ETH' ? 'ETH' : tokenOut.symbol}
+                  1 {tokenIn === 'ETH' ? 'ETH' : tokenIn.symbol} ≈ {(parseFloat(ethers.formatUnits(quote.amountOut, tokenOut === 'ETH' ? 18 : tokenOut.decimals)) / parseFloat(amountIn)).toFixed(6)} {tokenOut === 'ETH' ? 'ETH' : tokenOut.symbol}
                 </span>
               </div>
-              <div className="sidebar-info-item">
-                <span className="sidebar-info-label">Price Impact:</span>
-                <span className="sidebar-info-value" style={{ color: quote.priceImpact > 5 ? '#dc2626' : '#10b981' }}>
-                  {quote.priceImpact.toFixed(2)}%
-                </span>
-              </div>
-              <div className="sidebar-info-item">
-                <span className="sidebar-info-label">Minimum Received:</span>
-                <span className="sidebar-info-value">
-                  {ethers.formatUnits(quote.amountOutMinimum, tokenOut === 'ETH' ? 18 : tokenOut.decimals)} {tokenOut === 'ETH' ? 'ETH' : tokenOut.symbol}
-                </span>
-              </div>
+              {quote.priceImpact !== undefined && (
+                <div className="sidebar-info-item">
+                  <span className="sidebar-info-label">Price Impact:</span>
+                  <span className="sidebar-info-value" style={{ color: quote.priceImpact > 5 ? '#dc2626' : '#10b981' }}>
+                    {quote.priceImpact.toFixed(2)}%
+                  </span>
+                </div>
+              )}
               <div className="sidebar-info-item">
                 <span className="sidebar-info-label">Slippage Tolerance:</span>
                 <span className="sidebar-info-value">{slippage}%</span>
