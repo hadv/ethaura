@@ -126,7 +126,7 @@ describe('P256AccountSDK > executeSwap()', () => {
     )
   })
 
-  test('should work with 2FA enabled (owner signature)', async () => {
+  test('should work with owner signature (primary auth)', async () => {
     const params = {
       accountAddress: '0xAccountAddress',
       tokenIn: '0xTokenIn',
@@ -136,7 +136,7 @@ describe('P256AccountSDK > executeSwap()', () => {
       fee: 3000,
       passkeyCredential: { id: 'credential-id' },
       signWithPasskey: vi.fn(),
-      ownerSignature: '0xOwnerSignature',
+      ownerSignature: '0xOwnerSignature', // Web3Auth signature
     }
 
     await sdk.executeSwap(params)

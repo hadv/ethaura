@@ -612,9 +612,9 @@ export class P256AccountSDK {
    * @param {bigint} params.amountIn - Input amount (in token's smallest unit)
    * @param {bigint} params.amountOutMinimum - Minimum output amount (slippage protected)
    * @param {number} params.fee - Pool fee tier (500, 3000, or 10000). Default: 3000 (0.3%)
-   * @param {Object} params.passkeyCredential - Passkey credential for signing
-   * @param {Function} params.signWithPasskey - Function to sign with passkey
-   * @param {string|null} params.ownerSignature - Owner signature (for 2FA accounts)
+   * @param {Object} params.passkeyCredential - Passkey credential for 2FA signing
+   * @param {Function} params.signWithPasskey - Function to sign with passkey (2FA)
+   * @param {string|null} params.ownerSignature - Owner signature (primary auth via Web3Auth)
    * @param {boolean} params.needsDeployment - Whether account needs deployment
    * @param {string} params.initCode - InitCode for deployment (if needed)
    * @returns {Promise<Object>} UserOperation receipt
