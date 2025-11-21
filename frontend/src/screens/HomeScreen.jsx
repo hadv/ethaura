@@ -1,11 +1,10 @@
 import { useState, useEffect, useRef } from 'react'
-import { TrendingUp, TrendingDown, AlertTriangle, Lightbulb, ArrowLeftRight } from 'lucide-react'
+import { TrendingUp, TrendingDown, AlertTriangle, Lightbulb, ArrowLeftRight, ArrowUp, ArrowDown } from 'lucide-react'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
 import { useNetwork } from '../contexts/NetworkContext'
 import { useP256SDK } from '../hooks/useP256SDK'
 import { ethers } from 'ethers'
 import { BsThreeDotsVertical, BsPlus } from 'react-icons/bs'
-import { HiArrowUp, HiArrowDown } from 'react-icons/hi'
 import { HiPencil, HiTrash, HiOutlineWallet } from 'react-icons/hi2'
 import Header from '../components/Header'
 import { Identicon } from '../utils/identicon.jsx'
@@ -664,11 +663,11 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onSwap
                 onClick={handleSendClick}
                 disabled={wallets.length === 0}
               >
-                <HiArrowUp className="btn-icon" />
+                <ArrowUp className="btn-icon" size={18} />
                 Send
               </button>
               <button className="action-btn receive-btn" onClick={handleReceiveClick}>
-                <HiArrowDown className="btn-icon" />
+                <ArrowDown className="btn-icon" size={18} />
                 Receive
               </button>
               <button
