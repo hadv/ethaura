@@ -22,7 +22,7 @@ import { walletDataCache } from '../lib/walletDataCache'
 import '../styles/WalletDetailScreen.css'
 import logo from '../assets/logo.svg'
 
-function WalletDetailScreen({ wallet, onBack, onHome, onSettings, onSend, onLogout, onWalletChange, onViewAllTokens, onViewAllTransactions }) {
+function WalletDetailScreen({ wallet, onBack, onHome, onSettings, onSend, onLogout, onWalletChange, onViewAllTokens, onViewAllTransactions, onSwap }) {
   const { userInfo, provider: web3authProvider } = useWeb3Auth()
   const { networkInfo } = useNetwork()
   const { pendingProposal, pendingRequest, isInitialized: wcInitialized } = useWalletConnect()
@@ -314,7 +314,7 @@ function WalletDetailScreen({ wallet, onBack, onHome, onSettings, onSend, onLogo
 
             {/* Action Buttons */}
             <div className="action-buttons-grid">
-              <button className="action-btn" onClick={() => setShowReceiveModal(true)}>
+              <button className="action-btn" onClick={() => onSwap && onSwap()}>
                 <div className="action-icon">
                   <BiTransfer />
                 </div>
