@@ -659,6 +659,14 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onSwap
             {/* Action Buttons */}
             <div className="action-buttons">
               <button
+                className="action-btn swap-btn"
+                onClick={handleSwapClick}
+                disabled={wallets.length === 0}
+              >
+                <ArrowLeftRight className="btn-icon" size={18} />
+                Swap
+              </button>
+              <button
                 className="action-btn send-btn"
                 onClick={handleSendClick}
                 disabled={wallets.length === 0}
@@ -669,14 +677,6 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onSwap
               <button className="action-btn receive-btn" onClick={handleReceiveClick}>
                 <ArrowDown className="btn-icon" size={18} />
                 Receive
-              </button>
-              <button
-                className="action-btn swap-btn"
-                onClick={handleSwapClick}
-                disabled={wallets.length === 0}
-              >
-                <ArrowLeftRight className="btn-icon" size={18} />
-                Swap
               </button>
             </div>
           </div>
