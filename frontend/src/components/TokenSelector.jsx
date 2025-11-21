@@ -5,14 +5,16 @@ import '../styles/TokenSelector.css'
 
 /**
  * Reusable Token Selector Component
- * 
+ *
  * @param {Object} props
- * @param {Object|null} props.selectedToken - Currently selected token (null for ETH)
+ * @param {Object|null} props.selectedToken - Currently selected token (null for ETH or no selection)
  * @param {Function} props.onTokenSelect - Callback when token is selected
  * @param {Array} props.availableTokens - List of available ERC-20 tokens
  * @param {Object} props.tokenBalances - Token balances object { address: balance }
  * @param {string} props.ethBalance - ETH balance
  * @param {boolean} props.showAllTokens - If true, show all tokens; if false, only show tokens with balance > 0
+ * @param {boolean} props.showEthOption - If true, show ETH in dropdown; if false, hide ETH option
+ * @param {string} props.placeholder - Placeholder text when no token is selected
  * @param {string} props.className - Additional CSS class
  */
 function TokenSelector({
@@ -22,6 +24,8 @@ function TokenSelector({
   tokenBalances = {},
   ethBalance = '0.0000',
   showAllTokens = false,
+  showEthOption = true,
+  placeholder = 'Select token',
   className = '',
 }) {
   const [showDropdown, setShowDropdown] = useState(false)
@@ -76,7 +80,7 @@ function TokenSelector({
                 </div>
               </div>
             </>
-          ) : (
+          ) : showEthOption ? (
             <>
               <div className="token-icon">
                 <img src={ethIcon} alt="ETH" />
@@ -88,6 +92,10 @@ function TokenSelector({
                 </div>
               </div>
             </>
+          ) : (
+            <div className="token-details">
+              <div className="token-name" style={{ color: '#9ca3af' }}>{placeholder}</div>
+            </div>
           )}
         </div>
         <ChevronDown className="token-dropdown-icon" size={20} />
@@ -96,22 +104,24 @@ function TokenSelector({
       {/* Token Dropdown */}
       {showDropdown && (
         <div className="token-dropdown">
-          {/* ETH Option */}
-          <div
-            className={`token-dropdown-item ${!selectedToken ? 'selected' : ''}`}
-            onClick={() => handleTokenClick(null)}
-          >
-            <div className="token-icon">
-              <img src={ethIcon} alt="ETH" />
+          {/* ETH Option - Only show if showEthOption is true */}
+          {showEthOption && (
+            <div
+              className={`token-dropdown-item ${!selectedToken ? 'selected' : ''}`}
+              onClick={() => handleTokenClick(null)}
+            >
+              <div className="token-icon">
+                <img src={ethIcon} alt="ETH" />
+              </div>
+              <div className="token-dropdown-details">
+                <div className="token-dropdown-name">Ether</div>
+                <div className="token-dropdown-symbol">ETH</div>
+              </div>
+              <div className="token-dropdown-balance">
+                {ethBalance}
+              </div>
             </div>
-            <div className="token-dropdown-details">
-              <div className="token-dropdown-name">Ether</div>
-              <div className="token-dropdown-symbol">ETH</div>
-            </div>
-            <div className="token-dropdown-balance">
-              {ethBalance}
-            </div>
-          </div>
+          )}
 
           {/* ERC-20 Token Options */}
           {filteredTokens.map((token) => (

@@ -22,7 +22,7 @@ function SwapScreen({ wallet, onBack, onHome, onSettings, onLogout, onWalletChan
   const [wallets, setWallets] = useState([])
   const [selectedWallet, setSelectedWallet] = useState(wallet)
 
-  // Token selection state
+  // Token selection state - Start with null, user must select tokens
   const [tokenIn, setTokenIn] = useState(null)
   const [tokenOut, setTokenOut] = useState(null)
 
@@ -418,12 +418,14 @@ function SwapScreen({ wallet, onBack, onHome, onSettings, onLogout, onWalletChan
               <div className="swap-input-row">
                 {/* Token Selector */}
                 <TokenSelector
-                  selectedToken={tokenIn === 'ETH' ? null : tokenIn}
-                  onTokenSelect={(token) => setTokenIn(token || 'ETH')}
+                  selectedToken={tokenIn}
+                  onTokenSelect={(token) => setTokenIn(token)}
                   availableTokens={availableTokens.filter(t => t.address !== tokenOut?.address)}
                   tokenBalances={getFormattedTokenBalances()}
                   ethBalance={getFormattedEthBalance()}
                   showAllTokens={true}
+                  showEthOption={false}
+                  placeholder="Select token"
                   className="swap-token-selector"
                 />
 
@@ -462,12 +464,14 @@ function SwapScreen({ wallet, onBack, onHome, onSettings, onLogout, onWalletChan
               <div className="swap-input-row">
                 {/* Token Selector */}
                 <TokenSelector
-                  selectedToken={tokenOut === 'ETH' ? null : tokenOut}
-                  onTokenSelect={(token) => setTokenOut(token || 'ETH')}
+                  selectedToken={tokenOut}
+                  onTokenSelect={(token) => setTokenOut(token)}
                   availableTokens={availableTokens.filter(t => t.address !== tokenIn?.address)}
                   tokenBalances={getFormattedTokenBalances()}
                   ethBalance={getFormattedEthBalance()}
                   showAllTokens={true}
+                  showEthOption={false}
+                  placeholder="Select token"
                   className="swap-token-selector"
                 />
 
