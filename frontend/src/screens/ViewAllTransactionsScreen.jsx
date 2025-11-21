@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { ethers } from 'ethers'
-import { HiOutlineDocumentText } from 'react-icons/hi2'
+import { FileText } from 'lucide-react'
 import { useNetwork } from '../contexts/NetworkContext'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
 import { createTransactionHistoryService } from '../lib/transactionService'
@@ -429,7 +429,7 @@ function ViewAllTransactionsScreen({ wallet, onBack, onHome, onLogout, onSetting
             ) : (
               <div className="empty-state">
                 <div className="empty-icon">
-                  <HiOutlineDocumentText />
+                  <FileText size={48} />
                 </div>
                 <h3>No transactions found</h3>
                 <p>

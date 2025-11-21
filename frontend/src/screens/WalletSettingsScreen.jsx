@@ -7,7 +7,7 @@ import SubHeader from '../components/SubHeader'
 import { WalletConnectModal } from '../components/WalletConnectModal'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
 import { useNetwork } from '../contexts/NetworkContext'
-import { HiKey, HiShieldCheck, HiLockOpen } from 'react-icons/hi'
+import { Key, ShieldCheck, LockOpen } from 'lucide-react'
 import '../styles/WalletSettingsScreen.css'
 
 function WalletSettingsScreen({ wallet, onBack, onHome, onLogout, credential, onWalletChange, onSettings }) {
@@ -93,21 +93,21 @@ function WalletSettingsScreen({ wallet, onBack, onHome, onLogout, credential, on
               className={`tab-btn ${activeTab === '2fa' ? 'active' : ''}`}
               onClick={() => setActiveTab('2fa')}
             >
-              <HiKey className="tab-icon" />
+              <Key className="tab-icon" size={20} />
               <span className="tab-label">2FA / Passkey</span>
             </button>
             <button
               className={`tab-btn ${activeTab === 'guardians' ? 'active' : ''}`}
               onClick={() => setActiveTab('guardians')}
             >
-              <HiShieldCheck className="tab-icon" />
+              <ShieldCheck className="tab-icon" size={20} />
               <span className="tab-label">Guardians</span>
             </button>
             <button
               className={`tab-btn ${activeTab === 'recovery' ? 'active' : ''}`}
               onClick={() => setActiveTab('recovery')}
             >
-              <HiLockOpen className="tab-icon" />
+              <LockOpen className="tab-icon" size={20} />
               <span className="tab-label">Recovery</span>
             </button>
           </div>

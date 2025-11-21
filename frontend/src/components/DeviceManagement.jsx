@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react'
-import { Smartphone, Tablet, Monitor, Key, Trash2 } from 'lucide-react'
+import { Smartphone, Tablet, Monitor, Key, Trash2, CheckCircle, Clock, ExternalLink } from 'lucide-react'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
 import { useNetwork } from '../contexts/NetworkContext'
 import { useP256SDK } from '../hooks/useP256SDK'
 import { getDevices, removeDevice } from '../lib/deviceManager'
 import { signWithPasskey } from '../utils/webauthn'
 import { ethers } from 'ethers'
+import { NETWORKS } from '../lib/constants'
 import '../styles/DeviceManagement.css'
 
 function DeviceManagement({ accountAddress, onAddDevice }) {
@@ -376,6 +377,7 @@ function DeviceManagement({ accountAddress, onAddDevice }) {
                     )}
                   </div>
                 )}
+<<<<<<< HEAD
                 {/* Show on-chain device ID if available */}
                 {device.onChainDeviceId && (
                   <div className="device-chain-info">
@@ -384,6 +386,50 @@ function DeviceManagement({ accountAddress, onAddDevice }) {
                       {ethers.decodeBytes32String(device.onChainDeviceId) || device.onChainDeviceId.slice(0, 10) + '...'}
                     </code>
                   </div>
+=======
+                {device.proposalHash && (
+                  <>
+                    <div className="device-proposal-info">
+                      <span className="label">Proposal Hash:</span>
+                      <code className="key-preview">
+                        {device.proposalHash.slice(0, 10)}...{device.proposalHash.slice(-8)}
+                      </code>
+                      {device.proposalTxHash && (
+                        <a
+                          href={`${networkInfo.explorerUrl}/tx/${device.proposalTxHash}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="explorer-link"
+                          title="View proposal transaction on explorer"
+                        >
+                          <ExternalLink size={14} />
+                        </a>
+                      )}
+                    </div>
+                    {proposalDetails[device.proposalHash] && (
+                      <div className="device-timelock-info">
+                        {(() => {
+                          const timeInfo = formatTimeRemaining(proposalDetails[device.proposalHash].executeAfter)
+                          return timeInfo ? (
+                            <div className={`timelock-status ${timeInfo.className}`}>
+                              {timeInfo.canExecute ? (
+                                <span className="timelock-ready" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                                  <CheckCircle size={14} />
+                                  {timeInfo.text}
+                                </span>
+                              ) : (
+                                <span className="timelock-waiting" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                                  <Clock size={14} />
+                                  Can be executed in: {timeInfo.text}
+                                </span>
+                              )}
+                            </div>
+                          ) : null
+                        })()}
+                      </div>
+                    )}
+                  </>
+>>>>>>> d1280a4 (Phase 3: UI Components - Swap Screen (#106))
                 )}
               </div>
               <div className="device-actions">

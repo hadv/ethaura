@@ -31,7 +31,7 @@ const WalletDropdown = ({ wallets, selectedWallet, onWalletChange, formatAddress
   return (
     <div className="wallet-dropdown-container" ref={dropdownRef}>
       {/* Selected Wallet Display */}
-      <div 
+      <div
         className="wallet-dropdown-trigger"
         onClick={() => setIsOpen(!isOpen)}
       >
