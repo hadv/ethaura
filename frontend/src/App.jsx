@@ -11,6 +11,7 @@ import SignatureConfirmationScreen from './screens/SignatureConfirmationScreen'
 import TransactionResultScreen from './screens/TransactionResultScreen'
 import ViewAllTokensScreen from './screens/ViewAllTokensScreen'
 import ViewAllTransactionsScreen from './screens/ViewAllTransactionsScreen'
+import SwapScreen from './screens/SwapScreen'
 import { GuardianRecoveryPortal } from './screens/GuardianRecoveryPortal'
 import RegisterDevicePage from './pages/RegisterDevicePage'
 import { storePasskeyCredential } from './lib/passkeyStorage'
@@ -38,7 +39,7 @@ function AppContent() {
   }
 
   // Navigation state
-  const [currentScreen, setCurrentScreen] = useState('home') // 'home', 'wallet-detail', 'wallet-settings', 'add-wallet', 'new-wallet', 'send-transaction', 'signature-confirmation', 'transaction-result', 'view-all-tokens', 'view-all-transactions'
+  const [currentScreen, setCurrentScreen] = useState('home') // 'home', 'wallet-detail', 'wallet-settings', 'add-wallet', 'new-wallet', 'send-transaction', 'signature-confirmation', 'transaction-result', 'view-all-tokens', 'view-all-transactions', 'swap'
   const [selectedWallet, setSelectedWallet] = useState(null)
   const [selectedToken, setSelectedToken] = useState(null) // Pre-selected token for send screen
   const [previousScreen, setPreviousScreen] = useState(null) // Track previous screen for proper back navigation
@@ -244,6 +245,12 @@ function AppContent() {
     setCurrentScreen('send-transaction')
   }
 
+  const handleSwapFromHome = (wallet) => {
+    setSelectedWallet(wallet)
+    setPreviousScreen(currentScreen)
+    setCurrentScreen('swap')
+  }
+
   const handleWalletChange = (wallet) => {
     setSelectedWallet(wallet)
   }
@@ -256,6 +263,11 @@ function AppContent() {
   const handleViewAllTransactions = () => {
     setPreviousScreen(currentScreen)
     setCurrentScreen('view-all-transactions')
+  }
+
+  const handleSwap = () => {
+    setPreviousScreen(currentScreen)
+    setCurrentScreen('swap')
   }
 
   // Handle signature confirmation navigation
@@ -375,6 +387,7 @@ function AppContent() {
         <HomeScreen
           onWalletClick={handleWalletClick}
           onSend={handleSendFromHome}
+          onSwap={handleSwapFromHome}
           onLogout={handleLogout}
         />
       )}
@@ -390,6 +403,7 @@ function AppContent() {
           onLogout={handleLogout}
           onViewAllTokens={handleViewAllTokens}
           onViewAllTransactions={handleViewAllTransactions}
+          onSwap={handleSwap}
         />
       )}
 
@@ -466,6 +480,18 @@ function AppContent() {
           onLogout={handleLogout}
           onSettings={handleSettings}
           onWalletChange={handleWalletClick}
+        />
+      )}
+
+      {currentScreen === 'swap' && (
+        <SwapScreen
+          wallet={selectedWallet}
+          onBack={handleBack}
+          onHome={handleHome}
+          onLogout={handleLogout}
+          onSettings={handleSettings}
+          onWalletChange={handleWalletChange}
+          credential={passkeyCredential}
         />
       )}
     </>

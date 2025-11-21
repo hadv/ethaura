@@ -74,7 +74,19 @@
   margin-bottom: 24px;
 }
 
-/* Token Selector */
+/* Token Selector - Override for TransactionSender */
+.transaction-sender .token-selector {
+  position: relative;
+  width: 100%;
+  margin-bottom: 24px;
+}
+
+/* Make trigger button full width */
+.transaction-sender .token-selector .token-selector-trigger {
+  width: 100%;
+}
+
+/* Old styles - kept for backwards compatibility */
 .token-selector {
   position: relative;
   display: flex;

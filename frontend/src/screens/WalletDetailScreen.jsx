@@ -1,10 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
-import { TrendingUp, TrendingDown } from 'lucide-react'
+import { TrendingUp, TrendingDown, ArrowLeftRight, ArrowUp, ArrowDown, FileText } from 'lucide-react'
 import { ethers } from 'ethers'
-import { HiArrowUp, HiArrowDown } from 'react-icons/hi'
-import { BiTransfer } from 'react-icons/bi'
-import { MdFlashOn } from 'react-icons/md'
-import { HiOutlineDocumentText } from 'react-icons/hi2'
 import { P256_ACCOUNT_ABI } from '../lib/constants'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
 import { useNetwork } from '../contexts/NetworkContext'
@@ -22,7 +18,7 @@ import { walletDataCache } from '../lib/walletDataCache'
 import '../styles/WalletDetailScreen.css'
 import logo from '../assets/logo.svg'
 
-function WalletDetailScreen({ wallet, onBack, onHome, onSettings, onSend, onLogout, onWalletChange, onViewAllTokens, onViewAllTransactions }) {
+function WalletDetailScreen({ wallet, onBack, onHome, onSettings, onSend, onLogout, onWalletChange, onViewAllTokens, onViewAllTransactions, onSwap }) {
   const { userInfo, provider: web3authProvider } = useWeb3Auth()
   const { networkInfo } = useNetwork()
   const { pendingProposal, pendingRequest, isInitialized: wcInitialized } = useWalletConnect()
@@ -314,30 +310,31 @@ function WalletDetailScreen({ wallet, onBack, onHome, onSettings, onSend, onLogo
 
             {/* Action Buttons */}
             <div className="action-buttons-grid">
-              <button className="action-btn" onClick={() => setShowReceiveModal(true)}>
+              <button className="action-btn" onClick={() => onSwap && onSwap()}>
                 <div className="action-icon">
-                  <BiTransfer />
+                  <ArrowLeftRight />
                 </div>
                 <span>Swap</span>
               </button>
               <button className="action-btn" onClick={() => onSend()}>
                 <div className="action-icon">
-                  <HiArrowUp />
+                  <ArrowUp />
                 </div>
                 <span>Send</span>
               </button>
               <button className="action-btn" onClick={() => setShowReceiveModal(true)}>
                 <div className="action-icon">
-                  <HiArrowDown />
+                  <ArrowDown />
                 </div>
                 <span>Receive</span>
               </button>
-              <button className="action-btn">
+              {/* Transaction Builder - Hidden for now */}
+              {/* <button className="action-btn">
                 <div className="action-icon">
                   <MdFlashOn />
                 </div>
                 <span>Transaction Builder</span>
-              </button>
+              </button> */}
             </div>
           </div>
 
@@ -408,7 +405,7 @@ function WalletDetailScreen({ wallet, onBack, onHome, onSettings, onSend, onLogo
             ) : (
               <div className="empty-state">
                 <div className="empty-icon">
-                  <HiOutlineDocumentText />
+                  <FileText size={48} />
                 </div>
                 <h3>No transactions yet</h3>
                 <p>Your transaction history will appear here once you start using your wallet</p>

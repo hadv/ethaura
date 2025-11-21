@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { ethers } from 'ethers'
-import { HiOutlineCurrencyDollar } from 'react-icons/hi2'
+import { DollarSign } from 'lucide-react'
 import { useNetwork } from '../contexts/NetworkContext'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
 import { createTokenBalanceService } from '../lib/tokenService'
@@ -200,7 +200,7 @@ function ViewAllTokensScreen({ wallet, onBack, onHome, onLogout, onSettings, onW
             ) : (
               <div className="empty-state">
                 <div className="empty-icon">
-                  <HiOutlineCurrencyDollar />
+                  <DollarSign size={48} />
                 </div>
                 <h3>No tokens found</h3>
                 <p>
