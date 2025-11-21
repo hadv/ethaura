@@ -169,27 +169,42 @@
   border: 1px solid #e5e5e5;
   border-radius: 12px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  max-height: 300px;
+  max-height: 280px;
   overflow-y: auto;
   z-index: 1000;
 }
 
 .token-option {
   display: flex;
+  justify-content: space-between;
   align-items: center;
-  gap: 12px;
-  padding: 12px 16px;
+  padding: 12px;
   cursor: pointer;
-  transition: background 0.2s;
-  border-bottom: 1px solid #f5f5f5;
+  transition: all 0.2s ease;
+  background: #f9fafb;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  margin: 8px;
+}
+
+.token-option:first-child {
+  margin-top: 8px;
 }
 
 .token-option:last-child {
-  border-bottom: none;
+  margin-bottom: 8px;
 }
 
 .token-option:hover {
-  background: #f9f9f9;
+  background: #f8f9ff;
+  border-color: #667eea;
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.1);
+  transform: translateY(-1px);
+}
+
+.token-option:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 4px rgba(102, 126, 234, 0.15);
 }
 
 .token-option.selected {
@@ -197,28 +212,49 @@
 }
 
 .token-info {
-  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.token-details {
   display: flex;
   flex-direction: column;
   gap: 2px;
 }
 
 .token-symbol {
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
-  color: #000;
+  color: #111827;
+  line-height: 1.4;
 }
 
 .token-name {
-  font-size: 12px;
-  color: #8b8b8b;
+  font-size: 13px;
+  color: #6b7280;
+  line-height: 1.4;
 }
 
 .token-balance-display {
-  font-size: 14px;
-  color: #000;
-  font-weight: 500;
   text-align: right;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: flex-end;
+}
+
+.token-balance-amount {
+  font-size: 15px;
+  font-weight: 600;
+  color: #111827;
+  line-height: 1.4;
+}
+
+.token-balance-symbol {
+  font-size: 13px;
+  color: #6b7280;
+  line-height: 1.4;
 }
 
 /* Amount Input */
@@ -374,16 +410,16 @@
 /* Swap Button */
 .swap-button {
   width: 100%;
-  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  background: #6b6b6b;
   color: white;
   border: none;
-  border-radius: 12px;
-  padding: 1rem;
-  font-size: 1.125rem;
-  font-weight: 600;
+  border-radius: 50px;
+  padding: 16px 32px;
+  font-size: 16px;
+  font-weight: 500;
   cursor: pointer;
   margin-top: 1rem;
-  transition: all 0.2s;
+  transition: all 0.2s ease;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -391,16 +427,18 @@
 }
 
 .swap-button:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 10px 20px rgba(59, 130, 246, 0.3);
+  background: #5a5a5a;
+}
+
+.swap-button:active:not(:disabled) {
+  transform: scale(0.98);
 }
 
 .swap-button:disabled {
-  background: #e5e7eb;
-  color: #9ca3af;
+  background: #b0b0b0;
+  color: white;
   cursor: not-allowed;
   transform: none;
-  box-shadow: none;
 }
 
 .button-loader {

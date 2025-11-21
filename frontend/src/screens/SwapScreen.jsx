@@ -414,13 +414,15 @@ function SwapScreen({ wallet, onBack, onHome, onSettings, onLogout, onWalletChan
                           setShowTokenInDropdown(false)
                         }}
                       >
-                        <img src={ethIcon} alt="ETH" className="token-icon" />
                         <div className="token-info">
-                          <div className="token-symbol">ETH</div>
-                          <div className="token-name">Ethereum</div>
+                          <img src={ethIcon} alt="ETH" className="token-icon" />
+                          <div className="token-details">
+                            <div className="token-symbol">Ether</div>
+                            <div className="token-name">ETH</div>
+                          </div>
                         </div>
                         <div className="token-balance-display">
-                          {getTokenBalance('ETH')}
+                          <div className="token-balance-amount">{parseFloat(getTokenBalance('ETH')).toFixed(4)} ETH</div>
                         </div>
                       </div>
 
@@ -436,13 +438,15 @@ function SwapScreen({ wallet, onBack, onHome, onSettings, onLogout, onWalletChan
                               setShowTokenInDropdown(false)
                             }}
                           >
-                            <img src={token.icon} alt={token.symbol} className="token-icon" />
                             <div className="token-info">
-                              <div className="token-symbol">{token.symbol}</div>
-                              <div className="token-name">{token.name}</div>
+                              <img src={token.icon} alt={token.symbol} className="token-icon" />
+                              <div className="token-details">
+                                <div className="token-symbol">{token.name}</div>
+                                <div className="token-name">{token.symbol}</div>
+                              </div>
                             </div>
                             <div className="token-balance-display">
-                              {getTokenBalance(token)}
+                              <div className="token-balance-amount">{parseFloat(getTokenBalance(token)).toFixed(2)} {token.symbol}</div>
                             </div>
                           </div>
                         ))}
@@ -517,13 +521,15 @@ function SwapScreen({ wallet, onBack, onHome, onSettings, onLogout, onWalletChan
                           setShowTokenOutDropdown(false)
                         }}
                       >
-                        <img src={ethIcon} alt="ETH" className="token-icon" />
                         <div className="token-info">
-                          <div className="token-symbol">ETH</div>
-                          <div className="token-name">Ethereum</div>
+                          <img src={ethIcon} alt="ETH" className="token-icon" />
+                          <div className="token-details">
+                            <div className="token-symbol">Ether</div>
+                            <div className="token-name">ETH</div>
+                          </div>
                         </div>
                         <div className="token-balance-display">
-                          {getTokenBalance('ETH')}
+                          <div className="token-balance-amount">{parseFloat(getTokenBalance('ETH')).toFixed(4)} ETH</div>
                         </div>
                       </div>
 
@@ -539,13 +545,15 @@ function SwapScreen({ wallet, onBack, onHome, onSettings, onLogout, onWalletChan
                               setShowTokenOutDropdown(false)
                             }}
                           >
-                            <img src={token.icon} alt={token.symbol} className="token-icon" />
                             <div className="token-info">
-                              <div className="token-symbol">{token.symbol}</div>
-                              <div className="token-name">{token.name}</div>
+                              <img src={token.icon} alt={token.symbol} className="token-icon" />
+                              <div className="token-details">
+                                <div className="token-symbol">{token.name}</div>
+                                <div className="token-name">{token.symbol}</div>
+                              </div>
                             </div>
                             <div className="token-balance-display">
-                              {getTokenBalance(token)}
+                              <div className="token-balance-amount">{parseFloat(getTokenBalance(token)).toFixed(2)} {token.symbol}</div>
                             </div>
                           </div>
                         ))}
