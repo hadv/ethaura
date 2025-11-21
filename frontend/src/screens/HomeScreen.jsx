@@ -1,11 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
-import { TrendingUp, TrendingDown, AlertTriangle, Lightbulb, ArrowLeftRight, ArrowUp, ArrowDown } from 'lucide-react'
+import { TrendingUp, TrendingDown, AlertTriangle, Lightbulb, ArrowLeftRight, ArrowUp, ArrowDown, MoreVertical, Plus, Pencil, Trash2, Wallet } from 'lucide-react'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
 import { useNetwork } from '../contexts/NetworkContext'
 import { useP256SDK } from '../hooks/useP256SDK'
 import { ethers } from 'ethers'
-import { BsThreeDotsVertical, BsPlus } from 'react-icons/bs'
-import { HiPencil, HiTrash, HiOutlineWallet } from 'react-icons/hi2'
 import Header from '../components/Header'
 import { Identicon } from '../utils/identicon.jsx'
 import ReceiveModal from '../components/ReceiveModal'
@@ -686,7 +684,7 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onSwap
             <div className="section-header">
               <h2 className="section-title">My Wallets</h2>
               <button className="add-wallet-btn" onClick={() => setShowAddModal(true)} title="Add Wallet">
-                <BsPlus className="add-icon" />
+                <Plus className="add-icon" size={24} />
               </button>
             </div>
 
@@ -698,7 +696,7 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onSwap
             ) : wallets.length === 0 ? (
               <div className="empty-state">
                 <div className="empty-icon">
-                  <HiOutlineWallet />
+                  <Wallet size={48} />
                 </div>
                 <h3>No Wallets Yet</h3>
                 <p>Create a new smart account or add an existing one</p>
@@ -735,7 +733,7 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onSwap
                           className="wallet-menu-btn"
                           onClick={(e) => handleMenuClick(e, wallet)}
                         >
-                          <BsThreeDotsVertical className="menu-icon" />
+                          <MoreVertical className="menu-icon" size={18} />
                         </button>
                         {openMenuId === wallet.id && (
                           <div className="wallet-menu-dropdown">
@@ -743,14 +741,14 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onSwap
                               className="menu-item rename-item"
                               onClick={() => handleRenameClick(wallet)}
                             >
-                              <HiPencil className="menu-item-icon" />
+                              <Pencil className="menu-item-icon" size={16} />
                               Rename
                             </button>
                             <button
                               className="menu-item delete-item"
                               onClick={() => handleDeleteClick(wallet)}
                             >
-                              <HiTrash className="menu-item-icon" />
+                              <Trash2 className="menu-item-icon" size={16} />
                               Remove
                             </button>
                           </div>
@@ -989,7 +987,7 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onSwap
           <div className="modal-content edit-modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <div className="modal-icon">
-                <HiPencil />
+                <Pencil size={24} />
               </div>
               <h2>Edit name</h2>
               <button className="modal-close" onClick={handleCancelEdit}>×</button>

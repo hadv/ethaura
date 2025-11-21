@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
-import { TrendingUp, TrendingDown, ArrowLeftRight, ArrowUp, ArrowDown } from 'lucide-react'
+import { TrendingUp, TrendingDown, ArrowLeftRight, ArrowUp, ArrowDown, FileText } from 'lucide-react'
 import { ethers } from 'ethers'
-import { HiOutlineDocumentText } from 'react-icons/hi2'
 import { P256_ACCOUNT_ABI } from '../lib/constants'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
 import { useNetwork } from '../contexts/NetworkContext'
@@ -406,7 +405,7 @@ function WalletDetailScreen({ wallet, onBack, onHome, onSettings, onSend, onLogo
             ) : (
               <div className="empty-state">
                 <div className="empty-icon">
-                  <HiOutlineDocumentText />
+                  <FileText size={48} />
                 </div>
                 <h3>No transactions yet</h3>
                 <p>Your transaction history will appear here once you start using your wallet</p>

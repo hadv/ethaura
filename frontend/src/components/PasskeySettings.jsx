@@ -1,11 +1,10 @@
 import { useState, useEffect } from 'react'
-import { Lock, Star } from 'lucide-react'
+import { Lock, Star, ExternalLink, Info, Key } from 'lucide-react'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
 import { useNetwork } from '../contexts/NetworkContext'
 import { ethers } from 'ethers'
 import { NETWORKS } from '../lib/constants'
 import { updateDeviceProposalHash, getDevices } from '../lib/deviceManager'
-import { HiExternalLink, HiInformationCircle, HiKey } from 'react-icons/hi'
 import AddDeviceFlow from './AddDeviceFlow'
 import '../styles/PasskeySettings.css'
 
@@ -514,7 +513,7 @@ For now, please use the contract directly on Etherscan or wait for this feature 
                 <div className="settings-section">
                   <h3>Two-Factor Authentication</h3>
                   <p className="section-description">
-                    <HiInformationCircle style={{ display: 'inline', verticalAlign: 'middle', marginRight: '4px' }} />
+                    <Info size={16} style={{ display: 'inline', verticalAlign: 'middle', marginRight: '4px' }} />
                     2FA settings will be available after your account is deployed. Your account will be deployed automatically with your first transaction.
                   </p>
                 </div>
@@ -532,13 +531,13 @@ For now, please use the contract directly on Etherscan or wait for this feature 
                 </ul>
                 {!accountInfo?.isDeployed ? (
                   <p className="section-description" style={{ fontSize: '0.85rem', color: '#666', marginBottom: '12px' }}>
-                    <HiInformationCircle style={{ display: 'inline', verticalAlign: 'middle', marginRight: '4px' }} />
+                    <Info size={16} style={{ display: 'inline', verticalAlign: 'middle', marginRight: '4px' }} />
                     <strong>Note:</strong> For undeployed accounts, adding a new passkey will replace the existing one.
                     The latest passkey will be used when you deploy this account.
                   </p>
                 ) : (
                   <p className="section-description" style={{ fontSize: '0.85rem', color: '#666', marginBottom: '12px' }}>
-                    <HiInformationCircle style={{ display: 'inline', verticalAlign: 'middle', marginRight: '4px' }} />
+                    <Info size={16} style={{ display: 'inline', verticalAlign: 'middle', marginRight: '4px' }} />
                     <strong>Note:</strong> The update requires a 48-hour timelock before the new passkey becomes active.
                     Your old passkey will continue to work until the new one is activated.
                   </p>
@@ -562,7 +561,7 @@ For now, please use the contract directly on Etherscan or wait for this feature 
                     onClick={() => setShowAddDevice(true)}
                     disabled={loading || !ownerAddress}
                   >
-                    <HiKey style={{ display: 'inline', verticalAlign: 'middle', marginRight: '6px' }} />
+                    <Key size={18} style={{ display: 'inline', verticalAlign: 'middle', marginRight: '6px' }} />
                     Add New Device
                   </button>
                 )}
@@ -718,7 +717,7 @@ For now, please use the contract directly on Etherscan or wait for this feature 
                                         title="View proposal transaction"
                                         style={{ textDecoration: 'none', fontSize: '0.9rem' }}
                                       >
-                                        <HiExternalLink />
+                                        <ExternalLink size={14} />
                                       </a>
                                     )}
                                   </p>
@@ -852,7 +851,7 @@ For now, please use the contract directly on Etherscan or wait for this feature 
                             title="View proposal transaction on explorer"
                             style={{ textDecoration: 'none', fontSize: '1rem' }}
                           >
-                            <HiExternalLink />
+                            <ExternalLink size={16} />
                           </a>
                         )}
                       </p>
