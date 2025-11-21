@@ -424,7 +424,7 @@ function SwapScreen({ wallet, onBack, onHome, onSettings, onLogout, onWalletChan
                   tokenBalances={getFormattedTokenBalances()}
                   ethBalance={getFormattedEthBalance()}
                   showAllTokens={true}
-                  showEthOption={false}
+                  showEthOption={true}
                   placeholder="Select token"
                   className="swap-token-selector"
                 />
@@ -470,7 +470,7 @@ function SwapScreen({ wallet, onBack, onHome, onSettings, onLogout, onWalletChan
                   tokenBalances={getFormattedTokenBalances()}
                   ethBalance={getFormattedEthBalance()}
                   showAllTokens={true}
-                  showEthOption={false}
+                  showEthOption={true}
                   placeholder="Select token"
                   className="swap-token-selector"
                 />
