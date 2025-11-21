@@ -490,7 +490,7 @@ function AppContent() {
           onHome={handleHome}
           onLogout={handleLogout}
           onSettings={handleSettings}
-          onWalletChange={handleWalletClick}
+          onWalletChange={handleWalletChange}
           credential={passkeyCredential}
         />
       )}
