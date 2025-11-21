@@ -4,7 +4,10 @@ on:
   push:
     branches: [main, develop]
   pull_request:
-    branches: [main, develop]
+    branches:
+      - main
+      - develop
+      - 'feature/**'
 
 env:
   FOUNDRY_PROFILE: default
@@ -65,6 +68,10 @@ jobs:
       - name: Install dependencies
         working-directory: frontend
         run: npm ci --prefer-offline --no-audit
+
+      - name: Run frontend tests
+        working-directory: frontend
+        run: npm run test:run
 
       - name: Build frontend
         working-directory: frontend
