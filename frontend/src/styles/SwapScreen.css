@@ -40,16 +40,12 @@
   grid-template-columns: 70% 1fr;
   gap: 0;
   min-height: calc(100vh - 153px);
-  position: relative;
-  z-index: 1;
 }
 
 .swap-main {
   background: #fafafa;
   padding: 32px;
   border-right: 1px solid #e5e5e5;
-  position: relative;
-  z-index: 1;
 }
 
 .swap-form-card {
