@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
-import { HiLogin } from 'react-icons/hi'
+import { LogIn } from 'lucide-react'
 import '../styles/LoginScreen.css'
 import logo from '../assets/logo.svg'
 
@@ -33,7 +33,7 @@ function LoginScreen() {
           onClick={handleConnect}
           disabled={isLoading}
         >
-          {!isLoading && <HiLogin className="btn-icon" />}
+          {!isLoading && <LogIn className="btn-icon" size={20} />}
           {isLoading ? 'Connecting...' : 'Login'}
         </button>
 

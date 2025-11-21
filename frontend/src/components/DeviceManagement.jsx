@@ -1,11 +1,10 @@
 import { useState, useEffect } from 'react'
-import { Smartphone, Tablet, Monitor, Key, CheckCircle, Clock } from 'lucide-react'
+import { Smartphone, Tablet, Monitor, Key, CheckCircle, Clock, ExternalLink } from 'lucide-react'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
 import { useNetwork } from '../contexts/NetworkContext'
 import { ethers } from 'ethers'
 import { getDevices, removeDevice } from '../lib/deviceManager'
 import { NETWORKS } from '../lib/constants'
-import { HiExternalLink } from 'react-icons/hi'
 import '../styles/DeviceManagement.css'
 
 function DeviceManagement({ accountAddress, onAddDevice }) {
@@ -369,7 +368,7 @@ function DeviceManagement({ accountAddress, onAddDevice }) {
                           className="explorer-link"
                           title="View proposal transaction on explorer"
                         >
-                          <HiExternalLink />
+                          <ExternalLink size={14} />
                         </a>
                       )}
                     </div>

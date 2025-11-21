@@ -1,6 +1,5 @@
 import { useState } from 'react'
-import { HiArrowDown } from 'react-icons/hi'
-import { IoCopyOutline, IoCheckmark, IoOpenOutline } from 'react-icons/io5'
+import { ArrowDown, Copy, Check, ExternalLink } from 'lucide-react'
 import { Identicon } from '../utils/identicon.jsx'
 import GradientQRCode from './GradientQRCode'
 import { useNetwork } from '../contexts/NetworkContext'
@@ -75,7 +74,7 @@ function ReceiveModal({ isOpen, onClose, wallets = [], preselectedWallet = null 
       <div className="receive-modal-content" onClick={(e) => e.stopPropagation()}>
         <div className="receive-modal-header">
           <div className="receive-modal-icon">
-            <HiArrowDown />
+            <ArrowDown size={24} />
           </div>
           <h2>{showWalletList ? 'Select a Safe to receive on' : 'Receive Funds'}</h2>
           <button className="modal-close" onClick={handleClose}>×</button>
@@ -139,7 +138,7 @@ function ReceiveModal({ isOpen, onClose, wallets = [], preselectedWallet = null 
                 {effectiveWallet.address}
               </span>
               <button className="copy-icon-inline" onClick={copyAddress} title={copied ? 'Copied!' : 'Copy address'}>
-                {copied ? <IoCheckmark /> : <IoCopyOutline />}
+                {copied ? <Check size={16} /> : <Copy size={16} />}
               </button>
               <a
                 href={`${networkInfo.explorerUrl}/address/${effectiveWallet.address}`}
@@ -148,7 +147,7 @@ function ReceiveModal({ isOpen, onClose, wallets = [], preselectedWallet = null 
                 className="explorer-icon-inline"
                 title="View on Explorer"
               >
-                <IoOpenOutline />
+                <ExternalLink size={16} />
               </a>
             </div>
 
