@@ -7,7 +7,7 @@ import '../styles/TokenSelector.css'
  * Reusable Token Selector Component
  *
  * @param {Object} props
- * @param {Object|null} props.selectedToken - Currently selected token (null for ETH or no selection)
+ * @param {Object|string|null} props.selectedToken - Currently selected token ('ETH' for ETH, token object for ERC-20, null for no selection)
  * @param {Function} props.onTokenSelect - Callback when token is selected
  * @param {Array} props.availableTokens - List of available ERC-20 tokens
  * @param {Object} props.tokenBalances - Token balances object { address: balance }
@@ -68,19 +68,7 @@ function TokenSelector({
         onClick={() => setShowDropdown(!showDropdown)}
       >
         <div className="token-info">
-          {selectedToken ? (
-            <>
-              <div className="token-icon">
-                <img src={selectedToken.icon} alt={selectedToken.symbol} />
-              </div>
-              <div className="token-details">
-                <div className="token-name">{selectedToken.name}</div>
-                <div className="token-available">
-                  Available: {tokenBalances[selectedToken.address] || '0.0000'} {selectedToken.symbol}
-                </div>
-              </div>
-            </>
-          ) : showEthOption ? (
+          {selectedToken === 'ETH' ? (
             <>
               <div className="token-icon">
                 <img src={ethIcon} alt="ETH" />
@@ -89,6 +77,18 @@ function TokenSelector({
                 <div className="token-name">Ether</div>
                 <div className="token-available">
                   Available: {ethBalance} ETH
+                </div>
+              </div>
+            </>
+          ) : selectedToken ? (
+            <>
+              <div className="token-icon">
+                <img src={selectedToken.icon} alt={selectedToken.symbol} />
+              </div>
+              <div className="token-details">
+                <div className="token-name">{selectedToken.name}</div>
+                <div className="token-available">
+                  Available: {tokenBalances[selectedToken.address] || '0.0000'} {selectedToken.symbol}
                 </div>
               </div>
             </>
@@ -107,8 +107,8 @@ function TokenSelector({
           {/* ETH Option - Only show if showEthOption is true */}
           {showEthOption && (
             <div
-              className={`token-dropdown-item ${!selectedToken ? 'selected' : ''}`}
-              onClick={() => handleTokenClick(null)}
+              className={`token-dropdown-item ${selectedToken === 'ETH' ? 'selected' : ''}`}
+              onClick={() => handleTokenClick('ETH')}
             >
               <div className="token-icon">
                 <img src={ethIcon} alt="ETH" />

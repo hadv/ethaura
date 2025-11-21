@@ -22,8 +22,8 @@ function SwapScreen({ wallet, onBack, onHome, onSettings, onLogout, onWalletChan
   const [wallets, setWallets] = useState([])
   const [selectedWallet, setSelectedWallet] = useState(wallet)
 
-  // Token selection state - Start with null, user must select tokens
-  const [tokenIn, setTokenIn] = useState(null)
+  // Token selection state - Default to ETH for tokenIn
+  const [tokenIn, setTokenIn] = useState('ETH')
   const [tokenOut, setTokenOut] = useState(null)
 
   // Amount and quote state

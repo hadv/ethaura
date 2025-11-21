@@ -33,7 +33,7 @@ function TransactionSender({ accountAddress, credential, accountConfig, onSignat
   const [loadedCredential, setLoadedCredential] = useState(null) // Store credential loaded from fallback
 
   // Token-related state
-  const [selectedToken, setSelectedToken] = useState(null) // null = ETH, otherwise token object
+  const [selectedToken, setSelectedToken] = useState('ETH') // 'ETH' = ETH, otherwise token object
   const [tokenBalances, setTokenBalances] = useState({}) // Map of token address -> balance
   const [availableTokens, setAvailableTokens] = useState([])
 
@@ -693,7 +693,7 @@ function TransactionSender({ accountAddress, credential, accountConfig, onSignat
 
       // Build UserOp based on whether we're sending ETH or ERC-20 token
       let userOp
-      if (selectedToken) {
+      if (selectedToken && selectedToken !== 'ETH') {
         // Fetch decimals from contract if not already cached
         if (!selectedToken.decimalsFromChain) {
           const tokenContract = new ethers.Contract(selectedToken.address, ERC20_ABI, sdk.provider)
@@ -1031,7 +1031,7 @@ function TransactionSender({ accountAddress, credential, accountConfig, onSignat
 
         // Reload balances
         await loadBalanceInfo(accountAddress)
-        if (selectedToken) {
+        if (selectedToken && selectedToken !== 'ETH') {
           await loadTokenBalances(accountAddress)
         }
       }
@@ -1076,7 +1076,7 @@ function TransactionSender({ accountAddress, credential, accountConfig, onSignat
 
   // Handle Max button
   const handleMaxAmount = () => {
-    if (selectedToken) {
+    if (selectedToken && selectedToken !== 'ETH') {
       // For ERC-20 tokens, use full balance
       const tokenBalance = tokenBalances[selectedToken.address] || '0'
       setAmount(tokenBalance)
