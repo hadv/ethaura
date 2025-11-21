@@ -135,10 +135,24 @@
   align-items: center;
 }
 
-/* Token Selector */
-.token-selector {
+/* Token Selector - Override for swap screen layout */
+.swap-input-row .token-selector {
   position: relative;
   flex-shrink: 0;
+  width: 320px;
+}
+
+/* Make trigger button full width to match dropdown */
+.swap-input-row .token-selector .token-selector-trigger {
+  width: 100%;
+}
+
+/* Override old token dropdown min-width for TokenSelector component */
+.swap-input-row .token-selector .token-dropdown {
+  min-width: unset !important;
+  width: 100% !important;
+  left: 0 !important;
+  right: 0 !important;
 }
 
 .token-select-button {
