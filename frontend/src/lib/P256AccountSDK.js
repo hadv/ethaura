@@ -14,6 +14,7 @@ import {
   encodeExecuteBatch,
 } from './userOperation.js'
 import { ENTRYPOINT_ADDRESS } from './constants.js'
+import { UniswapV3Service } from './uniswapService.js'
 
 /**
  * P256AccountSDK - Main SDK class
@@ -600,6 +601,102 @@ export class P256AccountSDK {
     const receipt = await this.bundler.sendUserOperationAndWait(signedUserOp)
 
     return receipt
+  }
+
+  /**
+   * Execute token swap via Uniswap V3
+   * @param {Object} params - Swap parameters
+   * @param {string} params.accountAddress - P256Account address
+   * @param {string} params.tokenIn - Input token address
+   * @param {string} params.tokenOut - Output token address
+   * @param {bigint} params.amountIn - Input amount (in token's smallest unit)
+   * @param {bigint} params.amountOutMinimum - Minimum output amount (slippage protected)
+   * @param {number} params.fee - Pool fee tier (500, 3000, or 10000). Default: 3000 (0.3%)
+   * @param {Object} params.passkeyCredential - Passkey credential for signing
+   * @param {Function} params.signWithPasskey - Function to sign with passkey
+   * @param {string|null} params.ownerSignature - Owner signature (for 2FA accounts)
+   * @param {boolean} params.needsDeployment - Whether account needs deployment
+   * @param {string} params.initCode - InitCode for deployment (if needed)
+   * @returns {Promise<Object>} UserOperation receipt
+   * @throws {Error} If swap fails with user-friendly error message
+   */
+  async executeSwap({
+    accountAddress,
+    tokenIn,
+    tokenOut,
+    amountIn,
+    amountOutMinimum,
+    fee = 3000,
+    passkeyCredential,
+    signWithPasskey,
+    ownerSignature = null,
+    needsDeployment = false,
+    initCode = '0x',
+  }) {
+    try {
+      // Initialize Uniswap V3 service
+      const uniswapService = new UniswapV3Service(this.provider, this.chainId)
+
+      // Build approve + swap batch transaction
+      const { targets, values, datas } = uniswapService.buildApproveAndSwap(
+        tokenIn,
+        tokenOut,
+        amountIn,
+        amountOutMinimum,
+        accountAddress,
+        fee
+      )
+
+      console.log('🔄 SDK executeSwap - built batch transaction:', {
+        targets,
+        values,
+        datas: datas.map((d) => d.slice(0, 10) + '...'),
+        tokenIn,
+        tokenOut,
+        amountIn: amountIn.toString(),
+        amountOutMinimum: amountOutMinimum.toString(),
+        fee,
+      })
+
+      // Execute batch via P256Account
+      return await this.executeBatch({
+        accountAddress,
+        targets,
+        values,
+        datas,
+        passkeyCredential,
+        signWithPasskey,
+        ownerSignature,
+        needsDeployment,
+        initCode,
+      })
+    } catch (error) {
+      // Handle swap-specific errors with user-friendly messages
+      const errorMessage = error.message.toLowerCase()
+
+      if (errorMessage.includes('insufficient balance') || errorMessage.includes('transfer amount exceeds balance')) {
+        throw new Error('Insufficient token balance for swap')
+      }
+
+      if (errorMessage.includes('too little received') || errorMessage.includes('slippage')) {
+        throw new Error('Price moved too much. Try increasing slippage tolerance.')
+      }
+
+      if (errorMessage.includes('insufficient liquidity') || errorMessage.includes('no liquidity')) {
+        throw new Error('Not enough liquidity for this swap')
+      }
+
+      if (errorMessage.includes('deadline') || errorMessage.includes('expired')) {
+        throw new Error('Transaction took too long. Please try again.')
+      }
+
+      if (errorMessage.includes('gas estimation failed') || errorMessage.includes('cannot estimate gas')) {
+        throw new Error('Unable to estimate gas. Check token balances and allowances.')
+      }
+
+      // Re-throw original error if not a known swap error
+      throw error
+    }
   }
 
   /**
