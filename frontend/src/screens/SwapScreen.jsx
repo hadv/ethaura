@@ -61,7 +61,7 @@ function SwapScreen({ wallet, onBack, onHome, onSettings, onLogout, onWalletChan
   useEffect(() => {
     const loadWallets = () => {
       try {
-        const savedWallets = localStorage.getItem('wallets')
+        const savedWallets = localStorage.getItem('ethaura_wallets_list')
         if (savedWallets) {
           const parsedWallets = JSON.parse(savedWallets)
           setWallets(parsedWallets)

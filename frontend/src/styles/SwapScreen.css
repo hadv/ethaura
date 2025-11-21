@@ -29,11 +29,6 @@
   min-width: 0;
 }
 
-/* Ensure wallet dropdown is visible */
-.swap-screen .wallet-dropdown-menu {
-  z-index: 10000 !important;
-}
-
 /* Content Wrapper */
 .swap-content-wrapper {
   display: grid;
