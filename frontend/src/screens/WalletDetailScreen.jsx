@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { TrendingUp, TrendingDown, ArrowLeftRight, ArrowUp, ArrowDown } from 'lucide-react'
 import { ethers } from 'ethers'
-import { MdFlashOn } from 'react-icons/md'
 import { HiOutlineDocumentText } from 'react-icons/hi2'
 import { P256_ACCOUNT_ABI } from '../lib/constants'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
@@ -330,12 +329,13 @@ function WalletDetailScreen({ wallet, onBack, onHome, onSettings, onSend, onLogo
                 </div>
                 <span>Receive</span>
               </button>
-              <button className="action-btn">
+              {/* Transaction Builder - Hidden for now */}
+              {/* <button className="action-btn">
                 <div className="action-icon">
                   <MdFlashOn />
                 </div>
                 <span>Transaction Builder</span>
-              </button>
+              </button> */}
             </div>
           </div>
 
