@@ -370,6 +370,8 @@ function SwapScreen({ wallet, onBack, onHome, onSettings, onLogout, onWalletChan
         showWalletDropdown={true}
         wallets={wallets}
         onWalletChange={handleWalletChange}
+        title="Swap"
+        subtitle="Exchange tokens instantly"
       />
 
       {/* Main Content */}
@@ -377,11 +379,6 @@ function SwapScreen({ wallet, onBack, onHome, onSettings, onLogout, onWalletChan
         <div className="swap-main">
           {/* Swap Form Card */}
           <div className="swap-form-card">
-            {/* Page Title */}
-            <div className="page-header">
-              <h1 className="page-title">Swap</h1>
-            </div>
-
             {/* Swap Card */}
             <div className="swap-card">
             {/* Token In Section */}

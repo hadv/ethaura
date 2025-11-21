@@ -8,7 +8,7 @@
   border-bottom: 1px solid #e5e7eb;
   position: sticky;
   top: 73px; /* Below main header */
-  z-index: 99;
+  z-index: 999;
   gap: 16px;
   min-height: 80px;
 }

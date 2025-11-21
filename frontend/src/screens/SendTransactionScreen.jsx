@@ -81,6 +81,8 @@ function SendTransactionScreen({ wallet, selectedToken, onBack, onHome, onSettin
         showWalletConnect={true}
         onWalletConnectClick={() => setShowWalletConnectModal(true)}
         walletConnectButtonRef={walletConnectButtonRef}
+        title="Send"
+        subtitle="Transfer tokens to any address"
       />
 
       {/* Main Content */}
@@ -88,11 +90,6 @@ function SendTransactionScreen({ wallet, selectedToken, onBack, onHome, onSettin
         <div className="send-main">
           {/* Transaction Form Card */}
           <div className="send-form-card">
-            {/* Page Title */}
-            <div className="page-header">
-              <h1 className="page-title">Send</h1>
-            </div>
-
             <TransactionSender
               accountAddress={selectedWallet.address}
               credential={credential}
