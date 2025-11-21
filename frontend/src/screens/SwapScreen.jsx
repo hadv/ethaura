@@ -379,8 +379,6 @@ function SwapScreen({ wallet, onBack, onHome, onSettings, onLogout, onWalletChan
         <div className="swap-main">
           {/* Swap Form Card */}
           <div className="swap-form-card">
-            {/* Swap Card */}
-            <div className="swap-card">
             {/* Token In Section */}
             <div className="swap-input-section">
               <div className="swap-input-header">
@@ -674,7 +672,6 @@ function SwapScreen({ wallet, onBack, onHome, onSettings, onLogout, onWalletChan
             </button>
           </div>
         </div>
-      </div>
 
       {/* Right Panel - Swap Info */}
       <div className="swap-sidebar">

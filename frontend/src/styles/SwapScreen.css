@@ -18,6 +18,8 @@
   background: #fafafa;
   padding: 32px;
   border-right: 1px solid #e5e5e5;
+  position: relative;
+  overflow: visible;
 }
 
 .swap-form-card {
@@ -27,6 +29,8 @@
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
   border: 1px solid #e5e7eb;
   max-width: 100%;
+  position: relative;
+  overflow: visible;
 }
 
 .swap-sidebar {
@@ -172,7 +176,7 @@
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   max-height: 280px;
   overflow-y: auto;
-  z-index: 1000;
+  z-index: 10001;
 }
 
 .token-option {
