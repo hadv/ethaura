@@ -63,7 +63,7 @@
 .swap-input-section {
   background: #f9fafb;
   border-radius: 16px;
-  padding: 1rem;
+  padding: 0.75rem 1rem;
   margin-bottom: 0.5rem;
 }
 
@@ -71,7 +71,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 0.75rem;
+  margin-bottom: 0.5rem;
 }
 
 .swap-input-label {
@@ -164,7 +164,7 @@
   position: absolute;
   top: calc(100% + 8px);
   left: 0;
-  min-width: 280px;
+  min-width: 320px;
   background: white;
   border: 1px solid #e5e5e5;
   border-radius: 12px;
@@ -177,7 +177,7 @@
 .token-option {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   padding: 12px;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -213,7 +213,7 @@
 
 .token-info {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 12px;
 }
 
@@ -251,7 +251,7 @@
   line-height: 1.4;
 }
 
-.token-balance-symbol {
+.token-balance-value {
   font-size: 13px;
   color: #6b7280;
   line-height: 1.4;
@@ -536,6 +536,6 @@
   }
 
   .token-dropdown {
-    min-width: 240px;
+    min-width: 280px;
   }
 }

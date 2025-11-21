@@ -6,6 +6,7 @@ import { useP256SDK } from '../hooks/useP256SDK'
 import { signWithPasskey } from '../utils/webauthn'
 import { UniswapV3Service } from '../lib/uniswapService'
 import { SUPPORTED_TOKENS, ethIcon } from '../lib/constants'
+import { priceOracle } from '../lib/priceOracle'
 import { ethers } from 'ethers'
 import Header from '../components/Header'
 import SubHeader from '../components/SubHeader'
@@ -43,6 +44,7 @@ function SwapScreen({ wallet, onBack, onHome, onSettings, onLogout, onWalletChan
 
   // Token balances
   const [tokenBalances, setTokenBalances] = useState({})
+  const [tokenPrices, setTokenPrices] = useState({})
   const [balancesLoading, setBalancesLoading] = useState(false)
 
   // Refs for dropdowns
@@ -89,7 +91,7 @@ function SwapScreen({ wallet, onBack, onHome, onSettings, onLogout, onWalletChan
     setBalancesLoading(true)
     try {
       const balances = {}
-      
+
       // Load ETH balance
       const ethBalance = await sdk.provider.getBalance(accountAddress)
       balances['ETH'] = ethBalance
@@ -111,6 +113,11 @@ function SwapScreen({ wallet, onBack, onHome, onSettings, onLogout, onWalletChan
       }
 
       setTokenBalances(balances)
+
+      // Fetch token prices
+      const symbols = ['ETH', ...availableTokens.map(t => t.symbol)]
+      const prices = await priceOracle.getPrices(symbols)
+      setTokenPrices(prices)
     } catch (error) {
       console.error('Failed to load token balances:', error)
     } finally {
@@ -297,6 +304,18 @@ function SwapScreen({ wallet, onBack, onHome, onSettings, onLogout, onWalletChan
     return ethers.formatUnits(balance, decimals)
   }
 
+  // Get token USD value
+  const getTokenUSDValue = (token) => {
+    const balance = getTokenBalance(token)
+    const symbol = token === 'ETH' ? 'ETH' : token.symbol
+    const price = tokenPrices[symbol]
+
+    if (!price || parseFloat(balance) === 0) return null
+
+    const usdValue = parseFloat(balance) * price
+    return `$${usdValue.toFixed(2)}`
+  }
+
   // Check if swap button should be disabled
   const isSwapDisabled = () => {
     if (!tokenIn || !tokenOut || !amountIn || parseFloat(amountIn) <= 0) return true
@@ -423,6 +442,9 @@ function SwapScreen({ wallet, onBack, onHome, onSettings, onLogout, onWalletChan
                         </div>
                         <div className="token-balance-display">
                           <div className="token-balance-amount">{parseFloat(getTokenBalance('ETH')).toFixed(4)} ETH</div>
+                          {getTokenUSDValue('ETH') && (
+                            <div className="token-balance-value">{getTokenUSDValue('ETH')}</div>
+                          )}
                         </div>
                       </div>
 
@@ -447,6 +469,9 @@ function SwapScreen({ wallet, onBack, onHome, onSettings, onLogout, onWalletChan
                             </div>
                             <div className="token-balance-display">
                               <div className="token-balance-amount">{parseFloat(getTokenBalance(token)).toFixed(2)} {token.symbol}</div>
+                              {getTokenUSDValue(token) && (
+                                <div className="token-balance-value">{getTokenUSDValue(token)}</div>
+                              )}
                             </div>
                           </div>
                         ))}
@@ -530,6 +555,9 @@ function SwapScreen({ wallet, onBack, onHome, onSettings, onLogout, onWalletChan
                         </div>
                         <div className="token-balance-display">
                           <div className="token-balance-amount">{parseFloat(getTokenBalance('ETH')).toFixed(4)} ETH</div>
+                          {getTokenUSDValue('ETH') && (
+                            <div className="token-balance-value">{getTokenUSDValue('ETH')}</div>
+                          )}
                         </div>
                       </div>
 
@@ -554,6 +582,9 @@ function SwapScreen({ wallet, onBack, onHome, onSettings, onLogout, onWalletChan
                             </div>
                             <div className="token-balance-display">
                               <div className="token-balance-amount">{parseFloat(getTokenBalance(token)).toFixed(2)} {token.symbol}</div>
+                              {getTokenUSDValue(token) && (
+                                <div className="token-balance-value">{getTokenUSDValue(token)}</div>
+                              )}
                             </div>
                           </div>
                         ))}
