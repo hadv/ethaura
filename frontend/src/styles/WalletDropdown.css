@@ -2,6 +2,7 @@
 .wallet-dropdown-container {
   position: relative;
   min-width: 280px;
+  overflow: visible;
 }
 
 /* Dropdown Trigger (Selected Wallet) */

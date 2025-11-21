@@ -4,6 +4,7 @@
   padding: 0;
   min-height: 100vh;
   background: #f5f5f5;
+  overflow: visible;
 }
 
 /* Content Wrapper */
@@ -12,6 +13,7 @@
   grid-template-columns: 70% 1fr;
   gap: 0;
   min-height: calc(100vh - 153px);
+  overflow: visible;
 }
 
 .swap-main {
