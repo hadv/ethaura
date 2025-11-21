@@ -1,15 +1,16 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { ArrowDownUp, ChevronDown, AlertCircle, Loader } from 'lucide-react'
+import { ArrowDownUp, AlertCircle, Loader } from 'lucide-react'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
 import { useNetwork } from '../contexts/NetworkContext'
 import { useP256SDK } from '../hooks/useP256SDK'
 import { signWithPasskey } from '../utils/webauthn'
 import { UniswapV3Service } from '../lib/uniswapService'
-import { SUPPORTED_TOKENS, ethIcon } from '../lib/constants'
+import { SUPPORTED_TOKENS } from '../lib/constants'
 import { priceOracle } from '../lib/priceOracle'
 import { ethers } from 'ethers'
 import Header from '../components/Header'
 import SubHeader from '../components/SubHeader'
+import TokenSelector from '../components/TokenSelector'
 import '../styles/SwapScreen.css'
 
 function SwapScreen({ wallet, onBack, onHome, onSettings, onLogout, onWalletChange, credential }) {
@@ -24,8 +25,6 @@ function SwapScreen({ wallet, onBack, onHome, onSettings, onLogout, onWalletChan
   // Token selection state
   const [tokenIn, setTokenIn] = useState(null)
   const [tokenOut, setTokenOut] = useState(null)
-  const [showTokenInDropdown, setShowTokenInDropdown] = useState(false)
-  const [showTokenOutDropdown, setShowTokenOutDropdown] = useState(false)
 
   // Amount and quote state
   const [amountIn, setAmountIn] = useState('')
@@ -46,10 +45,6 @@ function SwapScreen({ wallet, onBack, onHome, onSettings, onLogout, onWalletChan
   const [tokenBalances, setTokenBalances] = useState({})
   const [tokenPrices, setTokenPrices] = useState({})
   const [balancesLoading, setBalancesLoading] = useState(false)
-
-  // Refs for dropdowns
-  const tokenInRef = useRef(null)
-  const tokenOutRef = useRef(null)
 
   // Debounce timer for quote fetching
   const quoteTimerRef = useRef(null)
@@ -304,6 +299,33 @@ function SwapScreen({ wallet, onBack, onHome, onSettings, onLogout, onWalletChan
     return ethers.formatUnits(balance, decimals)
   }
 
+  // Get formatted token balances for TokenSelector component
+  const getFormattedTokenBalances = () => {
+    const formatted = {}
+
+    // Format ERC-20 token balances
+    for (const token of availableTokens) {
+      const balance = tokenBalances[token.address]
+      if (balance) {
+        const formattedBalance = ethers.formatUnits(balance, token.decimals)
+        formatted[token.address] = parseFloat(formattedBalance).toFixed(4)
+      } else {
+        formatted[token.address] = '0.0000'
+      }
+    }
+
+    return formatted
+  }
+
+  // Get formatted ETH balance for TokenSelector component
+  const getFormattedEthBalance = () => {
+    const balance = tokenBalances['ETH']
+    if (!balance) return '0.0000'
+
+    const formattedBalance = ethers.formatUnits(balance, 18)
+    return parseFloat(formattedBalance).toFixed(4)
+  }
+
   // Get token USD value
   const getTokenUSDValue = (token) => {
     const balance = getTokenBalance(token)
@@ -395,84 +417,15 @@ function SwapScreen({ wallet, onBack, onHome, onSettings, onLogout, onWalletChan
 
               <div className="swap-input-row">
                 {/* Token Selector */}
-                <div className="token-selector" ref={tokenInRef}>
-                  <button
-                    className="token-select-button"
-                    onClick={() => setShowTokenInDropdown(!showTokenInDropdown)}
-                  >
-                    {tokenIn ? (
-                      <>
-                        <img
-                          src={tokenIn === 'ETH' ? ethIcon : tokenIn.icon}
-                          alt={tokenIn === 'ETH' ? 'ETH' : tokenIn.symbol}
-                          className="token-icon"
-                        />
-                        <span className="token-symbol">
-                          {tokenIn === 'ETH' ? 'ETH' : tokenIn.symbol}
-                        </span>
-                      </>
-                    ) : (
-                      <span className="token-placeholder">Select token</span>
-                    )}
-                    <ChevronDown size={20} />
-                  </button>
-
-                  {/* Token Dropdown */}
-                  {showTokenInDropdown && (
-                    <div className="token-dropdown">
-                      {/* ETH Option */}
-                      <div
-                        className="token-option"
-                        onClick={() => {
-                          setTokenIn('ETH')
-                          setShowTokenInDropdown(false)
-                        }}
-                      >
-                        <div className="token-info">
-                          <img src={ethIcon} alt="ETH" className="token-icon" />
-                          <div className="token-details">
-                            <div className="token-symbol">Ether</div>
-                            <div className="token-name">ETH</div>
-                          </div>
-                        </div>
-                        <div className="token-balance-display">
-                          <div className="token-balance-amount">{parseFloat(getTokenBalance('ETH')).toFixed(4)} ETH</div>
-                          {getTokenUSDValue('ETH') && (
-                            <div className="token-balance-value">{getTokenUSDValue('ETH')}</div>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* ERC-20 Tokens */}
-                      {availableTokens
-                        .filter(t => t.address !== tokenOut?.address)
-                        .map((token) => (
-                          <div
-                            key={token.address}
-                            className="token-option"
-                            onClick={() => {
-                              setTokenIn(token)
-                              setShowTokenInDropdown(false)
-                            }}
-                          >
-                            <div className="token-info">
-                              <img src={token.icon} alt={token.symbol} className="token-icon" />
-                              <div className="token-details">
-                                <div className="token-symbol">{token.name}</div>
-                                <div className="token-name">{token.symbol}</div>
-                              </div>
-                            </div>
-                            <div className="token-balance-display">
-                              <div className="token-balance-amount">{parseFloat(getTokenBalance(token)).toFixed(2)} {token.symbol}</div>
-                              {getTokenUSDValue(token) && (
-                                <div className="token-balance-value">{getTokenUSDValue(token)}</div>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                    </div>
-                  )}
-                </div>
+                <TokenSelector
+                  selectedToken={tokenIn === 'ETH' ? null : tokenIn}
+                  onTokenSelect={(token) => setTokenIn(token || 'ETH')}
+                  availableTokens={availableTokens.filter(t => t.address !== tokenOut?.address)}
+                  tokenBalances={getFormattedTokenBalances()}
+                  ethBalance={getFormattedEthBalance()}
+                  showAllTokens={true}
+                  className="swap-token-selector"
+                />
 
                 {/* Amount Input */}
                 <input
@@ -508,84 +461,15 @@ function SwapScreen({ wallet, onBack, onHome, onSettings, onLogout, onWalletChan
 
               <div className="swap-input-row">
                 {/* Token Selector */}
-                <div className="token-selector" ref={tokenOutRef}>
-                  <button
-                    className="token-select-button"
-                    onClick={() => setShowTokenOutDropdown(!showTokenOutDropdown)}
-                  >
-                    {tokenOut ? (
-                      <>
-                        <img
-                          src={tokenOut === 'ETH' ? ethIcon : tokenOut.icon}
-                          alt={tokenOut === 'ETH' ? 'ETH' : tokenOut.symbol}
-                          className="token-icon"
-                        />
-                        <span className="token-symbol">
-                          {tokenOut === 'ETH' ? 'ETH' : tokenOut.symbol}
-                        </span>
-                      </>
-                    ) : (
-                      <span className="token-placeholder">Select token</span>
-                    )}
-                    <ChevronDown size={20} />
-                  </button>
-
-                  {/* Token Dropdown */}
-                  {showTokenOutDropdown && (
-                    <div className="token-dropdown">
-                      {/* ETH Option */}
-                      <div
-                        className="token-option"
-                        onClick={() => {
-                          setTokenOut('ETH')
-                          setShowTokenOutDropdown(false)
-                        }}
-                      >
-                        <div className="token-info">
-                          <img src={ethIcon} alt="ETH" className="token-icon" />
-                          <div className="token-details">
-                            <div className="token-symbol">Ether</div>
-                            <div className="token-name">ETH</div>
-                          </div>
-                        </div>
-                        <div className="token-balance-display">
-                          <div className="token-balance-amount">{parseFloat(getTokenBalance('ETH')).toFixed(4)} ETH</div>
-                          {getTokenUSDValue('ETH') && (
-                            <div className="token-balance-value">{getTokenUSDValue('ETH')}</div>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* ERC-20 Tokens */}
-                      {availableTokens
-                        .filter(t => t.address !== tokenIn?.address)
-                        .map((token) => (
-                          <div
-                            key={token.address}
-                            className="token-option"
-                            onClick={() => {
-                              setTokenOut(token)
-                              setShowTokenOutDropdown(false)
-                            }}
-                          >
-                            <div className="token-info">
-                              <img src={token.icon} alt={token.symbol} className="token-icon" />
-                              <div className="token-details">
-                                <div className="token-symbol">{token.name}</div>
-                                <div className="token-name">{token.symbol}</div>
-                              </div>
-                            </div>
-                            <div className="token-balance-display">
-                              <div className="token-balance-amount">{parseFloat(getTokenBalance(token)).toFixed(2)} {token.symbol}</div>
-                              {getTokenUSDValue(token) && (
-                                <div className="token-balance-value">{getTokenUSDValue(token)}</div>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                    </div>
-                  )}
-                </div>
+                <TokenSelector
+                  selectedToken={tokenOut === 'ETH' ? null : tokenOut}
+                  onTokenSelect={(token) => setTokenOut(token || 'ETH')}
+                  availableTokens={availableTokens.filter(t => t.address !== tokenIn?.address)}
+                  tokenBalances={getFormattedTokenBalances()}
+                  ethBalance={getFormattedEthBalance()}
+                  showAllTokens={true}
+                  className="swap-token-selector"
+                />
 
                 {/* Output Amount Display */}
                 <div className="swap-amount-output">
