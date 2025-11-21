@@ -273,11 +273,50 @@ See `example.js` for complete examples:
 
 ```
 P256AccountSDK
-├── accountManager.js    - Account creation & management
-├── userOperation.js     - UserOperation building & signing
-├── bundlerClient.js     - Bundler communication
-├── constants.js         - Network configs & ABIs
-└── P256AccountSDK.js    - Main SDK wrapper
+├── accountManager.js       - Account creation & management
+├── userOperation.js        - UserOperation building & signing
+├── bundlerClient.js        - Bundler communication
+├── constants.js            - Network configs & ABIs
+├── P256AccountSDK.js       - Main SDK wrapper
+├── tokenService.js         - Token balance management
+├── transactionService.js   - Transaction history
+├── priceOracle.js          - Token price fetching
+└── uniswapService.js       - Uniswap V3 swap integration (NEW)
+```
+
+## Token Swap Integration
+
+The SDK now includes Uniswap V3 integration for token swaps. See [UNISWAP_SERVICE.md](./UNISWAP_SERVICE.md) for detailed documentation.
+
+### Quick Example
+
+```javascript
+import { createUniswapV3Service } from './lib/uniswapService'
+
+// Create service
+const uniswapService = createUniswapV3Service(provider, chainId)
+
+// Get quote
+const quote = await uniswapService.getQuote(tokenIn, tokenOut, amountIn)
+
+// Build swap batch
+const batch = uniswapService.buildApproveAndSwap(
+  tokenIn,
+  tokenOut,
+  amountIn,
+  amountOutMinimum,
+  accountAddress
+)
+
+// Execute via P256Account
+await sdk.executeBatch({
+  accountAddress,
+  targets: batch.targets,
+  values: batch.values,
+  datas: batch.datas,
+  passkeyCredential,
+  signWithPasskey,
+})
 ```
 
 ## Gas Costs
