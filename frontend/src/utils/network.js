@@ -8,7 +8,8 @@ import sepoliaIcon from '../assets/networks/sepolia.png'
 import optimismIcon from '../assets/networks/optimism.png'
 import polygonIcon from '../assets/networks/polygon.png'
 import arbitrumIcon from '../assets/networks/arbitrum.png'
-import baseIcon from '../assets/networks/base.svg'
+import baseIcon from '../assets/networks/base.png'
+import baseSepoliaIcon from '../assets/networks/base-sepolia.svg'
 
 /**
  * Get network name from chain ID
@@ -48,8 +49,8 @@ export function getNetworkIcon(chainId) {
     421614: arbitrumIcon,
     10: optimismIcon,
     11155420: optimismIcon,
-    8453: baseIcon, // Base - using official Base icon
-    84532: baseIcon, // Base Sepolia - using official Base icon
+    8453: baseIcon, // Base mainnet - blue square logo (PNG, 938 bytes)
+    84532: baseSepoliaIcon, // Base Sepolia - circle logo (SVG, 201 bytes)
   }
 
   return icons[chainId] || ethereumIcon
