@@ -57,7 +57,7 @@ export const AVAILABLE_NETWORKS = [
     rpcUrl: import.meta.env.VITE_BASE_RPC_URL || 'https://mainnet.base.org',
     bundlerUrl: import.meta.env.VITE_BASE_BUNDLER_URL || 'https://api.pimlico.io/v2/base/rpc?apikey=YOUR_API_KEY',
     explorerUrl: 'https://basescan.org',
-    factoryAddress: import.meta.env.VITE_BASE_FACTORY_ADDRESS,
+    factoryAddress: import.meta.env.VITE_FACTORY_ADDRESS,
     supported: false, // Factory will be deployed after Base Sepolia testing
   },
   {
