@@ -8,6 +8,7 @@ import sepoliaIcon from '../assets/networks/sepolia.png'
 import optimismIcon from '../assets/networks/optimism.png'
 import polygonIcon from '../assets/networks/polygon.png'
 import arbitrumIcon from '../assets/networks/arbitrum.png'
+import baseIcon from '../assets/networks/base.svg'
 
 /**
  * Get network name from chain ID
@@ -24,6 +25,8 @@ export function getNetworkName(chainId) {
     421614: 'Arbitrum Sepolia',
     10: 'Optimism',
     11155420: 'Optimism Sepolia',
+    8453: 'Base',
+    84532: 'Base Sepolia',
   }
 
   return networks[chainId] || 'Unknown Network'
@@ -45,6 +48,8 @@ export function getNetworkIcon(chainId) {
     421614: arbitrumIcon,
     10: optimismIcon,
     11155420: optimismIcon,
+    8453: baseIcon, // Base - using official Base icon
+    84532: baseIcon, // Base Sepolia - using official Base icon
   }
 
   return icons[chainId] || ethereumIcon
@@ -65,9 +70,28 @@ export function getNetworkColor(chainId) {
     421614: '#28a0f0', // Arbitrum Sepolia blue
     10: '#ff0420', // Optimism red
     11155420: '#ff0420', // Optimism Sepolia red
+    8453: '#0052FF', // Base blue (Coinbase blue)
+    84532: '#0052FF', // Base Sepolia blue
   }
 
   return colors[chainId] || '#6b7280'
+}
+
+/**
+ * Check if a network is a testnet
+ * @param {number} chainId - The chain ID
+ * @returns {boolean} True if testnet, false if mainnet
+ */
+export function isTestnet(chainId) {
+  const testnets = [
+    11155111, // Sepolia
+    84532,    // Base Sepolia
+    17000,    // Holesky
+    80001,    // Mumbai (Polygon testnet)
+    421614,   // Arbitrum Sepolia
+    11155420, // Optimism Sepolia
+  ]
+  return testnets.includes(chainId)
 }
 
 /**
@@ -118,10 +142,22 @@ export function getAllNetworks() {
       color: getNetworkColor(42161),
     },
     {
+      chainId: 8453,
+      name: 'Base',
+      icon: getNetworkIcon(8453),
+      color: getNetworkColor(8453),
+    },
+    {
       chainId: 11155111,
       name: 'Sepolia',
       icon: getNetworkIcon(11155111),
       color: getNetworkColor(11155111),
+    },
+    {
+      chainId: 84532,
+      name: 'Base Sepolia',
+      icon: getNetworkIcon(84532),
+      color: getNetworkColor(84532),
     },
   ]
 }

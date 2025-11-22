@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNetwork } from '../contexts/NetworkContext';
-import { getNetworkIcon } from '../utils/network';
+import { getNetworkIcon, isTestnet } from '../utils/network';
 import '../styles/NetworkSelector.css';
 
 const NetworkSelector = () => {
@@ -26,24 +26,6 @@ const NetworkSelector = () => {
   const handleNetworkChange = (chainId) => {
     switchNetwork(chainId);
     setIsOpen(false);
-  };
-
-  // Get network color based on chainId
-  const getNetworkColor = (chainId) => {
-    switch (chainId) {
-      case 11155111: // Sepolia
-        return '#627EEA'; // Ethereum blue
-      case 1: // Ethereum
-        return '#627EEA';
-      case 137: // Polygon
-        return '#8247E5';
-      case 42161: // Arbitrum
-        return '#28A0F0';
-      case 10: // Optimism
-        return '#FF0420';
-      default:
-        return '#6B7280';
-    }
   };
 
   return (
@@ -73,8 +55,10 @@ const NetworkSelector = () => {
         <div className="network-dropdown">
           {availableNetworks.map((network, index) => {
             const isSelected = network.chainId === networkInfo.chainId;
-            const isTestnet = network.chainId === 11155111; // Sepolia
-            const showSeparator = isTestnet && index > 0;
+            const isCurrentTestnet = isTestnet(network.chainId);
+            const isPreviousMainnet = index > 0 && !isTestnet(availableNetworks[index - 1].chainId);
+            // Show separator only once: before the first testnet (when previous network was mainnet)
+            const showSeparator = isCurrentTestnet && isPreviousMainnet;
 
             return (
               <div key={network.chainId}>
