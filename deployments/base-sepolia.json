@@ -1,0 +1,51 @@
+{
+  "network": "Base Sepolia",
+  "chainId": 84532,
+  "deployedAt": "2025-11-22T01:45:00Z",
+  "deployer": "0x18Ee4C040568238643C07e7aFd6c53efc196D26b",
+  "contracts": {
+    "EntryPoint": {
+      "address": "0x0000000071727De22E5E9d8BAf0edAc6f37da032",
+      "note": "Pre-deployed EntryPoint v0.7 (canonical address)"
+    },
+    "P256AccountFactory": {
+      "address": "0xF913EF5101Dcb4fDB9A62666D18593aea5509262",
+      "deploymentTx": "0x656624922fd4f3694ecd5516516cfa495e82e84297b848673a3dc9caeb7ab8aa",
+      "blockNumber": 34008080,
+      "gasUsed": 3776556,
+      "gasCost": "0.000091254104690028 ETH"
+    },
+    "P256Account": {
+      "address": "0xA0ca2CDd6fe515f4C1B87f2aEe2EbD4F1e6EfB1E",
+      "note": "Implementation contract (deployed by factory constructor)"
+    },
+    "SoladyERC1967Factory": {
+      "address": "0x0000000000006396FF2a80c067f99B3d2Ab4Df24",
+      "note": "Canonical Solady proxy factory"
+    }
+  },
+  "explorer": {
+    "factory": "https://sepolia.basescan.org/address/0xF913EF5101Dcb4fDB9A62666D18593aea5509262",
+    "implementation": "https://sepolia.basescan.org/address/0xA0ca2CDd6fe515f4C1B87f2aEe2EbD4F1e6EfB1E",
+    "deploymentTx": "https://sepolia.basescan.org/tx/0x656624922fd4f3694ecd5516516cfa495e82e84297b848673a3dc9caeb7ab8aa"
+  },
+  "rpc": {
+    "public": "https://sepolia.base.org",
+    "bundler": "https://api.pimlico.io/v2/base-sepolia/rpc?apikey=YOUR_API_KEY"
+  },
+  "features": {
+    "rip7212": true,
+    "erc4337": true,
+    "passkeySupport": true,
+    "twoFactorAuth": true,
+    "guardianRecovery": true
+  },
+  "notes": [
+    "Base Sepolia has RIP-7212 P256 precompile support (Fjord upgrade)",
+    "EntryPoint v0.7 is pre-deployed at canonical address",
+    "Factory uses Solady ERC-1967 proxy pattern for gas-efficient deployments",
+    "Each account is a minimal proxy (~121 bytes) pointing to implementation",
+    "Deployment cost: ~$0.09 USD (extremely cheap on Base L2)"
+  ]
+}
+

@@ -10,9 +10,13 @@ via_ir = true
 
 [rpc_endpoints]
 sepolia = "${SEPOLIA_RPC_URL}"
+base = "${BASE_RPC_URL}"
+base-sepolia = "${BASE_SEPOLIA_RPC_URL}"
 
 [etherscan]
 sepolia = { key = "${ETHERSCAN_API_KEY}", url = "https://api-sepolia.etherscan.io/api" }
+base = { key = "${ETHERSCAN_API_KEY}", url = "https://api.basescan.org/api" }
+base-sepolia = { key = "${ETHERSCAN_API_KEY}", url = "https://api-sepolia.basescan.org/api" }
 
 # See more config options https://github.com/foundry-rs/foundry/tree/master/config
 
