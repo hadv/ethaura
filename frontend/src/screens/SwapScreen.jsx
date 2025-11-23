@@ -231,17 +231,22 @@ function SwapScreen({ wallet, onBack, onHome, onSettings, onLogout, onWalletChan
       const ethPrice = await priceOracle.getPrice('ETH')
       const gasCostUsd = ethPrice ? parseFloat(gasCostEth) * ethPrice : null
 
+      // Convert gas price to Gwei for display
+      const gasPriceGwei = parseFloat(ethers.formatUnits(gasPrice, 'gwei'))
+
       setGasEstimate({
         gasCostEth: parseFloat(gasCostEth),
         gasCostUsd,
         gasPrice: gasPrice.toString(),
+        gasPriceGwei,
       })
 
       console.log('💰 Gas estimate:', {
         gasLimit: gasLimit.toString(),
         gasPrice: gasPrice.toString(),
+        gasPriceGwei: gasPriceGwei.toFixed(2) + ' Gwei',
         gasCostEth,
-        gasCostUsd: gasCostUsd ? `$${gasCostUsd.toFixed(2)}` : 'N/A',
+        gasCostUsd: gasCostUsd ? `$${gasCostUsd.toFixed(4)}` : 'N/A',
       })
     } catch (error) {
       console.error('Failed to calculate gas cost:', error)
@@ -625,10 +630,20 @@ function SwapScreen({ wallet, onBack, onHome, onSettings, onLogout, onWalletChan
                   </div>
                   {gasEstimate && (
                     <div className="quote-row">
-                      <span className="quote-label">Network Fee</span>
+                      <span className="quote-label">
+                        Network Fee
+                        {gasEstimate.gasPriceGwei && (
+                          <span style={{ fontSize: '0.75rem', color: '#9ca3af', marginLeft: '0.25rem' }}>
+                            ({gasEstimate.gasPriceGwei.toFixed(2)} Gwei)
+                          </span>
+                        )}
+                      </span>
                       <span className="quote-value">
-                        ~{gasEstimate.gasCostEth.toFixed(6)} ETH
-                        {gasEstimate.gasCostUsd && ` ($${gasEstimate.gasCostUsd.toFixed(2)})`}
+                        ~{gasEstimate.gasCostEth < 0.000001
+                          ? gasEstimate.gasCostEth.toExponential(2)
+                          : gasEstimate.gasCostEth.toFixed(6)} ETH
+                        {gasEstimate.gasCostUsd && gasEstimate.gasCostUsd >= 0.01 && ` ($${gasEstimate.gasCostUsd.toFixed(2)})`}
+                        {gasEstimate.gasCostUsd && gasEstimate.gasCostUsd < 0.01 && ` ($${gasEstimate.gasCostUsd.toFixed(4)})`}
                       </span>
                     </div>
                   )}
