@@ -54,6 +54,10 @@ function SwapScreen({ wallet, onBack, onHome, onSettings, onLogout, onWalletChan
   // Gas estimation
   const [gasEstimate, setGasEstimate] = useState(null) // { gasCostEth, gasCostUsd, gasPrice }
 
+  // Balance validation
+  const [insufficientBalanceError, setInsufficientBalanceError] = useState(null)
+  const [lowEthWarning, setLowEthWarning] = useState(null)
+
   // Debounce timer for quote fetching
   const quoteTimerRef = useRef(null)
 
@@ -435,6 +439,74 @@ function SwapScreen({ wallet, onBack, onHome, onSettings, onLogout, onWalletChan
     return `$${usdValue.toFixed(2)}`
   }
 
+  // Check balance and update error/warning messages
+  const checkBalanceAndGas = useCallback(() => {
+    // Reset errors
+    setInsufficientBalanceError(null)
+    setLowEthWarning(null)
+
+    if (!tokenIn || !amountIn || parseFloat(amountIn) <= 0) return
+
+    // Check token balance
+    const balance = tokenIn === 'ETH'
+      ? tokenBalances['ETH']
+      : tokenBalances[tokenIn.address]
+
+    if (!balance) return
+
+    const decimals = tokenIn === 'ETH' ? 18 : tokenIn.decimals
+    const amountInTrimmed = parseFloat(amountIn).toFixed(decimals)
+    const amountInWei = ethers.parseUnits(amountInTrimmed, decimals)
+
+    // Check if insufficient balance
+    if (amountInWei > balance) {
+      const tokenSymbol = tokenIn === 'ETH' ? 'ETH' : tokenIn.symbol
+      const currentBalance = ethers.formatUnits(balance, decimals)
+      setInsufficientBalanceError({
+        token: tokenSymbol,
+        current: parseFloat(currentBalance).toFixed(6),
+        required: parseFloat(amountIn).toFixed(6),
+      })
+    }
+
+    // Check ETH balance for gas fees
+    const ethBalance = tokenBalances['ETH']
+    if (ethBalance && gasEstimate) {
+      const gasCostWei = BigInt(gasEstimate.gasPrice) * BigInt(quote?.gasEstimate || 100000n)
+
+      // If swapping ETH, need balance for both swap amount and gas
+      if (tokenIn === 'ETH') {
+        const totalNeeded = amountInWei + gasCostWei
+        if (totalNeeded > ethBalance) {
+          const gasCostEth = ethers.formatEther(gasCostWei)
+          const totalNeededEth = ethers.formatEther(totalNeeded)
+          const currentEth = ethers.formatEther(ethBalance)
+          setLowEthWarning({
+            gasCost: parseFloat(gasCostEth).toFixed(6),
+            totalNeeded: parseFloat(totalNeededEth).toFixed(6),
+            current: parseFloat(currentEth).toFixed(6),
+          })
+        }
+      } else {
+        // If swapping ERC-20, just need ETH for gas
+        if (gasCostWei > ethBalance) {
+          const gasCostEth = ethers.formatEther(gasCostWei)
+          const currentEth = ethers.formatEther(ethBalance)
+          setLowEthWarning({
+            gasCost: parseFloat(gasCostEth).toFixed(6),
+            totalNeeded: parseFloat(gasCostEth).toFixed(6),
+            current: parseFloat(currentEth).toFixed(6),
+          })
+        }
+      }
+    }
+  }, [tokenIn, amountIn, tokenBalances, gasEstimate, quote])
+
+  // Run balance check when inputs change
+  useEffect(() => {
+    checkBalanceAndGas()
+  }, [checkBalanceAndGas])
+
   // Check if swap button should be disabled
   const isSwapDisabled = () => {
     if (!tokenIn || !tokenOut || !amountIn || parseFloat(amountIn) <= 0) return true
@@ -444,20 +516,10 @@ function SwapScreen({ wallet, onBack, onHome, onSettings, onLogout, onWalletChan
     // Block if price impact > 15%
     if (quote && quote.priceImpact > 15) return true
 
-    // Check balance
-    const balance = tokenIn === 'ETH'
-      ? tokenBalances['ETH']
-      : tokenBalances[tokenIn.address]
+    // Block if insufficient balance or low ETH
+    if (insufficientBalanceError || lowEthWarning) return true
 
-    if (!balance) return true
-
-    const decimals = tokenIn === 'ETH' ? 18 : tokenIn.decimals
-
-    // Limit decimal places to token's decimals to avoid parseUnits error
-    const amountInTrimmed = parseFloat(amountIn).toFixed(decimals)
-    const amountInWei = ethers.parseUnits(amountInTrimmed, decimals)
-
-    return amountInWei > balance
+    return false
   }
 
   // Get swap button text
@@ -467,18 +529,8 @@ function SwapScreen({ wallet, onBack, onHome, onSettings, onLogout, onWalletChan
     if (!amountIn || parseFloat(amountIn) <= 0) return 'Enter amount'
     if (quoteLoading) return 'Fetching quote...'
     if (!quote) return 'No quote available'
-
-    const balance = tokenIn === 'ETH'
-      ? tokenBalances['ETH']
-      : tokenBalances[tokenIn.address]
-
-    if (balance) {
-      const decimals = tokenIn === 'ETH' ? 18 : tokenIn.decimals
-      // Limit decimal places to token's decimals to avoid parseUnits error
-      const amountInTrimmed = parseFloat(amountIn).toFixed(decimals)
-      const amountInWei = ethers.parseUnits(amountInTrimmed, decimals)
-      if (amountInWei > balance) return 'Insufficient balance'
-    }
+    if (insufficientBalanceError) return 'Insufficient balance'
+    if (lowEthWarning) return 'Insufficient ETH for gas'
 
     return 'Swap'
   }
@@ -704,6 +756,41 @@ function SwapScreen({ wallet, onBack, onHome, onSettings, onLogout, onWalletChan
             {swapSuccess && (
               <div className="swap-success">
                 Swap successful! Your tokens have been exchanged.
+              </div>
+            )}
+
+            {/* Insufficient Balance Error */}
+            {insufficientBalanceError && (
+              <div className="balance-error">
+                <AlertCircle size={16} />
+                <div className="balance-error-content">
+                  <div className="balance-error-title">
+                    Insufficient {insufficientBalanceError.token} balance
+                  </div>
+                  <div className="balance-error-details">
+                    <div>You have: {insufficientBalanceError.current} {insufficientBalanceError.token}</div>
+                    <div>Required: {insufficientBalanceError.required} {insufficientBalanceError.token}</div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Low ETH Warning */}
+            {lowEthWarning && (
+              <div className="eth-warning">
+                <AlertCircle size={16} />
+                <div className="eth-warning-content">
+                  <div className="eth-warning-title">
+                    Insufficient ETH for gas fees
+                  </div>
+                  <div className="eth-warning-details">
+                    <div>You have: {lowEthWarning.current} ETH</div>
+                    <div>Estimated gas: {lowEthWarning.gasCost} ETH</div>
+                    {tokenIn === 'ETH' && (
+                      <div>Total needed: {lowEthWarning.totalNeeded} ETH</div>
+                    )}
+                  </div>
+                </div>
               </div>
             )}
 
