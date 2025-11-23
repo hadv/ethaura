@@ -23,10 +23,10 @@ contract DeployScript is Script {
     // EntryPoint v0.7 address (same on all networks)
     address constant ENTRYPOINT_V07 = 0x0000000071727De22E5E9d8BAf0edAc6f37da032;
 
-    // Salt for CREATE2 deployment
+    // Salt for CREATE2 deployment (vanity salt for 0x00000000 prefix)
     // IMPORTANT: Use the SAME salt on ALL networks to get the same factory address
-    // You can change this to any value, but keep it consistent across networks
-    bytes32 constant SALT = bytes32(uint256(0x0000000000000000000000000000000000000000000000000000000000000001));
+    // This salt produces factory address: 0x000000004dc40D84B6FA523e8De2BCf90515EE0B
+    bytes32 constant SALT = 0x3f9b0f828fffac7c03a85295e164e03603eca87a5f29479f10dbd79d12bcb402;
 
     function run() external {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
