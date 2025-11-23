@@ -336,16 +336,43 @@ export class UniswapV3Service {
   }
 
   /**
-   * Build approve and swap batch transaction
+   * Check token allowance for swap router
+   * @param {string} tokenAddress - Token contract address
+   * @param {string} ownerAddress - Owner address (P256Account)
+   * @param {string} spenderAddress - Spender address (SwapRouter)
+   * @returns {Promise<bigint>} Current allowance amount
+   */
+  async checkAllowance(tokenAddress, ownerAddress, spenderAddress) {
+    try {
+      const tokenContract = new ethers.Contract(tokenAddress, ERC20_ABI, this.provider)
+      const allowance = await tokenContract.allowance(ownerAddress, spenderAddress)
+
+      console.log('🔍 Checked allowance:', {
+        token: tokenAddress,
+        owner: ownerAddress,
+        spender: spenderAddress,
+        allowance: allowance.toString(),
+      })
+
+      return allowance
+    } catch (error) {
+      console.error('❌ Failed to check allowance:', error)
+      // Return 0 on error to be safe (will trigger approval)
+      return 0n
+    }
+  }
+
+  /**
+   * Build approve and swap batch transaction with allowance optimization
    * @param {string} tokenIn - Input token address
    * @param {string} tokenOut - Output token address
    * @param {bigint} amountIn - Input amount in wei
    * @param {bigint} amountOutMinimum - Minimum output amount (with slippage)
    * @param {string} recipient - Recipient address (P256Account)
    * @param {number} fee - Pool fee tier (default: 3000 = 0.3%)
-   * @returns {Object} Batch transaction object with targets, values, and datas arrays
+   * @returns {Promise<Object>} Batch transaction object with targets, values, and datas arrays
    */
-  buildApproveAndSwap(tokenIn, tokenOut, amountIn, amountOutMinimum, recipient, fee = 3000) {
+  async buildApproveAndSwap(tokenIn, tokenOut, amountIn, amountOutMinimum, recipient, fee = 3000) {
     try {
       console.log('🔨 Building approve and swap batch:', {
         tokenIn,
@@ -358,12 +385,8 @@ export class UniswapV3Service {
 
       const config = this.getConfig()
 
-      // Build approve calldata for tokenIn
-      const tokenContract = new ethers.Contract(tokenIn, ERC20_ABI, this.provider)
-      const approveCalldata = tokenContract.interface.encodeFunctionData('approve', [
-        config.swapRouter,
-        amountIn,
-      ])
+      // Check existing allowance
+      const allowance = await this.checkAllowance(tokenIn, recipient, config.swapRouter)
 
       // Build swap calldata
       const swapCalldata = this.buildSwapCalldata(
@@ -375,7 +398,40 @@ export class UniswapV3Service {
         fee
       )
 
-      // Return batch transaction
+      // If allowance is sufficient, skip approval
+      if (allowance >= amountIn) {
+        console.log('✅ Sufficient allowance, skipping approval:', {
+          allowance: allowance.toString(),
+          required: amountIn.toString(),
+        })
+
+        const batch = {
+          targets: [config.swapRouter],
+          values: [0n],
+          datas: [swapCalldata],
+        }
+
+        console.log('✅ Swap-only batch built (no approval needed):', {
+          targets: batch.targets,
+          values: batch.values.map(v => v.toString()),
+        })
+
+        return batch
+      }
+
+      // Allowance insufficient, include approval
+      console.log('⚠️ Insufficient allowance, including approval:', {
+        allowance: allowance.toString(),
+        required: amountIn.toString(),
+      })
+
+      const tokenContract = new ethers.Contract(tokenIn, ERC20_ABI, this.provider)
+      const approveCalldata = tokenContract.interface.encodeFunctionData('approve', [
+        config.swapRouter,
+        amountIn,
+      ])
+
+      // Return batch transaction with approval
       const batch = {
         targets: [tokenIn, config.swapRouter],
         values: [0n, 0n],

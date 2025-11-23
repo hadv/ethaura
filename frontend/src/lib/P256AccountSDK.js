@@ -637,8 +637,8 @@ export class P256AccountSDK {
       // Initialize Uniswap V3 service
       const uniswapService = new UniswapV3Service(this.provider, this.chainId)
 
-      // Build approve + swap batch transaction
-      const { targets, values, datas } = uniswapService.buildApproveAndSwap(
+      // Build approve + swap batch transaction (with allowance optimization)
+      const { targets, values, datas } = await uniswapService.buildApproveAndSwap(
         tokenIn,
         tokenOut,
         amountIn,
@@ -656,6 +656,7 @@ export class P256AccountSDK {
         amountIn: amountIn.toString(),
         amountOutMinimum: amountOutMinimum.toString(),
         fee,
+        batchSize: targets.length,
       })
 
       // Execute batch via P256Account
