@@ -1081,18 +1081,6 @@
   font-weight: 500;
 }
 
-.network-icon {
-  width: 24px;
-  height: 24px;
-  background: #3b82f6;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
-  font-size: 12px;
-}
-
 .address-info {
   font-family: 'Courier New', monospace;
 }
