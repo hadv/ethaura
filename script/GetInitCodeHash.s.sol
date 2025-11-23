@@ -16,10 +16,7 @@ contract GetInitCodeHashScript is Script {
 
     function run() external view {
         // Get the creation code (bytecode + constructor args)
-        bytes memory creationCode = abi.encodePacked(
-            type(P256AccountFactory).creationCode,
-            abi.encode(ENTRYPOINT_V07)
-        );
+        bytes memory creationCode = abi.encodePacked(type(P256AccountFactory).creationCode, abi.encode(ENTRYPOINT_V07));
 
         // Compute the keccak256 hash
         bytes32 initCodeHash = keccak256(creationCode);
