@@ -146,44 +146,84 @@ export class UniswapV3Service {
    */
   async calculatePriceImpact(tokenIn, tokenOut, amountIn, amountOut) {
     try {
-      // Get pool contract to fetch reserves
+      // Get token decimals
+      const getDecimals = async (tokenAddress) => {
+        const tokenContract = new ethers.Contract(
+          tokenAddress,
+          ['function decimals() view returns (uint8)'],
+          this.provider
+        )
+        return await tokenContract.decimals()
+      }
+
+      const [decimalsIn, decimalsOut] = await Promise.all([
+        getDecimals(tokenIn),
+        getDecimals(tokenOut)
+      ])
+
+      // Get pool contract to fetch current price
       const poolAddress = await this.getPoolAddress(tokenIn, tokenOut, 3000)
       const poolContract = new ethers.Contract(
         poolAddress,
         [
           'function slot0() external view returns (uint160 sqrtPriceX96, int24 tick, uint16 observationIndex, uint16 observationCardinality, uint16 observationCardinalityNext, uint8 feeProtocol, bool unlocked)',
-          'function liquidity() external view returns (uint128)',
+          'function token0() external view returns (address)',
+          'function token1() external view returns (address)',
         ],
         this.provider
       )
 
-      // Get current pool state
-      const [slot0, liquidity] = await Promise.all([
+      // Get current pool state and token order
+      const [slot0, token0Address] = await Promise.all([
         poolContract.slot0(),
-        poolContract.liquidity()
+        poolContract.token0()
       ])
 
       const sqrtPriceX96 = slot0[0]
 
-      // Calculate current price from sqrtPriceX96
+      // Determine if tokenIn is token0 or token1
+      const isToken0 = tokenIn.toLowerCase() === token0Address.toLowerCase()
+
+      // Calculate current pool price
+      // sqrtPriceX96 = sqrt(price) * 2^96
       // price = (sqrtPriceX96 / 2^96)^2
+      // This gives us token1/token0 price
       const Q96 = 2n ** 96n
-      const currentPrice = (sqrtPriceX96 * sqrtPriceX96 * (10n ** 18n)) / (Q96 * Q96)
+      let poolPrice = (sqrtPriceX96 * sqrtPriceX96) / (Q96 * Q96)
+
+      // Adjust for decimals: price in terms of token1 per token0
+      // poolPrice = (amount of token1 with decimals) / (amount of token0 with decimals)
+      const decimalAdjustment = 10n ** BigInt(decimalsOut - decimalsIn)
+      poolPrice = (poolPrice * decimalAdjustment) / (2n ** 96n)
+
+      // If tokenIn is token1, we need to invert the price
+      if (!isToken0) {
+        // Invert: we want tokenOut/tokenIn but pool gives token1/token0
+        // Since tokenIn is token1, we need token0/token1
+        poolPrice = (10n ** BigInt(decimalsIn + decimalsOut)) / poolPrice
+      }
 
       // Calculate execution price from the quote
-      // executionPrice = amountOut / amountIn
-      const executionPrice = (amountOut * (10n ** 18n)) / amountIn
+      // executionPrice = amountOut / amountIn (in same decimal terms)
+      const executionPrice = (amountOut * (10n ** BigInt(decimalsIn))) / amountIn
 
-      // Price impact = |1 - (executionPrice / currentPrice)| * 100
+      // Price impact = |1 - (executionPrice / poolPrice)| * 100
       let priceImpact = 0
-      if (currentPrice > 0n) {
-        const ratio = (executionPrice * 10000n) / currentPrice
+      if (poolPrice > 0n) {
+        const ratio = (executionPrice * 10000n) / poolPrice
         const diff = ratio > 10000n ? ratio - 10000n : 10000n - ratio
         priceImpact = Number(diff) / 100
       }
 
       console.log('📊 Price impact calculation:', {
-        currentPrice: currentPrice.toString(),
+        tokenIn,
+        tokenOut,
+        decimalsIn,
+        decimalsOut,
+        isToken0,
+        amountIn: amountIn.toString(),
+        amountOut: amountOut.toString(),
+        poolPrice: poolPrice.toString(),
         executionPrice: executionPrice.toString(),
         priceImpact: priceImpact.toFixed(2) + '%'
       })
@@ -191,8 +231,8 @@ export class UniswapV3Service {
       return priceImpact
     } catch (error) {
       console.warn('⚠️ Failed to calculate price impact, using fallback:', error.message)
-      // Fallback: estimate based on amount size
-      // For small amounts, assume low impact
+      // Fallback: estimate based on amount size relative to typical liquidity
+      // This is a rough estimate - actual impact depends on pool liquidity
       const amountInEth = Number(amountIn) / 1e18
       if (amountInEth < 0.1) return 0.1
       if (amountInEth < 1) return 0.5
