@@ -639,8 +639,8 @@ function SwapScreen({ wallet, onBack, onHome, onSettings, onLogout, onWalletChan
                         )}
                       </span>
                       <span className="quote-value">
-                        ~{gasEstimate.gasCostEth < 0.000001
-                          ? gasEstimate.gasCostEth.toExponential(2)
+                        ~{gasEstimate.gasCostEth < 0.00001
+                          ? gasEstimate.gasCostEth.toFixed(18).replace(/\.?0+$/, '')
                           : gasEstimate.gasCostEth.toFixed(6)} ETH
                         {gasEstimate.gasCostUsd && gasEstimate.gasCostUsd >= 0.01 && ` ($${gasEstimate.gasCostUsd.toFixed(2)})`}
                         {gasEstimate.gasCostUsd && gasEstimate.gasCostUsd < 0.01 && ` ($${gasEstimate.gasCostUsd.toFixed(4)})`}
