@@ -19,12 +19,14 @@ const UNISWAP_V3_CONFIG = {
   11155111: {
     swapRouter: '0x3bFA4769FB09eefC5a80d6E87c3B9C650f7Ae48E',
     quoter: '0xEd1f6473345F45b75F8179591dd5bA1888cf2FB3',
+    factory: '0x0227628f3F023bb0B980b67D528571c95c6DaC1c',
     weth: '0xfff9976782d46cc05630d1f6ebab18b2324d6b14',
   },
   // Ethereum Mainnet (chainId: 1)
   1: {
     swapRouter: '0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45',
     quoter: '0x61fFE014bA17989E743c5F6cB21bF9697530B21e',
+    factory: '0x1F98431c8aD98523631AE4a59f267346ea31F984',
     weth: '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2',
   },
 }
@@ -36,23 +38,29 @@ export class UniswapV3Service {
   constructor(provider, chainId) {
     this.provider = provider
     this.chainId = chainId
-    
+
     // Get network configuration
     const config = this.getConfig()
-    
+
     // Initialize contract instances
     this.swapRouter = new ethers.Contract(
       config.swapRouter,
       UNISWAP_V3_SWAP_ROUTER_ABI,
       provider
     )
-    
+
     this.quoter = new ethers.Contract(
       config.quoter,
       UNISWAP_V3_QUOTER_V2_ABI,
       provider
     )
-    
+
+    this.factory = new ethers.Contract(
+      config.factory,
+      ['function getPool(address tokenA, address tokenB, uint24 fee) external view returns (address pool)'],
+      provider
+    )
+
     this.weth = new ethers.Contract(
       config.weth,
       WETH_ABI,
@@ -66,15 +74,32 @@ export class UniswapV3Service {
    */
   getConfig() {
     const config = UNISWAP_V3_CONFIG[this.chainId]
-    
+
     if (!config) {
       throw new Error(
         `Uniswap V3 not supported on chainId ${this.chainId}. ` +
         `Supported networks: ${Object.keys(UNISWAP_V3_CONFIG).join(', ')}`
       )
     }
-    
+
     return config
+  }
+
+  /**
+   * Get pool address for a token pair
+   * @param {string} tokenA - First token address
+   * @param {string} tokenB - Second token address
+   * @param {number} fee - Pool fee tier (default: 3000 = 0.3%)
+   * @returns {Promise<string>} Pool address
+   */
+  async getPoolAddress(tokenA, tokenB, fee = 3000) {
+    const poolAddress = await this.factory.getPool(tokenA, tokenB, fee)
+
+    if (poolAddress === ethers.ZeroAddress) {
+      throw new Error(`No pool found for ${tokenA}/${tokenB} with fee ${fee}`)
+    }
+
+    return poolAddress
   }
 
   /**
