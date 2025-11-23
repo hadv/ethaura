@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Settings, AlertTriangle } from 'lucide-react'
+import { SlidersHorizontal, AlertTriangle } from 'lucide-react'
 import '../styles/SlippageSelector.css'
 
 const PRESET_SLIPPAGE = [
@@ -85,7 +85,7 @@ function SlippageSelector({ value, onChange, className = '' }) {
         onClick={() => setIsOpen(!isOpen)}
         title="Slippage Settings"
       >
-        <Settings size={18} />
+        <SlidersHorizontal size={18} />
         <span>{value}%</span>
       </button>
 
