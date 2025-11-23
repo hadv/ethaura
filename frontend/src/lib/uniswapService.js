@@ -145,13 +145,60 @@ export class UniswapV3Service {
    * @returns {Promise<number>} Price impact as percentage (e.g., 0.5 for 0.5%)
    */
   async calculatePriceImpact(tokenIn, tokenOut, amountIn, amountOut) {
-    // For now, return a simple calculation based on the quote
-    // In a production system, you would compare against oracle prices or pool reserves
-    // Price impact = (1 - (actualRate / expectedRate)) * 100
+    try {
+      // Get pool contract to fetch reserves
+      const poolAddress = await this.getPoolAddress(tokenIn, tokenOut, 3000)
+      const poolContract = new ethers.Contract(
+        poolAddress,
+        [
+          'function slot0() external view returns (uint160 sqrtPriceX96, int24 tick, uint16 observationIndex, uint16 observationCardinality, uint16 observationCardinalityNext, uint8 feeProtocol, bool unlocked)',
+          'function liquidity() external view returns (uint128)',
+        ],
+        this.provider
+      )
 
-    // Simple heuristic: if the swap is large relative to typical pool size, impact is higher
-    // This is a placeholder - real implementation would query pool reserves
-    return 0.0 // Placeholder - will be improved in Phase 4
+      // Get current pool state
+      const [slot0, liquidity] = await Promise.all([
+        poolContract.slot0(),
+        poolContract.liquidity()
+      ])
+
+      const sqrtPriceX96 = slot0[0]
+
+      // Calculate current price from sqrtPriceX96
+      // price = (sqrtPriceX96 / 2^96)^2
+      const Q96 = 2n ** 96n
+      const currentPrice = (sqrtPriceX96 * sqrtPriceX96 * (10n ** 18n)) / (Q96 * Q96)
+
+      // Calculate execution price from the quote
+      // executionPrice = amountOut / amountIn
+      const executionPrice = (amountOut * (10n ** 18n)) / amountIn
+
+      // Price impact = |1 - (executionPrice / currentPrice)| * 100
+      let priceImpact = 0
+      if (currentPrice > 0n) {
+        const ratio = (executionPrice * 10000n) / currentPrice
+        const diff = ratio > 10000n ? ratio - 10000n : 10000n - ratio
+        priceImpact = Number(diff) / 100
+      }
+
+      console.log('📊 Price impact calculation:', {
+        currentPrice: currentPrice.toString(),
+        executionPrice: executionPrice.toString(),
+        priceImpact: priceImpact.toFixed(2) + '%'
+      })
+
+      return priceImpact
+    } catch (error) {
+      console.warn('⚠️ Failed to calculate price impact, using fallback:', error.message)
+      // Fallback: estimate based on amount size
+      // For small amounts, assume low impact
+      const amountInEth = Number(amountIn) / 1e18
+      if (amountInEth < 0.1) return 0.1
+      if (amountInEth < 1) return 0.5
+      if (amountInEth < 10) return 2.0
+      return 5.0
+    }
   }
 
   /**

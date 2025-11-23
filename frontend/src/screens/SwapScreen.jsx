@@ -12,6 +12,8 @@ import Header from '../components/Header'
 import SubHeader from '../components/SubHeader'
 import TokenSelector from '../components/TokenSelector'
 import SlippageSelector from '../components/SlippageSelector'
+import PriceImpactWarning from '../components/PriceImpactWarning'
+import PriceImpactConfirmModal from '../components/PriceImpactConfirmModal'
 import '../styles/SwapScreen.css'
 
 function SwapScreen({ wallet, onBack, onHome, onSettings, onLogout, onWalletChange, credential }) {
@@ -40,6 +42,9 @@ function SwapScreen({ wallet, onBack, onHome, onSettings, onLogout, onWalletChan
 
   // Settings
   const [slippage, setSlippage] = useState(0.5) // 0.5% default
+
+  // Price impact confirmation
+  const [showPriceImpactModal, setShowPriceImpactModal] = useState(false)
 
   // Token balances
   const [tokenBalances, setTokenBalances] = useState({})
@@ -220,11 +225,34 @@ function SwapScreen({ wallet, onBack, onHome, onSettings, onLogout, onWalletChan
     }
   }
 
+  // Handle swap button click - check price impact first
+  const handleSwapClick = () => {
+    if (!quote) return
+
+    // Block swap if price impact > 15%
+    if (quote.priceImpact > 15) {
+      setSwapError('Price impact too high (>15%). Swap blocked for your protection.')
+      return
+    }
+
+    // Show confirmation modal if price impact > 5%
+    if (quote.priceImpact > 5) {
+      setShowPriceImpactModal(true)
+      return
+    }
+
+    // Execute swap directly if price impact <= 5%
+    handleSwap()
+  }
+
   // Handle swap execution
   const handleSwap = async () => {
     if (!sdk || !selectedWallet || !tokenIn || !tokenOut || !amountIn || !quote) {
       return
     }
+
+    // Close modal if open
+    setShowPriceImpactModal(false)
 
     setSwapping(true)
     setSwapError('')
@@ -344,6 +372,9 @@ function SwapScreen({ wallet, onBack, onHome, onSettings, onLogout, onWalletChan
     if (!tokenIn || !tokenOut || !amountIn || parseFloat(amountIn) <= 0) return true
     if (!quote || quoteLoading) return true
     if (swapping) return true
+
+    // Block if price impact > 15%
+    if (quote && quote.priceImpact > 15) return true
 
     // Check balance
     const balance = tokenIn === 'ETH'
@@ -499,37 +530,42 @@ function SwapScreen({ wallet, onBack, onHome, onSettings, onLogout, onWalletChan
 
             {/* Quote Details */}
             {quote && tokenIn && tokenOut && !quoteError && (
-              <div className="quote-details">
-                <div className="quote-row">
-                  <span className="quote-label">Rate</span>
-                  <span className="quote-value">
-                    1 {tokenIn === 'ETH' ? 'ETH' : tokenIn.symbol} ≈{' '}
-                    {(
-                      parseFloat(ethers.formatUnits(quote.amountOut, tokenOut === 'ETH' ? 18 : tokenOut.decimals)) /
-                      parseFloat(amountIn)
-                    ).toFixed(6)}{' '}
-                    {tokenOut === 'ETH' ? 'ETH' : tokenOut.symbol}
-                  </span>
+              <>
+                <div className="quote-details">
+                  <div className="quote-row">
+                    <span className="quote-label">Rate</span>
+                    <span className="quote-value">
+                      1 {tokenIn === 'ETH' ? 'ETH' : tokenIn.symbol} ≈{' '}
+                      {(
+                        parseFloat(ethers.formatUnits(quote.amountOut, tokenOut === 'ETH' ? 18 : tokenOut.decimals)) /
+                        parseFloat(amountIn)
+                      ).toFixed(6)}{' '}
+                      {tokenOut === 'ETH' ? 'ETH' : tokenOut.symbol}
+                    </span>
+                  </div>
+                  <div className="quote-row">
+                    <span className="quote-label">Price Impact</span>
+                    <PriceImpactWarning priceImpact={quote.priceImpact} compact={true} />
+                  </div>
+                  <div className="quote-row">
+                    <span className="quote-label">Minimum Received</span>
+                    <span className="quote-value">
+                      {parseFloat(ethers.formatUnits(
+                        new UniswapV3Service(sdk.provider, sdk.chainId).calculateMinimumOutput(quote.amountOut, slippage),
+                        tokenOut === 'ETH' ? 18 : tokenOut.decimals
+                      )).toFixed(6)}{' '}
+                      {tokenOut === 'ETH' ? 'ETH' : tokenOut.symbol}
+                    </span>
+                  </div>
+                  <div className="quote-row">
+                    <span className="quote-label">Slippage Tolerance</span>
+                    <span className="quote-value">{slippage}%</span>
+                  </div>
                 </div>
-                <div className="quote-row">
-                  <span className="quote-label">Price Impact</span>
-                  <span className="quote-value">{quote.priceImpact.toFixed(2)}%</span>
-                </div>
-                <div className="quote-row">
-                  <span className="quote-label">Minimum Received</span>
-                  <span className="quote-value">
-                    {parseFloat(ethers.formatUnits(
-                      new UniswapV3Service(sdk.provider, sdk.chainId).calculateMinimumOutput(quote.amountOut, slippage),
-                      tokenOut === 'ETH' ? 18 : tokenOut.decimals
-                    )).toFixed(6)}{' '}
-                    {tokenOut === 'ETH' ? 'ETH' : tokenOut.symbol}
-                  </span>
-                </div>
-                <div className="quote-row">
-                  <span className="quote-label">Slippage Tolerance</span>
-                  <span className="quote-value">{slippage}%</span>
-                </div>
-              </div>
+
+                {/* Price Impact Warning Banner */}
+                <PriceImpactWarning priceImpact={quote.priceImpact} />
+              </>
             )}
 
             {/* Quote Error */}
@@ -558,7 +594,7 @@ function SwapScreen({ wallet, onBack, onHome, onSettings, onLogout, onWalletChan
             {/* Swap Button */}
             <button
               className="swap-button"
-              onClick={handleSwap}
+              onClick={handleSwapClick}
               disabled={isSwapDisabled()}
             >
               {swapping && <Loader className="button-loader" size={20} />}
@@ -612,6 +648,22 @@ function SwapScreen({ wallet, onBack, onHome, onSettings, onLogout, onWalletChan
         )}
       </div>
     </div>
+
+    {/* Price Impact Confirmation Modal */}
+    {showPriceImpactModal && quote && tokenIn && tokenOut && (
+      <PriceImpactConfirmModal
+        priceImpact={quote.priceImpact}
+        tokenIn={tokenIn === 'ETH' ? 'ETH' : tokenIn.symbol}
+        tokenOut={tokenOut === 'ETH' ? 'ETH' : tokenOut.symbol}
+        amountIn={amountIn}
+        amountOut={parseFloat(ethers.formatUnits(
+          quote.amountOut,
+          tokenOut === 'ETH' ? 18 : tokenOut.decimals
+        )).toFixed(6)}
+        onConfirm={handleSwap}
+        onCancel={() => setShowPriceImpactModal(false)}
+      />
+    )}
     </div>
   )
 }
