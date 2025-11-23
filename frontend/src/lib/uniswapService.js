@@ -211,52 +211,50 @@ export class UniswapV3Service {
 
       // Calculate pool price: token1/token0
       // sqrtPriceX96 = sqrt(price) * 2^96
-      // price = (sqrtPriceX96 / 2^96)^2 = sqrtPriceX96^2 / 2^192
+      // price = (sqrtPriceX96 / 2^96)^2
       const Q96 = 2n ** 96n
-      const Q192 = Q96 * Q96
-
-      // Pool price in raw terms (token1/token0) without decimal adjustment
-      // We need to be careful with precision here
-      let poolPriceRaw = (sqrtPriceX96 * sqrtPriceX96) / Q192
-
-      // Now adjust for decimals
-      // If token0 has 18 decimals and token1 has 6 decimals:
-      // poolPriceRaw gives us (token1_raw / token0_raw)
-      // We want (token1_human / token0_human) = (token1_raw/10^6) / (token0_raw/10^18)
-      //                                        = (token1_raw * 10^18) / (token0_raw * 10^6)
-      //                                        = poolPriceRaw * 10^(18-6)
 
       // Get decimals for token0 and token1 (not tokenIn/tokenOut)
       const decimals0 = isToken0 ? decimalsIn : decimalsOut
       const decimals1 = isToken0 ? decimalsOut : decimalsIn
 
-      // Adjust pool price for decimals: multiply by 10^(decimals0 - decimals1)
-      const decimalAdjustment = 10n ** BigInt(decimals0 - decimals1)
-      const poolPriceAdjusted = poolPriceRaw * decimalAdjustment
+      // Calculate price with proper decimal adjustment
+      // price = (sqrtPriceX96^2 * 10^decimals0) / (2^192 * 10^decimals1)
+      // This gives us the price in human-readable terms: token1/token0
+      const numerator = sqrtPriceX96 * sqrtPriceX96 * (10n ** decimals0)
+      const denominator = Q96 * Q96 * (10n ** decimals1)
+      const poolPriceToken1PerToken0 = numerator / denominator
 
-      // Now we have pool price as token1/token0 in human-readable terms
-      // We need tokenOut/tokenIn
+      // Now we need tokenOut/tokenIn
       let poolPrice
       if (isToken0) {
         // tokenIn = token0, tokenOut = token1
         // We want token1/token0, which is what we have
-        poolPrice = poolPriceAdjusted
+        poolPrice = poolPriceToken1PerToken0
       } else {
         // tokenIn = token1, tokenOut = token0
         // We want token0/token1, need to invert
-        // Invert with proper scaling
-        const scale = 10n ** 36n // Use high precision for inversion
-        poolPrice = (scale * scale) / poolPriceAdjusted
+        // Use high precision for inversion to avoid zero
+        if (poolPriceToken1PerToken0 === 0n) {
+          throw new Error('Pool price is zero, cannot calculate price impact')
+        }
+        const scale = 10n ** 18n
+        poolPrice = (scale * scale) / poolPriceToken1PerToken0
       }
 
       // Calculate execution price from the quote: amountOut / amountIn
-      // Scale to same precision as poolPrice for comparison
-      const scale = 10n ** 18n
-      const executionPrice = (amountOut * scale) / amountIn
+      // amountOut is in raw units (e.g., 54631345 for PYUSD with 6 decimals)
+      // amountIn is in raw units (e.g., 20000000000000000000 for LINK with 18 decimals)
+      // We need to adjust for decimals to get human-readable price
+      // executionPrice = (amountOut / 10^decimalsOut) / (amountIn / 10^decimalsIn)
+      //                = (amountOut * 10^decimalsIn) / (amountIn * 10^decimalsOut)
+      const executionPriceNumerator = amountOut * (10n ** decimalsIn)
+      const executionPriceDenominator = amountIn * (10n ** decimalsOut)
+      const executionPrice = executionPriceNumerator / executionPriceDenominator
 
       // Price impact = |1 - (executionPrice / poolPrice)| * 100
       let priceImpact = 0
-      if (poolPrice > 0n) {
+      if (poolPrice > 0n && executionPrice > 0n) {
         const ratio = (executionPrice * 10000n) / poolPrice
         const diff = ratio > 10000n ? ratio - 10000n : 10000n - ratio
         priceImpact = Number(diff) / 100
