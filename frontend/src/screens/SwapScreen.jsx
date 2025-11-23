@@ -249,6 +249,7 @@ function SwapScreen({ wallet, onBack, onHome, onSettings, onLogout, onWalletChan
         gasPrice: gasPrice.toString(),
         gasPriceGwei,
         gasPriceDisplay,
+        gasLimit: gasLimit.toString(),
       })
 
       console.log('💰 Gas estimate:', {
@@ -458,6 +459,15 @@ function SwapScreen({ wallet, onBack, onHome, onSettings, onLogout, onWalletChan
     const amountInTrimmed = parseFloat(amountIn).toFixed(decimals)
     const amountInWei = ethers.parseUnits(amountInTrimmed, decimals)
 
+    console.log('🔍 Balance check:', {
+      tokenSymbol: tokenIn === 'ETH' ? 'ETH' : tokenIn.symbol,
+      balance: balance.toString(),
+      balanceFormatted: ethers.formatUnits(balance, decimals),
+      amountIn,
+      amountInWei: amountInWei.toString(),
+      insufficient: amountInWei > balance,
+    })
+
     // Check if insufficient balance
     if (amountInWei > balance) {
       const tokenSymbol = tokenIn === 'ETH' ? 'ETH' : tokenIn.symbol
@@ -471,31 +481,65 @@ function SwapScreen({ wallet, onBack, onHome, onSettings, onLogout, onWalletChan
 
     // Check ETH balance for gas fees
     const ethBalance = tokenBalances['ETH']
-    if (ethBalance && gasEstimate) {
-      const gasCostWei = BigInt(gasEstimate.gasPrice) * BigInt(quote?.gasEstimate || 100000n)
+    if (ethBalance && gasEstimate && gasEstimate.gasLimit) {
+      // Calculate gas cost in wei using stored gasLimit and gasPrice
+      const gasCostWei = BigInt(gasEstimate.gasLimit) * BigInt(gasEstimate.gasPrice)
+
+      console.log('⛽ Gas check:', {
+        ethBalance: ethBalance.toString(),
+        ethBalanceFormatted: ethers.formatEther(ethBalance),
+        gasLimit: gasEstimate.gasLimit,
+        gasPrice: gasEstimate.gasPrice,
+        gasCostWei: gasCostWei.toString(),
+        gasCostEth: ethers.formatEther(gasCostWei),
+        isSwappingETH: tokenIn === 'ETH',
+      })
 
       // If swapping ETH, need balance for both swap amount and gas
       if (tokenIn === 'ETH') {
         const totalNeeded = amountInWei + gasCostWei
+        console.log('⛽ ETH swap check:', {
+          amountInWei: amountInWei.toString(),
+          gasCostWei: gasCostWei.toString(),
+          totalNeeded: totalNeeded.toString(),
+          ethBalance: ethBalance.toString(),
+          insufficient: totalNeeded > ethBalance,
+        })
         if (totalNeeded > ethBalance) {
-          const gasCostEth = ethers.formatEther(gasCostWei)
-          const totalNeededEth = ethers.formatEther(totalNeeded)
-          const currentEth = ethers.formatEther(ethBalance)
+          const gasCostEth = parseFloat(ethers.formatEther(gasCostWei))
+          const totalNeededEth = parseFloat(ethers.formatEther(totalNeeded))
+          const currentEth = parseFloat(ethers.formatEther(ethBalance))
+
+          // Use more decimals for small amounts (up to 8 decimals for gas)
+          const gasCostFormatted = gasCostEth < 0.0001 ? gasCostEth.toFixed(8) : gasCostEth.toFixed(6)
+          const totalNeededFormatted = totalNeededEth < 0.0001 ? totalNeededEth.toFixed(8) : totalNeededEth.toFixed(6)
+          const currentFormatted = currentEth < 0.0001 ? currentEth.toFixed(8) : currentEth.toFixed(6)
+
           setLowEthWarning({
-            gasCost: parseFloat(gasCostEth).toFixed(6),
-            totalNeeded: parseFloat(totalNeededEth).toFixed(6),
-            current: parseFloat(currentEth).toFixed(6),
+            gasCost: gasCostFormatted,
+            totalNeeded: totalNeededFormatted,
+            current: currentFormatted,
           })
         }
       } else {
         // If swapping ERC-20, just need ETH for gas
+        console.log('⛽ ERC-20 swap check:', {
+          gasCostWei: gasCostWei.toString(),
+          ethBalance: ethBalance.toString(),
+          insufficient: gasCostWei > ethBalance,
+        })
         if (gasCostWei > ethBalance) {
-          const gasCostEth = ethers.formatEther(gasCostWei)
-          const currentEth = ethers.formatEther(ethBalance)
+          const gasCostEth = parseFloat(ethers.formatEther(gasCostWei))
+          const currentEth = parseFloat(ethers.formatEther(ethBalance))
+
+          // Use more decimals for small amounts (up to 8 decimals for gas)
+          const gasCostFormatted = gasCostEth < 0.0001 ? gasCostEth.toFixed(8) : gasCostEth.toFixed(6)
+          const currentFormatted = currentEth < 0.0001 ? currentEth.toFixed(8) : currentEth.toFixed(6)
+
           setLowEthWarning({
-            gasCost: parseFloat(gasCostEth).toFixed(6),
-            totalNeeded: parseFloat(gasCostEth).toFixed(6),
-            current: parseFloat(currentEth).toFixed(6),
+            gasCost: gasCostFormatted,
+            totalNeeded: gasCostFormatted,
+            current: currentFormatted,
           })
         }
       }
