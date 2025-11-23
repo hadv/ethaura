@@ -172,7 +172,9 @@ function SwapScreen({ wallet, onBack, onHome, onSettings, onLogout, onWalletChan
 
       // Parse amount based on token decimals
       const decimals = tokenIn === 'ETH' ? 18 : tokenIn.decimals
-      const amountInWei = ethers.parseUnits(amountIn, decimals)
+      // Limit decimal places to token's decimals to avoid parseUnits error
+      const amountInTrimmed = parseFloat(amountIn).toFixed(decimals)
+      const amountInWei = ethers.parseUnits(amountInTrimmed, decimals)
 
       // Get token addresses
       const tokenInAddress = tokenIn === 'ETH' ? uniswapService.getConfig().weth : tokenIn.address
@@ -261,7 +263,9 @@ function SwapScreen({ wallet, onBack, onHome, onSettings, onLogout, onWalletChan
     try {
       // Parse amount
       const decimals = tokenIn === 'ETH' ? 18 : tokenIn.decimals
-      const amountInWei = ethers.parseUnits(amountIn, decimals)
+      // Limit decimal places to token's decimals to avoid parseUnits error
+      const amountInTrimmed = parseFloat(amountIn).toFixed(decimals)
+      const amountInWei = ethers.parseUnits(amountInTrimmed, decimals)
 
       // Calculate minimum output with slippage
       const uniswapService = new UniswapV3Service(sdk.provider, sdk.chainId)
@@ -384,7 +388,10 @@ function SwapScreen({ wallet, onBack, onHome, onSettings, onLogout, onWalletChan
     if (!balance) return true
 
     const decimals = tokenIn === 'ETH' ? 18 : tokenIn.decimals
-    const amountInWei = ethers.parseUnits(amountIn, decimals)
+
+    // Limit decimal places to token's decimals to avoid parseUnits error
+    const amountInTrimmed = parseFloat(amountIn).toFixed(decimals)
+    const amountInWei = ethers.parseUnits(amountInTrimmed, decimals)
 
     return amountInWei > balance
   }
@@ -403,7 +410,9 @@ function SwapScreen({ wallet, onBack, onHome, onSettings, onLogout, onWalletChan
 
     if (balance) {
       const decimals = tokenIn === 'ETH' ? 18 : tokenIn.decimals
-      const amountInWei = ethers.parseUnits(amountIn, decimals)
+      // Limit decimal places to token's decimals to avoid parseUnits error
+      const amountInTrimmed = parseFloat(amountIn).toFixed(decimals)
+      const amountInWei = ethers.parseUnits(amountInTrimmed, decimals)
       if (amountInWei > balance) return 'Insufficient balance'
     }
 
