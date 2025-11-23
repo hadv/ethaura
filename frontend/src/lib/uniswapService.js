@@ -184,28 +184,50 @@ export class UniswapV3Service {
       // Determine if tokenIn is token0 or token1
       const isToken0 = tokenIn.toLowerCase() === token0Address.toLowerCase()
 
-      // Calculate current pool price
+      // Calculate pool price: token1/token0
       // sqrtPriceX96 = sqrt(price) * 2^96
-      // price = (sqrtPriceX96 / 2^96)^2
-      // This gives us token1/token0 price
+      // price = (sqrtPriceX96 / 2^96)^2 = sqrtPriceX96^2 / 2^192
       const Q96 = 2n ** 96n
-      let poolPrice = (sqrtPriceX96 * sqrtPriceX96) / (Q96 * Q96)
+      const Q192 = Q96 * Q96
 
-      // Adjust for decimals: price in terms of token1 per token0
-      // poolPrice = (amount of token1 with decimals) / (amount of token0 with decimals)
-      const decimalAdjustment = 10n ** BigInt(decimalsOut - decimalsIn)
-      poolPrice = (poolPrice * decimalAdjustment) / (2n ** 96n)
+      // Pool price in raw terms (token1/token0) without decimal adjustment
+      // We need to be careful with precision here
+      let poolPriceRaw = (sqrtPriceX96 * sqrtPriceX96) / Q192
 
-      // If tokenIn is token1, we need to invert the price
-      if (!isToken0) {
-        // Invert: we want tokenOut/tokenIn but pool gives token1/token0
-        // Since tokenIn is token1, we need token0/token1
-        poolPrice = (10n ** BigInt(decimalsIn + decimalsOut)) / poolPrice
+      // Now adjust for decimals
+      // If token0 has 18 decimals and token1 has 6 decimals:
+      // poolPriceRaw gives us (token1_raw / token0_raw)
+      // We want (token1_human / token0_human) = (token1_raw/10^6) / (token0_raw/10^18)
+      //                                        = (token1_raw * 10^18) / (token0_raw * 10^6)
+      //                                        = poolPriceRaw * 10^(18-6)
+
+      // Get decimals for token0 and token1 (not tokenIn/tokenOut)
+      const decimals0 = isToken0 ? decimalsIn : decimalsOut
+      const decimals1 = isToken0 ? decimalsOut : decimalsIn
+
+      // Adjust pool price for decimals: multiply by 10^(decimals0 - decimals1)
+      const decimalAdjustment = 10n ** BigInt(decimals0 - decimals1)
+      const poolPriceAdjusted = poolPriceRaw * decimalAdjustment
+
+      // Now we have pool price as token1/token0 in human-readable terms
+      // We need tokenOut/tokenIn
+      let poolPrice
+      if (isToken0) {
+        // tokenIn = token0, tokenOut = token1
+        // We want token1/token0, which is what we have
+        poolPrice = poolPriceAdjusted
+      } else {
+        // tokenIn = token1, tokenOut = token0
+        // We want token0/token1, need to invert
+        // Invert with proper scaling
+        const scale = 10n ** 36n // Use high precision for inversion
+        poolPrice = (scale * scale) / poolPriceAdjusted
       }
 
-      // Calculate execution price from the quote
-      // executionPrice = amountOut / amountIn (in same decimal terms)
-      const executionPrice = (amountOut * (10n ** BigInt(decimalsIn))) / amountIn
+      // Calculate execution price from the quote: amountOut / amountIn
+      // Scale to same precision as poolPrice for comparison
+      const scale = 10n ** 18n
+      const executionPrice = (amountOut * scale) / amountIn
 
       // Price impact = |1 - (executionPrice / poolPrice)| * 100
       let priceImpact = 0
@@ -218,13 +240,16 @@ export class UniswapV3Service {
       console.log('📊 Price impact calculation:', {
         tokenIn,
         tokenOut,
+        token0: token0Address,
         decimalsIn,
         decimalsOut,
         isToken0,
+        sqrtPriceX96: sqrtPriceX96.toString(),
         amountIn: amountIn.toString(),
         amountOut: amountOut.toString(),
         poolPrice: poolPrice.toString(),
         executionPrice: executionPrice.toString(),
+        ratio: poolPrice > 0n ? ((executionPrice * 10000n) / poolPrice).toString() : '0',
         priceImpact: priceImpact.toFixed(2) + '%'
       })
 
