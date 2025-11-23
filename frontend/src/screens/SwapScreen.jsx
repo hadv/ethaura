@@ -51,6 +51,9 @@ function SwapScreen({ wallet, onBack, onHome, onSettings, onLogout, onWalletChan
   const [tokenPrices, setTokenPrices] = useState({})
   const [balancesLoading, setBalancesLoading] = useState(false)
 
+  // Gas estimation
+  const [gasEstimate, setGasEstimate] = useState(null) // { gasCostEth, gasCostUsd, gasPrice }
+
   // Debounce timer for quote fetching
   const quoteTimerRef = useRef(null)
 
@@ -188,11 +191,72 @@ function SwapScreen({ wallet, onBack, onHome, onSettings, onLogout, onWalletChan
       )
 
       setQuote(quoteResult)
+
+      // Calculate gas cost
+      await calculateGasCost(quoteResult.gasEstimate)
     } catch (error) {
       console.error('Failed to fetch quote:', error)
       setQuoteError('Failed to fetch quote. Please try again.')
+      setGasEstimate(null)
     } finally {
       setQuoteLoading(false)
+    }
+  }
+
+  // Calculate gas cost in ETH and USD
+  const calculateGasCost = async (gasLimit) => {
+    if (!sdk || !gasLimit) {
+      setGasEstimate(null)
+      return
+    }
+
+    try {
+      // Get current gas price from network
+      const feeData = await sdk.provider.getFeeData()
+      const gasPrice = feeData.gasPrice || feeData.maxFeePerGas
+
+      if (!gasPrice) {
+        console.warn('⚠️ Could not fetch gas price')
+        setGasEstimate(null)
+        return
+      }
+
+      // Calculate total gas cost in wei
+      const gasCostWei = gasLimit * gasPrice
+
+      // Convert to ETH
+      const gasCostEth = ethers.formatEther(gasCostWei)
+
+      // Get ETH price in USD
+      const ethPrice = await priceOracle.getPrice('ETH')
+      const gasCostUsd = ethPrice ? parseFloat(gasCostEth) * ethPrice : null
+
+      // Convert gas price to Gwei for display
+      const gasPriceGwei = parseFloat(ethers.formatUnits(gasPrice, 'gwei'))
+
+      // Use Wei for very low gas prices (< 0.01 Gwei), otherwise use Gwei
+      const gasPriceDisplay = gasPriceGwei < 0.01
+        ? { value: Number(gasPrice), unit: 'Wei' }
+        : { value: gasPriceGwei, unit: 'Gwei' }
+
+      setGasEstimate({
+        gasCostEth: parseFloat(gasCostEth),
+        gasCostUsd,
+        gasPrice: gasPrice.toString(),
+        gasPriceGwei,
+        gasPriceDisplay,
+      })
+
+      console.log('💰 Gas estimate:', {
+        gasLimit: gasLimit.toString(),
+        gasPrice: gasPrice.toString(),
+        gasPriceDisplay: `${gasPriceDisplay.value.toLocaleString()} ${gasPriceDisplay.unit}`,
+        gasCostEth,
+        gasCostUsd: gasCostUsd ? `$${gasCostUsd.toFixed(4)}` : 'N/A',
+      })
+    } catch (error) {
+      console.error('Failed to calculate gas cost:', error)
+      setGasEstimate(null)
     }
   }
 
@@ -570,7 +634,50 @@ function SwapScreen({ wallet, onBack, onHome, onSettings, onLogout, onWalletChan
                     <span className="quote-label">Slippage Tolerance</span>
                     <span className="quote-value">{slippage}%</span>
                   </div>
+                  {gasEstimate && (
+                    <div className="quote-row">
+                      <span className="quote-label">
+                        Network Fee
+                        {gasEstimate.gasPriceDisplay && (
+                          <span style={{ fontSize: '0.75rem', color: '#9ca3af', marginLeft: '0.25rem' }}>
+                            ({gasEstimate.gasPriceDisplay.value.toLocaleString(undefined, {
+                              minimumFractionDigits: 0,
+                              maximumFractionDigits: gasEstimate.gasPriceDisplay.unit === 'Gwei' ? 2 : 0
+                            })} {gasEstimate.gasPriceDisplay.unit})
+                          </span>
+                        )}
+                      </span>
+                      <span className="quote-value">
+                        ~{gasEstimate.gasCostEth < 0.00001
+                          ? gasEstimate.gasCostEth.toFixed(18).replace(/\.?0+$/, '')
+                          : gasEstimate.gasCostEth.toFixed(6)} ETH
+                        {gasEstimate.gasCostUsd && gasEstimate.gasCostUsd >= 0.01 && ` ($${gasEstimate.gasCostUsd.toFixed(2)})`}
+                        {gasEstimate.gasCostUsd && gasEstimate.gasCostUsd < 0.01 && ` ($${gasEstimate.gasCostUsd.toFixed(4)})`}
+                      </span>
+                    </div>
+                  )}
                 </div>
+
+                {/* Gas Cost Warning - if gas > 10% of swap value */}
+                {gasEstimate && gasEstimate.gasCostUsd && tokenPrices[tokenIn === 'ETH' ? 'ETH' : tokenIn.symbol] && (
+                  (() => {
+                    const swapValueUsd = parseFloat(amountIn) * tokenPrices[tokenIn === 'ETH' ? 'ETH' : tokenIn.symbol]
+                    const gasPercentage = (gasEstimate.gasCostUsd / swapValueUsd) * 100
+
+                    if (gasPercentage > 10) {
+                      return (
+                        <div className="gas-warning">
+                          <AlertCircle size={16} />
+                          <span>
+                            Network fee is {gasPercentage.toFixed(1)}% of swap value.
+                            Consider swapping a larger amount to reduce relative cost.
+                          </span>
+                        </div>
+                      )
+                    }
+                    return null
+                  })()
+                )}
 
                 {/* Price Impact Warning Banner */}
                 <PriceImpactWarning priceImpact={quote.priceImpact} />
