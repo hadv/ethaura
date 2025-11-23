@@ -234,17 +234,23 @@ function SwapScreen({ wallet, onBack, onHome, onSettings, onLogout, onWalletChan
       // Convert gas price to Gwei for display
       const gasPriceGwei = parseFloat(ethers.formatUnits(gasPrice, 'gwei'))
 
+      // Use Wei for very low gas prices (< 0.01 Gwei), otherwise use Gwei
+      const gasPriceDisplay = gasPriceGwei < 0.01
+        ? { value: Number(gasPrice), unit: 'Wei' }
+        : { value: gasPriceGwei, unit: 'Gwei' }
+
       setGasEstimate({
         gasCostEth: parseFloat(gasCostEth),
         gasCostUsd,
         gasPrice: gasPrice.toString(),
         gasPriceGwei,
+        gasPriceDisplay,
       })
 
       console.log('💰 Gas estimate:', {
         gasLimit: gasLimit.toString(),
         gasPrice: gasPrice.toString(),
-        gasPriceGwei: gasPriceGwei.toFixed(2) + ' Gwei',
+        gasPriceDisplay: `${gasPriceDisplay.value.toLocaleString()} ${gasPriceDisplay.unit}`,
         gasCostEth,
         gasCostUsd: gasCostUsd ? `$${gasCostUsd.toFixed(4)}` : 'N/A',
       })
@@ -632,9 +638,12 @@ function SwapScreen({ wallet, onBack, onHome, onSettings, onLogout, onWalletChan
                     <div className="quote-row">
                       <span className="quote-label">
                         Network Fee
-                        {gasEstimate.gasPriceGwei && (
+                        {gasEstimate.gasPriceDisplay && (
                           <span style={{ fontSize: '0.75rem', color: '#9ca3af', marginLeft: '0.25rem' }}>
-                            ({gasEstimate.gasPriceGwei.toFixed(2)} Gwei)
+                            ({gasEstimate.gasPriceDisplay.value.toLocaleString(undefined, {
+                              minimumFractionDigits: 0,
+                              maximumFractionDigits: gasEstimate.gasPriceDisplay.unit === 'Gwei' ? 2 : 0
+                            })} {gasEstimate.gasPriceDisplay.unit})
                           </span>
                         )}
                       </span>
