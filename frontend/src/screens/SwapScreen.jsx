@@ -11,6 +11,7 @@ import { ethers } from 'ethers'
 import Header from '../components/Header'
 import SubHeader from '../components/SubHeader'
 import TokenSelector from '../components/TokenSelector'
+import SlippageSelector from '../components/SlippageSelector'
 import '../styles/SwapScreen.css'
 
 function SwapScreen({ wallet, onBack, onHome, onSettings, onLogout, onWalletChange, credential }) {
@@ -39,7 +40,6 @@ function SwapScreen({ wallet, onBack, onHome, onSettings, onLogout, onWalletChan
 
   // Settings
   const [slippage, setSlippage] = useState(0.5) // 0.5% default
-  const [showSlippageSettings, setShowSlippageSettings] = useState(false)
 
   // Token balances
   const [tokenBalances, setTokenBalances] = useState({})
@@ -400,6 +400,11 @@ function SwapScreen({ wallet, onBack, onHome, onSettings, onLogout, onWalletChan
       {/* Main Content */}
       <div className="swap-content-wrapper">
         <div className="swap-main">
+          {/* Settings Bar */}
+          <div className="swap-settings-bar">
+            <SlippageSelector value={slippage} onChange={setSlippage} />
+          </div>
+
           {/* Swap Form Card */}
           <div className="swap-form-card">
             {/* Token In Section */}
