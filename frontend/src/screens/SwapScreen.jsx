@@ -510,15 +510,11 @@ function SwapScreen({ wallet, onBack, onHome, onSettings, onLogout, onWalletChan
           const totalNeededEth = parseFloat(ethers.formatEther(totalNeeded))
           const currentEth = parseFloat(ethers.formatEther(ethBalance))
 
-          // Use more decimals for small amounts (up to 8 decimals for gas)
-          const gasCostFormatted = gasCostEth < 0.0001 ? gasCostEth.toFixed(8) : gasCostEth.toFixed(6)
-          const totalNeededFormatted = totalNeededEth < 0.0001 ? totalNeededEth.toFixed(8) : totalNeededEth.toFixed(6)
-          const currentFormatted = currentEth < 0.0001 ? currentEth.toFixed(8) : currentEth.toFixed(6)
-
+          // Use 8 decimals for all ETH amounts to show precise differences
           setLowEthWarning({
-            gasCost: gasCostFormatted,
-            totalNeeded: totalNeededFormatted,
-            current: currentFormatted,
+            gasCost: gasCostEth.toFixed(8),
+            totalNeeded: totalNeededEth.toFixed(8),
+            current: currentEth.toFixed(8),
           })
         }
       } else {
@@ -532,14 +528,11 @@ function SwapScreen({ wallet, onBack, onHome, onSettings, onLogout, onWalletChan
           const gasCostEth = parseFloat(ethers.formatEther(gasCostWei))
           const currentEth = parseFloat(ethers.formatEther(ethBalance))
 
-          // Use more decimals for small amounts (up to 8 decimals for gas)
-          const gasCostFormatted = gasCostEth < 0.0001 ? gasCostEth.toFixed(8) : gasCostEth.toFixed(6)
-          const currentFormatted = currentEth < 0.0001 ? currentEth.toFixed(8) : currentEth.toFixed(6)
-
+          // Use 8 decimals for all ETH amounts to show precise differences
           setLowEthWarning({
-            gasCost: gasCostFormatted,
-            totalNeeded: gasCostFormatted,
-            current: currentFormatted,
+            gasCost: gasCostEth.toFixed(8),
+            totalNeeded: gasCostEth.toFixed(8),
+            current: currentEth.toFixed(8),
           })
         }
       }
