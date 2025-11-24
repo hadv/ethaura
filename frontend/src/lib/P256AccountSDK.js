@@ -223,6 +223,104 @@ export class P256AccountSDK {
     })
   }
 
+  /*//////////////////////////////////////////////////////////////
+                      PASSKEY MANAGEMENT
+  //////////////////////////////////////////////////////////////*/
+
+  /**
+   * Add a new passkey to the account
+   * @param {Object} params - Parameters
+   * @param {string} params.accountAddress - P256Account address
+   * @param {string} params.qx - Passkey X coordinate (bytes32)
+   * @param {string} params.qy - Passkey Y coordinate (bytes32)
+   * @param {string} params.deviceId - Device identifier (bytes32, e.g., "iPhone 15")
+   * @param {Object} params.passkeyCredential - Passkey credential for signing
+   * @param {Function} params.signWithPasskey - Function to sign with passkey
+   * @param {string} params.ownerSignature - Owner signature (for 2FA, optional)
+   * @returns {Promise<Object>} UserOperation receipt
+   */
+  async addPasskey({
+    accountAddress,
+    qx,
+    qy,
+    deviceId,
+    passkeyCredential,
+    signWithPasskey,
+    ownerSignature = null,
+  }) {
+    // Encode addPasskey call
+    const accountContract = this.accountManager.getAccountContract(accountAddress)
+    const data = accountContract.interface.encodeFunctionData('addPasskey', [qx, qy, deviceId])
+
+    return await this.executeCall({
+      accountAddress,
+      targetAddress: accountAddress,
+      value: 0n,
+      data,
+      passkeyCredential,
+      signWithPasskey,
+      ownerSignature,
+      needsDeployment: false,
+      initCode: '0x',
+    })
+  }
+
+  /**
+   * Remove a passkey from the account
+   * @param {Object} params - Parameters
+   * @param {string} params.accountAddress - P256Account address
+   * @param {string} params.qx - Passkey X coordinate (bytes32)
+   * @param {string} params.qy - Passkey Y coordinate (bytes32)
+   * @param {Object} params.passkeyCredential - Passkey credential for signing
+   * @param {Function} params.signWithPasskey - Function to sign with passkey
+   * @param {string} params.ownerSignature - Owner signature (for 2FA, optional)
+   * @returns {Promise<Object>} UserOperation receipt
+   */
+  async removePasskey({
+    accountAddress,
+    qx,
+    qy,
+    passkeyCredential,
+    signWithPasskey,
+    ownerSignature = null,
+  }) {
+    // Encode removePasskey call
+    const accountContract = this.accountManager.getAccountContract(accountAddress)
+    const data = accountContract.interface.encodeFunctionData('removePasskey', [qx, qy])
+
+    return await this.executeCall({
+      accountAddress,
+      targetAddress: accountAddress,
+      value: 0n,
+      data,
+      passkeyCredential,
+      signWithPasskey,
+      ownerSignature,
+      needsDeployment: false,
+      initCode: '0x',
+    })
+  }
+
+  /**
+   * Get all passkeys for an account (paginated)
+   * @param {string} accountAddress - P256Account address
+   * @param {number} offset - Starting index (default: 0)
+   * @param {number} limit - Maximum number to return (default: 50)
+   * @returns {Promise<Object>} Passkeys data
+   */
+  async getPasskeys(accountAddress, offset = 0, limit = 50) {
+    return await this.accountManager.getPasskeys(accountAddress, offset, limit)
+  }
+
+  /**
+   * Get active passkey count
+   * @param {string} accountAddress - P256Account address
+   * @returns {Promise<number>} Number of active passkeys
+   */
+  async getActivePasskeyCount(accountAddress) {
+    return await this.accountManager.getActivePasskeyCount(accountAddress)
+  }
+
   /**
    * Get pending recovery requests for an account
    * @param {string} accountAddress - P256Account address
