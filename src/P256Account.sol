@@ -492,8 +492,7 @@ contract P256Account is IAccount, IERC1271, Ownable, Initializable {
         require(!twoFactorEnabled, "2FA already enabled");
 
         // Check for at least one ACTIVE passkey
-        uint256 activeCount = _getActivePasskeyCount();
-        require(activeCount > 0, "Active passkey required for 2FA");
+        require(passkeyIds.length > 0, "Active passkey required for 2FA");
 
         twoFactorEnabled = true;
         emit TwoFactorEnabled(owner());
@@ -549,8 +548,7 @@ contract P256Account is IAccount, IERC1271, Ownable, Initializable {
         if (!passkeys[passkeyId].active) revert PasskeyNotActive();
 
         // Prevent removing last passkey when 2FA is enabled
-        uint256 activeCount = _getActivePasskeyCount();
-        if (activeCount <= 1 && twoFactorEnabled) revert CannotRemoveLastPasskey();
+        if (passkeyIds.length <= 1 && twoFactorEnabled) revert CannotRemoveLastPasskey();
 
         PasskeyInfo storage passkeyInfo = passkeys[passkeyId];
 
@@ -581,15 +579,6 @@ contract P256Account is IAccount, IERC1271, Ownable, Initializable {
         passkeyIds.push(passkeyId);
 
         emit PasskeyAdded(passkeyId, _qx, _qy, block.timestamp);
-    }
-
-    /**
-     * @notice Get the count of active passkeys
-     * @return count The number of active passkeys
-     * @dev Gas optimized: passkeyIds only contains active passkeys
-     */
-    function _getActivePasskeyCount() internal view returns (uint256 count) {
-        return passkeyIds.length;
     }
 
     /**
@@ -873,19 +862,12 @@ contract P256Account is IAccount, IERC1271, Ownable, Initializable {
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @notice Get the total number of passkeys (active and inactive)
-     * @return The total count of passkeys
-     */
-    function getPasskeyCount() external view returns (uint256) {
-        return passkeyIds.length;
-    }
-
-    /**
      * @notice Get the number of active passkeys
      * @return The count of active passkeys
+     * @dev passkeyIds array only contains active passkeys
      */
     function getActivePasskeyCount() external view returns (uint256) {
-        return _getActivePasskeyCount();
+        return passkeyIds.length;
     }
 
     /**

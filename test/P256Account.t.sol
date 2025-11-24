@@ -50,7 +50,7 @@ contract P256AccountTest is Test {
 
     function test_Initialization() public view {
         // Verify first passkey
-        assertEq(account.getPasskeyCount(), 1, "Should have 1 passkey");
+        assertEq(account.getActivePasskeyCount(), 1, "Should have 1 passkey");
         bytes32 passkeyId = account.passkeyIds(0);
         (bytes32 storedQx, bytes32 storedQy,,,) = account.passkeys(passkeyId);
         assertEq(storedQx, qx, "QX mismatch");
@@ -73,7 +73,7 @@ contract P256AccountTest is Test {
         P256Account account2 = factory.createAccount(qx, qy, owner, 1, false, bytes32("Device 2"));
 
         // Verify first passkey
-        assertEq(account2.getPasskeyCount(), 1, "Should have 1 passkey");
+        assertEq(account2.getActivePasskeyCount(), 1, "Should have 1 passkey");
         bytes32 passkeyId = account2.passkeyIds(0);
         (bytes32 storedQx, bytes32 storedQy,,,) = account2.passkeys(passkeyId);
         assertEq(storedQx, qx, "QX mismatch");
@@ -90,7 +90,7 @@ contract P256AccountTest is Test {
         P256Account ownerOnlyAccount = factory.createAccount(bytes32(0), bytes32(0), owner, 2, false, bytes32(0));
 
         // Verify no passkeys
-        assertEq(ownerOnlyAccount.getPasskeyCount(), 0, "Should have 0 passkeys");
+        assertEq(ownerOnlyAccount.getActivePasskeyCount(), 0, "Should have 0 passkeys");
 
         assertEq(ownerOnlyAccount.owner(), owner, "Owner mismatch");
 
@@ -706,7 +706,7 @@ contract P256AccountTest is Test {
         }
 
         // Total should be 6 (1 initial + 5 added)
-        assertEq(account.getPasskeyCount(), 6, "Should have 6 passkeys");
+        assertEq(account.getActivePasskeyCount(), 6, "Should have 6 passkeys");
 
         // Test pagination: get first 3
         (
@@ -770,5 +770,4 @@ contract P256AccountTest is Test {
         // Note: The actual cap of 50 is enforced in the contract
         // If we had 100 passkeys and requested 100, we'd only get 50
     }
-
 }
