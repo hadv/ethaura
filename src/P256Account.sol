@@ -477,12 +477,10 @@ contract P256Account is IAccount, IERC1271, Ownable, Initializable {
     /**
      * @notice Verify a signature according to EIP-1271
      * @param hash The hash of the data to verify
-     * @param signature The signature to verify
+     * @param signature The signature to verify (r || s || passkeyId - 96 bytes)
      * @return magicValue The EIP-1271 magic value if valid
-     * @dev Supports two formats:
-     *      1. Legacy: r(32) || s(32) - 64 bytes (checks all passkeys for backward compatibility)
-     *      2. Optimized: r(32) || s(32) || passkeyId(32) - 96 bytes (O(1) lookup)
-     *      GAS OPTIMIZATION: Use 96-byte format with passkeyId to avoid looping
+     * @dev Signature format: r(32) || s(32) || passkeyId(32) - 96 bytes
+     *      The passkeyId enables O(1) lookup instead of iterating through all passkeys
      */
     function isValidSignature(bytes32 hash, bytes calldata signature)
         external
@@ -490,7 +488,7 @@ contract P256Account is IAccount, IERC1271, Ownable, Initializable {
         override
         returns (bytes4 magicValue)
     {
-        if (signature.length != 64 && signature.length != 96) {
+        if (signature.length != 96) {
             revert InvalidSignatureLength();
         }
 
@@ -504,25 +502,14 @@ contract P256Account is IAccount, IERC1271, Ownable, Initializable {
         // Use SHA-256 for consistency with validateUserOp
         bytes32 messageHash = sha256(abi.encodePacked(hash));
 
+        // Extract passkeyId from signature
+        bytes32 passkeyId = bytes32(signature[64:96]);
+        PasskeyInfo storage passkeyInfo = passkeys[passkeyId];
+
+        // SECURITY: Verify passkey exists and is active
         bool isValid = false;
-
-        // Optimized format: r || s || passkeyId (96 bytes)
-        if (signature.length == 96) {
-            bytes32 passkeyId = bytes32(signature[64:96]);
-            PasskeyInfo storage passkeyInfo = passkeys[passkeyId];
-
-            // SECURITY: Verify passkey exists and is active
-            if (passkeyInfo.active && passkeyInfo.qx != bytes32(0)) {
-                isValid = P256.verifySignature(messageHash, r, s, passkeyInfo.qx, passkeyInfo.qy);
-            }
-        } else {
-            // Legacy format: r || s (64 bytes) - check all passkeys
-            for (uint256 i = 0; i < passkeyIds.length && !isValid; i++) {
-                PasskeyInfo storage passkeyInfo = passkeys[passkeyIds[i]];
-                if (passkeyInfo.active) {
-                    isValid = P256.verifySignature(messageHash, r, s, passkeyInfo.qx, passkeyInfo.qy);
-                }
-            }
+        if (passkeyInfo.active && passkeyInfo.qx != bytes32(0)) {
+            isValid = P256.verifySignature(messageHash, r, s, passkeyInfo.qx, passkeyInfo.qy);
         }
 
         return isValid ? MAGICVALUE : bytes4(0);
