@@ -11,17 +11,18 @@
       "note": "Pre-deployed EntryPoint v0.7 (canonical address)"
     },
     "P256AccountFactory": {
-      "address": "0x000000B5d8bDF5f7c208Ad680c7C6B17cd986291",
-      "deploymentTx": "PENDING",
-      "blockNumber": "PENDING",
-      "gasUsed": "~4059182 (estimated)",
-      "gasCost": "~0.004 ETH (estimated)",
-      "salt": "0xbfae1974f681bad305d92efe0f7441e1577e78371b463bb9abc8a16c6ca16fe3",
+      "address": "0x000000C825FF71C29c18ec467A5e8c0edBab247d",
+      "deploymentTx": "0x24b9d35d3470ca37ea6623baff9234c307f9c6602880739e9d7a1d90ee98fab4",
+      "blockNumber": "CONFIRMED",
+      "gasUsed": "6050587",
+      "gasCost": "~0.006 ETH",
+      "salt": "0x18ee4c040568238643c07e7afd6c53efc196d26b313a4205a4bba75f1e0587da",
       "initCodeHash": "0x4e04c34fcd41071105645138364629f261a28c528dc14756a91f6b41fef6f0f3",
-      "note": "Vanity address with 0x000000 prefix - requires --legacy flag for deployment"
+      "create2Factory": "0x0000000000FFe8B47B3e2130213B802212439497",
+      "note": "Vanity address with 0x000000 prefix - deployed via Solady's CREATE2 factory"
     },
     "P256Account": {
-      "address": "0x223A17300aB076795eeBC4DA3e803bDAD3DA86D8",
+      "address": "0xA5EB07c92c83220213bAb79766e510E1Df04b635",
       "note": "Implementation contract (deployed by factory constructor)"
     },
     "SoladyERC1967Factory": {
@@ -30,9 +31,9 @@
     }
   },
   "explorer": {
-    "factory": "https://sepolia.etherscan.io/address/0x000000B5d8bDF5f7c208Ad680c7C6B17cd986291",
-    "implementation": "PENDING",
-    "deploymentTx": "PENDING"
+    "factory": "https://sepolia.etherscan.io/address/0x000000C825FF71C29c18ec467A5e8c0edBab247d",
+    "implementation": "https://sepolia.etherscan.io/address/0xA5EB07c92c83220213bAb79766e510E1Df04b635",
+    "deploymentTx": "https://sepolia.etherscan.io/tx/0x24b9d35d3470ca37ea6623baff9234c307f9c6602880739e9d7a1d90ee98fab4"
   },
   "rpc": {
     "public": "https://rpc.sepolia.org",

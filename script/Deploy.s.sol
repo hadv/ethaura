@@ -23,12 +23,16 @@ contract DeployScript is Script {
     // EntryPoint v0.7 address (same on all networks)
     address constant ENTRYPOINT_V07 = 0x0000000071727De22E5E9d8BAf0edAc6f37da032;
 
+    // Solady's canonical CREATE2 factory (deployed on all major chains)
+    address constant SOLADY_CREATE2_FACTORY = 0x0000000000FFe8B47B3e2130213B802212439497;
+
     // Salt for CREATE2 deployment (vanity salt for 0x000000 prefix)
     // IMPORTANT: Use the SAME salt on ALL networks to get the same factory address
-    // This salt produces factory address: 0x000000B5d8bDF5f7c208Ad680c7C6B17cd986291
+    // First 20 bytes must match deployer address (0x18Ee4C040568238643C07e7aFd6c53efc196D26b) for Solady factory
+    // This salt produces factory address: 0x000000c825ff71c29c18ec467a5e8c0edbab247d
     // Init code hash: 0x4e04c34fcd41071105645138364629f261a28c528dc14756a91f6b41fef6f0f3
     // NOTE: Must use --legacy flag when deploying to get this address
-    bytes32 constant SALT = 0xbfae1974f681bad305d92efe0f7441e1577e78371b463bb9abc8a16c6ca16fe3;
+    bytes32 constant SALT = 0x18ee4c040568238643c07e7afd6c53efc196d26b313a4205a4bba75f1e0587da;
 
     function run() external {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
@@ -40,11 +44,12 @@ contract DeployScript is Script {
             abi.encode(ENTRYPOINT_V07)
         );
 
-        // Calculate init code hash
-        bytes32 initCodeHash = keccak256(creationCode);
+        // Use hardcoded init code hash (compiled with --legacy flag)
+        // This must match the actual bytecode that will be deployed
+        bytes32 initCodeHash = 0x4e04c34fcd41071105645138364629f261a28c528dc14756a91f6b41fef6f0f3;
 
-        // Calculate expected address using CREATE2 formula
-        address expectedAddress = computeCreate2Address(deployer, SALT, initCodeHash);
+        // Calculate expected address using CREATE2 formula with Solady factory
+        address expectedAddress = computeCreate2Address(SOLADY_CREATE2_FACTORY, SALT, initCodeHash);
 
         console2.log("=== CREATE2 Deployment ===");
         console2.log("Deployer:", deployer);
@@ -56,30 +61,17 @@ contract DeployScript is Script {
 
         vm.startBroadcast(deployerPrivateKey);
 
-        // Deploy using raw CREATE2 opcode
-        address factoryAddress;
-        assembly {
-            factoryAddress := create2(
-                0,                              // value (0 ETH)
-                add(creationCode, 0x20),        // pointer to code (skip length prefix)
-                mload(creationCode),            // code length
-                SALT                            // salt
-            )
-        }
+        // Deploy using Solady's CREATE2 factory
+        // Call safeCreate2(bytes32 salt, bytes memory initializationCode)
+        (bool success, bytes memory returnData) = SOLADY_CREATE2_FACTORY.call{value: 0}(
+            abi.encodeWithSignature("safeCreate2(bytes32,bytes)", SALT, creationCode)
+        );
 
-        // Note: In Foundry simulation, the address may differ due to Foundry's CREATE2 deployer
-        // The actual on-chain deployment will use the correct address
-        if (factoryAddress == address(0)) {
-            console2.log("WARNING: CREATE2 returned zero address (likely collision in simulation)");
-            console2.log("This is expected if you're redeploying with the same salt");
-            console2.log("On-chain deployment will succeed at:", expectedAddress);
-            // Use expected address for logging purposes
-            factoryAddress = expectedAddress;
-        } else if (factoryAddress != expectedAddress) {
-            console2.log("WARNING: Simulated address differs from expected (Foundry quirk)");
-            console2.log("Simulated:", factoryAddress);
-            console2.log("On-chain will be:", expectedAddress);
-        }
+        require(success, "Solady CREATE2 factory deployment failed");
+
+        address factoryAddress = abi.decode(returnData, (address));
+
+        require(factoryAddress == expectedAddress, "Deployed address mismatch");
 
         // Try to get implementation address (may fail in simulation if using expected address)
         P256AccountFactory factory = P256AccountFactory(factoryAddress);
