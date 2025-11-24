@@ -85,7 +85,8 @@ contract P256AccountFactory {
         }
 
         // Deploy ERC-1967 proxy using Solady's factory with CREATE2
-        // Salt is based ONLY on owner and salt to make address independent of passkey/2FA
+        // Salt includes owner, implementation, and salt to make address independent of passkey/2FA
+        // but dependent on contract version (implementation address)
         bytes32 finalSalt = _computeSalt(owner, salt);
 
         // Deploy proxy using Solady's factory
@@ -109,8 +110,9 @@ contract P256AccountFactory {
      * @param owner The owner address for the account
      * @param salt A salt for CREATE2 deployment
      * @return The predicted proxy address
-     * @dev Address is calculated ONLY from owner and salt, NOT from passkey (qx, qy) or enable2FA
+     * @dev Address is calculated from owner, implementation address, and salt (NOT from passkey or enable2FA)
      * @dev This allows users to add/change passkey later without changing the account address
+     * @dev Including implementation ensures different contract versions get different addresses
      * @dev Uses Solady's ERC1967Factory.predictDeterministicAddress()
      */
     function getAddress(bytes32 qx, bytes32 qy, address owner, uint256 salt) public view returns (address) {
@@ -118,9 +120,10 @@ contract P256AccountFactory {
         // to ensure address is independent of passkey choice
         (qx, qy);
 
-        // IMPORTANT: Only use owner and salt for address calculation
+        // IMPORTANT: Use owner, implementation, and salt for address calculation
         // This allows the same address regardless of passkey choice or 2FA setting
         // Users can receive funds first, then decide on passkey/2FA later
+        // Different contract versions (implementations) will get different addresses
         bytes32 finalSalt = _computeSalt(owner, salt);
 
         // Use Solady's factory to predict the deterministic address
@@ -131,14 +134,17 @@ contract P256AccountFactory {
      * @notice Compute the final salt for CREATE2 deployment
      * @param owner The owner address
      * @param salt The user-provided salt
-     * @return The final salt (includes owner to prevent collisions)
+     * @return The final salt (includes owner and implementation address to prevent collisions)
      * @dev Solady's factory requires salt to start with caller address or zero address
      * @dev We use zero address prefix to allow anyone to deploy on behalf of users
-     * @dev Salt format: [20 bytes: zero address][12 bytes: hash of owner+salt]
+     * @dev Salt format: [20 bytes: zero address][12 bytes: hash of owner+implementation+salt]
+     * @dev Including implementation address ensures different contract versions get different addresses
+     * @dev This allows reusing the same salt (index) during development when contract code changes
      */
-    function _computeSalt(address owner, uint256 salt) internal pure returns (bytes32) {
-        // Combine owner and salt to create unique hash
-        bytes32 combinedSalt = keccak256(abi.encodePacked(owner, salt));
+    function _computeSalt(address owner, uint256 salt) internal view returns (bytes32) {
+        // Combine owner, implementation address, and salt to create unique hash
+        // Including implementation ensures different contract versions get different addresses
+        bytes32 combinedSalt = keccak256(abi.encodePacked(owner, address(IMPLEMENTATION), salt));
         // Keep only the last 96 bits (12 bytes) of the hash
         // The first 160 bits (20 bytes) will be zero, satisfying Solady's requirement
         return bytes32(uint256(combinedSalt) & ((1 << 96) - 1));

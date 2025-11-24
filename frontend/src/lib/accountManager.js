@@ -96,30 +96,40 @@ export class P256AccountManager {
 
   /**
    * Compute CREATE2 address locally to cross-check factory.getAddress
-   * IMPORTANT: Address is calculated ONLY from owner and salt, NOT from passkey (qx, qy)
-   * This allows users to add/change passkey later without changing the account address
+   * IMPORTANT: Address is calculated from owner, implementation address, and salt
+   * @deprecated This function is complex and error-prone. Use factory.getAddress() instead.
+   * @note The factory uses Solady's ERC1967Factory which deploys proxies, not P256Account directly
+   * @note The salt includes the implementation address, so different contract versions get different addresses
    */
   async computeLocalAddress(_qx, _qy, owner, salt = 0n) {
-    // IMPORTANT: Only use owner and salt for address calculation
-    // NOT including qx, qy to allow passkey changes without address changes
-    const finalSalt = ethers.solidityPackedKeccak256(
-      ['address', 'uint256'],
-      [owner, salt]
+    console.warn('⚠️ computeLocalAddress() is deprecated. This may not match factory.getAddress() if implementation changed.')
+
+    // Get implementation address from factory
+    const implementation = await this.factory.IMPLEMENTATION()
+
+    // Compute salt: keccak256(owner, implementation, salt) & ((1 << 96) - 1)
+    // This matches the factory's _computeSalt() function
+    const combinedSalt = ethers.solidityPackedKeccak256(
+      ['address', 'address', 'uint256'],
+      [owner, implementation, salt]
+    )
+    // Keep only last 96 bits (12 bytes) - first 160 bits (20 bytes) are zero
+    const mask = (1n << 96n) - 1n
+    const finalSalt = ethers.zeroPadValue(
+      ethers.toBeHex(BigInt(combinedSalt) & mask),
+      32
     )
 
-    // initCode = P256Account.creationCode ++ abi.encode(ENTRYPOINT)
-    const bytecode = (P256AccountArtifact?.bytecode?.object) || P256AccountArtifact?.bytecode || '0x'
-    const abiCoder = ethers.AbiCoder.defaultAbiCoder()
-    const constructorArgs = abiCoder.encode(['address'], [ENTRYPOINT_ADDRESS])
-    const initCode = ethers.concat([bytecode, constructorArgs])
-    const initCodeHash = ethers.keccak256(initCode)
+    // Get proxy initCodeHash from Solady's ERC1967Factory
+    // This is complex because we need the proxy's bytecode hash, not P256Account's
+    const proxyInitCodeHash = await this.factory.PROXY_FACTORY.initCodeHash()
 
-    // computeAddress = keccak256(0xff ++ factory ++ finalSalt ++ initCodeHash)[12:]
+    // computeAddress = keccak256(0xff ++ factory ++ finalSalt ++ proxyInitCodeHash)[12:]
     const data = ethers.concat([
       ethers.getBytes('0xff'),
       ethers.getBytes(this.factoryAddress),
       ethers.getBytes(finalSalt),
-      ethers.getBytes(initCodeHash),
+      ethers.getBytes(proxyInitCodeHash),
     ])
     const hash = ethers.keccak256(data)
     return ethers.getAddress('0x' + hash.slice(26))

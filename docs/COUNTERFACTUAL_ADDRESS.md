@@ -55,12 +55,18 @@
 <augment_code_snippet path="src/P256AccountFactory.sol" mode="EXCERPT">
 ```solidity
 function getAddress(bytes32 qx, bytes32 qy, address owner, uint256 salt) public view returns (address) {
-    // IMPORTANT: Only use owner and salt for address calculation
+    // Address is calculated from owner, implementation, and salt
     // This allows the same address regardless of passkey choice
-    bytes32 finalSalt = keccak256(abi.encodePacked(owner, salt));
-    return Create2.computeAddress(
-        finalSalt, keccak256(abi.encodePacked(type(P256Account).creationCode, abi.encode(ENTRYPOINT)))
-    );
+    // Different contract versions (implementations) get different addresses
+    bytes32 finalSalt = _computeSalt(owner, salt);
+    return PROXY_FACTORY.predictDeterministicAddress(finalSalt);
+}
+
+function _computeSalt(address owner, uint256 salt) internal view returns (bytes32) {
+    // Include implementation address so different contract versions get different addresses
+    bytes32 combinedSalt = keccak256(abi.encodePacked(owner, address(IMPLEMENTATION), salt));
+    // Keep only last 96 bits (Solady requirement)
+    return bytes32(uint256(combinedSalt) & ((1 << 96) - 1));
 }
 ```
 </augment_code_snippet>
@@ -68,14 +74,11 @@ function getAddress(bytes32 qx, bytes32 qy, address owner, uint256 salt) public 
 ### Frontend SDK
 
 ```javascript
-async computeLocalAddress(qx, qy, owner, salt = 0n) {
-  // IMPORTANT: Only use owner and salt for address calculation
-  const finalSalt = ethers.solidityPackedKeccak256(
-    ['address', 'uint256'],
-    [owner, salt]
-  )
-  
-  // ... rest of CREATE2 calculation
+async getAccountAddress(qx, qy, owner, salt = 0n) {
+  // Always use factory.getAddress() - it includes implementation address in salt
+  // This ensures different contract versions get different addresses
+  const address = await this.factory.getAddress(qx, qy, owner, salt)
+  return address
 }
 ```
 
