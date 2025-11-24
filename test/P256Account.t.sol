@@ -45,14 +45,14 @@ contract P256AccountTest is Test {
         factory = new P256AccountFactory(entryPoint);
 
         // Create account with 2FA enabled
-        account = factory.createAccount(qx, qy, owner, 0, true);
+        account = factory.createAccount(qx, qy, owner, 0, true, bytes32("Test Device"));
     }
 
     function test_Initialization() public view {
         // Verify first passkey
         assertEq(account.getPasskeyCount(), 1, "Should have 1 passkey");
         bytes32 passkeyId = account.passkeyIds(0);
-        (bytes32 storedQx, bytes32 storedQy,,) = account.passkeys(passkeyId);
+        (bytes32 storedQx, bytes32 storedQy,,,) = account.passkeys(passkeyId);
         assertEq(storedQx, qx, "QX mismatch");
         assertEq(storedQy, qy, "QY mismatch");
 
@@ -70,12 +70,12 @@ contract P256AccountTest is Test {
 
     function test_InitializationWithout2FA() public {
         // Create account without 2FA
-        P256Account account2 = factory.createAccount(qx, qy, owner, 1, false);
+        P256Account account2 = factory.createAccount(qx, qy, owner, 1, false, bytes32("Device 2"));
 
         // Verify first passkey
         assertEq(account2.getPasskeyCount(), 1, "Should have 1 passkey");
         bytes32 passkeyId = account2.passkeyIds(0);
-        (bytes32 storedQx, bytes32 storedQy,,) = account2.passkeys(passkeyId);
+        (bytes32 storedQx, bytes32 storedQy,,,) = account2.passkeys(passkeyId);
         assertEq(storedQx, qx, "QX mismatch");
         assertEq(storedQy, qy, "QY mismatch");
 
@@ -87,7 +87,7 @@ contract P256AccountTest is Test {
 
     function test_OwnerOnlyMode() public {
         // Create account in owner-only mode (no passkey)
-        P256Account ownerOnlyAccount = factory.createAccount(bytes32(0), bytes32(0), owner, 2, false);
+        P256Account ownerOnlyAccount = factory.createAccount(bytes32(0), bytes32(0), owner, 2, false, bytes32(0));
 
         // Verify no passkeys
         assertEq(ownerOnlyAccount.getPasskeyCount(), 0, "Should have 0 passkeys");
@@ -100,7 +100,7 @@ contract P256AccountTest is Test {
 
     function test_CannotEnable2FAWithoutPasskey() public {
         // Create account in owner-only mode
-        P256Account ownerOnlyAccount = factory.createAccount(bytes32(0), bytes32(0), owner, 3, false);
+        P256Account ownerOnlyAccount = factory.createAccount(bytes32(0), bytes32(0), owner, 3, false, bytes32(0));
 
         // Try to enable 2FA (should fail because no passkey)
         vm.prank(ENTRYPOINT_ADDR);
@@ -111,7 +111,7 @@ contract P256AccountTest is Test {
     function test_CannotReinitialize() public {
         // OpenZeppelin's Initializable uses InvalidInitialization() error
         vm.expectRevert(abi.encodeWithSignature("InvalidInitialization()"));
-        account.initialize(bytes32(uint256(1)), bytes32(uint256(2)), owner, true);
+        account.initialize(bytes32(uint256(1)), bytes32(uint256(2)), owner, true, bytes32("Device"));
     }
 
     function test_ProposePublicKeyUpdate() public {
@@ -124,7 +124,7 @@ contract P256AccountTest is Test {
         // Public key should not be added yet
         assertEq(account.getPasskeyCount(), 1, "Should still have 1 passkey");
         bytes32 passkeyId = account.passkeyIds(0);
-        (bytes32 storedQx, bytes32 storedQy,,) = account.passkeys(passkeyId);
+        (bytes32 storedQx, bytes32 storedQy,,,) = account.passkeys(passkeyId);
         assertEq(storedQx, qx, "QX should not be updated yet");
         assertEq(storedQy, qy, "QY should not be updated yet");
 
@@ -149,7 +149,7 @@ contract P256AccountTest is Test {
         // Verify new passkey was added
         assertEq(account.getPasskeyCount(), 2, "Should have 2 passkeys");
         bytes32 newPasskeyId = keccak256(abi.encodePacked(newQx, newQy));
-        (bytes32 storedQx, bytes32 storedQy, uint256 addedAt, bool active) = account.passkeys(newPasskeyId);
+        (bytes32 storedQx, bytes32 storedQy, uint256 addedAt, bool active,) = account.passkeys(newPasskeyId);
         assertEq(storedQx, newQx, "QX not updated");
         assertEq(storedQy, newQy, "QY not updated");
         assertTrue(active, "New passkey should be active");
@@ -367,18 +367,18 @@ contract P256AccountTest is Test {
 
     function test_CreateAccountIdempotent() public {
         // Creating account with same parameters should return existing account
-        P256Account account2 = factory.createAccount(qx, qy, owner, 0, true);
+        P256Account account2 = factory.createAccount(qx, qy, owner, 0, true, bytes32("Test Device"));
         assertEq(address(account2), address(account), "Should return same account");
     }
 
     function test_CreateAccountWithDifferentSalt() public {
         // Creating account with different salt should create new account
-        P256Account account2 = factory.createAccount(qx, qy, owner, 1, true);
+        P256Account account2 = factory.createAccount(qx, qy, owner, 1, true, bytes32("Test Device"));
         assertTrue(address(account2) != address(account), "Should create different account");
     }
 
     function test_GetInitCode() public view {
-        bytes memory initCode = factory.getInitCode(qx, qy, owner, 0, true);
+        bytes memory initCode = factory.getInitCode(qx, qy, owner, 0, true, bytes32("Test Device"));
 
         // InitCode should start with factory address
         address factoryAddr;
@@ -760,7 +760,7 @@ contract P256AccountTest is Test {
         // Verify account updated - old passkeys should be deactivated, new passkey added
         assertEq(account.getActivePasskeyCount(), 1, "Should have 1 active passkey");
         bytes32 newPasskeyId = keccak256(abi.encodePacked(newQx, newQy));
-        (bytes32 storedQx, bytes32 storedQy,, bool active) = account.passkeys(newPasskeyId);
+        (bytes32 storedQx, bytes32 storedQy,, bool active,) = account.passkeys(newPasskeyId);
         assertEq(storedQx, newQx, "QX not updated");
         assertEq(storedQy, newQy, "QY not updated");
         assertTrue(active, "New passkey should be active");
@@ -832,7 +832,7 @@ contract P256AccountTest is Test {
             testQy[i] = bytes32(uint256(qy) + i + 1);
 
             vm.prank(ENTRYPOINT_ADDR);
-            account.addPasskey(testQx[i], testQy[i]);
+            account.addPasskey(testQx[i], testQy[i], bytes32(abi.encodePacked("Device", i)));
         }
 
         // Total should be 6 (1 initial + 5 added)
@@ -845,6 +845,7 @@ contract P256AccountTest is Test {
             bytes32[] memory qyList1,
             uint256[] memory addedAt1,
             bool[] memory active1,
+            bytes32[] memory deviceIds1,
             uint256 total1
         ) = account.getPasskeys(0, 3);
 
@@ -861,9 +862,8 @@ contract P256AccountTest is Test {
         (
             bytes32[] memory ids2,
             bytes32[] memory qxList2,
-            bytes32[] memory qyList2,
-            ,
-            bool[] memory active2,
+            bytes32[] memory qyList2,,
+            bool[] memory active2,,
             uint256 total2
         ) = account.getPasskeys(3, 3);
 
@@ -877,27 +877,13 @@ contract P256AccountTest is Test {
         assertTrue(active2[0], "Added passkey should be active");
 
         // Test pagination: offset beyond total
-        (
-            bytes32[] memory ids3,
-            ,
-            ,
-            ,
-            ,
-            uint256 total3
-        ) = account.getPasskeys(10, 3);
+        (bytes32[] memory ids3,,,,,, uint256 total3) = account.getPasskeys(10, 3);
 
         assertEq(total3, 6, "Total should still be 6");
         assertEq(ids3.length, 0, "Should return empty array");
 
         // Test pagination: limit exceeds remaining
-        (
-            bytes32[] memory ids4,
-            ,
-            ,
-            ,
-            ,
-            uint256 total4
-        ) = account.getPasskeys(4, 10);
+        (bytes32[] memory ids4,,,,,, uint256 total4) = account.getPasskeys(4, 10);
 
         assertEq(total4, 6, "Total should still be 6");
         assertEq(ids4.length, 2, "Should return only 2 remaining passkeys");
@@ -905,14 +891,7 @@ contract P256AccountTest is Test {
 
     function test_GetPasskeysLimitCap() public {
         // The limit should be capped at 50 to prevent gas issues
-        (
-            bytes32[] memory ids,
-            ,
-            ,
-            ,
-            ,
-            uint256 total
-        ) = account.getPasskeys(0, 100);
+        (bytes32[] memory ids,,,,,, uint256 total) = account.getPasskeys(0, 100);
 
         // With only 1 passkey, should return 1
         assertEq(total, 1, "Total should be 1");

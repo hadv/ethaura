@@ -49,6 +49,7 @@ contract P256Account is IAccount, IERC1271, Ownable, Initializable {
         bytes32 qy; // Public key y-coordinate
         uint256 addedAt; // Timestamp when passkey was added
         bool active; // Whether the passkey is active
+        bytes32 deviceId; // Short device identifier (e.g., "iPhone 15", "YubiKey 5")
     }
 
     /// @notice Passkey storage by ID
@@ -218,12 +219,16 @@ contract P256Account is IAccount, IERC1271, Ownable, Initializable {
      * @param _qy The y-coordinate of the public key (can be 0 for owner-only mode)
      * @param _owner The owner of the account
      * @param _enable2FA Whether to enable two-factor authentication immediately
+     * @param _deviceId Short device identifier (e.g., "iPhone 15", "YubiKey 5")
      * @dev If _qx and _qy are both 0, the account operates in owner-only mode (no passkey)
      * @dev If _qx and _qy are set but _enable2FA is false, passkey can be used but 2FA is not required
      * @dev If _enable2FA is true, both _qx and _qy must be non-zero
      * @dev Uses Solady's Initializable to ensure this can only be called once per proxy
      */
-    function initialize(bytes32 _qx, bytes32 _qy, address _owner, bool _enable2FA) external initializer {
+    function initialize(bytes32 _qx, bytes32 _qy, address _owner, bool _enable2FA, bytes32 _deviceId)
+        external
+        initializer
+    {
         // If enabling 2FA, passkey must be provided
         if (_enable2FA) {
             require(_qx != bytes32(0) && _qy != bytes32(0), "2FA requires passkey");
@@ -231,7 +236,7 @@ contract P256Account is IAccount, IERC1271, Ownable, Initializable {
 
         // Add first passkey if provided
         if (_qx != bytes32(0) && _qy != bytes32(0)) {
-            _addPasskeyInternal(_qx, _qy);
+            _addPasskeyInternal(_qx, _qy, _deviceId);
         }
 
         _transferOwnership(_owner);
@@ -567,7 +572,7 @@ contract P256Account is IAccount, IERC1271, Ownable, Initializable {
         // Add as new passkey if not already exists
         bytes32 passkeyId = keccak256(abi.encodePacked(action.qx, action.qy));
         if (passkeys[passkeyId].qx == bytes32(0)) {
-            _addPasskeyInternal(action.qx, action.qy);
+            _addPasskeyInternal(action.qx, action.qy, bytes32(0)); // No device ID for legacy updates
         }
 
         // Remove from pending list
@@ -632,17 +637,18 @@ contract P256Account is IAccount, IERC1271, Ownable, Initializable {
      * @notice Add a new passkey to the account
      * @param _qx The x-coordinate of the new passkey
      * @param _qy The y-coordinate of the new passkey
+     * @param _deviceId Short device identifier (e.g., "iPhone 15", "YubiKey 5")
      * @dev SECURITY: Only callable via EntryPoint (requires existing passkey signature)
      * @dev Validates that coordinates are non-zero and passkey doesn't already exist
      */
-    function addPasskey(bytes32 _qx, bytes32 _qy) external {
+    function addPasskey(bytes32 _qx, bytes32 _qy, bytes32 _deviceId) external {
         if (msg.sender != address(ENTRYPOINT)) revert OnlyEntryPoint();
 
         // Validate coordinates
         if (_qx == bytes32(0) || _qy == bytes32(0)) revert InvalidPasskeyCoordinates();
 
         // Add passkey
-        _addPasskeyInternal(_qx, _qy);
+        _addPasskeyInternal(_qx, _qy, _deviceId);
     }
 
     /**
@@ -730,16 +736,18 @@ contract P256Account is IAccount, IERC1271, Ownable, Initializable {
      * @notice Internal function to add a passkey
      * @param _qx The x-coordinate of the passkey
      * @param _qy The y-coordinate of the passkey
+     * @param _deviceId Short device identifier (e.g., "iPhone 15", "YubiKey 5")
      * @dev Used by initialize() and addPasskey()
      */
-    function _addPasskeyInternal(bytes32 _qx, bytes32 _qy) internal {
+    function _addPasskeyInternal(bytes32 _qx, bytes32 _qy, bytes32 _deviceId) internal {
         bytes32 passkeyId = keccak256(abi.encodePacked(_qx, _qy));
 
         // Check if passkey already exists
         if (passkeys[passkeyId].qx != bytes32(0)) revert PasskeyAlreadyExists();
 
         // Add passkey
-        passkeys[passkeyId] = PasskeyInfo({qx: _qx, qy: _qy, addedAt: block.timestamp, active: true});
+        passkeys[passkeyId] =
+            PasskeyInfo({qx: _qx, qy: _qy, addedAt: block.timestamp, active: true, deviceId: _deviceId});
 
         passkeyIds.push(passkeyId);
 
@@ -933,7 +941,7 @@ contract P256Account is IAccount, IERC1271, Ownable, Initializable {
         }
 
         // Add the new recovery passkey
-        _addPasskeyInternal(request.newQx, request.newQy);
+        _addPasskeyInternal(request.newQx, request.newQy, bytes32(0)); // No device ID for recovery
 
         _transferOwnership(request.newOwner);
 
@@ -1071,6 +1079,7 @@ contract P256Account is IAccount, IERC1271, Ownable, Initializable {
      * @return qyList Array of y-coordinates
      * @return addedAtList Array of timestamps
      * @return activeList Array of active flags
+     * @return deviceIdList Array of device identifiers
      * @return total Total number of passkeys
      */
     function getPasskeys(uint256 offset, uint256 limit)
@@ -1082,6 +1091,7 @@ contract P256Account is IAccount, IERC1271, Ownable, Initializable {
             bytes32[] memory qyList,
             uint256[] memory addedAtList,
             bool[] memory activeList,
+            bytes32[] memory deviceIdList,
             uint256 total
         )
     {
@@ -1095,6 +1105,7 @@ contract P256Account is IAccount, IERC1271, Ownable, Initializable {
                 new bytes32[](0),
                 new uint256[](0),
                 new bool[](0),
+                new bytes32[](0),
                 total
             );
         }
@@ -1114,6 +1125,7 @@ contract P256Account is IAccount, IERC1271, Ownable, Initializable {
         qyList = new bytes32[](length);
         addedAtList = new uint256[](length);
         activeList = new bool[](length);
+        deviceIdList = new bytes32[](length);
 
         for (uint256 i = 0; i < length; i++) {
             bytes32 passkeyId = passkeyIds[offset + i];
@@ -1123,6 +1135,7 @@ contract P256Account is IAccount, IERC1271, Ownable, Initializable {
             qyList[i] = info.qy;
             addedAtList[i] = info.addedAt;
             activeList[i] = info.active;
+            deviceIdList[i] = info.deviceId;
         }
     }
 
@@ -1134,6 +1147,7 @@ contract P256Account is IAccount, IERC1271, Ownable, Initializable {
      * @return qyList Array of y-coordinates
      * @return addedAtList Array of timestamps
      * @return activeList Array of active flags
+     * @return deviceIdList Array of device identifiers
      */
     function getAllPasskeys()
         external
@@ -1143,7 +1157,8 @@ contract P256Account is IAccount, IERC1271, Ownable, Initializable {
             bytes32[] memory qxList,
             bytes32[] memory qyList,
             uint256[] memory addedAtList,
-            bool[] memory activeList
+            bool[] memory activeList,
+            bytes32[] memory deviceIdList
         )
     {
         uint256 length = passkeyIds.length;
@@ -1152,6 +1167,7 @@ contract P256Account is IAccount, IERC1271, Ownable, Initializable {
         qyList = new bytes32[](length);
         addedAtList = new uint256[](length);
         activeList = new bool[](length);
+        deviceIdList = new bytes32[](length);
 
         for (uint256 i = 0; i < length; i++) {
             bytes32 passkeyId = passkeyIds[i];
@@ -1161,6 +1177,7 @@ contract P256Account is IAccount, IERC1271, Ownable, Initializable {
             qyList[i] = info.qy;
             addedAtList[i] = info.addedAt;
             activeList[i] = info.active;
+            deviceIdList[i] = info.deviceId;
         }
     }
 

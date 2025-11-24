@@ -34,7 +34,7 @@ contract CreateAccountScript is Script {
         console2.log("Predicted account address:", predictedAddr);
 
         // Create account with 2FA enabled
-        P256Account account = factory.createAccount(qx, qy, owner, salt, true);
+        P256Account account = factory.createAccount(qx, qy, owner, salt, true, bytes32("My Device"));
 
         console2.log("=== Account Created ===");
         console2.log("Account address:", address(account));
