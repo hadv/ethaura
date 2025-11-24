@@ -594,12 +594,16 @@ contract P256Account is IAccount, IERC1271, Ownable, Initializable {
      * @notice Enable two-factor authentication
      * @dev When enabled, all transactions require both P-256 passkey signature and owner ECDSA signature
      * @dev Can only be called via UserOperation (passkey signature or owner signature)
-     * @dev Requires at least one passkey to be configured
+     * @dev Requires at least one active passkey to be configured
      */
     function enableTwoFactor() external {
         if (msg.sender != address(ENTRYPOINT)) revert OnlyEntryPoint();
         require(!twoFactorEnabled, "2FA already enabled");
-        require(passkeyIds.length > 0, "Passkey required for 2FA");
+
+        // Check for at least one ACTIVE passkey
+        uint256 activeCount = _getActivePasskeyCount();
+        require(activeCount > 0, "Active passkey required for 2FA");
+
         twoFactorEnabled = true;
         emit TwoFactorEnabled(owner());
     }
@@ -645,7 +649,7 @@ contract P256Account is IAccount, IERC1271, Ownable, Initializable {
      * @return actionHash The hash of the proposed removal action
      * @dev SECURITY: Only callable via EntryPoint (requires existing passkey signature)
      * @dev 24-hour timelock prevents malicious immediate removal
-     * @dev Cannot remove the last active passkey
+     * @dev Cannot remove the last active passkey when 2FA is enabled
      */
     function proposePasskeyRemoval(bytes32 _qx, bytes32 _qy) external returns (bytes32) {
         if (msg.sender != address(ENTRYPOINT)) revert OnlyEntryPoint();
@@ -655,9 +659,9 @@ contract P256Account is IAccount, IERC1271, Ownable, Initializable {
         // Verify passkey exists and is active
         if (!passkeys[passkeyId].active) revert PasskeyNotActive();
 
-        // Prevent removing last passkey
+        // Prevent removing last passkey when 2FA is enabled
         uint256 activeCount = _getActivePasskeyCount();
-        if (activeCount <= 1) revert CannotRemoveLastPasskey();
+        if (activeCount <= 1 && twoFactorEnabled) revert CannotRemoveLastPasskey();
 
         // Create action hash
         bytes32 actionHash = keccak256(abi.encode("removePasskey", passkeyId, block.timestamp));
@@ -686,9 +690,9 @@ contract P256Account is IAccount, IERC1271, Ownable, Initializable {
         if (removal.cancelled) revert ActionAlreadyCancelled();
         if (block.timestamp < removal.executeAfter) revert TimelockNotExpired();
 
-        // Double-check we're not removing the last passkey
+        // Double-check we're not removing the last passkey when 2FA is enabled
         uint256 activeCount = _getActivePasskeyCount();
-        if (activeCount <= 1) revert CannotRemoveLastPasskey();
+        if (activeCount <= 1 && twoFactorEnabled) revert CannotRemoveLastPasskey();
 
         removal.executed = true;
 
