@@ -693,27 +693,16 @@ contract P256AccountTest is Test {
     }
 
     function test_GetPasskeysPagination() public {
-        // Add multiple passkeys with timelock
+        // Add multiple passkeys
         bytes32[] memory testQx = new bytes32[](5);
         bytes32[] memory testQy = new bytes32[](5);
-        bytes32[] memory actionHashes = new bytes32[](5);
 
         for (uint256 i = 0; i < 5; i++) {
             testQx[i] = bytes32(uint256(qx) + i + 1);
             testQy[i] = bytes32(uint256(qy) + i + 1);
 
-            // Propose passkey addition
             vm.prank(ENTRYPOINT_ADDR);
-            actionHashes[i] =
-                account.proposePasskeyAddition(testQx[i], testQy[i], bytes32(abi.encodePacked("Device", i)));
-        }
-
-        // Fast forward past timelock (24 hours)
-        vm.warp(block.timestamp + 24 hours + 1);
-
-        // Execute all additions
-        for (uint256 i = 0; i < 5; i++) {
-            account.executePasskeyAddition(actionHashes[i]);
+            account.addPasskey(testQx[i], testQy[i], bytes32(abi.encodePacked("Device", i)));
         }
 
         // Total should be 6 (1 initial + 5 added)
@@ -782,135 +771,4 @@ contract P256AccountTest is Test {
         // If we had 100 passkeys and requested 100, we'd only get 50
     }
 
-    /*//////////////////////////////////////////////////////////////
-                      PASSKEY ADDITION TIMELOCK TESTS
-    //////////////////////////////////////////////////////////////*/
-
-    function test_ProposePasskeyAddition() public {
-        bytes32 newQx = bytes32(uint256(0x1111));
-        bytes32 newQy = bytes32(uint256(0x2222));
-        bytes32 deviceId = bytes32("New Device");
-
-        // Propose passkey addition
-        vm.prank(ENTRYPOINT_ADDR);
-        bytes32 actionHash = account.proposePasskeyAddition(newQx, newQy, deviceId);
-
-        // Verify action hash is not zero
-        assertTrue(actionHash != bytes32(0), "Action hash should not be zero");
-
-        // Verify pending addition exists
-        (
-            bytes32 storedQx,
-            bytes32 storedQy,
-            bytes32 storedDeviceId,
-            uint256 executeAfter,
-            bool executed,
-            bool cancelled
-        ) = account.pendingPasskeyAdditions(actionHash);
-        assertEq(storedQx, newQx, "QX mismatch");
-        assertEq(storedQy, newQy, "QY mismatch");
-        assertEq(storedDeviceId, deviceId, "Device ID mismatch");
-        assertEq(executeAfter, block.timestamp + 24 hours, "Execute after should be 24 hours from now");
-        assertFalse(executed, "Should not be executed yet");
-        assertFalse(cancelled, "Should not be cancelled");
-    }
-
-    function test_ExecutePasskeyAddition() public {
-        bytes32 newQx = bytes32(uint256(0x1111));
-        bytes32 newQy = bytes32(uint256(0x2222));
-        bytes32 deviceId = bytes32("New Device");
-
-        // Propose passkey addition
-        vm.prank(ENTRYPOINT_ADDR);
-        bytes32 actionHash = account.proposePasskeyAddition(newQx, newQy, deviceId);
-
-        // Fast forward past timelock
-        vm.warp(block.timestamp + 24 hours + 1);
-
-        // Execute addition
-        account.executePasskeyAddition(actionHash);
-
-        // Verify passkey was added
-        bytes32 passkeyId = keccak256(abi.encodePacked(newQx, newQy));
-        (bytes32 storedQx, bytes32 storedQy,, bool active,) = account.passkeys(passkeyId);
-        assertEq(storedQx, newQx, "QX mismatch");
-        assertEq(storedQy, newQy, "QY mismatch");
-        assertTrue(active, "Passkey should be active");
-
-        // Verify passkey count increased
-        assertEq(account.getPasskeyCount(), 2, "Should have 2 passkeys");
-    }
-
-    function test_CannotExecutePasskeyAdditionBeforeTimelock() public {
-        bytes32 newQx = bytes32(uint256(0x1111));
-        bytes32 newQy = bytes32(uint256(0x2222));
-        bytes32 deviceId = bytes32("New Device");
-
-        // Propose passkey addition
-        vm.prank(ENTRYPOINT_ADDR);
-        bytes32 actionHash = account.proposePasskeyAddition(newQx, newQy, deviceId);
-
-        // Try to execute immediately - should fail
-        vm.expectRevert(P256Account.TimelockNotExpired.selector);
-        account.executePasskeyAddition(actionHash);
-    }
-
-    function test_CancelPasskeyAddition() public {
-        bytes32 newQx = bytes32(uint256(0x1111));
-        bytes32 newQy = bytes32(uint256(0x2222));
-        bytes32 deviceId = bytes32("New Device");
-
-        // Propose passkey addition
-        vm.prank(ENTRYPOINT_ADDR);
-        bytes32 actionHash = account.proposePasskeyAddition(newQx, newQy, deviceId);
-
-        // Cancel the addition
-        vm.prank(ENTRYPOINT_ADDR);
-        account.cancelPasskeyAddition(actionHash);
-
-        // Verify cancellation
-        (,,,, bool executed, bool cancelled) = account.pendingPasskeyAdditions(actionHash);
-        assertFalse(executed, "Should not be executed");
-        assertTrue(cancelled, "Should be cancelled");
-
-        // Fast forward past timelock
-        vm.warp(block.timestamp + 24 hours + 1);
-
-        // Try to execute - should fail
-        vm.expectRevert(P256Account.ActionAlreadyCancelled.selector);
-        account.executePasskeyAddition(actionHash);
-
-        // Verify passkey was not added
-        assertEq(account.getPasskeyCount(), 1, "Should still have only 1 passkey");
-    }
-
-    function test_ProposePasskeyAdditionOnlyViaEntryPoint() public {
-        bytes32 newQx = bytes32(uint256(0x1111));
-        bytes32 newQy = bytes32(uint256(0x2222));
-        bytes32 deviceId = bytes32("New Device");
-
-        address attacker = makeAddr("attacker");
-
-        // Try to propose from non-EntryPoint - should fail
-        vm.prank(attacker);
-        vm.expectRevert(P256Account.OnlyEntryPoint.selector);
-        account.proposePasskeyAddition(newQx, newQy, deviceId);
-    }
-
-    function test_CancelPasskeyAdditionOnlyViaEntryPoint() public {
-        bytes32 newQx = bytes32(uint256(0x1111));
-        bytes32 newQy = bytes32(uint256(0x2222));
-        bytes32 deviceId = bytes32("New Device");
-
-        // Propose passkey addition
-        vm.prank(ENTRYPOINT_ADDR);
-        bytes32 actionHash = account.proposePasskeyAddition(newQx, newQy, deviceId);
-
-        address attacker = makeAddr("attacker");
-
-        // Try to cancel from non-EntryPoint - should fail
-        vm.prank(attacker);
-        vm.expectRevert(P256Account.OnlyEntryPoint.selector);
-        account.cancelPasskeyAddition(actionHash);
-    }
 }

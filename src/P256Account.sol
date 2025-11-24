@@ -61,42 +61,12 @@ contract P256Account is IAccount, IERC1271, Ownable, Initializable {
     /// @dev Inactive passkeys remain in the mapping for history but are removed from array
     bytes32[] public passkeyIds;
 
-    /// @notice Timelock duration for passkey operations (24 hours)
-    /// @dev Prevents malicious immediate addition or removal of passkeys
-    uint256 public constant PASSKEY_TIMELOCK = 24 hours;
-
-    /// @notice Pending passkey addition
-    struct PendingPasskeyAddition {
-        bytes32 qx;
-        bytes32 qy;
-        bytes32 deviceId;
-        uint256 executeAfter;
-        bool executed;
-        bool cancelled;
-    }
-
-    /// @notice Pending passkey additions by actionHash
-    mapping(bytes32 => PendingPasskeyAddition) public pendingPasskeyAdditions;
-
-    /// @notice Pending passkey removal
-    struct PendingPasskeyRemoval {
-        bytes32 passkeyId;
-        uint256 executeAfter;
-        bool executed;
-        bool cancelled;
-    }
-
-    /// @notice Pending passkey removals by actionHash
-    mapping(bytes32 => PendingPasskeyRemoval) public pendingPasskeyRemovals;
-
     /*//////////////////////////////////////////////////////////////
                           GUARDIAN & RECOVERY
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Timelock duration for administrative actions (48 hours)
-    uint256 public constant ADMIN_TIMELOCK = 48 hours;
-
     /// @notice Timelock duration for recovery execution (24 hours)
+    /// @dev Gives users time to detect and cancel malicious recovery attempts
     uint256 public constant RECOVERY_TIMELOCK = 24 hours;
 
     /// @notice Guardian addresses
@@ -139,12 +109,8 @@ contract P256Account is IAccount, IERC1271, Ownable, Initializable {
     event TwoFactorDisabled(address indexed owner);
 
     // Passkey events
-    event PasskeyAdditionProposed(bytes32 indexed actionHash, bytes32 qx, bytes32 qy, uint256 executeAfter);
     event PasskeyAdded(bytes32 indexed passkeyId, bytes32 qx, bytes32 qy, uint256 timestamp);
-    event PasskeyAdditionCancelled(bytes32 indexed actionHash, bytes32 qx, bytes32 qy);
-    event PasskeyRemovalProposed(bytes32 indexed actionHash, bytes32 indexed passkeyId, uint256 executeAfter);
     event PasskeyRemoved(bytes32 indexed passkeyId, bytes32 qx, bytes32 qy);
-    event PasskeyRemovalCancelled(bytes32 indexed actionHash, bytes32 indexed passkeyId);
 
     // Guardian events
     event GuardianAdded(address indexed guardian);
@@ -194,12 +160,6 @@ contract P256Account is IAccount, IERC1271, Ownable, Initializable {
     error RecoveryAlreadyApproved();
     error RecoveryNotReady();
     error InsufficientApprovals();
-
-    // Timelock errors
-    error ActionNotFound();
-    error ActionAlreadyExecuted();
-    error ActionAlreadyCancelled();
-    error TimelockNotExpired();
 
     /*//////////////////////////////////////////////////////////////
                               CONSTRUCTOR
@@ -556,88 +516,31 @@ contract P256Account is IAccount, IERC1271, Ownable, Initializable {
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @notice Propose adding a new passkey to the account (with timelock)
+     * @notice Add a new passkey to the account
      * @param _qx The x-coordinate of the new passkey
      * @param _qy The y-coordinate of the new passkey
      * @param _deviceId Short device identifier (e.g., "iPhone 15", "YubiKey 5")
-     * @return actionHash The hash of the proposed addition action
      * @dev SECURITY: Only callable via EntryPoint (requires existing signature)
-     * @dev 24-hour timelock prevents malicious immediate addition of passkeys
      * @dev Validates that coordinates are non-zero and passkey doesn't already exist
      */
-    function proposePasskeyAddition(bytes32 _qx, bytes32 _qy, bytes32 _deviceId) external returns (bytes32) {
+    function addPasskey(bytes32 _qx, bytes32 _qy, bytes32 _deviceId) external {
         if (msg.sender != address(ENTRYPOINT)) revert OnlyEntryPoint();
 
         // Validate coordinates
         if (_qx == bytes32(0) || _qy == bytes32(0)) revert InvalidPasskeyCoordinates();
 
-        // Verify passkey doesn't already exist
-        bytes32 passkeyId = keccak256(abi.encodePacked(_qx, _qy));
-        if (passkeys[passkeyId].qx != bytes32(0)) revert PasskeyAlreadyExists();
-
-        // Create action hash
-        bytes32 actionHash = keccak256(abi.encode("addPasskey", _qx, _qy, _deviceId, block.timestamp));
-
-        pendingPasskeyAdditions[actionHash] = PendingPasskeyAddition({
-            qx: _qx,
-            qy: _qy,
-            deviceId: _deviceId,
-            executeAfter: block.timestamp + PASSKEY_TIMELOCK,
-            executed: false,
-            cancelled: false
-        });
-
-        emit PasskeyAdditionProposed(actionHash, _qx, _qy, block.timestamp + PASSKEY_TIMELOCK);
-        return actionHash;
+        // Add the passkey immediately
+        _addPasskeyInternal(_qx, _qy, _deviceId);
     }
 
     /**
-     * @notice Execute a pending passkey addition
-     * @param actionHash The hash of the addition action
-     * @dev Can be executed by anyone after timelock expires
-     */
-    function executePasskeyAddition(bytes32 actionHash) external {
-        PendingPasskeyAddition storage addition = pendingPasskeyAdditions[actionHash];
-
-        if (addition.executeAfter == 0) revert ActionNotFound();
-        if (addition.executed) revert ActionAlreadyExecuted();
-        if (addition.cancelled) revert ActionAlreadyCancelled();
-        if (block.timestamp < addition.executeAfter) revert TimelockNotExpired();
-
-        addition.executed = true;
-
-        // Add the passkey
-        _addPasskeyInternal(addition.qx, addition.qy, addition.deviceId);
-    }
-
-    /**
-     * @notice Cancel a pending passkey addition
-     * @param actionHash The hash of the addition action to cancel
-     * @dev SECURITY: Only callable via EntryPoint (requires signature)
-     */
-    function cancelPasskeyAddition(bytes32 actionHash) external {
-        if (msg.sender != address(ENTRYPOINT)) revert OnlyEntryPoint();
-
-        PendingPasskeyAddition storage addition = pendingPasskeyAdditions[actionHash];
-        if (addition.executeAfter == 0) revert ActionNotFound();
-        if (addition.executed) revert ActionAlreadyExecuted();
-        if (addition.cancelled) revert ActionAlreadyCancelled();
-
-        addition.cancelled = true;
-
-        emit PasskeyAdditionCancelled(actionHash, addition.qx, addition.qy);
-    }
-
-    /**
-     * @notice Propose removal of a passkey (with timelock)
+     * @notice Remove a passkey from the account
      * @param _qx The x-coordinate of the passkey to remove
      * @param _qy The y-coordinate of the passkey to remove
-     * @return actionHash The hash of the proposed removal action
      * @dev SECURITY: Only callable via EntryPoint (requires existing passkey signature)
-     * @dev 24-hour timelock prevents malicious immediate removal
      * @dev Cannot remove the last active passkey when 2FA is enabled
      */
-    function proposePasskeyRemoval(bytes32 _qx, bytes32 _qy) external returns (bytes32) {
+    function removePasskey(bytes32 _qx, bytes32 _qy) external {
         if (msg.sender != address(ENTRYPOINT)) revert OnlyEntryPoint();
 
         bytes32 passkeyId = keccak256(abi.encodePacked(_qx, _qy));
@@ -649,37 +552,6 @@ contract P256Account is IAccount, IERC1271, Ownable, Initializable {
         uint256 activeCount = _getActivePasskeyCount();
         if (activeCount <= 1 && twoFactorEnabled) revert CannotRemoveLastPasskey();
 
-        // Create action hash
-        bytes32 actionHash = keccak256(abi.encode("removePasskey", passkeyId, block.timestamp));
-
-        pendingPasskeyRemovals[actionHash] = PendingPasskeyRemoval({
-            passkeyId: passkeyId, executeAfter: block.timestamp + PASSKEY_TIMELOCK, executed: false, cancelled: false
-        });
-
-        emit PasskeyRemovalProposed(actionHash, passkeyId, block.timestamp + PASSKEY_TIMELOCK);
-        return actionHash;
-    }
-
-    /**
-     * @notice Execute a pending passkey removal
-     * @param actionHash The hash of the removal action
-     * @dev Can be executed by anyone after timelock expires
-     */
-    function executePasskeyRemoval(bytes32 actionHash) external {
-        PendingPasskeyRemoval storage removal = pendingPasskeyRemovals[actionHash];
-
-        if (removal.executeAfter == 0) revert ActionNotFound();
-        if (removal.executed) revert ActionAlreadyExecuted();
-        if (removal.cancelled) revert ActionAlreadyCancelled();
-        if (block.timestamp < removal.executeAfter) revert TimelockNotExpired();
-
-        // Double-check we're not removing the last passkey when 2FA is enabled
-        uint256 activeCount = passkeyIds.length;
-        if (activeCount <= 1 && twoFactorEnabled) revert CannotRemoveLastPasskey();
-
-        removal.executed = true;
-
-        bytes32 passkeyId = removal.passkeyId;
         PasskeyInfo storage passkeyInfo = passkeys[passkeyId];
 
         // Mark as inactive and remove from passkeyIds array
@@ -687,24 +559,6 @@ contract P256Account is IAccount, IERC1271, Ownable, Initializable {
         _removePasskeyFromArray(passkeyId);
 
         emit PasskeyRemoved(passkeyId, passkeyInfo.qx, passkeyInfo.qy);
-    }
-
-    /**
-     * @notice Cancel a pending passkey removal
-     * @param actionHash The hash of the removal action to cancel
-     * @dev SECURITY: Only callable via EntryPoint (requires passkey signature)
-     */
-    function cancelPasskeyRemoval(bytes32 actionHash) external {
-        if (msg.sender != address(ENTRYPOINT)) revert OnlyEntryPoint();
-
-        PendingPasskeyRemoval storage removal = pendingPasskeyRemovals[actionHash];
-        if (removal.executeAfter == 0) revert ActionNotFound();
-        if (removal.executed) revert ActionAlreadyExecuted();
-        if (removal.cancelled) revert ActionAlreadyCancelled();
-
-        removal.cancelled = true;
-
-        emit PasskeyRemovalCancelled(actionHash, removal.passkeyId);
     }
 
     /**
@@ -1139,23 +993,6 @@ contract P256Account is IAccount, IERC1271, Ownable, Initializable {
             activeList[i] = true; // All passkeys in array are active
             deviceIdList[i] = info.deviceId;
         }
-    }
-
-    /**
-     * @notice Get pending passkey removal details
-     * @param actionHash The hash of the pending removal
-     * @return passkeyId The passkey ID to be removed
-     * @return executeAfter The timestamp when removal can be executed
-     * @return executed Whether the removal has been executed
-     * @return cancelled Whether the removal has been cancelled
-     */
-    function getPendingPasskeyRemoval(bytes32 actionHash)
-        external
-        view
-        returns (bytes32 passkeyId, uint256 executeAfter, bool executed, bool cancelled)
-    {
-        PendingPasskeyRemoval storage removal = pendingPasskeyRemovals[actionHash];
-        return (removal.passkeyId, removal.executeAfter, removal.executed, removal.cancelled);
     }
 
     /*//////////////////////////////////////////////////////////////
