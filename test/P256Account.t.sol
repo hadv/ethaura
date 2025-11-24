@@ -102,9 +102,9 @@ contract P256AccountTest is Test {
         // Create account in owner-only mode
         P256Account ownerOnlyAccount = factory.createAccount(bytes32(0), bytes32(0), owner, 3, false, bytes32(0));
 
-        // Try to enable 2FA (should fail because no passkey)
+        // Try to enable 2FA (should fail because no active passkey)
         vm.prank(ENTRYPOINT_ADDR);
-        vm.expectRevert("Passkey required for 2FA");
+        vm.expectRevert("Active passkey required for 2FA");
         ownerOnlyAccount.enableTwoFactor();
     }
 
@@ -350,10 +350,16 @@ contract P256AccountTest is Test {
         // Create a test hash
         bytes32 hash = keccak256("test message");
 
-        // Create a dummy signature (64 bytes)
-        bytes memory signature = new bytes(64);
+        // Create a dummy signature (96 bytes: r || s || passkeyId)
+        bytes memory signature = new bytes(96);
 
-        // This will return invalid magic value since signature is wrong
+        // Set a dummy passkeyId (last 32 bytes) - use a non-existent passkey
+        bytes32 dummyPasskeyId = keccak256("non-existent-passkey");
+        assembly {
+            mstore(add(signature, 96), dummyPasskeyId)
+        }
+
+        // This will return invalid magic value since passkey doesn't exist
         bytes4 result = account.isValidSignature(hash, signature);
 
         // Should return 0x00000000 for invalid signature
