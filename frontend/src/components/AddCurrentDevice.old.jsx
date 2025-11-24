@@ -1,22 +1,24 @@
 import { useState } from 'react'
 import { ethers } from 'ethers'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
-import { useNetwork } from '../contexts/NetworkContext'
 import { parsePublicKey, verifyAttestation } from '../utils/webauthn'
-import { addDevice } from '../lib/deviceManager'
+import { addDevice, updateDeviceProposalHash } from '../lib/deviceManager'
 import '../styles/AddCurrentDevice.css'
 
-/**
- * AddCurrentDevice V2 - Clean implementation for immediate passkey addition
- * This replaces the old AddCurrentDevice.jsx which used the propose/execute pattern
- */
-function AddCurrentDeviceV2({ accountAddress, onComplete, onCancel }) {
+function AddCurrentDevice({ accountAddress, onComplete, onCancel }) {
   const { address: ownerAddress, provider, signMessage } = useWeb3Auth()
-  const { networkInfo } = useNetwork()
   const [deviceName, setDeviceName] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [status, setStatus] = useState('')
+
+  // P256Account ABI (minimal)
+  const accountABI = [
+    'function qx() view returns (bytes32)',
+    'function qy() view returns (bytes32)',
+    'function proposePublicKeyUpdate(bytes32 _qx, bytes32 _qy) returns (bytes32)',
+    'event PublicKeyUpdateProposed(bytes32 indexed actionHash, bytes32 qx, bytes32 qy, uint256 executeAfter)',
+  ]
 
   // Auto-detect device type
   const getDeviceType = () => {
@@ -114,7 +116,7 @@ function AddCurrentDeviceV2({ accountAddress, onComplete, onCancel }) {
       // Parse the public key
       const publicKey = parsePublicKey(credential.response.attestationObject)
 
-      // Verify attestation and extract metadata
+      // Verify attestation and extract metadata (Phase 1)
       setStatus('Verifying device attestation...')
       const attestationResult = verifyAttestation(
         credential.response.attestationObject,
@@ -142,20 +144,97 @@ function AddCurrentDeviceV2({ accountAddress, onComplete, onCancel }) {
       setStatus('Saving passkey locally...')
       localStorage.setItem(`passkey_${accountAddress}`, JSON.stringify(serializedCredential))
 
-      // Save to database (for metadata and multi-device support)
-      setStatus('Saving to database...')
-      const deviceType = getDeviceType()
-      await addDevice(
-        signMessage,
-        ownerAddress,
-        accountAddress,
-        deviceName.trim(),
-        deviceType,
-        serializedCredential,
-        attestationResult
-      )
+      // Check if account is deployed
+      const ethersProvider = new ethers.BrowserProvider(provider)
+      const accountCode = await ethersProvider.getCode(accountAddress)
+      const isDeployed = accountCode !== '0x'
 
-      setStatus('✅ Passkey saved! It will be added to the blockchain when you make your first transaction.')
+      if (isDeployed) {
+        // For DEPLOYED accounts: Save to multi-device table and create proposal
+        setStatus('Saving to database...')
+        const deviceType = getDeviceType()
+        await addDevice(
+          signMessage,
+          ownerAddress,
+          accountAddress,
+          deviceName.trim(),
+          deviceType,
+          serializedCredential,
+          attestationResult // NEW: Phase 1 - pass attestation metadata
+        )
+
+        // Create on-chain proposal for the new passkey
+        setStatus('Proposing passkey to smart contract (48-hour timelock)...')
+
+        const signer = await ethersProvider.getSigner()
+        const contractWithSigner = new ethers.Contract(accountAddress, accountABI, signer)
+
+        const tx = await contractWithSigner.proposePublicKeyUpdate(publicKey.x, publicKey.y)
+        const receipt = await tx.wait()
+
+        // Extract actionHash from the PublicKeyUpdateProposed event
+        let actionHash = null
+        try {
+          console.log('🔍 Parsing receipt logs to find PublicKeyUpdateProposed event...')
+          console.log('📋 Receipt logs count:', receipt.logs.length)
+
+          const event = receipt.logs.find(log => {
+            try {
+              const parsed = contractWithSigner.interface.parseLog(log)
+              console.log('📝 Parsed log:', parsed?.name)
+              return parsed && parsed.name === 'PublicKeyUpdateProposed'
+            } catch (parseError) {
+              // Silently skip logs that don't match our ABI
+              return false
+            }
+          })
+
+          if (event) {
+            const parsed = contractWithSigner.interface.parseLog(event)
+            actionHash = parsed.args.actionHash
+            console.log('✅ Found PublicKeyUpdateProposed event!')
+            console.log('📝 Proposal actionHash:', actionHash)
+            console.log('📝 Proposal transaction hash:', receipt.hash)
+            console.log('📝 Device ID:', serializedCredential.id)
+
+            // Update the device in database with actionHash and transaction hash
+            console.log('💾 Saving proposal hash to database...')
+            await updateDeviceProposalHash(signMessage, ownerAddress, accountAddress, serializedCredential.id, actionHash, receipt.hash)
+            console.log('✅ Proposal hash saved to database successfully!')
+          } else {
+            console.error('❌ PublicKeyUpdateProposed event not found in receipt logs!')
+            console.log('📋 All logs:', receipt.logs.map(log => {
+              try {
+                const parsed = contractWithSigner.interface.parseLog(log)
+                return parsed?.name || 'unknown'
+              } catch {
+                return 'unparseable'
+              }
+            }))
+          }
+        } catch (eventError) {
+          console.error('⚠️  Failed to extract or save actionHash:', eventError)
+          console.error('Error stack:', eventError.stack)
+          alert(`Warning: Proposal created but hash not saved: ${eventError.message}`)
+          // Continue anyway - the proposal was successful
+        }
+
+        setStatus('✅ Passkey proposed! Wait 48 hours then execute the update.')
+      } else {
+        // For UNDEPLOYED accounts: Save to multi-device table
+        setStatus('Saving to database...')
+        const deviceType = getDeviceType()
+        await addDevice(
+          signMessage,
+          ownerAddress,
+          accountAddress,
+          deviceName.trim(),
+          deviceType,
+          serializedCredential,
+          attestationResult // Phase 1 - pass attestation metadata
+        )
+        setStatus('✅ Device saved! It will be used when you deploy this account.')
+      }
 
       // Wait a moment then complete
       setTimeout(() => {
@@ -207,4 +286,5 @@ function AddCurrentDeviceV2({ accountAddress, onComplete, onCancel }) {
   )
 }
 
-export default AddCurrentDeviceV2
+export default AddCurrentDevice
+
