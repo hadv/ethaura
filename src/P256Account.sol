@@ -61,9 +61,22 @@ contract P256Account is IAccount, IERC1271, Ownable, Initializable {
     /// @dev Inactive passkeys remain in the mapping for history but are removed from array
     bytes32[] public passkeyIds;
 
-    /// @notice Timelock duration for passkey removal (24 hours)
-    /// @dev Prevents malicious immediate removal of passkeys
-    uint256 public constant PASSKEY_REMOVAL_TIMELOCK = 24 hours;
+    /// @notice Timelock duration for passkey operations (24 hours)
+    /// @dev Prevents malicious immediate addition or removal of passkeys
+    uint256 public constant PASSKEY_TIMELOCK = 24 hours;
+
+    /// @notice Pending passkey addition
+    struct PendingPasskeyAddition {
+        bytes32 qx;
+        bytes32 qy;
+        bytes32 deviceId;
+        uint256 executeAfter;
+        bool executed;
+        bool cancelled;
+    }
+
+    /// @notice Pending passkey additions by actionHash
+    mapping(bytes32 => PendingPasskeyAddition) public pendingPasskeyAdditions;
 
     /// @notice Pending passkey removal
     struct PendingPasskeyRemoval {
@@ -126,7 +139,9 @@ contract P256Account is IAccount, IERC1271, Ownable, Initializable {
     event TwoFactorDisabled(address indexed owner);
 
     // Passkey events
+    event PasskeyAdditionProposed(bytes32 indexed actionHash, bytes32 qx, bytes32 qy, uint256 executeAfter);
     event PasskeyAdded(bytes32 indexed passkeyId, bytes32 qx, bytes32 qy, uint256 timestamp);
+    event PasskeyAdditionCancelled(bytes32 indexed actionHash, bytes32 qx, bytes32 qy);
     event PasskeyRemovalProposed(bytes32 indexed actionHash, bytes32 indexed passkeyId, uint256 executeAfter);
     event PasskeyRemoved(bytes32 indexed passkeyId, bytes32 qx, bytes32 qy);
     event PasskeyRemovalCancelled(bytes32 indexed actionHash, bytes32 indexed passkeyId);
@@ -541,21 +556,76 @@ contract P256Account is IAccount, IERC1271, Ownable, Initializable {
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @notice Add a new passkey to the account
+     * @notice Propose adding a new passkey to the account (with timelock)
      * @param _qx The x-coordinate of the new passkey
      * @param _qy The y-coordinate of the new passkey
      * @param _deviceId Short device identifier (e.g., "iPhone 15", "YubiKey 5")
-     * @dev SECURITY: Only callable via EntryPoint (requires existing passkey signature)
+     * @return actionHash The hash of the proposed addition action
+     * @dev SECURITY: Only callable via EntryPoint (requires existing signature)
+     * @dev 24-hour timelock prevents malicious immediate addition of passkeys
      * @dev Validates that coordinates are non-zero and passkey doesn't already exist
      */
-    function addPasskey(bytes32 _qx, bytes32 _qy, bytes32 _deviceId) external {
+    function proposePasskeyAddition(bytes32 _qx, bytes32 _qy, bytes32 _deviceId) external returns (bytes32) {
         if (msg.sender != address(ENTRYPOINT)) revert OnlyEntryPoint();
 
         // Validate coordinates
         if (_qx == bytes32(0) || _qy == bytes32(0)) revert InvalidPasskeyCoordinates();
 
-        // Add passkey
-        _addPasskeyInternal(_qx, _qy, _deviceId);
+        // Verify passkey doesn't already exist
+        bytes32 passkeyId = keccak256(abi.encodePacked(_qx, _qy));
+        if (passkeys[passkeyId].qx != bytes32(0)) revert PasskeyAlreadyExists();
+
+        // Create action hash
+        bytes32 actionHash = keccak256(abi.encode("addPasskey", _qx, _qy, _deviceId, block.timestamp));
+
+        pendingPasskeyAdditions[actionHash] = PendingPasskeyAddition({
+            qx: _qx,
+            qy: _qy,
+            deviceId: _deviceId,
+            executeAfter: block.timestamp + PASSKEY_TIMELOCK,
+            executed: false,
+            cancelled: false
+        });
+
+        emit PasskeyAdditionProposed(actionHash, _qx, _qy, block.timestamp + PASSKEY_TIMELOCK);
+        return actionHash;
+    }
+
+    /**
+     * @notice Execute a pending passkey addition
+     * @param actionHash The hash of the addition action
+     * @dev Can be executed by anyone after timelock expires
+     */
+    function executePasskeyAddition(bytes32 actionHash) external {
+        PendingPasskeyAddition storage addition = pendingPasskeyAdditions[actionHash];
+
+        if (addition.executeAfter == 0) revert ActionNotFound();
+        if (addition.executed) revert ActionAlreadyExecuted();
+        if (addition.cancelled) revert ActionAlreadyCancelled();
+        if (block.timestamp < addition.executeAfter) revert TimelockNotExpired();
+
+        addition.executed = true;
+
+        // Add the passkey
+        _addPasskeyInternal(addition.qx, addition.qy, addition.deviceId);
+    }
+
+    /**
+     * @notice Cancel a pending passkey addition
+     * @param actionHash The hash of the addition action to cancel
+     * @dev SECURITY: Only callable via EntryPoint (requires signature)
+     */
+    function cancelPasskeyAddition(bytes32 actionHash) external {
+        if (msg.sender != address(ENTRYPOINT)) revert OnlyEntryPoint();
+
+        PendingPasskeyAddition storage addition = pendingPasskeyAdditions[actionHash];
+        if (addition.executeAfter == 0) revert ActionNotFound();
+        if (addition.executed) revert ActionAlreadyExecuted();
+        if (addition.cancelled) revert ActionAlreadyCancelled();
+
+        addition.cancelled = true;
+
+        emit PasskeyAdditionCancelled(actionHash, addition.qx, addition.qy);
     }
 
     /**
@@ -583,13 +653,10 @@ contract P256Account is IAccount, IERC1271, Ownable, Initializable {
         bytes32 actionHash = keccak256(abi.encode("removePasskey", passkeyId, block.timestamp));
 
         pendingPasskeyRemovals[actionHash] = PendingPasskeyRemoval({
-            passkeyId: passkeyId,
-            executeAfter: block.timestamp + PASSKEY_REMOVAL_TIMELOCK,
-            executed: false,
-            cancelled: false
+            passkeyId: passkeyId, executeAfter: block.timestamp + PASSKEY_TIMELOCK, executed: false, cancelled: false
         });
 
-        emit PasskeyRemovalProposed(actionHash, passkeyId, block.timestamp + PASSKEY_REMOVAL_TIMELOCK);
+        emit PasskeyRemovalProposed(actionHash, passkeyId, block.timestamp + PASSKEY_TIMELOCK);
         return actionHash;
     }
 
