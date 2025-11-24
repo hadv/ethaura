@@ -56,7 +56,9 @@ contract P256Account is IAccount, IERC1271, Ownable, Initializable {
     /// @dev passkeyId = keccak256(abi.encodePacked(qx, qy))
     mapping(bytes32 => PasskeyInfo) public passkeys;
 
-    /// @notice List of all passkey IDs for enumeration
+    /// @notice List of ACTIVE passkey IDs for enumeration
+    /// @dev Gas optimization: Only active passkeys are stored in this array
+    /// @dev Inactive passkeys remain in the mapping for history but are removed from array
     bytes32[] public passkeyIds;
 
     /// @notice Timelock duration for passkey removal (24 hours)
@@ -691,7 +693,7 @@ contract P256Account is IAccount, IERC1271, Ownable, Initializable {
         if (block.timestamp < removal.executeAfter) revert TimelockNotExpired();
 
         // Double-check we're not removing the last passkey when 2FA is enabled
-        uint256 activeCount = _getActivePasskeyCount();
+        uint256 activeCount = passkeyIds.length;
         if (activeCount <= 1 && twoFactorEnabled) revert CannotRemoveLastPasskey();
 
         removal.executed = true;
@@ -699,8 +701,9 @@ contract P256Account is IAccount, IERC1271, Ownable, Initializable {
         bytes32 passkeyId = removal.passkeyId;
         PasskeyInfo storage passkeyInfo = passkeys[passkeyId];
 
-        // Mark as inactive instead of deleting to preserve history
+        // Mark as inactive and remove from passkeyIds array
         passkeyInfo.active = false;
+        _removePasskeyFromArray(passkeyId);
 
         emit PasskeyRemoved(passkeyId, passkeyInfo.qx, passkeyInfo.qy);
     }
@@ -748,11 +751,25 @@ contract P256Account is IAccount, IERC1271, Ownable, Initializable {
     /**
      * @notice Get the count of active passkeys
      * @return count The number of active passkeys
+     * @dev Gas optimized: passkeyIds only contains active passkeys
      */
     function _getActivePasskeyCount() internal view returns (uint256 count) {
-        for (uint256 i = 0; i < passkeyIds.length; i++) {
-            if (passkeys[passkeyIds[i]].active) {
-                count++;
+        return passkeyIds.length;
+    }
+
+    /**
+     * @notice Remove a passkey from the passkeyIds array
+     * @param passkeyId The ID of the passkey to remove
+     * @dev Uses swap-and-pop pattern for gas efficiency
+     */
+    function _removePasskeyFromArray(bytes32 passkeyId) internal {
+        uint256 length = passkeyIds.length;
+        for (uint256 i = 0; i < length; i++) {
+            if (passkeyIds[i] == passkeyId) {
+                // Swap with last element and pop
+                passkeyIds[i] = passkeyIds[length - 1];
+                passkeyIds.pop();
+                return;
             }
         }
     }
@@ -927,8 +944,11 @@ contract P256Account is IAccount, IERC1271, Ownable, Initializable {
 
         // SECURITY: Deactivate ALL existing passkeys during recovery
         // This prevents the compromised passkeys from being used
-        for (uint256 i = 0; i < passkeyIds.length; i++) {
-            passkeys[passkeyIds[i]].active = false;
+        // Clear the array by iterating backwards to avoid index issues
+        while (passkeyIds.length > 0) {
+            bytes32 passkeyId = passkeyIds[passkeyIds.length - 1];
+            passkeys[passkeyId].active = false;
+            passkeyIds.pop();
         }
 
         // Add the new recovery passkey
@@ -1125,7 +1145,7 @@ contract P256Account is IAccount, IERC1271, Ownable, Initializable {
             qxList[i] = info.qx;
             qyList[i] = info.qy;
             addedAtList[i] = info.addedAt;
-            activeList[i] = info.active;
+            activeList[i] = true; // All passkeys in array are active
             deviceIdList[i] = info.deviceId;
         }
     }
