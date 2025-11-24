@@ -114,8 +114,6 @@ contract P256AccountTest is Test {
         account.initialize(bytes32(uint256(1)), bytes32(uint256(2)), owner, true, bytes32("Device"));
     }
 
-
-
     function test_ExecuteOnlyViaEntryPoint() public {
         address target = makeAddr("target");
         uint256 value = 1 ether;

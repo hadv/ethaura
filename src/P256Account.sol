@@ -98,8 +98,6 @@ contract P256Account is IAccount, IERC1271, Ownable, Initializable {
     /// @notice Recovery request nonce
     uint256 public recoveryNonce;
 
-
-
     /// @notice List of all pending action hashes (for enumeration)
     bytes32[] public pendingActionHashes;
 
@@ -507,8 +505,6 @@ contract P256Account is IAccount, IERC1271, Ownable, Initializable {
     /*//////////////////////////////////////////////////////////////
                           ACCOUNT MANAGEMENT
     //////////////////////////////////////////////////////////////*/
-
-
 
     /**
      * @notice Enable two-factor authentication
@@ -1079,48 +1075,6 @@ contract P256Account is IAccount, IERC1271, Ownable, Initializable {
     }
 
     /**
-     * @notice Get all passkeys (DEPRECATED - use getPasskeys() for pagination)
-     * @dev This function may run out of gas if there are too many passkeys
-     * @return passkeyIdList Array of passkey IDs
-     * @return qxList Array of x-coordinates
-     * @return qyList Array of y-coordinates
-     * @return addedAtList Array of timestamps
-     * @return activeList Array of active flags
-     * @return deviceIdList Array of device identifiers
-     */
-    function getAllPasskeys()
-        external
-        view
-        returns (
-            bytes32[] memory passkeyIdList,
-            bytes32[] memory qxList,
-            bytes32[] memory qyList,
-            uint256[] memory addedAtList,
-            bool[] memory activeList,
-            bytes32[] memory deviceIdList
-        )
-    {
-        uint256 length = passkeyIds.length;
-        passkeyIdList = new bytes32[](length);
-        qxList = new bytes32[](length);
-        qyList = new bytes32[](length);
-        addedAtList = new uint256[](length);
-        activeList = new bool[](length);
-        deviceIdList = new bytes32[](length);
-
-        for (uint256 i = 0; i < length; i++) {
-            bytes32 passkeyId = passkeyIds[i];
-            PasskeyInfo storage info = passkeys[passkeyId];
-            passkeyIdList[i] = passkeyId;
-            qxList[i] = info.qx;
-            qyList[i] = info.qy;
-            addedAtList[i] = info.addedAt;
-            activeList[i] = info.active;
-            deviceIdList[i] = info.deviceId;
-        }
-    }
-
-    /**
      * @notice Get pending passkey removal details
      * @param actionHash The hash of the pending removal
      * @return passkeyId The passkey ID to be removed
@@ -1201,6 +1155,4 @@ contract P256Account is IAccount, IERC1271, Ownable, Initializable {
         if (msg.sender != address(ENTRYPOINT)) revert OnlyEntryPoint();
         ENTRYPOINT.withdrawTo(withdrawAddress, amount);
     }
-
-
 }
