@@ -11,18 +11,18 @@
       "note": "Pre-deployed EntryPoint v0.7 (canonical address)"
     },
     "P256AccountFactory": {
-      "address": "0x000000C825FF71C29c18ec467A5e8c0edBab247d",
-      "deploymentTx": "0x24b9d35d3470ca37ea6623baff9234c307f9c6602880739e9d7a1d90ee98fab4",
+      "address": "0x0000005F6a0659138c929F0C425EF741dA91783D",
+      "deploymentTx": "0x2d0879396556fe0fcf5b9856ffc20e20129b671fc77a04822b306b43d8f95720",
       "blockNumber": "CONFIRMED",
-      "gasUsed": "6050587",
+      "gasUsed": "6240430",
       "gasCost": "~0.006 ETH",
-      "salt": "0x18ee4c040568238643c07e7afd6c53efc196d26b313a4205a4bba75f1e0587da",
-      "initCodeHash": "0x4e04c34fcd41071105645138364629f261a28c528dc14756a91f6b41fef6f0f3",
+      "salt": "0x18ee4c040568238643c07e7afd6c53efc196d26b87b5f6e96eb690bfb787e6bb",
+      "initCodeHash": "0x747dd63dfae991117debeb008f2fb0533bb59a6eee74ba0e197e21099d034c7a",
       "create2Factory": "0x0000000000FFe8B47B3e2130213B802212439497",
-      "note": "Vanity address with 0x000000 prefix - deployed via Solady's CREATE2 factory"
+      "note": "Vanity address with 0x000000 prefix - deployed via Solady's CREATE2 factory (without --legacy flag)"
     },
     "P256Account": {
-      "address": "0xA5EB07c92c83220213bAb79766e510E1Df04b635",
+      "address": "0x128a791b72cCF2Be25E634619F57D422e927877A",
       "note": "Implementation contract (deployed by factory constructor)"
     },
     "SoladyERC1967Factory": {
@@ -31,9 +31,9 @@
     }
   },
   "explorer": {
-    "factory": "https://sepolia.etherscan.io/address/0x000000C825FF71C29c18ec467A5e8c0edBab247d",
-    "implementation": "https://sepolia.etherscan.io/address/0xA5EB07c92c83220213bAb79766e510E1Df04b635",
-    "deploymentTx": "https://sepolia.etherscan.io/tx/0x24b9d35d3470ca37ea6623baff9234c307f9c6602880739e9d7a1d90ee98fab4"
+    "factory": "https://sepolia.etherscan.io/address/0x0000005F6a0659138c929F0C425EF741dA91783D",
+    "implementation": "https://sepolia.etherscan.io/address/0x128a791b72cCF2Be25E634619F57D422e927877A",
+    "deploymentTx": "https://sepolia.etherscan.io/tx/0x2d0879396556fe0fcf5b9856ffc20e20129b671fc77a04822b306b43d8f95720"
   },
   "rpc": {
     "public": "https://rpc.sepolia.org",
