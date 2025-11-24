@@ -770,4 +770,189 @@ contract P256AccountTest is Test {
         // Note: The actual cap of 50 is enforced in the contract
         // If we had 100 passkeys and requested 100, we'd only get 50
     }
+
+    /*//////////////////////////////////////////////////////////////
+                    MULTIPLE PASSKEYS TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    function test_AddPasskey() public {
+        bytes32 newQx = bytes32(uint256(0x9999));
+        bytes32 newQy = bytes32(uint256(0xAAAA));
+        bytes32 deviceId = bytes32("iPhone 15");
+
+        // Add passkey via EntryPoint
+        vm.prank(ENTRYPOINT_ADDR);
+        account.addPasskey(newQx, newQy, deviceId);
+
+        // Verify passkey was added
+        assertEq(account.getActivePasskeyCount(), 2, "Should have 2 passkeys");
+
+        bytes32 passkeyId = keccak256(abi.encodePacked(newQx, newQy));
+        (bytes32 storedQx, bytes32 storedQy,, bool active, bytes32 storedDeviceId) = account.passkeys(passkeyId);
+
+        assertEq(storedQx, newQx, "QX mismatch");
+        assertEq(storedQy, newQy, "QY mismatch");
+        assertTrue(active, "Passkey should be active");
+        assertEq(storedDeviceId, deviceId, "Device ID mismatch");
+    }
+
+    function test_AddPasskeyOnlyViaEntryPoint() public {
+        bytes32 newQx = bytes32(uint256(0x9999));
+        bytes32 newQy = bytes32(uint256(0xAAAA));
+        address attacker = makeAddr("attacker");
+
+        vm.prank(attacker);
+        vm.expectRevert(P256Account.OnlyEntryPoint.selector);
+        account.addPasskey(newQx, newQy, bytes32("Device"));
+    }
+
+    function test_CannotAddDuplicatePasskey() public {
+        // Try to add the same passkey that was added during initialization
+        vm.prank(ENTRYPOINT_ADDR);
+        vm.expectRevert(P256Account.PasskeyAlreadyExists.selector);
+        account.addPasskey(qx, qy, bytes32("Duplicate"));
+    }
+
+    function test_CannotAddPasskeyWithZeroCoordinates() public {
+        vm.prank(ENTRYPOINT_ADDR);
+        vm.expectRevert(P256Account.InvalidPasskeyCoordinates.selector);
+        account.addPasskey(bytes32(0), bytes32(0), bytes32("Device"));
+
+        vm.prank(ENTRYPOINT_ADDR);
+        vm.expectRevert(P256Account.InvalidPasskeyCoordinates.selector);
+        account.addPasskey(bytes32(uint256(1)), bytes32(0), bytes32("Device"));
+
+        vm.prank(ENTRYPOINT_ADDR);
+        vm.expectRevert(P256Account.InvalidPasskeyCoordinates.selector);
+        account.addPasskey(bytes32(0), bytes32(uint256(1)), bytes32("Device"));
+    }
+
+    function test_RemovePasskey() public {
+        // Add a second passkey first
+        bytes32 newQx = bytes32(uint256(0x9999));
+        bytes32 newQy = bytes32(uint256(0xAAAA));
+
+        vm.prank(ENTRYPOINT_ADDR);
+        account.addPasskey(newQx, newQy, bytes32("Device 2"));
+
+        assertEq(account.getActivePasskeyCount(), 2, "Should have 2 passkeys");
+
+        // Remove the new passkey
+        vm.prank(ENTRYPOINT_ADDR);
+        account.removePasskey(newQx, newQy);
+
+        // Verify passkey was removed
+        assertEq(account.getActivePasskeyCount(), 1, "Should have 1 passkey");
+
+        bytes32 passkeyId = keccak256(abi.encodePacked(newQx, newQy));
+        (,,, bool active,) = account.passkeys(passkeyId);
+        assertFalse(active, "Passkey should be inactive");
+    }
+
+    function test_RemovePasskeyOnlyViaEntryPoint() public {
+        address attacker = makeAddr("attacker");
+
+        vm.prank(attacker);
+        vm.expectRevert(P256Account.OnlyEntryPoint.selector);
+        account.removePasskey(qx, qy);
+    }
+
+    function test_CannotRemoveNonexistentPasskey() public {
+        bytes32 fakeQx = bytes32(uint256(0x9999));
+        bytes32 fakeQy = bytes32(uint256(0xAAAA));
+
+        vm.prank(ENTRYPOINT_ADDR);
+        vm.expectRevert(P256Account.PasskeyNotActive.selector);
+        account.removePasskey(fakeQx, fakeQy);
+    }
+
+    function test_CannotRemoveLastPasskeyWhen2FAEnabled() public {
+        // Account has 2FA enabled by default with 1 passkey
+        assertTrue(account.twoFactorEnabled(), "2FA should be enabled");
+        assertEq(account.getActivePasskeyCount(), 1, "Should have 1 passkey");
+
+        // Try to remove the last passkey
+        vm.prank(ENTRYPOINT_ADDR);
+        vm.expectRevert(P256Account.CannotRemoveLastPasskey.selector);
+        account.removePasskey(qx, qy);
+    }
+
+    function test_CanRemoveLastPasskeyWhen2FADisabled() public {
+        // Disable 2FA first
+        vm.prank(ENTRYPOINT_ADDR);
+        account.disableTwoFactor();
+
+        assertFalse(account.twoFactorEnabled(), "2FA should be disabled");
+        assertEq(account.getActivePasskeyCount(), 1, "Should have 1 passkey");
+
+        // Now we can remove the last passkey
+        vm.prank(ENTRYPOINT_ADDR);
+        account.removePasskey(qx, qy);
+
+        assertEq(account.getActivePasskeyCount(), 0, "Should have 0 passkeys");
+    }
+
+    function test_AddMultiplePasskeys() public {
+        // Add 5 passkeys
+        for (uint256 i = 0; i < 5; i++) {
+            bytes32 newQx = bytes32(uint256(qx) + i + 1);
+            bytes32 newQy = bytes32(uint256(qy) + i + 1);
+            bytes32 deviceId = bytes32(abi.encodePacked("Device", i));
+
+            vm.prank(ENTRYPOINT_ADDR);
+            account.addPasskey(newQx, newQy, deviceId);
+        }
+
+        // Should have 6 total (1 initial + 5 added)
+        assertEq(account.getActivePasskeyCount(), 6, "Should have 6 passkeys");
+
+        // Verify all passkeys are active
+        (,,,, bool[] memory activeList,,) = account.getPasskeys(0, 10);
+        for (uint256 i = 0; i < activeList.length; i++) {
+            assertTrue(activeList[i], "All passkeys should be active");
+        }
+    }
+
+    function test_RemoveMultiplePasskeys() public {
+        // Add 3 passkeys
+        bytes32[] memory testQx = new bytes32[](3);
+        bytes32[] memory testQy = new bytes32[](3);
+
+        for (uint256 i = 0; i < 3; i++) {
+            testQx[i] = bytes32(uint256(qx) + i + 1);
+            testQy[i] = bytes32(uint256(qy) + i + 1);
+
+            vm.prank(ENTRYPOINT_ADDR);
+            account.addPasskey(testQx[i], testQy[i], bytes32(abi.encodePacked("Device", i)));
+        }
+
+        assertEq(account.getActivePasskeyCount(), 4, "Should have 4 passkeys");
+
+        // Remove 2 passkeys
+        vm.prank(ENTRYPOINT_ADDR);
+        account.removePasskey(testQx[0], testQy[0]);
+
+        vm.prank(ENTRYPOINT_ADDR);
+        account.removePasskey(testQx[1], testQy[1]);
+
+        assertEq(account.getActivePasskeyCount(), 2, "Should have 2 passkeys");
+    }
+
+    function test_GetPasskeyByIndex() public {
+        // Get the initial passkey
+        (bytes32 passkeyId, bytes32 storedQx, bytes32 storedQy, uint256 addedAt, bool active) =
+            account.getPasskeyByIndex(0);
+
+        bytes32 expectedId = keccak256(abi.encodePacked(qx, qy));
+        assertEq(passkeyId, expectedId, "Passkey ID mismatch");
+        assertEq(storedQx, qx, "QX mismatch");
+        assertEq(storedQy, qy, "QY mismatch");
+        assertTrue(active, "Passkey should be active");
+        assertGt(addedAt, 0, "Added timestamp should be set");
+    }
+
+    function test_GetPasskeyByIndexOutOfBounds() public {
+        vm.expectRevert("Index out of bounds");
+        account.getPasskeyByIndex(999);
+    }
 }
