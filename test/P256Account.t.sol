@@ -49,8 +49,13 @@ contract P256AccountTest is Test {
     }
 
     function test_Initialization() public view {
-        assertEq(account.qx(), qx, "QX mismatch");
-        assertEq(account.qy(), qy, "QY mismatch");
+        // Verify first passkey
+        assertEq(account.getPasskeyCount(), 1, "Should have 1 passkey");
+        bytes32 passkeyId = account.passkeyIds(0);
+        (bytes32 storedQx, bytes32 storedQy,,) = account.passkeys(passkeyId);
+        assertEq(storedQx, qx, "QX mismatch");
+        assertEq(storedQy, qy, "QY mismatch");
+
         assertEq(account.owner(), owner, "Owner mismatch");
         assertEq(address(account.ENTRYPOINT()), address(entryPoint), "EntryPoint mismatch");
 
@@ -67,8 +72,13 @@ contract P256AccountTest is Test {
         // Create account without 2FA
         P256Account account2 = factory.createAccount(qx, qy, owner, 1, false);
 
-        assertEq(account2.qx(), qx, "QX mismatch");
-        assertEq(account2.qy(), qy, "QY mismatch");
+        // Verify first passkey
+        assertEq(account2.getPasskeyCount(), 1, "Should have 1 passkey");
+        bytes32 passkeyId = account2.passkeyIds(0);
+        (bytes32 storedQx, bytes32 storedQy,,) = account2.passkeys(passkeyId);
+        assertEq(storedQx, qx, "QX mismatch");
+        assertEq(storedQy, qy, "QY mismatch");
+
         assertEq(account2.owner(), owner, "Owner mismatch");
 
         // Verify two-factor authentication is disabled
@@ -79,8 +89,9 @@ contract P256AccountTest is Test {
         // Create account in owner-only mode (no passkey)
         P256Account ownerOnlyAccount = factory.createAccount(bytes32(0), bytes32(0), owner, 2, false);
 
-        assertEq(ownerOnlyAccount.qx(), bytes32(0), "QX should be zero");
-        assertEq(ownerOnlyAccount.qy(), bytes32(0), "QY should be zero");
+        // Verify no passkeys
+        assertEq(ownerOnlyAccount.getPasskeyCount(), 0, "Should have 0 passkeys");
+
         assertEq(ownerOnlyAccount.owner(), owner, "Owner mismatch");
 
         // Verify two-factor authentication is disabled
@@ -110,9 +121,12 @@ contract P256AccountTest is Test {
         vm.prank(owner);
         bytes32 actionHash = account.proposePublicKeyUpdate(newQx, newQy);
 
-        // Public key should not be updated yet
-        assertEq(account.qx(), qx, "QX should not be updated yet");
-        assertEq(account.qy(), qy, "QY should not be updated yet");
+        // Public key should not be added yet
+        assertEq(account.getPasskeyCount(), 1, "Should still have 1 passkey");
+        bytes32 passkeyId = account.passkeyIds(0);
+        (bytes32 storedQx, bytes32 storedQy,,) = account.passkeys(passkeyId);
+        assertEq(storedQx, qx, "QX should not be updated yet");
+        assertEq(storedQy, qy, "QY should not be updated yet");
 
         // Verify action hash is not zero
         assertTrue(actionHash != bytes32(0), "Action hash should not be zero");
@@ -132,8 +146,14 @@ contract P256AccountTest is Test {
         // Execute update
         account.executePublicKeyUpdate(actionHash);
 
-        assertEq(account.qx(), newQx, "QX not updated");
-        assertEq(account.qy(), newQy, "QY not updated");
+        // Verify new passkey was added
+        assertEq(account.getPasskeyCount(), 2, "Should have 2 passkeys");
+        bytes32 newPasskeyId = keccak256(abi.encodePacked(newQx, newQy));
+        (bytes32 storedQx, bytes32 storedQy, uint256 addedAt, bool active) = account.passkeys(newPasskeyId);
+        assertEq(storedQx, newQx, "QX not updated");
+        assertEq(storedQy, newQy, "QY not updated");
+        assertTrue(active, "New passkey should be active");
+        assertTrue(addedAt > 0, "Added timestamp should be set");
     }
 
     function test_CannotExecutePublicKeyUpdateBeforeTimelock() public {
@@ -737,9 +757,14 @@ contract P256AccountTest is Test {
         // Execute recovery
         account.executeRecovery(0);
 
-        // Verify account updated
-        assertEq(account.qx(), newQx, "QX not updated");
-        assertEq(account.qy(), newQy, "QY not updated");
+        // Verify account updated - old passkeys should be deactivated, new passkey added
+        assertEq(account.getActivePasskeyCount(), 1, "Should have 1 active passkey");
+        bytes32 newPasskeyId = keccak256(abi.encodePacked(newQx, newQy));
+        (bytes32 storedQx, bytes32 storedQy,, bool active) = account.passkeys(newPasskeyId);
+        assertEq(storedQx, newQx, "QX not updated");
+        assertEq(storedQy, newQy, "QY not updated");
+        assertTrue(active, "New passkey should be active");
+
         assertEq(account.owner(), newOwner, "Owner not updated");
     }
 

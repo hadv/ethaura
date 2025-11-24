@@ -32,14 +32,6 @@ contract P256Account is IAccount, IERC1271, Ownable, Initializable {
                                 STORAGE
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice DEPRECATED: The P-256 public key x-coordinate (kept for backward compatibility)
-    /// @dev Use passkeys mapping instead
-    bytes32 public qx;
-
-    /// @notice DEPRECATED: The P-256 public key y-coordinate (kept for backward compatibility)
-    /// @dev Use passkeys mapping instead
-    bytes32 public qy;
-
     /// @notice Nonce for replay protection (in addition to EntryPoint nonce)
     uint256 public nonce;
 
@@ -51,16 +43,12 @@ contract P256Account is IAccount, IERC1271, Ownable, Initializable {
                           MULTIPLE PASSKEYS
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Maximum number of passkeys allowed per account
-    /// @dev Limited to prevent excessive gas costs during signature verification
-    uint256 public constant MAX_PASSKEYS = 10;
-
     /// @notice Passkey information
     struct PasskeyInfo {
-        bytes32 qx;           // Public key x-coordinate
-        bytes32 qy;           // Public key y-coordinate
-        uint256 addedAt;      // Timestamp when passkey was added
-        bool active;          // Whether the passkey is active
+        bytes32 qx; // Public key x-coordinate
+        bytes32 qy; // Public key y-coordinate
+        uint256 addedAt; // Timestamp when passkey was added
+        bool active; // Whether the passkey is active
     }
 
     /// @notice Passkey storage by ID
@@ -186,7 +174,6 @@ contract P256Account is IAccount, IERC1271, Ownable, Initializable {
     error PasskeyAlreadyExists();
     error PasskeyDoesNotExist();
     error PasskeyNotActive();
-    error MaxPasskeysReached();
     error CannotRemoveLastPasskey();
     error InvalidPasskeyCoordinates();
 
@@ -242,11 +229,7 @@ contract P256Account is IAccount, IERC1271, Ownable, Initializable {
             require(_qx != bytes32(0) && _qy != bytes32(0), "2FA requires passkey");
         }
 
-        // Set deprecated storage for backward compatibility
-        qx = _qx;
-        qy = _qy;
-
-        // Add first passkey to new storage if provided
+        // Add first passkey if provided
         if (_qx != bytes32(0) && _qy != bytes32(0)) {
             _addPasskeyInternal(_qx, _qy);
         }
@@ -404,8 +387,12 @@ contract P256Account is IAccount, IERC1271, Ownable, Initializable {
         returns (bytes32 _qx, bytes32 _qy, bool _twoFactorEnabled, address _owner)
     {
         // Default to storage values
-        _qx = qx;
-        _qy = qy;
+        // Get first passkey if available
+        if (passkeyIds.length > 0) {
+            PasskeyInfo storage firstPasskey = passkeys[passkeyIds[0]];
+            _qx = firstPasskey.qx;
+            _qy = firstPasskey.qy;
+        }
         _twoFactorEnabled = twoFactorEnabled;
         _owner = owner();
 
@@ -524,17 +511,12 @@ contract P256Account is IAccount, IERC1271, Ownable, Initializable {
                 isValid = P256.verifySignature(messageHash, r, s, passkeyInfo.qx, passkeyInfo.qy);
             }
         } else {
-            // Legacy format: r || s (64 bytes) - check all passkeys for backward compatibility
+            // Legacy format: r || s (64 bytes) - check all passkeys
             for (uint256 i = 0; i < passkeyIds.length && !isValid; i++) {
                 PasskeyInfo storage passkeyInfo = passkeys[passkeyIds[i]];
                 if (passkeyInfo.active) {
                     isValid = P256.verifySignature(messageHash, r, s, passkeyInfo.qx, passkeyInfo.qy);
                 }
-            }
-
-            // Fallback to deprecated qx/qy for backward compatibility during transition
-            if (!isValid && qx != bytes32(0) && qy != bytes32(0)) {
-                isValid = P256.verifySignature(messageHash, r, s, qx, qy);
             }
         }
 
@@ -582,10 +564,6 @@ contract P256Account is IAccount, IERC1271, Ownable, Initializable {
 
         action.executed = true;
 
-        // Update deprecated storage for backward compatibility
-        qx = action.qx;
-        qy = action.qy;
-
         // Add as new passkey if not already exists
         bytes32 passkeyId = keccak256(abi.encodePacked(action.qx, action.qy));
         if (passkeys[passkeyId].qx == bytes32(0)) {
@@ -624,12 +602,12 @@ contract P256Account is IAccount, IERC1271, Ownable, Initializable {
      * @notice Enable two-factor authentication
      * @dev When enabled, all transactions require both P-256 passkey signature and owner ECDSA signature
      * @dev Can only be called via UserOperation (passkey signature or owner signature)
-     * @dev Requires a passkey to be configured (qx and qy must be non-zero)
+     * @dev Requires at least one passkey to be configured
      */
     function enableTwoFactor() external {
         if (msg.sender != address(ENTRYPOINT)) revert OnlyEntryPoint();
         require(!twoFactorEnabled, "2FA already enabled");
-        require(qx != bytes32(0) && qy != bytes32(0), "Passkey required for 2FA");
+        require(passkeyIds.length > 0, "Passkey required for 2FA");
         twoFactorEnabled = true;
         emit TwoFactorEnabled(owner());
     }
@@ -655,7 +633,6 @@ contract P256Account is IAccount, IERC1271, Ownable, Initializable {
      * @param _qx The x-coordinate of the new passkey
      * @param _qy The y-coordinate of the new passkey
      * @dev SECURITY: Only callable via EntryPoint (requires existing passkey signature)
-     * @dev Enforces MAX_PASSKEYS limit to prevent gas issues
      * @dev Validates that coordinates are non-zero and passkey doesn't already exist
      */
     function addPasskey(bytes32 _qx, bytes32 _qy) external {
@@ -663,10 +640,6 @@ contract P256Account is IAccount, IERC1271, Ownable, Initializable {
 
         // Validate coordinates
         if (_qx == bytes32(0) || _qy == bytes32(0)) revert InvalidPasskeyCoordinates();
-
-        // Check max limit
-        uint256 activeCount = _getActivePasskeyCount();
-        if (activeCount >= MAX_PASSKEYS) revert MaxPasskeysReached();
 
         // Add passkey
         _addPasskeyInternal(_qx, _qy);
@@ -766,12 +739,7 @@ contract P256Account is IAccount, IERC1271, Ownable, Initializable {
         if (passkeys[passkeyId].qx != bytes32(0)) revert PasskeyAlreadyExists();
 
         // Add passkey
-        passkeys[passkeyId] = PasskeyInfo({
-            qx: _qx,
-            qy: _qy,
-            addedAt: block.timestamp,
-            active: true
-        });
+        passkeys[passkeyId] = PasskeyInfo({qx: _qx, qy: _qy, addedAt: block.timestamp, active: true});
 
         passkeyIds.push(passkeyId);
 
@@ -957,10 +925,6 @@ contract P256Account is IAccount, IERC1271, Ownable, Initializable {
         if (block.timestamp < request.executeAfter) revert RecoveryNotReady();
 
         request.executed = true;
-
-        // Update deprecated storage for backward compatibility
-        qx = request.newQx;
-        qy = request.newQy;
 
         // SECURITY: Deactivate ALL existing passkeys during recovery
         // This prevents the compromised passkeys from being used
