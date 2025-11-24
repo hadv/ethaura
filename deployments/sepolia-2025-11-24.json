@@ -11,15 +11,16 @@
       "note": "Pre-deployed EntryPoint v0.7 (canonical address)"
     },
     "P256AccountFactory": {
-      "address": "0xD2f89749941C1f181EF68D014a29244686cd24CE",
-      "deploymentTx": "0x7a697953ba28ae8534c58efd5de66b267269ee2e372fbcc7f517269dfd961b2a",
-      "blockNumber": 9695965,
+      "address": "0x21939287E8b2bA5cfFBF103C1369Ec6Cf8f35AbF",
+      "deploymentTx": "0xd1cee83c8aeab45bd534c1bb4d5107c0176e73170a32501cd4a48d546d834f35",
+      "blockNumber": 9696019,
       "gasUsed": 4059182,
       "gasCost": "0.00000405922259182 ETH",
-      "salt": "0xbfae1974f681bad305d92efe0f7441e1577e78371b463bb9abc8a16c6ca16fe3"
+      "salt": "0x1eb54b512d3bb151834ddb91521c2344e3b598a3facafb4d2c2b633c93e628c1",
+      "initCodeHash": "0x747dd63dfae991117debeb008f2fb0533bb59a6eee74ba0e197e21099d034c7a"
     },
     "P256Account": {
-      "address": "0xA171892A4f98C30722C9739211Be655EBca3Bd19",
+      "address": "0x223A17300aB076795eeBC4DA3e803bDAD3DA86D8",
       "note": "Implementation contract (deployed by factory constructor)"
     },
     "SoladyERC1967Factory": {
@@ -28,9 +29,9 @@
     }
   },
   "explorer": {
-    "factory": "https://sepolia.etherscan.io/address/0xD2f89749941C1f181EF68D014a29244686cd24CE",
-    "implementation": "https://sepolia.etherscan.io/address/0xA171892A4f98C30722C9739211Be655EBca3Bd19",
-    "deploymentTx": "https://sepolia.etherscan.io/tx/0x7a697953ba28ae8534c58efd5de66b267269ee2e372fbcc7f517269dfd961b2a"
+    "factory": "https://sepolia.etherscan.io/address/0x21939287E8b2bA5cfFBF103C1369Ec6Cf8f35AbF",
+    "implementation": "https://sepolia.etherscan.io/address/0x223A17300aB076795eeBC4DA3e803bDAD3DA86D8",
+    "deploymentTx": "https://sepolia.etherscan.io/tx/0xd1cee83c8aeab45bd534c1bb4d5107c0176e73170a32501cd4a48d546d834f35"
   },
   "rpc": {
     "public": "https://rpc.sepolia.org",
@@ -58,7 +59,10 @@
     "The salt calculation now includes the implementation address",
     "This is NOT a vanity address deployment (no 0x000000 prefix)",
     "All 72 tests passing before deployment",
-    "Frontend .env files updated with new factory address"
+    "Frontend .env files updated with new factory address",
+    "Note: Foundry's CREATE2 deployment doesn't produce the expected vanity address",
+    "The salt 0x1eb54b512d3bb151834ddb91521c2344e3b598a3facafb4d2c2b633c93e628c1 was verified to produce 0x00000038f2A972e308AaB153c84e6ed3e38e8225 with raw CREATE2",
+    "But Foundry's deployment mechanism produced 0x21939287E8b2bA5cfFBF103C1369Ec6Cf8f35AbF instead"
   ]
 }
 
