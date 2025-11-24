@@ -98,17 +98,7 @@ contract P256Account is IAccount, IERC1271, Ownable, Initializable {
     /// @notice Recovery request nonce
     uint256 public recoveryNonce;
 
-    /// @notice Pending public key update
-    struct PendingPublicKeyUpdate {
-        bytes32 qx;
-        bytes32 qy;
-        uint256 executeAfter;
-        bool executed;
-        bool cancelled;
-    }
 
-    /// @notice Pending public key updates by actionHash
-    mapping(bytes32 => PendingPublicKeyUpdate) public pendingPublicKeyUpdates;
 
     /// @notice List of all pending action hashes (for enumeration)
     bytes32[] public pendingActionHashes;
@@ -157,9 +147,6 @@ contract P256Account is IAccount, IERC1271, Ownable, Initializable {
     event RecoveryCancelled(uint256 indexed nonce);
 
     // Timelock events
-    event PublicKeyUpdateProposed(bytes32 indexed actionHash, bytes32 qx, bytes32 qy, uint256 executeAfter);
-    event PublicKeyUpdateExecuted(bytes32 indexed actionHash, bytes32 qx, bytes32 qy);
-    event PublicKeyUpdateCancelled(bytes32 indexed actionHash);
 
     /*//////////////////////////////////////////////////////////////
                                 ERRORS
@@ -521,76 +508,7 @@ contract P256Account is IAccount, IERC1271, Ownable, Initializable {
                           ACCOUNT MANAGEMENT
     //////////////////////////////////////////////////////////////*/
 
-    /**
-     * @notice Propose a P-256 public key update (with timelock)
-     * @param _qx The new x-coordinate
-     * @param _qy The new y-coordinate
-     * @return actionHash The hash of the proposed action
-     * @dev Owner can propose, but must wait ADMIN_TIMELOCK before execution
-     */
-    function proposePublicKeyUpdate(bytes32 _qx, bytes32 _qy) external onlyOwner returns (bytes32) {
-        bytes32 actionHash = keccak256(abi.encode("updatePublicKey", _qx, _qy, block.timestamp));
 
-        pendingPublicKeyUpdates[actionHash] = PendingPublicKeyUpdate({
-            qx: _qx, qy: _qy, executeAfter: block.timestamp + ADMIN_TIMELOCK, executed: false, cancelled: false
-        });
-
-        pendingActionHashes.push(actionHash);
-
-        emit PublicKeyUpdateProposed(actionHash, _qx, _qy, block.timestamp + ADMIN_TIMELOCK);
-        return actionHash;
-    }
-
-    /**
-     * @notice Execute a pending public key update
-     * @param actionHash The hash of the action to execute
-     * @dev Can be executed by anyone after timelock expires
-     * @dev NOTE: This is deprecated in favor of addPasskey/removePasskey
-     * @dev Kept for backward compatibility - adds as a new passkey
-     */
-    function executePublicKeyUpdate(bytes32 actionHash) external {
-        PendingPublicKeyUpdate storage action = pendingPublicKeyUpdates[actionHash];
-
-        if (action.executeAfter == 0) revert ActionNotFound();
-        if (action.executed) revert ActionAlreadyExecuted();
-        if (action.cancelled) revert ActionAlreadyCancelled();
-        if (block.timestamp < action.executeAfter) revert TimelockNotExpired();
-
-        action.executed = true;
-
-        // Add as new passkey if not already exists
-        bytes32 passkeyId = keccak256(abi.encodePacked(action.qx, action.qy));
-        if (passkeys[passkeyId].qx == bytes32(0)) {
-            _addPasskeyInternal(action.qx, action.qy, bytes32(0)); // No device ID for legacy updates
-        }
-
-        // Remove from pending list
-        _removePendingActionHash(actionHash);
-
-        emit PublicKeyUpdateExecuted(actionHash, action.qx, action.qy);
-        emit PublicKeyUpdated(action.qx, action.qy);
-    }
-
-    /**
-     * @notice Cancel a pending public key update (via passkey signature through EntryPoint)
-     * @param actionHash The hash of the action to cancel
-     * @dev Only callable via UserOperation (passkey signature)
-     */
-    function cancelPendingAction(bytes32 actionHash) external {
-        if (msg.sender != address(ENTRYPOINT)) revert OnlyEntryPoint();
-
-        PendingPublicKeyUpdate storage action = pendingPublicKeyUpdates[actionHash];
-        if (action.executeAfter == 0) revert ActionNotFound();
-        if (action.executed) revert ActionAlreadyExecuted();
-        if (action.cancelled) revert ActionAlreadyCancelled();
-
-        action.cancelled = true;
-
-        // Remove from pending list
-        _removePendingActionHash(actionHash);
-
-        emit PublicKeyUpdateCancelled(actionHash);
-    }
 
     /**
      * @notice Enable two-factor authentication
@@ -1284,78 +1202,5 @@ contract P256Account is IAccount, IERC1271, Ownable, Initializable {
         ENTRYPOINT.withdrawTo(withdrawAddress, amount);
     }
 
-    /**
-     * @notice Get pending public key update details
-     * @param actionHash The hash of the pending action
-     * @return proposedQx The proposed x-coordinate
-     * @return proposedQy The proposed y-coordinate
-     * @return executeAfter The timestamp when the action can be executed
-     * @return executed Whether the action has been executed
-     * @return cancelled Whether the action has been cancelled
-     */
-    function getPendingPublicKeyUpdate(bytes32 actionHash)
-        public
-        view
-        returns (bytes32 proposedQx, bytes32 proposedQy, uint256 executeAfter, bool executed, bool cancelled)
-    {
-        PendingPublicKeyUpdate storage action = pendingPublicKeyUpdates[actionHash];
-        return (action.qx, action.qy, action.executeAfter, action.executed, action.cancelled);
-    }
 
-    /**
-     * @notice Get the number of pending action hashes
-     * @return The count of pending action hashes
-     */
-    function getPendingActionCount() public view returns (uint256) {
-        return pendingActionHashes.length;
-    }
-
-    /**
-     * @notice Get all active (not executed and not cancelled) pending actions
-     * @return actionHashes Array of active action hashes
-     * @return qxValues Array of proposed qx values
-     * @return qyValues Array of proposed qy values
-     * @return executeAfters Array of execution timestamps
-     */
-    function getActivePendingActions()
-        public
-        view
-        returns (
-            bytes32[] memory actionHashes,
-            bytes32[] memory qxValues,
-            bytes32[] memory qyValues,
-            uint256[] memory executeAfters
-        )
-    {
-        // First pass: count active actions
-        uint256 activeCount = 0;
-        for (uint256 i = 0; i < pendingActionHashes.length; i++) {
-            PendingPublicKeyUpdate storage action = pendingPublicKeyUpdates[pendingActionHashes[i]];
-            if (!action.executed && !action.cancelled) {
-                activeCount++;
-            }
-        }
-
-        // Allocate arrays
-        actionHashes = new bytes32[](activeCount);
-        qxValues = new bytes32[](activeCount);
-        qyValues = new bytes32[](activeCount);
-        executeAfters = new uint256[](activeCount);
-
-        // Second pass: populate arrays
-        uint256 index = 0;
-        for (uint256 i = 0; i < pendingActionHashes.length; i++) {
-            bytes32 hash = pendingActionHashes[i];
-            PendingPublicKeyUpdate storage action = pendingPublicKeyUpdates[hash];
-            if (!action.executed && !action.cancelled) {
-                actionHashes[index] = hash;
-                qxValues[index] = action.qx;
-                qyValues[index] = action.qy;
-                executeAfters[index] = action.executeAfter;
-                index++;
-            }
-        }
-
-        return (actionHashes, qxValues, qyValues, executeAfters);
-    }
 }
