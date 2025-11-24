@@ -1,15 +1,21 @@
 import { useState, useEffect } from 'react'
-import { CheckCircle } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
 import { useNetwork } from '../contexts/NetworkContext'
-import { createDeviceSession, pollSessionUntilComplete, addDevice, updateDeviceProposalHash } from '../lib/deviceManager'
+import { useP256SDK } from '../hooks/useP256SDK'
+import { createDeviceSession, pollSessionUntilComplete, addDevice } from '../lib/deviceManager'
+import { signWithPasskey } from '../utils/webauthn'
 import { ethers } from 'ethers'
 import '../styles/AddMobileDevice.css'
 
-function AddMobileDevice({ accountAddress, onComplete, onCancel }) {
-  const { address: ownerAddress, signMessage, web3AuthProvider } = useWeb3Auth()
+/**
+ * AddMobileDevice V2 - Clean implementation for adding passkeys from mobile devices
+ * Uses immediate passkey addition (no timelock) via UserOperation
+ */
+function AddMobileDeviceV2({ accountAddress, onComplete, onCancel }) {
+  const { address: ownerAddress, signMessage, signRawHash } = useWeb3Auth()
   const { networkInfo } = useNetwork()
+  const sdk = useP256SDK()
   const [sessionId, setSessionId] = useState(null)
   const [qrUrl, setQrUrl] = useState('')
   const [loading, setLoading] = useState(false)
@@ -27,7 +33,6 @@ function AddMobileDevice({ accountAddress, onComplete, onCancel }) {
     setStatus('Creating registration session...')
 
     try {
-      // Verify we have required context
       if (!ownerAddress || !signMessage) {
         throw new Error('Not logged in. Please refresh the page and try again.')
       }
@@ -60,7 +65,6 @@ function AddMobileDevice({ accountAddress, onComplete, onCancel }) {
       const completedSession = await pollSessionUntilComplete(sid, 10 * 60 * 1000, 2000)
 
       if (completedSession.status === 'completed') {
-        // Extract device data from completed session
         const deviceData = completedSession.deviceData
 
         if (!deviceData) {
@@ -77,122 +81,88 @@ function AddMobileDevice({ accountAddress, onComplete, onCancel }) {
           },
         }
 
-        // Extract attestation metadata (Phase 1)
         const attestationMetadata = deviceData.attestationMetadata || null
 
-        // Check if account is deployed (using public RPC, no wallet needed)
-        setStatus('Checking account deployment...')
+        // Save device to database first
+        setStatus('Saving device to database...')
+        await addDevice(
+          signMessage,
+          ownerAddress,
+          accountAddress,
+          deviceData.deviceName,
+          deviceData.deviceType,
+          credential,
+          attestationMetadata
+        )
 
-        // Use public RPC to check deployment (no wallet/provider needed)
+        // Check if account is deployed
+        setStatus('Checking account deployment...')
         const publicProvider = new ethers.JsonRpcProvider(networkInfo.rpcUrl)
         const code = await publicProvider.getCode(accountAddress)
         const isDeployed = code !== '0x'
 
         console.log('🔍 Account deployment status:', { accountAddress, isDeployed })
 
-        if (isDeployed) {
-          // For DEPLOYED accounts: Save to multi-device table and create proposal
-          setStatus('Saving device to database...')
+        if (isDeployed && sdk) {
+          // Account is deployed - add passkey to blockchain immediately
+          setStatus('Adding passkey to blockchain...')
 
-          // Verify we have a provider for signing transactions
-          if (!web3AuthProvider) {
-            throw new Error('Web3Auth provider not available. Please refresh the page and try again.')
-          }
-
-          // Save device to database
-          await addDevice(
-            signMessage,
-            ownerAddress,
-            accountAddress,
-            deviceData.deviceName,
-            deviceData.deviceType,
-            credential,
-            attestationMetadata // NEW: Phase 1 - pass attestation metadata
-          )
-
-          // Create on-chain proposal
-          setStatus('Creating on-chain proposal...')
-
-          const accountABI = [
-            'function qx() view returns (bytes32)',
-            'function qy() view returns (bytes32)',
-            'function proposePublicKeyUpdate(bytes32 _qx, bytes32 _qy) returns (bytes32)',
-            'event PublicKeyUpdateProposed(bytes32 indexed actionHash, bytes32 qx, bytes32 qy, uint256 executeAfter)',
-          ]
-
-          const provider = new ethers.BrowserProvider(web3AuthProvider)
-          const signer = await provider.getSigner()
-          const accountContract = new ethers.Contract(accountAddress, accountABI, signer)
-
-          // Convert public key coordinates to bytes32
-          const qxBytes32 = deviceData.qx.startsWith('0x') ? deviceData.qx : `0x${deviceData.qx}`
-          const qyBytes32 = deviceData.qy.startsWith('0x') ? deviceData.qy : `0x${deviceData.qy}`
-
-          console.log('📝 Proposing public key update:', { qx: qxBytes32, qy: qyBytes32 })
-
-          // Call proposePublicKeyUpdate
-          const tx = await accountContract.proposePublicKeyUpdate(qxBytes32, qyBytes32)
-          console.log('⏳ Transaction sent:', tx.hash)
-
-          setStatus('Waiting for transaction confirmation...')
-          const receipt = await tx.wait()
-          console.log('✅ Transaction confirmed:', receipt.hash)
-
-          // Extract actionHash from event logs
           try {
-            const iface = new ethers.Interface(accountABI)
-            let actionHash = null
+            // Get account info to check if 2FA is enabled
+            const accountInfo = await sdk.getAccountInfo(accountAddress)
+            const needsOwnerSignature = accountInfo.twoFactorEnabled
 
-            for (const log of receipt.logs) {
-              try {
-                const parsed = iface.parseLog({ topics: log.topics, data: log.data })
-                if (parsed && parsed.name === 'PublicKeyUpdateProposed') {
-                  actionHash = parsed.args.actionHash
-                  console.log('✅ Extracted actionHash from event:', actionHash)
-                  break
-                }
-              } catch (e) {
-                // Skip logs that don't match our ABI
-                continue
-              }
+            console.log('📝 Adding mobile passkey to blockchain:', {
+              qx: deviceData.qx,
+              qy: deviceData.qy,
+              deviceId: ethers.id(deviceData.deviceName),
+              twoFactorEnabled: accountInfo.twoFactorEnabled,
+            })
+
+            // Convert device name to bytes32 deviceId
+            const deviceId = ethers.id(deviceData.deviceName)
+
+            // Load the passkey credential from CURRENT device (desktop)
+            // We need to use the desktop's passkey to sign the UserOperation
+            const currentPasskeyStr = localStorage.getItem(`passkey_${accountAddress}`)
+            if (!currentPasskeyStr) {
+              throw new Error('No passkey found on this device. Please add a passkey to this device first before adding mobile passkeys.')
             }
 
-            if (actionHash) {
-              // Save proposal hash to database
-              await updateDeviceProposalHash(
-                signMessage,
-                ownerAddress,
-                accountAddress,
-                credential.id,
-                actionHash,
-                receipt.hash
-              )
-              console.log('✅ Proposal hash saved to database')
-            } else {
-              console.warn('⚠️  Could not extract actionHash from transaction logs')
-            }
-          } catch (eventError) {
-            console.error('⚠️  Failed to extract or save actionHash:', eventError)
-            // Continue anyway - the proposal was successful
+            const currentPasskey = JSON.parse(currentPasskeyStr)
+
+            // Add mobile passkey via UserOperation (signed by desktop passkey)
+            await sdk.addPasskey({
+              accountAddress,
+              qx: deviceData.qx,
+              qy: deviceData.qy,
+              deviceId,
+              passkeyCredential: currentPasskey, // Use desktop's passkey to sign
+              signWithPasskey,
+              getOwnerSignature: needsOwnerSignature
+                ? async (userOpHash, userOp) => {
+                    console.log('🔐 2FA enabled - requesting owner signature (Step 1/2)...')
+                    setStatus('🔐 Step 1/2: Requesting signature from your social login account...')
+
+                    const ownerSig = await signRawHash(userOpHash)
+                    console.log('🔐 Owner signature received (Step 1/2):', ownerSig)
+
+                    setStatus('🔑 Step 2/2: Signing with your passkey (biometric)...')
+
+                    return ownerSig
+                  }
+                : null,
+            })
+
+            setStatus('✅ Mobile passkey added to blockchain successfully!')
+          } catch (err) {
+            console.error('Failed to add passkey to blockchain:', err)
+            // Don't fail the whole operation - passkey is saved in database
+            setStatus('⚠️ Passkey saved but failed to add to blockchain. It will be added on your next transaction.')
           }
-
-          setStatus('✅ Device registered and proposal created! Wait 48 hours then execute.')
         } else {
-          // For UNDEPLOYED accounts: Save to multi-device table
-          // NO on-chain transaction needed!
-          setStatus('Saving device to database...')
-          console.log('📝 Saving device for undeployed account:', {
-            accountAddress,
-            ownerAddress,
-            credentialId: credential.id,
-            deviceName: deviceData.deviceName,
-            deviceType: deviceData.deviceType,
-          })
-
-          // Use addDevice() which supports attestation metadata
-          await addDevice(signMessage, ownerAddress, accountAddress, deviceData.deviceName, deviceData.deviceType, credential, deviceData.attestationMetadata)
-          console.log('Device saved successfully')
-          setStatus('Device saved! It will be used when you deploy this account.')
+          // Account not deployed yet - passkey will be added on first transaction
+          setStatus('✅ Device saved! It will be added to the blockchain when you deploy this account.')
         }
 
         setTimeout(() => {
@@ -300,5 +270,5 @@ function AddMobileDevice({ accountAddress, onComplete, onCancel }) {
   )
 }
 
-export default AddMobileDevice
+export default AddMobileDeviceV2
 

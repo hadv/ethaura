@@ -92,7 +92,7 @@ contract P256AccountFactoryTest is Test {
 
         // Deploy account with 2FA enabled
         vm.deal(address(this), 1 ether);
-        P256Account account = factory.createAccount(QX1, QY1, owner1, salt, true);
+        P256Account account = factory.createAccount(QX1, QY1, owner1, salt, true, bytes32("Device 1"));
 
         // Verify addresses match
         assertEq(address(account), predicted, "Predicted address should match deployed address");
@@ -148,7 +148,7 @@ contract P256AccountFactoryTest is Test {
         address predicted = factory.getAddress(QX1, QY1, owner1, salt);
 
         // Get initCode with 2FA enabled
-        bytes memory initCode = factory.getInitCode(QX1, QY1, owner1, salt, true);
+        bytes memory initCode = factory.getInitCode(QX1, QY1, owner1, salt, true, bytes32("Device 1"));
 
         // Verify initCode contains factory address
         address factoryFromInitCode;
@@ -187,14 +187,14 @@ contract P256AccountFactoryTest is Test {
 
         // Try to initialize the implementation contract - should revert
         vm.expectRevert(abi.encodeWithSignature("InvalidInitialization()"));
-        implementation.initialize(QX1, QY1, owner1, true);
+        implementation.initialize(QX1, QY1, owner1, true, bytes32("Device 1"));
     }
 
     /**
      * Test: Proxy accounts should be minimal in size
      */
     function test_ProxyAccountsAreMinimal() public {
-        P256Account account = factory.createAccount(QX1, QY1, owner1, 0, true);
+        P256Account account = factory.createAccount(QX1, QY1, owner1, 0, true, bytes32("Device 1"));
 
         // Get the bytecode size of the deployed proxy
         uint256 proxySize = address(account).code.length;
@@ -211,8 +211,8 @@ contract P256AccountFactoryTest is Test {
      * Test: All proxies should point to the same implementation
      */
     function test_AllProxiesShareSameImplementation() public {
-        P256Account account1 = factory.createAccount(QX1, QY1, owner1, 0, true);
-        P256Account account2 = factory.createAccount(QX2, QY2, owner2, 1, false);
+        P256Account account1 = factory.createAccount(QX1, QY1, owner1, 0, true, bytes32("Device 1"));
+        P256Account account2 = factory.createAccount(QX2, QY2, owner2, 1, false, bytes32("Device 2"));
 
         // Both should point to the same implementation
         P256Account impl = factory.IMPLEMENTATION();
@@ -231,7 +231,7 @@ contract P256AccountFactoryTest is Test {
     function test_GasBenchmarkProxyDeployment() public {
         // Measure gas for proxy deployment
         uint256 gasBefore = gasleft();
-        P256Account account = factory.createAccount(QX1, QY1, owner1, 0, true);
+        P256Account account = factory.createAccount(QX1, QY1, owner1, 0, true, bytes32("Device 1"));
         uint256 gasUsed = gasBefore - gasleft();
 
         // Log gas usage

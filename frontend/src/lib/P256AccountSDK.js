@@ -223,6 +223,168 @@ export class P256AccountSDK {
     })
   }
 
+  /*//////////////////////////////////////////////////////////////
+                      PASSKEY MANAGEMENT
+  //////////////////////////////////////////////////////////////*/
+
+  /**
+   * Add a new passkey to the account
+   * @param {Object} params - Parameters
+   * @param {string} params.accountAddress - P256Account address
+   * @param {string} params.qx - Passkey X coordinate (bytes32)
+   * @param {string} params.qy - Passkey Y coordinate (bytes32)
+   * @param {string} params.deviceId - Device identifier (bytes32, e.g., "iPhone 15")
+   * @param {Object} params.passkeyCredential - Passkey credential for signing
+   * @param {Function} params.signWithPasskey - Function to sign with passkey
+   * @param {string} params.ownerSignature - Owner signature (for 2FA, optional)
+   * @returns {Promise<Object>} UserOperation receipt
+   */
+  async addPasskey({
+    accountAddress,
+    qx,
+    qy,
+    deviceId,
+    passkeyCredential,
+    signWithPasskey,
+    ownerSignature = null,
+  }) {
+    // Encode addPasskey call
+    const accountContract = this.accountManager.getAccountContract(accountAddress)
+    const data = accountContract.interface.encodeFunctionData('addPasskey', [qx, qy, deviceId])
+
+    return await this.executeCall({
+      accountAddress,
+      targetAddress: accountAddress,
+      value: 0n,
+      data,
+      passkeyCredential,
+      signWithPasskey,
+      ownerSignature,
+      needsDeployment: false,
+      initCode: '0x',
+    })
+  }
+
+  /**
+   * Remove a passkey from the account
+   * @param {Object} params - Parameters
+   * @param {string} params.accountAddress - P256Account address
+   * @param {string} params.qx - Passkey X coordinate (bytes32)
+   * @param {string} params.qy - Passkey Y coordinate (bytes32)
+   * @param {Object} params.passkeyCredential - Passkey credential for signing
+   * @param {Function} params.signWithPasskey - Function to sign with passkey
+   * @param {string} params.ownerSignature - Owner signature (for 2FA, optional)
+   * @returns {Promise<Object>} UserOperation receipt
+   */
+  async removePasskey({
+    accountAddress,
+    qx,
+    qy,
+    passkeyCredential,
+    signWithPasskey,
+    ownerSignature = null,
+  }) {
+    // Encode removePasskey call
+    const accountContract = this.accountManager.getAccountContract(accountAddress)
+    const data = accountContract.interface.encodeFunctionData('removePasskey', [qx, qy])
+
+    return await this.executeCall({
+      accountAddress,
+      targetAddress: accountAddress,
+      value: 0n,
+      data,
+      passkeyCredential,
+      signWithPasskey,
+      ownerSignature,
+      needsDeployment: false,
+      initCode: '0x',
+    })
+  }
+
+  /**
+   * Get all passkeys for an account (paginated)
+   * @param {string} accountAddress - P256Account address
+   * @param {number} offset - Starting index (default: 0)
+   * @param {number} limit - Maximum number to return (default: 50)
+   * @returns {Promise<Object>} Passkeys data
+   */
+  async getPasskeys(accountAddress, offset = 0, limit = 50) {
+    return await this.accountManager.getPasskeys(accountAddress, offset, limit)
+  }
+
+  /**
+   * Get active passkey count
+   * @param {string} accountAddress - P256Account address
+   * @returns {Promise<number>} Number of active passkeys
+   */
+  async getActivePasskeyCount(accountAddress) {
+    return await this.accountManager.getActivePasskeyCount(accountAddress)
+  }
+
+  /**
+   * Enable two-factor authentication (requires both passkey + owner signatures)
+   * @param {Object} params - Parameters
+   * @param {string} params.accountAddress - P256Account address
+   * @param {Object} params.passkeyCredential - Passkey credential for signing
+   * @param {Function} params.signWithPasskey - Function to sign with passkey
+   * @param {string} params.ownerSignature - Owner signature (optional, will be requested if 2FA already enabled)
+   * @returns {Promise<Object>} UserOperation receipt
+   */
+  async enableTwoFactor({
+    accountAddress,
+    passkeyCredential,
+    signWithPasskey,
+    ownerSignature = null,
+  }) {
+    // Encode enableTwoFactor call
+    const accountContract = this.accountManager.getAccountContract(accountAddress)
+    const data = accountContract.interface.encodeFunctionData('enableTwoFactor', [])
+
+    return await this.executeCall({
+      accountAddress,
+      targetAddress: accountAddress,
+      value: 0n,
+      data,
+      passkeyCredential,
+      signWithPasskey,
+      ownerSignature,
+      needsDeployment: false,
+      initCode: '0x',
+    })
+  }
+
+  /**
+   * Disable two-factor authentication (only requires passkey + owner signatures)
+   * @param {Object} params - Parameters
+   * @param {string} params.accountAddress - P256Account address
+   * @param {Object} params.passkeyCredential - Passkey credential for signing
+   * @param {Function} params.signWithPasskey - Function to sign with passkey
+   * @param {string} params.ownerSignature - Owner signature (required when 2FA is enabled)
+   * @returns {Promise<Object>} UserOperation receipt
+   */
+  async disableTwoFactor({
+    accountAddress,
+    passkeyCredential,
+    signWithPasskey,
+    ownerSignature = null,
+  }) {
+    // Encode disableTwoFactor call
+    const accountContract = this.accountManager.getAccountContract(accountAddress)
+    const data = accountContract.interface.encodeFunctionData('disableTwoFactor', [])
+
+    return await this.executeCall({
+      accountAddress,
+      targetAddress: accountAddress,
+      value: 0n,
+      data,
+      passkeyCredential,
+      signWithPasskey,
+      ownerSignature,
+      needsDeployment: false,
+      initCode: '0x',
+    })
+  }
+
   /**
    * Get pending recovery requests for an account
    * @param {string} accountAddress - P256Account address
@@ -448,6 +610,16 @@ export class P256AccountSDK {
   /**
    * Execute arbitrary call from P256Account
    * @param {Object} params - Parameters
+   * @param {string} params.accountAddress - P256Account address
+   * @param {string} params.targetAddress - Target contract address
+   * @param {bigint} params.value - ETH value to send
+   * @param {string} params.data - Encoded function call data
+   * @param {Object} params.passkeyCredential - Passkey credential for signing
+   * @param {Function} params.signWithPasskey - Function to sign with passkey
+   * @param {string} params.ownerSignature - Pre-computed owner signature (optional, for backward compatibility)
+   * @param {Function} params.getOwnerSignature - Callback to get owner signature (receives userOpHash, userOp)
+   * @param {boolean} params.needsDeployment - Whether account needs deployment
+   * @param {string} params.initCode - InitCode for deployment
    * @returns {Promise<Object>} UserOperation receipt
    */
   async executeCall({
@@ -458,6 +630,7 @@ export class P256AccountSDK {
     passkeyCredential,
     signWithPasskey,
     ownerSignature = null,
+    getOwnerSignature = null,
     needsDeployment = false,
     initCode = '0x',
   }) {
@@ -478,6 +651,15 @@ export class P256AccountSDK {
     // Get UserOperation hash
     const userOpHash = await getUserOpHash(userOp, this.provider, this.chainId)
 
+    // Get owner signature if callback provided (for 2FA mode)
+    // This allows the UI to show a confirmation dialog before signing
+    let finalOwnerSignature = ownerSignature
+    if (getOwnerSignature && !ownerSignature) {
+      console.log('🔐 Requesting owner signature via callback...')
+      finalOwnerSignature = await getOwnerSignature(userOpHash, userOp)
+      console.log('🔐 Owner signature received:', finalOwnerSignature)
+    }
+
     // Sign with passkey
     const userOpHashBytes = ethers.getBytes(userOpHash)
     const passkeySignatureRaw = await signWithPasskey(passkeyCredential, userOpHashBytes)
@@ -492,7 +674,7 @@ export class P256AccountSDK {
     }
 
     // Sign UserOperation
-    const signedUserOp = signUserOperation(userOp, passkeySignature, ownerSignature)
+    const signedUserOp = signUserOperation(userOp, passkeySignature, finalOwnerSignature)
 
     // Submit to bundler
     const receipt = await this.bundler.sendUserOperationAndWait(signedUserOp)

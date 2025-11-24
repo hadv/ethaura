@@ -151,36 +151,6 @@
   border: 1px solid #e5e5e5;
 }
 
-/* Pending Actions */
-.pending-actions-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.pending-action-card {
-  background: #fffbeb;
-  border: 1px solid #fcd34d;
-  border-radius: 8px;
-  padding: 16px;
-}
-
-.pending-action-card h4 {
-  margin-bottom: 8px;
-  font-size: 14px;
-}
-
-.pending-action-card p {
-  margin: 4px 0;
-  font-size: 13px;
-  color: #374151;
-}
-
-.pending-action-card .small-text {
-  font-size: 12px;
-  color: #6b7280;
-}
-
 /* Form Groups */
 .form-group {
   margin-bottom: 20px;

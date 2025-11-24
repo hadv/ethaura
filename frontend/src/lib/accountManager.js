@@ -562,6 +562,51 @@ export function formatPublicKeyForContract(publicKey) {
 }
 
 /**
+ * Get all passkeys for an account (paginated)
+ * @param {string} accountAddress - Account address
+ * @param {number} offset - Starting index
+ * @param {number} limit - Maximum number to return
+ * @returns {Promise<Object>} Passkeys data
+ */
+P256AccountManager.prototype.getPasskeys = async function (accountAddress, offset = 0, limit = 50) {
+  const account = this.getAccountContract(accountAddress)
+
+  try {
+    const result = await account.getPasskeys(offset, limit)
+
+    return {
+      passkeyIds: result[0],
+      qxList: result[1],
+      qyList: result[2],
+      addedAtList: result[3],
+      activeList: result[4],
+      deviceIdList: result[5],
+      total: Number(result[6]),
+    }
+  } catch (error) {
+    console.error('Error getting passkeys:', error)
+    throw error
+  }
+}
+
+/**
+ * Get active passkey count
+ * @param {string} accountAddress - Account address
+ * @returns {Promise<number>} Number of active passkeys
+ */
+P256AccountManager.prototype.getActivePasskeyCount = async function (accountAddress) {
+  const account = this.getAccountContract(accountAddress)
+
+  try {
+    const count = await account.getActivePasskeyCount()
+    return Number(count)
+  } catch (error) {
+    console.error('Error getting active passkey count:', error)
+    throw error
+  }
+}
+
+/**
  * Create account manager instance
  * @param {string} factoryAddress - Factory contract address
  * @param {Object} provider - ethers provider

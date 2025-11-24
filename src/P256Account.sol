@@ -32,12 +32,6 @@ contract P256Account is IAccount, IERC1271, Ownable, Initializable {
                                 STORAGE
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice The P-256 public key x-coordinate
-    bytes32 public qx;
-
-    /// @notice The P-256 public key y-coordinate
-    bytes32 public qy;
-
     /// @notice Nonce for replay protection (in addition to EntryPoint nonce)
     uint256 public nonce;
 
@@ -46,13 +40,33 @@ contract P256Account is IAccount, IERC1271, Ownable, Initializable {
     bool public twoFactorEnabled;
 
     /*//////////////////////////////////////////////////////////////
+                          MULTIPLE PASSKEYS
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice Passkey information
+    struct PasskeyInfo {
+        bytes32 qx; // Public key x-coordinate
+        bytes32 qy; // Public key y-coordinate
+        uint256 addedAt; // Timestamp when passkey was added
+        bool active; // Whether the passkey is active
+        bytes32 deviceId; // Short device identifier (e.g., "iPhone 15", "YubiKey 5")
+    }
+
+    /// @notice Passkey storage by ID
+    /// @dev passkeyId = keccak256(abi.encodePacked(qx, qy))
+    mapping(bytes32 => PasskeyInfo) public passkeys;
+
+    /// @notice List of ACTIVE passkey IDs for enumeration
+    /// @dev Gas optimization: Only active passkeys are stored in this array
+    /// @dev Inactive passkeys remain in the mapping for history but are removed from array
+    bytes32[] public passkeyIds;
+
+    /*//////////////////////////////////////////////////////////////
                           GUARDIAN & RECOVERY
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Timelock duration for administrative actions (48 hours)
-    uint256 public constant ADMIN_TIMELOCK = 48 hours;
-
     /// @notice Timelock duration for recovery execution (24 hours)
+    /// @dev Gives users time to detect and cancel malicious recovery attempts
     uint256 public constant RECOVERY_TIMELOCK = 24 hours;
 
     /// @notice Guardian addresses
@@ -66,18 +80,6 @@ contract P256Account is IAccount, IERC1271, Ownable, Initializable {
 
     /// @notice Recovery request nonce
     uint256 public recoveryNonce;
-
-    /// @notice Pending public key update
-    struct PendingPublicKeyUpdate {
-        bytes32 qx;
-        bytes32 qy;
-        uint256 executeAfter;
-        bool executed;
-        bool cancelled;
-    }
-
-    /// @notice Pending public key updates by actionHash
-    mapping(bytes32 => PendingPublicKeyUpdate) public pendingPublicKeyUpdates;
 
     /// @notice List of all pending action hashes (for enumeration)
     bytes32[] public pendingActionHashes;
@@ -106,6 +108,10 @@ contract P256Account is IAccount, IERC1271, Ownable, Initializable {
     event TwoFactorEnabled(address indexed owner);
     event TwoFactorDisabled(address indexed owner);
 
+    // Passkey events
+    event PasskeyAdded(bytes32 indexed passkeyId, bytes32 qx, bytes32 qy, uint256 timestamp);
+    event PasskeyRemoved(bytes32 indexed passkeyId, bytes32 qx, bytes32 qy);
+
     // Guardian events
     event GuardianAdded(address indexed guardian);
     event GuardianRemoved(address indexed guardian);
@@ -120,9 +126,6 @@ contract P256Account is IAccount, IERC1271, Ownable, Initializable {
     event RecoveryCancelled(uint256 indexed nonce);
 
     // Timelock events
-    event PublicKeyUpdateProposed(bytes32 indexed actionHash, bytes32 qx, bytes32 qy, uint256 executeAfter);
-    event PublicKeyUpdateExecuted(bytes32 indexed actionHash, bytes32 qx, bytes32 qy);
-    event PublicKeyUpdateCancelled(bytes32 indexed actionHash);
 
     /*//////////////////////////////////////////////////////////////
                                 ERRORS
@@ -135,6 +138,13 @@ contract P256Account is IAccount, IERC1271, Ownable, Initializable {
     error CallFailed(bytes result);
     error TwoFactorSignatureRequired();
     error InvalidOwnerSignature();
+
+    // Passkey errors
+    error PasskeyAlreadyExists();
+    error PasskeyDoesNotExist();
+    error PasskeyNotActive();
+    error CannotRemoveLastPasskey();
+    error InvalidPasskeyCoordinates();
 
     // Guardian errors
     error NotGuardian();
@@ -150,12 +160,6 @@ contract P256Account is IAccount, IERC1271, Ownable, Initializable {
     error RecoveryAlreadyApproved();
     error RecoveryNotReady();
     error InsufficientApprovals();
-
-    // Timelock errors
-    error ActionNotFound();
-    error ActionAlreadyExecuted();
-    error ActionAlreadyCancelled();
-    error TimelockNotExpired();
 
     /*//////////////////////////////////////////////////////////////
                               CONSTRUCTOR
@@ -177,19 +181,26 @@ contract P256Account is IAccount, IERC1271, Ownable, Initializable {
      * @param _qy The y-coordinate of the public key (can be 0 for owner-only mode)
      * @param _owner The owner of the account
      * @param _enable2FA Whether to enable two-factor authentication immediately
+     * @param _deviceId Short device identifier (e.g., "iPhone 15", "YubiKey 5")
      * @dev If _qx and _qy are both 0, the account operates in owner-only mode (no passkey)
      * @dev If _qx and _qy are set but _enable2FA is false, passkey can be used but 2FA is not required
      * @dev If _enable2FA is true, both _qx and _qy must be non-zero
      * @dev Uses Solady's Initializable to ensure this can only be called once per proxy
      */
-    function initialize(bytes32 _qx, bytes32 _qy, address _owner, bool _enable2FA) external initializer {
+    function initialize(bytes32 _qx, bytes32 _qy, address _owner, bool _enable2FA, bytes32 _deviceId)
+        external
+        initializer
+    {
         // If enabling 2FA, passkey must be provided
         if (_enable2FA) {
             require(_qx != bytes32(0) && _qy != bytes32(0), "2FA requires passkey");
         }
 
-        qx = _qx;
-        qy = _qy;
+        // Add first passkey if provided
+        if (_qx != bytes32(0) && _qy != bytes32(0)) {
+            _addPasskeyInternal(_qx, _qy, _deviceId);
+        }
+
         _transferOwnership(_owner);
 
         // Add owner as the first guardian
@@ -241,16 +252,19 @@ contract P256Account is IAccount, IERC1271, Ownable, Initializable {
      * @return validationData 0 if valid, 1 if invalid
      * @dev Two signature modes:
      *      1. Owner-only: 65-byte ECDSA signature from owner
-     *         - Used when qx=0, qy=0 (no passkey configured)
-     *         - Used when qx!=0, qy!=0 but twoFactorEnabled=false (passkey configured but 2FA disabled)
-     *      2. Passkey with 2FA: WebAuthn signature (Solady compact format) + 65-byte ECDSA signature from owner
-     *         - Used when qx!=0, qy!=0 and twoFactorEnabled=true
+     *         - Used when no passkeys configured
+     *         - Used when passkeys exist but twoFactorEnabled=false
+     *      2. Passkey with 2FA: WebAuthn signature (Solady compact format) + passkeyId(32) + 65-byte ECDSA signature from owner
+     *         - Used when passkeys exist and twoFactorEnabled=true
+     *         - Client specifies which passkey to verify against (no loop needed)
      *
      *      WebAuthn signature format (2FA mode) - Solady compact encoding:
-     *      authDataLen(2) || authenticatorData || clientDataJSON || challengeIdx(2) || typeIdx(2) || r(32) || s(32) || ownerSig(65)
+     *      authDataLen(2) || authenticatorData || clientDataJSON || challengeIdx(2) || typeIdx(2) || r(32) || s(32) || passkeyId(32) || ownerSig(65)
      *
      *      SECURITY: The challenge field in clientDataJSON MUST contain the base64url-encoded userOpHash.
      *                This ensures the WebAuthn signature is actually authorizing this specific transaction.
+     *      SECURITY: Any active passkey can authorize - client specifies which one via passkeyId
+     *      GAS OPTIMIZATION: Client passes passkeyId to avoid looping through all passkeys (O(1) instead of O(n))
      */
     function _validateSignature(PackedUserOperation calldata userOp, bytes32 userOpHash)
         internal
@@ -269,35 +283,53 @@ contract P256Account is IAccount, IERC1271, Ownable, Initializable {
             return _recoverSigner(userOpHash, sig) == _owner ? 0 : 1;
         }
 
-        // Passkey with 2FA: requires both passkey and owner signatures
-        // Minimum: authDataLen(2) + authData(37) + clientData(20) + challengeIdx(2) + typeIdx(2) + r(32) + s(32) + ownerSig(65) = 192 bytes
-        if (sig.length < 192) return 1;
+        // Passkey with 2FA: requires WebAuthn signature + passkeyId + owner signature
+        // Minimum: authDataLen(2) + authData(37) + clientData(20) + challengeIdx(2) + typeIdx(2) + r(32) + s(32) + passkeyId(32) + ownerSig(65) = 224 bytes
+        if (sig.length < 224) return 1;
 
         // Extract owner signature (last 65 bytes)
         bytes calldata ownerSig = sig[sig.length - 65:];
 
-        // Extract WebAuthn compact signature (everything except owner signature)
-        bytes calldata webAuthnSig = sig[:sig.length - 65];
+        // Extract passkeyId (32 bytes before owner signature)
+        bytes32 passkeyId = bytes32(sig[sig.length - 97:sig.length - 65]);
+
+        // Extract WebAuthn compact signature (everything except passkeyId and owner signature)
+        bytes calldata webAuthnSig = sig[:sig.length - 97];
 
         // Decode WebAuthn signature using Solady's compact decoder
         // This handles the format: authDataLen(2) || authenticatorData || clientDataJSON || challengeIdx(2) || typeIdx(2) || r(32) || s(32)
         WebAuthn.WebAuthnAuth memory auth = WebAuthn.tryDecodeAuthCompactCalldata(webAuthnSig);
 
-        // Verify WebAuthn signature using Solady's verify function
-        // This validates:
-        // - User Present flag is set
-        // - User Verified flag is set (if requireUserVerification=true)
-        // - Type is "webauthn.get"
-        // - Challenge matches userOpHash (base64url encoded)
-        // - P256 signature is valid
         bytes memory challenge = abi.encodePacked(userOpHash);
-        bool webAuthnValid = WebAuthn.verify(
-            challenge,
-            true, // requireUserVerification - enforce UV flag for security
-            auth,
-            _qx,
-            _qy
-        );
+
+        // SECURITY: Verify signature against the specified passkey (O(1) lookup)
+        // Client specifies which passkey they're using via passkeyId
+        bool webAuthnValid = false;
+
+        // During counterfactual deployment, check against the initial passkey from initCode
+        if (userOp.initCode.length >= 184) {
+            webAuthnValid = WebAuthn.verify(
+                challenge,
+                true, // requireUserVerification - enforce UV flag for security
+                auth,
+                _qx,
+                _qy
+            );
+        } else {
+            // After deployment, check against the specified passkey
+            PasskeyInfo storage passkeyInfo = passkeys[passkeyId];
+
+            // SECURITY: Verify passkey exists and is active
+            if (passkeyInfo.active && passkeyInfo.qx != bytes32(0)) {
+                webAuthnValid = WebAuthn.verify(
+                    challenge,
+                    true, // requireUserVerification - enforce UV flag for security
+                    auth,
+                    passkeyInfo.qx,
+                    passkeyInfo.qy
+                );
+            }
+        }
 
         if (!webAuthnValid) return 1;
 
@@ -322,8 +354,12 @@ contract P256Account is IAccount, IERC1271, Ownable, Initializable {
         returns (bytes32 _qx, bytes32 _qy, bool _twoFactorEnabled, address _owner)
     {
         // Default to storage values
-        _qx = qx;
-        _qy = qy;
+        // Get first passkey if available
+        if (passkeyIds.length > 0) {
+            PasskeyInfo storage firstPasskey = passkeys[passkeyIds[0]];
+            _qx = firstPasskey.qx;
+            _qy = firstPasskey.qy;
+        }
         _twoFactorEnabled = twoFactorEnabled;
         _owner = owner();
 
@@ -403,8 +439,10 @@ contract P256Account is IAccount, IERC1271, Ownable, Initializable {
     /**
      * @notice Verify a signature according to EIP-1271
      * @param hash The hash of the data to verify
-     * @param signature The signature to verify (r || s, 64 bytes)
+     * @param signature The signature to verify (r || s || passkeyId - 96 bytes)
      * @return magicValue The EIP-1271 magic value if valid
+     * @dev Signature format: r(32) || s(32) || passkeyId(32) - 96 bytes
+     *      The passkeyId enables O(1) lookup instead of iterating through all passkeys
      */
     function isValidSignature(bytes32 hash, bytes calldata signature)
         external
@@ -412,7 +450,7 @@ contract P256Account is IAccount, IERC1271, Ownable, Initializable {
         override
         returns (bytes4 magicValue)
     {
-        if (signature.length != 64) {
+        if (signature.length != 96) {
             revert InvalidSignatureLength();
         }
 
@@ -425,7 +463,16 @@ contract P256Account is IAccount, IERC1271, Ownable, Initializable {
 
         // Use SHA-256 for consistency with validateUserOp
         bytes32 messageHash = sha256(abi.encodePacked(hash));
-        bool isValid = P256.verifySignature(messageHash, r, s, qx, qy);
+
+        // Extract passkeyId from signature
+        bytes32 passkeyId = bytes32(signature[64:96]);
+        PasskeyInfo storage passkeyInfo = passkeys[passkeyId];
+
+        // SECURITY: Verify passkey exists and is active
+        bool isValid = false;
+        if (passkeyInfo.active && passkeyInfo.qx != bytes32(0)) {
+            isValid = P256.verifySignature(messageHash, r, s, passkeyInfo.qx, passkeyInfo.qy);
+        }
 
         return isValid ? MAGICVALUE : bytes4(0);
     }
@@ -435,80 +482,18 @@ contract P256Account is IAccount, IERC1271, Ownable, Initializable {
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @notice Propose a P-256 public key update (with timelock)
-     * @param _qx The new x-coordinate
-     * @param _qy The new y-coordinate
-     * @return actionHash The hash of the proposed action
-     * @dev Owner can propose, but must wait ADMIN_TIMELOCK before execution
-     */
-    function proposePublicKeyUpdate(bytes32 _qx, bytes32 _qy) external onlyOwner returns (bytes32) {
-        bytes32 actionHash = keccak256(abi.encode("updatePublicKey", _qx, _qy, block.timestamp));
-
-        pendingPublicKeyUpdates[actionHash] = PendingPublicKeyUpdate({
-            qx: _qx, qy: _qy, executeAfter: block.timestamp + ADMIN_TIMELOCK, executed: false, cancelled: false
-        });
-
-        pendingActionHashes.push(actionHash);
-
-        emit PublicKeyUpdateProposed(actionHash, _qx, _qy, block.timestamp + ADMIN_TIMELOCK);
-        return actionHash;
-    }
-
-    /**
-     * @notice Execute a pending public key update
-     * @param actionHash The hash of the action to execute
-     * @dev Can be executed by anyone after timelock expires
-     */
-    function executePublicKeyUpdate(bytes32 actionHash) external {
-        PendingPublicKeyUpdate storage action = pendingPublicKeyUpdates[actionHash];
-
-        if (action.executeAfter == 0) revert ActionNotFound();
-        if (action.executed) revert ActionAlreadyExecuted();
-        if (action.cancelled) revert ActionAlreadyCancelled();
-        if (block.timestamp < action.executeAfter) revert TimelockNotExpired();
-
-        action.executed = true;
-        qx = action.qx;
-        qy = action.qy;
-
-        // Remove from pending list
-        _removePendingActionHash(actionHash);
-
-        emit PublicKeyUpdateExecuted(actionHash, action.qx, action.qy);
-        emit PublicKeyUpdated(action.qx, action.qy);
-    }
-
-    /**
-     * @notice Cancel a pending public key update (via passkey signature through EntryPoint)
-     * @param actionHash The hash of the action to cancel
-     * @dev Only callable via UserOperation (passkey signature)
-     */
-    function cancelPendingAction(bytes32 actionHash) external {
-        if (msg.sender != address(ENTRYPOINT)) revert OnlyEntryPoint();
-
-        PendingPublicKeyUpdate storage action = pendingPublicKeyUpdates[actionHash];
-        if (action.executeAfter == 0) revert ActionNotFound();
-        if (action.executed) revert ActionAlreadyExecuted();
-        if (action.cancelled) revert ActionAlreadyCancelled();
-
-        action.cancelled = true;
-
-        // Remove from pending list
-        _removePendingActionHash(actionHash);
-
-        emit PublicKeyUpdateCancelled(actionHash);
-    }
-
-    /**
      * @notice Enable two-factor authentication
      * @dev When enabled, all transactions require both P-256 passkey signature and owner ECDSA signature
      * @dev Can only be called via UserOperation (passkey signature or owner signature)
-     * @dev Requires a passkey to be configured (qx and qy must be non-zero)
+     * @dev Requires at least one active passkey to be configured
      */
     function enableTwoFactor() external {
         if (msg.sender != address(ENTRYPOINT)) revert OnlyEntryPoint();
         require(!twoFactorEnabled, "2FA already enabled");
-        require(qx != bytes32(0) && qy != bytes32(0), "Passkey required for 2FA");
+
+        // Check for at least one ACTIVE passkey
+        require(passkeyIds.length > 0, "Active passkey required for 2FA");
+
         twoFactorEnabled = true;
         emit TwoFactorEnabled(owner());
     }
@@ -523,6 +508,94 @@ contract P256Account is IAccount, IERC1271, Ownable, Initializable {
         require(twoFactorEnabled, "2FA already disabled");
         twoFactorEnabled = false;
         emit TwoFactorDisabled(owner());
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                        PASSKEY MANAGEMENT
+    //////////////////////////////////////////////////////////////*/
+
+    /**
+     * @notice Add a new passkey to the account
+     * @param _qx The x-coordinate of the new passkey
+     * @param _qy The y-coordinate of the new passkey
+     * @param _deviceId Short device identifier (e.g., "iPhone 15", "YubiKey 5")
+     * @dev SECURITY: Only callable via EntryPoint (requires existing signature)
+     * @dev Validates that coordinates are non-zero and passkey doesn't already exist
+     */
+    function addPasskey(bytes32 _qx, bytes32 _qy, bytes32 _deviceId) external {
+        if (msg.sender != address(ENTRYPOINT)) revert OnlyEntryPoint();
+
+        // Validate coordinates
+        if (_qx == bytes32(0) || _qy == bytes32(0)) revert InvalidPasskeyCoordinates();
+
+        // Add the passkey immediately
+        _addPasskeyInternal(_qx, _qy, _deviceId);
+    }
+
+    /**
+     * @notice Remove a passkey from the account
+     * @param _qx The x-coordinate of the passkey to remove
+     * @param _qy The y-coordinate of the passkey to remove
+     * @dev SECURITY: Only callable via EntryPoint (requires existing passkey signature)
+     * @dev Cannot remove the last active passkey when 2FA is enabled
+     */
+    function removePasskey(bytes32 _qx, bytes32 _qy) external {
+        if (msg.sender != address(ENTRYPOINT)) revert OnlyEntryPoint();
+
+        bytes32 passkeyId = keccak256(abi.encodePacked(_qx, _qy));
+
+        // Verify passkey exists and is active
+        if (!passkeys[passkeyId].active) revert PasskeyNotActive();
+
+        // Prevent removing last passkey when 2FA is enabled
+        if (passkeyIds.length <= 1 && twoFactorEnabled) revert CannotRemoveLastPasskey();
+
+        PasskeyInfo storage passkeyInfo = passkeys[passkeyId];
+
+        // Mark as inactive and remove from passkeyIds array
+        passkeyInfo.active = false;
+        _removePasskeyFromArray(passkeyId);
+
+        emit PasskeyRemoved(passkeyId, passkeyInfo.qx, passkeyInfo.qy);
+    }
+
+    /**
+     * @notice Internal function to add a passkey
+     * @param _qx The x-coordinate of the passkey
+     * @param _qy The y-coordinate of the passkey
+     * @param _deviceId Short device identifier (e.g., "iPhone 15", "YubiKey 5")
+     * @dev Used by initialize() and addPasskey()
+     */
+    function _addPasskeyInternal(bytes32 _qx, bytes32 _qy, bytes32 _deviceId) internal {
+        bytes32 passkeyId = keccak256(abi.encodePacked(_qx, _qy));
+
+        // Check if passkey already exists
+        if (passkeys[passkeyId].qx != bytes32(0)) revert PasskeyAlreadyExists();
+
+        // Add passkey
+        passkeys[passkeyId] =
+            PasskeyInfo({qx: _qx, qy: _qy, addedAt: block.timestamp, active: true, deviceId: _deviceId});
+
+        passkeyIds.push(passkeyId);
+
+        emit PasskeyAdded(passkeyId, _qx, _qy, block.timestamp);
+    }
+
+    /**
+     * @notice Remove a passkey from the passkeyIds array
+     * @param passkeyId The ID of the passkey to remove
+     * @dev Uses swap-and-pop pattern for gas efficiency
+     */
+    function _removePasskeyFromArray(bytes32 passkeyId) internal {
+        uint256 length = passkeyIds.length;
+        for (uint256 i = 0; i < length; i++) {
+            if (passkeyIds[i] == passkeyId) {
+                // Swap with last element and pop
+                passkeyIds[i] = passkeyIds[length - 1];
+                passkeyIds.pop();
+                return;
+            }
+        }
     }
 
     /**
@@ -680,6 +753,7 @@ contract P256Account is IAccount, IERC1271, Ownable, Initializable {
      * @notice Execute a recovery request
      * @param requestNonce The recovery request nonce
      * @dev Can be called by anyone after threshold is met and timelock expires
+     * @dev SECURITY: Replaces ALL passkeys with the new recovery passkey
      */
     function executeRecovery(uint256 requestNonce) external {
         RecoveryRequest storage request = recoveryRequests[requestNonce];
@@ -692,9 +766,28 @@ contract P256Account is IAccount, IERC1271, Ownable, Initializable {
 
         request.executed = true;
 
-        // Update account
-        qx = request.newQx;
-        qy = request.newQy;
+        // SECURITY: Deactivate ALL existing passkeys during recovery
+        // This prevents the compromised passkeys from being used
+        // Clear the array by iterating backwards to avoid index issues
+        while (passkeyIds.length > 0) {
+            bytes32 passkeyId = passkeyIds[passkeyIds.length - 1];
+            passkeys[passkeyId].active = false;
+            passkeyIds.pop();
+        }
+
+        // Add the new recovery passkey (if provided)
+        // If qx=0 and qy=0, recovery is to owner-only mode (no passkey)
+        if (request.newQx != bytes32(0) || request.newQy != bytes32(0)) {
+            _addPasskeyInternal(request.newQx, request.newQy, bytes32(0)); // No device ID for recovery
+        } else {
+            // SECURITY: Auto-disable 2FA when recovering to owner-only mode
+            // Cannot have 2FA enabled without any passkeys
+            if (twoFactorEnabled) {
+                twoFactorEnabled = false;
+                emit TwoFactorDisabled(request.newOwner);
+            }
+        }
+
         _transferOwnership(request.newOwner);
 
         emit RecoveryExecuted(requestNonce);
@@ -765,6 +858,126 @@ contract P256Account is IAccount, IERC1271, Ownable, Initializable {
     }
 
     /*//////////////////////////////////////////////////////////////
+                          PASSKEY VIEW FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
+
+    /**
+     * @notice Get the number of active passkeys
+     * @return The count of active passkeys
+     * @dev passkeyIds array only contains active passkeys
+     */
+    function getActivePasskeyCount() external view returns (uint256) {
+        return passkeyIds.length;
+    }
+
+    /**
+     * @notice Get passkey information by index
+     * @param index The index in the passkeyIds array
+     * @return passkeyId The passkey ID
+     * @return qx The x-coordinate
+     * @return qy The y-coordinate
+     * @return addedAt The timestamp when added
+     * @return active Whether the passkey is active
+     */
+    function getPasskeyByIndex(uint256 index)
+        external
+        view
+        returns (bytes32 passkeyId, bytes32 qx, bytes32 qy, uint256 addedAt, bool active)
+    {
+        require(index < passkeyIds.length, "Index out of bounds");
+        passkeyId = passkeyIds[index];
+        PasskeyInfo storage info = passkeys[passkeyId];
+        return (passkeyId, info.qx, info.qy, info.addedAt, info.active);
+    }
+
+    /**
+     * @notice Get passkey information by ID
+     * @param passkeyId The passkey ID (keccak256(qx, qy))
+     * @return qx The x-coordinate
+     * @return qy The y-coordinate
+     * @return addedAt The timestamp when added
+     * @return active Whether the passkey is active
+     */
+    function getPasskeyById(bytes32 passkeyId)
+        external
+        view
+        returns (bytes32 qx, bytes32 qy, uint256 addedAt, bool active)
+    {
+        PasskeyInfo storage info = passkeys[passkeyId];
+        require(info.qx != bytes32(0), "Passkey does not exist");
+        return (info.qx, info.qy, info.addedAt, info.active);
+    }
+
+    /**
+     * @notice Get paginated passkeys to prevent DoS/gas issues
+     * @param offset Starting index
+     * @param limit Maximum number of passkeys to return (capped at 50)
+     * @return passkeyIdList Array of passkey IDs
+     * @return qxList Array of x-coordinates
+     * @return qyList Array of y-coordinates
+     * @return addedAtList Array of timestamps
+     * @return activeList Array of active flags
+     * @return deviceIdList Array of device identifiers
+     * @return total Total number of passkeys
+     */
+    function getPasskeys(uint256 offset, uint256 limit)
+        external
+        view
+        returns (
+            bytes32[] memory passkeyIdList,
+            bytes32[] memory qxList,
+            bytes32[] memory qyList,
+            uint256[] memory addedAtList,
+            bool[] memory activeList,
+            bytes32[] memory deviceIdList,
+            uint256 total
+        )
+    {
+        total = passkeyIds.length;
+
+        // Return empty arrays if offset is beyond total
+        if (offset >= total) {
+            return (
+                new bytes32[](0),
+                new bytes32[](0),
+                new bytes32[](0),
+                new uint256[](0),
+                new bool[](0),
+                new bytes32[](0),
+                total
+            );
+        }
+
+        // Cap limit at 50 to prevent gas issues
+        uint256 maxLimit = 50;
+        if (limit > maxLimit) {
+            limit = maxLimit;
+        }
+
+        // Calculate actual length to return
+        uint256 remaining = total - offset;
+        uint256 length = remaining < limit ? remaining : limit;
+
+        passkeyIdList = new bytes32[](length);
+        qxList = new bytes32[](length);
+        qyList = new bytes32[](length);
+        addedAtList = new uint256[](length);
+        activeList = new bool[](length);
+        deviceIdList = new bytes32[](length);
+
+        for (uint256 i = 0; i < length; i++) {
+            bytes32 passkeyId = passkeyIds[offset + i];
+            PasskeyInfo storage info = passkeys[passkeyId];
+            passkeyIdList[i] = passkeyId;
+            qxList[i] = info.qx;
+            qyList[i] = info.qy;
+            addedAtList[i] = info.addedAt;
+            activeList[i] = true; // All passkeys in array are active
+            deviceIdList[i] = info.deviceId;
+        }
+    }
+
+    /*//////////////////////////////////////////////////////////////
                           INTERNAL FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
@@ -827,80 +1040,5 @@ contract P256Account is IAccount, IERC1271, Ownable, Initializable {
     function withdrawDepositTo(address payable withdrawAddress, uint256 amount) public {
         if (msg.sender != address(ENTRYPOINT)) revert OnlyEntryPoint();
         ENTRYPOINT.withdrawTo(withdrawAddress, amount);
-    }
-
-    /**
-     * @notice Get pending public key update details
-     * @param actionHash The hash of the pending action
-     * @return proposedQx The proposed x-coordinate
-     * @return proposedQy The proposed y-coordinate
-     * @return executeAfter The timestamp when the action can be executed
-     * @return executed Whether the action has been executed
-     * @return cancelled Whether the action has been cancelled
-     */
-    function getPendingPublicKeyUpdate(bytes32 actionHash)
-        public
-        view
-        returns (bytes32 proposedQx, bytes32 proposedQy, uint256 executeAfter, bool executed, bool cancelled)
-    {
-        PendingPublicKeyUpdate storage action = pendingPublicKeyUpdates[actionHash];
-        return (action.qx, action.qy, action.executeAfter, action.executed, action.cancelled);
-    }
-
-    /**
-     * @notice Get the number of pending action hashes
-     * @return The count of pending action hashes
-     */
-    function getPendingActionCount() public view returns (uint256) {
-        return pendingActionHashes.length;
-    }
-
-    /**
-     * @notice Get all active (not executed and not cancelled) pending actions
-     * @return actionHashes Array of active action hashes
-     * @return qxValues Array of proposed qx values
-     * @return qyValues Array of proposed qy values
-     * @return executeAfters Array of execution timestamps
-     */
-    function getActivePendingActions()
-        public
-        view
-        returns (
-            bytes32[] memory actionHashes,
-            bytes32[] memory qxValues,
-            bytes32[] memory qyValues,
-            uint256[] memory executeAfters
-        )
-    {
-        // First pass: count active actions
-        uint256 activeCount = 0;
-        for (uint256 i = 0; i < pendingActionHashes.length; i++) {
-            PendingPublicKeyUpdate storage action = pendingPublicKeyUpdates[pendingActionHashes[i]];
-            if (!action.executed && !action.cancelled) {
-                activeCount++;
-            }
-        }
-
-        // Allocate arrays
-        actionHashes = new bytes32[](activeCount);
-        qxValues = new bytes32[](activeCount);
-        qyValues = new bytes32[](activeCount);
-        executeAfters = new uint256[](activeCount);
-
-        // Second pass: populate arrays
-        uint256 index = 0;
-        for (uint256 i = 0; i < pendingActionHashes.length; i++) {
-            bytes32 hash = pendingActionHashes[i];
-            PendingPublicKeyUpdate storage action = pendingPublicKeyUpdates[hash];
-            if (!action.executed && !action.cancelled) {
-                actionHashes[index] = hash;
-                qxValues[index] = action.qx;
-                qyValues[index] = action.qy;
-                executeAfters[index] = action.executeAfter;
-                index++;
-            }
-        }
-
-        return (actionHashes, qxValues, qyValues, executeAfters);
     }
 }

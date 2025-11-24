@@ -63,6 +63,7 @@ contract P256AccountFactory {
      * @param owner The owner address for the account
      * @param salt A salt for CREATE2 deployment
      * @param enable2FA Whether to enable two-factor authentication immediately
+     * @param deviceId Short device identifier (e.g., "iPhone 15", "YubiKey 5")
      * @return account The address of the created account
      * @dev If qx=0 and qy=0, creates an owner-only account (no passkey)
      * @dev If qx and qy are set but enable2FA=false, passkey is registered but 2FA is not enforced
@@ -71,7 +72,7 @@ contract P256AccountFactory {
      * @dev This allows users to add/change passkey later without changing the account address
      * @dev Uses Solady's hyper-optimized ERC-1967 proxy pattern for maximum gas efficiency
      */
-    function createAccount(bytes32 qx, bytes32 qy, address owner, uint256 salt, bool enable2FA)
+    function createAccount(bytes32 qx, bytes32 qy, address owner, uint256 salt, bool enable2FA, bytes32 deviceId)
         public
         returns (P256Account account)
     {
@@ -93,7 +94,7 @@ contract P256AccountFactory {
             address(IMPLEMENTATION),
             address(0), // No admin - proxies are not upgradeable
             finalSalt,
-            abi.encodeCall(P256Account.initialize, (qx, qy, owner, enable2FA))
+            abi.encodeCall(P256Account.initialize, (qx, qy, owner, enable2FA, deviceId))
         );
 
         account = P256Account(payable(proxy));
@@ -150,14 +151,18 @@ contract P256AccountFactory {
      * @param owner The owner address for the account
      * @param salt A salt for CREATE2 deployment
      * @param enable2FA Whether to enable two-factor authentication immediately
+     * @param deviceId Short device identifier (e.g., "iPhone 15", "YubiKey 5")
      * @return account The address of the created account
      */
-    function createAccountWithDeposit(bytes32 qx, bytes32 qy, address owner, uint256 salt, bool enable2FA)
-        external
-        payable
-        returns (P256Account account)
-    {
-        account = createAccount(qx, qy, owner, salt, enable2FA);
+    function createAccountWithDeposit(
+        bytes32 qx,
+        bytes32 qy,
+        address owner,
+        uint256 salt,
+        bool enable2FA,
+        bytes32 deviceId
+    ) external payable returns (P256Account account) {
+        account = createAccount(qx, qy, owner, salt, enable2FA, deviceId);
 
         // Add deposit to EntryPoint if ETH was sent
         if (msg.value > 0) {
@@ -173,13 +178,16 @@ contract P256AccountFactory {
      * @param owner The owner address for the account
      * @param salt A salt for CREATE2 deployment
      * @param enable2FA Whether to enable two-factor authentication immediately
+     * @param deviceId Short device identifier (e.g., "iPhone 15", "YubiKey 5")
      * @return initCode The initCode bytes
      */
-    function getInitCode(bytes32 qx, bytes32 qy, address owner, uint256 salt, bool enable2FA)
+    function getInitCode(bytes32 qx, bytes32 qy, address owner, uint256 salt, bool enable2FA, bytes32 deviceId)
         external
         view
         returns (bytes memory initCode)
     {
-        return abi.encodePacked(address(this), abi.encodeCall(this.createAccount, (qx, qy, owner, salt, enable2FA)));
+        return abi.encodePacked(
+            address(this), abi.encodeCall(this.createAccount, (qx, qy, owner, salt, enable2FA, deviceId))
+        );
     }
 }

@@ -42,7 +42,7 @@ contract Demo2FA is Script {
         bytes32 qy = bytes32(uint256(0xfedcba0987654321)); // Mock public key Y
         uint256 salt = 0;
 
-        account = factory.createAccount(qx, qy, owner, salt, true);
+        account = factory.createAccount(qx, qy, owner, salt, true, bytes32("Demo Device"));
         console2.log("Account created at:", address(account));
         console2.log("Public key (qx):", vm.toString(qx));
         console2.log("Public key (qy):", vm.toString(qy));
