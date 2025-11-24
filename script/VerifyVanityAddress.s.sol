@@ -17,7 +17,7 @@ contract VerifyVanityAddressScript is Script {
     address constant ENTRYPOINT_V07 = 0x0000000071727De22E5E9d8BAf0edAc6f37da032;
 
     // Vanity salt to verify
-    bytes32 constant SALT = 0x3f9b0f828fffac7c03a85295e164e03603eca87a5f29479f10dbd79d12bcb402;
+    bytes32 constant SALT = 0xbfae1974f681bad305d92efe0f7441e1577e78371b463bb9abc8a16c6ca16fe3;
 
     function run() external view {
         console2.log("=== Vanity Address Verification ===");
