@@ -1,0 +1,64 @@
+{
+  "network": "Sepolia Testnet",
+  "chainId": 11155111,
+  "deployedAt": "2025-11-24T00:00:00Z",
+  "deployer": "0x18Ee4C040568238643C07e7aFd6c53efc196D26b",
+  "version": "v2.0.0-implementation-in-salt",
+  "description": "Factory with implementation address in CREATE2 salt for version-specific account addresses",
+  "contracts": {
+    "EntryPoint": {
+      "address": "0x0000000071727De22E5E9d8BAf0edAc6f37da032",
+      "note": "Pre-deployed EntryPoint v0.7 (canonical address)"
+    },
+    "P256AccountFactory": {
+      "address": "0xD2f89749941C1f181EF68D014a29244686cd24CE",
+      "deploymentTx": "0x7a697953ba28ae8534c58efd5de66b267269ee2e372fbcc7f517269dfd961b2a",
+      "blockNumber": 9695965,
+      "gasUsed": 4059182,
+      "gasCost": "0.00000405922259182 ETH",
+      "salt": "0xbfae1974f681bad305d92efe0f7441e1577e78371b463bb9abc8a16c6ca16fe3"
+    },
+    "P256Account": {
+      "address": "0xA171892A4f98C30722C9739211Be655EBca3Bd19",
+      "note": "Implementation contract (deployed by factory constructor)"
+    },
+    "SoladyERC1967Factory": {
+      "address": "0x0000000000006396FF2a80c067f99B3d2Ab4Df24",
+      "note": "Canonical Solady proxy factory"
+    }
+  },
+  "explorer": {
+    "factory": "https://sepolia.etherscan.io/address/0xD2f89749941C1f181EF68D014a29244686cd24CE",
+    "implementation": "https://sepolia.etherscan.io/address/0xA171892A4f98C30722C9739211Be655EBca3Bd19",
+    "deploymentTx": "https://sepolia.etherscan.io/tx/0x7a697953ba28ae8534c58efd5de66b267269ee2e372fbcc7f517269dfd961b2a"
+  },
+  "rpc": {
+    "public": "https://rpc.sepolia.org",
+    "alchemy": "https://eth-sepolia.g.alchemy.com/v2/YOUR_API_KEY",
+    "bundler": "https://api.pimlico.io/v2/sepolia/rpc?apikey=YOUR_API_KEY"
+  },
+  "features": {
+    "rip7212": false,
+    "erc4337": true,
+    "passkeySupport": true,
+    "twoFactorAuth": true,
+    "guardianRecovery": true,
+    "multiplePasskeys": true,
+    "implementationInSalt": true
+  },
+  "changes": [
+    "Modified _computeSalt() to include implementation address in CREATE2 salt",
+    "Salt formula: keccak256(owner, address(IMPLEMENTATION), salt) & ((1 << 96) - 1)",
+    "Different contract versions now get different account addresses",
+    "Allows reusing same salt (index 0) during development when contract code changes",
+    "Account address is independent of passkey (qx, qy) and 2FA settings"
+  ],
+  "notes": [
+    "This deployment uses a different factory address than previous deployments",
+    "The salt calculation now includes the implementation address",
+    "This is NOT a vanity address deployment (no 0x000000 prefix)",
+    "All 72 tests passing before deployment",
+    "Frontend .env files updated with new factory address"
+  ]
+}
+
