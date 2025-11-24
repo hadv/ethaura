@@ -955,14 +955,13 @@ contract P256Account is IAccount, IERC1271, Ownable, Initializable {
         // If qx=0 and qy=0, recovery is to owner-only mode (no passkey)
         if (request.newQx != bytes32(0) || request.newQy != bytes32(0)) {
             _addPasskeyInternal(request.newQx, request.newQy, bytes32(0)); // No device ID for recovery
-        }
-
-        // SECURITY: Auto-disable 2FA during recovery
-        // Recovery replaces all passkeys with a single recovery passkey (or none)
-        // User must re-enable 2FA after recovery if desired
-        if (twoFactorEnabled) {
-            twoFactorEnabled = false;
-            emit TwoFactorDisabled(request.newOwner);
+        } else {
+            // SECURITY: Auto-disable 2FA when recovering to owner-only mode
+            // Cannot have 2FA enabled without any passkeys
+            if (twoFactorEnabled) {
+                twoFactorEnabled = false;
+                emit TwoFactorDisabled(request.newOwner);
+            }
         }
 
         _transferOwnership(request.newOwner);
