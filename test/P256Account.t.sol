@@ -821,4 +821,104 @@ contract P256AccountTest is Test {
         vm.expectRevert(P256Account.RecoveryAlreadyCancelled.selector);
         account.executeRecovery(0);
     }
+
+    function test_GetPasskeysPagination() public {
+        // Add multiple passkeys
+        bytes32[] memory testQx = new bytes32[](5);
+        bytes32[] memory testQy = new bytes32[](5);
+
+        for (uint256 i = 0; i < 5; i++) {
+            testQx[i] = bytes32(uint256(qx) + i + 1);
+            testQy[i] = bytes32(uint256(qy) + i + 1);
+
+            vm.prank(ENTRYPOINT_ADDR);
+            account.addPasskey(testQx[i], testQy[i]);
+        }
+
+        // Total should be 6 (1 initial + 5 added)
+        assertEq(account.getPasskeyCount(), 6, "Should have 6 passkeys");
+
+        // Test pagination: get first 3
+        (
+            bytes32[] memory ids1,
+            bytes32[] memory qxList1,
+            bytes32[] memory qyList1,
+            uint256[] memory addedAt1,
+            bool[] memory active1,
+            uint256 total1
+        ) = account.getPasskeys(0, 3);
+
+        assertEq(total1, 6, "Total should be 6");
+        assertEq(ids1.length, 3, "Should return 3 passkeys");
+        assertEq(qxList1.length, 3, "Should return 3 qx values");
+
+        // Verify first passkey is the initial one
+        assertEq(qxList1[0], qx, "First passkey should be initial qx");
+        assertEq(qyList1[0], qy, "First passkey should be initial qy");
+        assertTrue(active1[0], "First passkey should be active");
+
+        // Test pagination: get next 3
+        (
+            bytes32[] memory ids2,
+            bytes32[] memory qxList2,
+            bytes32[] memory qyList2,
+            ,
+            bool[] memory active2,
+            uint256 total2
+        ) = account.getPasskeys(3, 3);
+
+        assertEq(total2, 6, "Total should still be 6");
+        assertEq(ids2.length, 3, "Should return 3 passkeys");
+
+        // Verify these are the added passkeys (offset 3 = index 3, 4, 5)
+        // testQx[0] is at index 1, so index 3 is testQx[2]
+        assertEq(qxList2[0], testQx[2], "Should match 3rd added passkey");
+        assertEq(qyList2[0], testQy[2], "Should match 3rd added passkey");
+        assertTrue(active2[0], "Added passkey should be active");
+
+        // Test pagination: offset beyond total
+        (
+            bytes32[] memory ids3,
+            ,
+            ,
+            ,
+            ,
+            uint256 total3
+        ) = account.getPasskeys(10, 3);
+
+        assertEq(total3, 6, "Total should still be 6");
+        assertEq(ids3.length, 0, "Should return empty array");
+
+        // Test pagination: limit exceeds remaining
+        (
+            bytes32[] memory ids4,
+            ,
+            ,
+            ,
+            ,
+            uint256 total4
+        ) = account.getPasskeys(4, 10);
+
+        assertEq(total4, 6, "Total should still be 6");
+        assertEq(ids4.length, 2, "Should return only 2 remaining passkeys");
+    }
+
+    function test_GetPasskeysLimitCap() public {
+        // The limit should be capped at 50 to prevent gas issues
+        (
+            bytes32[] memory ids,
+            ,
+            ,
+            ,
+            ,
+            uint256 total
+        ) = account.getPasskeys(0, 100);
+
+        // With only 1 passkey, should return 1
+        assertEq(total, 1, "Total should be 1");
+        assertEq(ids.length, 1, "Should return 1 passkey");
+
+        // Note: The actual cap of 50 is enforced in the contract
+        // If we had 100 passkeys and requested 100, we'd only get 50
+    }
 }

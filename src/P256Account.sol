@@ -1063,7 +1063,72 @@ contract P256Account is IAccount, IERC1271, Ownable, Initializable {
     }
 
     /**
-     * @notice Get all passkeys
+     * @notice Get paginated passkeys to prevent DoS/gas issues
+     * @param offset Starting index
+     * @param limit Maximum number of passkeys to return (capped at 50)
+     * @return passkeyIdList Array of passkey IDs
+     * @return qxList Array of x-coordinates
+     * @return qyList Array of y-coordinates
+     * @return addedAtList Array of timestamps
+     * @return activeList Array of active flags
+     * @return total Total number of passkeys
+     */
+    function getPasskeys(uint256 offset, uint256 limit)
+        external
+        view
+        returns (
+            bytes32[] memory passkeyIdList,
+            bytes32[] memory qxList,
+            bytes32[] memory qyList,
+            uint256[] memory addedAtList,
+            bool[] memory activeList,
+            uint256 total
+        )
+    {
+        total = passkeyIds.length;
+
+        // Return empty arrays if offset is beyond total
+        if (offset >= total) {
+            return (
+                new bytes32[](0),
+                new bytes32[](0),
+                new bytes32[](0),
+                new uint256[](0),
+                new bool[](0),
+                total
+            );
+        }
+
+        // Cap limit at 50 to prevent gas issues
+        uint256 maxLimit = 50;
+        if (limit > maxLimit) {
+            limit = maxLimit;
+        }
+
+        // Calculate actual length to return
+        uint256 remaining = total - offset;
+        uint256 length = remaining < limit ? remaining : limit;
+
+        passkeyIdList = new bytes32[](length);
+        qxList = new bytes32[](length);
+        qyList = new bytes32[](length);
+        addedAtList = new uint256[](length);
+        activeList = new bool[](length);
+
+        for (uint256 i = 0; i < length; i++) {
+            bytes32 passkeyId = passkeyIds[offset + i];
+            PasskeyInfo storage info = passkeys[passkeyId];
+            passkeyIdList[i] = passkeyId;
+            qxList[i] = info.qx;
+            qyList[i] = info.qy;
+            addedAtList[i] = info.addedAt;
+            activeList[i] = info.active;
+        }
+    }
+
+    /**
+     * @notice Get all passkeys (DEPRECATED - use getPasskeys() for pagination)
+     * @dev This function may run out of gas if there are too many passkeys
      * @return passkeyIdList Array of passkey IDs
      * @return qxList Array of x-coordinates
      * @return qyList Array of y-coordinates
