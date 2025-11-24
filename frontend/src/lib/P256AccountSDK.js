@@ -322,6 +322,70 @@ export class P256AccountSDK {
   }
 
   /**
+   * Enable two-factor authentication (requires both passkey + owner signatures)
+   * @param {Object} params - Parameters
+   * @param {string} params.accountAddress - P256Account address
+   * @param {Object} params.passkeyCredential - Passkey credential for signing
+   * @param {Function} params.signWithPasskey - Function to sign with passkey
+   * @param {string} params.ownerSignature - Owner signature (optional, will be requested if 2FA already enabled)
+   * @returns {Promise<Object>} UserOperation receipt
+   */
+  async enableTwoFactor({
+    accountAddress,
+    passkeyCredential,
+    signWithPasskey,
+    ownerSignature = null,
+  }) {
+    // Encode enableTwoFactor call
+    const accountContract = this.accountManager.getAccountContract(accountAddress)
+    const data = accountContract.interface.encodeFunctionData('enableTwoFactor', [])
+
+    return await this.executeCall({
+      accountAddress,
+      targetAddress: accountAddress,
+      value: 0n,
+      data,
+      passkeyCredential,
+      signWithPasskey,
+      ownerSignature,
+      needsDeployment: false,
+      initCode: '0x',
+    })
+  }
+
+  /**
+   * Disable two-factor authentication (only requires passkey + owner signatures)
+   * @param {Object} params - Parameters
+   * @param {string} params.accountAddress - P256Account address
+   * @param {Object} params.passkeyCredential - Passkey credential for signing
+   * @param {Function} params.signWithPasskey - Function to sign with passkey
+   * @param {string} params.ownerSignature - Owner signature (required when 2FA is enabled)
+   * @returns {Promise<Object>} UserOperation receipt
+   */
+  async disableTwoFactor({
+    accountAddress,
+    passkeyCredential,
+    signWithPasskey,
+    ownerSignature = null,
+  }) {
+    // Encode disableTwoFactor call
+    const accountContract = this.accountManager.getAccountContract(accountAddress)
+    const data = accountContract.interface.encodeFunctionData('disableTwoFactor', [])
+
+    return await this.executeCall({
+      accountAddress,
+      targetAddress: accountAddress,
+      value: 0n,
+      data,
+      passkeyCredential,
+      signWithPasskey,
+      ownerSignature,
+      needsDeployment: false,
+      initCode: '0x',
+    })
+  }
+
+  /**
    * Get pending recovery requests for an account
    * @param {string} accountAddress - P256Account address
    * @returns {Promise<Array>} Array of pending recovery requests

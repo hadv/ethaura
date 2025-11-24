@@ -3,6 +3,7 @@ import { Lock, Key, AlertCircle } from 'lucide-react'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
 import { useNetwork } from '../contexts/NetworkContext'
 import { useP256SDK } from '../hooks/useP256SDK'
+import { signWithPasskey } from '../utils/webauthn'
 import { ethers } from 'ethers'
 import DeviceManagement from './DeviceManagement'
 import '../styles/PasskeySettings.css'
@@ -12,7 +13,7 @@ import '../styles/PasskeySettings.css'
  * This replaces the old PasskeySettings.jsx which used the timelock pattern
  */
 function PasskeySettingsV2({ accountAddress }) {
-  const { address: ownerAddress, provider: web3AuthProvider } = useWeb3Auth()
+  const { address: ownerAddress, signRawHash, provider: web3AuthProvider } = useWeb3Auth()
   const { networkInfo } = useNetwork()
   const sdk = useP256SDK()
   const [status, setStatus] = useState('')
@@ -89,24 +90,54 @@ function PasskeySettingsV2({ accountAddress }) {
     setStatus(enable ? 'Enabling 2FA...' : 'Disabling 2FA...')
 
     try {
-      // IMPORTANT: enableTwoFactor() and disableTwoFactor() can only be called via UserOperation
-      // They cannot be called directly from an EOA (even the owner)
-      // This is a security feature to ensure all account modifications go through the EntryPoint
+      // Load passkey credential from localStorage
+      const storedCredential = localStorage.getItem(`passkey_${accountAddress}`)
+      if (!storedCredential) {
+        throw new Error('Passkey credential not found. Please ensure you have a passkey for this account.')
+      }
 
-      setError(`⚠️ 2FA toggle must be done through a UserOperation, not a direct transaction.
+      const passkeyCredential = JSON.parse(storedCredential)
+      console.log('🔑 Loaded passkey credential for 2FA toggle:', passkeyCredential.id)
 
-This feature requires integration with the transaction sender to:
-1. Build a UserOperation that calls ${enable ? 'enableTwoFactor()' : 'disableTwoFactor()'}
-2. Sign it with your ${accountInfo.twoFactorEnabled ? 'passkey + owner' : 'passkey or owner'}
-3. Send it through the bundler
+      // Get owner signature if 2FA is currently enabled (required for disabling)
+      let ownerSignature = null
+      if (!enable && accountInfo.twoFactorEnabled) {
+        console.log('🔐 2FA currently enabled - requesting owner signature to disable...')
+        // Similar issue as passkey removal - we need the userOpHash first
+        // For now, show a message
+        throw new Error('Disabling 2FA when it\'s currently enabled requires a more complex flow. This will be implemented in a future update.')
+      }
 
-This will be implemented in a future update.`)
+      console.log(`${enable ? '🔒 Enabling' : '🔓 Disabling'} 2FA...`)
+
+      // Toggle 2FA via UserOperation
+      const receipt = enable
+        ? await sdk.enableTwoFactor({
+            accountAddress,
+            passkeyCredential,
+            signWithPasskey,
+            ownerSignature,
+          })
+        : await sdk.disableTwoFactor({
+            accountAddress,
+            passkeyCredential,
+            signWithPasskey,
+            ownerSignature,
+          })
+
+      console.log(`✅ 2FA ${enable ? 'enabled' : 'disabled'} successfully:`, receipt)
+
+      setStatus(`✅ 2FA ${enable ? 'enabled' : 'disabled'} successfully!`)
+
+      // Reload account info
+      await loadAccountInfo()
+
     } catch (err) {
       console.error('Failed to toggle 2FA:', err)
       setError(err.message || 'Failed to toggle 2FA')
     } finally {
       setLoading(false)
-      setStatus('')
+      setTimeout(() => setStatus(''), 3000)
     }
   }
 

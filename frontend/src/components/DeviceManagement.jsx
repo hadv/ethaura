@@ -4,11 +4,12 @@ import { useWeb3Auth } from '../contexts/Web3AuthContext'
 import { useNetwork } from '../contexts/NetworkContext'
 import { useP256SDK } from '../hooks/useP256SDK'
 import { getDevices, removeDevice } from '../lib/deviceManager'
+import { signWithPasskey } from '../utils/webauthn'
 import { ethers } from 'ethers'
 import '../styles/DeviceManagement.css'
 
 function DeviceManagement({ accountAddress, onAddDevice }) {
-  const { address: ownerAddress, signMessage, provider: web3AuthProvider } = useWeb3Auth()
+  const { address: ownerAddress, signMessage, signRawHash, provider: web3AuthProvider } = useWeb3Auth()
   const { networkInfo } = useNetwork()
   const sdk = useP256SDK()
   const [devices, setDevices] = useState([]) // Merged devices (local + on-chain)
@@ -178,25 +179,50 @@ function DeviceManagement({ accountAddress, onAddDevice }) {
         setRemoving(device.deviceId)
         setError('')
 
-        // Note: This requires passkey signature + owner signature (if 2FA enabled)
-        // For now, show error message that this needs to be implemented via UserOperation
-        setError('⚠️ On-chain passkey removal must be done through a UserOperation with passkey signature. This feature requires integration with the transaction sender.')
+        // Load passkey credential from localStorage
+        const storedCredential = localStorage.getItem(`passkey_${accountAddress}`)
+        if (!storedCredential) {
+          throw new Error('Passkey credential not found. Please ensure you have a passkey for this account.')
+        }
 
-        // TODO: Implement via SDK
-        // const passkeyCredential = await getPasskeyCredential()
-        // const signWithPasskey = async (credential, data) => { ... }
-        // const ownerSignature = twoFactorEnabled ? await getOwnerSignature() : null
-        //
-        // await sdk.removePasskey({
-        //   accountAddress,
-        //   qx: device.publicKey.x,
-        //   qy: device.publicKey.y,
-        //   passkeyCredential,
-        //   signWithPasskey,
-        //   ownerSignature,
-        // })
-        //
-        // await loadDevices()
+        const passkeyCredential = JSON.parse(storedCredential)
+        console.log('🔑 Loaded passkey credential for removal:', passkeyCredential.id)
+
+        // Get owner signature if 2FA is enabled
+        let ownerSignature = null
+        if (twoFactorEnabled) {
+          console.log('🔐 2FA enabled - requesting owner signature...')
+          // We'll need to get the userOpHash first, then sign it
+          // For now, we'll pass null and let the SDK handle it
+          // The SDK's executeCall will build the UserOp and get the hash
+          // But we need to sign it before sending
+          // This is a limitation - we need to refactor to support this flow
+          // For now, show a message
+          throw new Error('2FA-enabled passkey removal requires a more complex flow. Please disable 2FA first, then remove the passkey.')
+        }
+
+        console.log('🗑️ Removing passkey from blockchain:', {
+          qx: device.publicKey.x,
+          qy: device.publicKey.y,
+        })
+
+        // Remove passkey via UserOperation
+        const receipt = await sdk.removePasskey({
+          accountAddress,
+          qx: device.publicKey.x,
+          qy: device.publicKey.y,
+          passkeyCredential,
+          signWithPasskey,
+          ownerSignature,
+        })
+
+        console.log('✅ Passkey removed successfully:', receipt)
+
+        // Also remove from local storage if it matches
+        await removeDevice(signMessage, ownerAddress, accountAddress, device.deviceId)
+
+        // Reload devices
+        await loadDevices()
 
       } catch (err) {
         console.error('Failed to remove passkey:', err)
