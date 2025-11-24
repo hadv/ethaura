@@ -1,48 +1,29 @@
 import { useState, useEffect } from 'react'
-import { Smartphone, Tablet, Monitor, Key, CheckCircle, Clock } from 'lucide-react'
+import { Smartphone, Tablet, Monitor, Key, Trash2 } from 'lucide-react'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
 import { useNetwork } from '../contexts/NetworkContext'
-import { ethers } from 'ethers'
+import { useP256SDK } from '../hooks/useP256SDK'
 import { getDevices, removeDevice } from '../lib/deviceManager'
-import { NETWORKS } from '../lib/constants'
-import { HiExternalLink } from 'react-icons/hi'
+import { ethers } from 'ethers'
 import '../styles/DeviceManagement.css'
 
 function DeviceManagement({ accountAddress, onAddDevice }) {
   const { address: ownerAddress, signMessage, provider: web3AuthProvider } = useWeb3Auth()
   const { networkInfo } = useNetwork()
-  const [devices, setDevices] = useState([])
+  const sdk = useP256SDK()
+  const [devices, setDevices] = useState([]) // Merged devices (local + on-chain)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [removing, setRemoving] = useState(null)
-  const [executing, setExecuting] = useState(null)
-  const [cancelling, setCancelling] = useState(null)
-  const [proposalDetails, setProposalDetails] = useState({})
-  const [isAccountDeployed, setIsAccountDeployed] = useState(true) // Track deployment status
-
-  // P256Account ABI (minimal for what we need)
-  const accountABI = [
-    'function executePublicKeyUpdate(bytes32 actionHash)',
-    'function cancelPendingAction(bytes32 actionHash)',
-    'function pendingPublicKeyUpdates(bytes32) view returns (bytes32 qx, bytes32 qy, uint256 executeAfter, bool executed, bool cancelled)',
-  ]
+  const [isAccountDeployed, setIsAccountDeployed] = useState(true)
+  const [twoFactorEnabled, setTwoFactorEnabled] = useState(false)
 
   useEffect(() => {
     loadDevices()
-  }, [accountAddress, ownerAddress])
-
-  // Update timelock display every minute
-  useEffect(() => {
-    const interval = setInterval(() => {
-      // Force re-render to update timelock display
-      setProposalDetails(prev => ({ ...prev }))
-    }, 60000) // Update every minute
-
-    return () => clearInterval(interval)
-  }, [])
+  }, [accountAddress, sdk, signMessage])
 
   const loadDevices = async () => {
-    if (!accountAddress || !ownerAddress || !signMessage) {
+    if (!accountAddress || !sdk || !signMessage) {
       setLoading(false)
       return
     }
@@ -52,7 +33,6 @@ function DeviceManagement({ accountAddress, onAddDevice }) {
       setError('')
 
       // Check if account is deployed
-      const networkInfo = JSON.parse(localStorage.getItem('ethaura_network') || '{"name":"sepolia","rpcUrl":"https://rpc.sepolia.org"}')
       const provider = new ethers.JsonRpcProvider(networkInfo.rpcUrl)
       const code = await provider.getCode(accountAddress)
       const isDeployed = code !== '0x'
@@ -60,24 +40,38 @@ function DeviceManagement({ accountAddress, onAddDevice }) {
       console.log('🔍 Account deployment status:', { accountAddress, isDeployed })
       setIsAccountDeployed(isDeployed)
 
-      const deviceList = await getDevices(signMessage, ownerAddress, accountAddress)
+      // 1. Fetch local/backend devices (has metadata like device name, type, attestation)
+      const localDevices = await getDevices(signMessage, ownerAddress, accountAddress)
+      console.log('📱 Loaded local devices:', localDevices)
 
-      // For undeployed accounts, only keep the most recent device
-      // (only the last device will be deployed with the account)
-      if (!isDeployed && deviceList.length > 0) {
-        // Sort by created_at descending and keep only the first one
-        const sortedDevices = [...deviceList].sort((a, b) => b.createdAt - a.createdAt)
-        const latestDevice = sortedDevices[0]
-        console.log('⚠️ Account not deployed - showing only latest device:', latestDevice.deviceName)
-        setDevices([latestDevice])
-      } else {
-        setDevices(deviceList)
+      if (!isDeployed) {
+        // For undeployed accounts, only show local devices (not on-chain yet)
+        // Only keep the most recent device (only it will be deployed)
+        if (localDevices.length > 0) {
+          const sortedDevices = [...localDevices].sort((a, b) => b.createdAt - a.createdAt)
+          const latestDevice = sortedDevices[0]
+          console.log('⚠️ Account not deployed - showing only latest device:', latestDevice.deviceName)
+          setDevices([latestDevice])
+        } else {
+          setDevices([])
+        }
+        setLoading(false)
+        return
       }
 
-      // Fetch proposal details for pending devices (only for deployed accounts)
-      if (isDeployed) {
-        await loadProposalDetails(deviceList)
-      }
+      // 2. Fetch on-chain passkeys (source of truth for active passkeys)
+      const passkeyData = await sdk.getPasskeys(accountAddress, 0, 50)
+      console.log('🔗 Loaded on-chain passkeys:', passkeyData)
+
+      // Get account info for 2FA status
+      const accountInfo = await sdk.accountManager.getAccountInfo(accountAddress)
+      setTwoFactorEnabled(accountInfo.twoFactorEnabled)
+
+      // 3. Merge local devices with on-chain passkeys
+      const mergedDevices = mergeDevicesWithPasskeys(localDevices, passkeyData)
+      console.log('✅ Merged devices:', mergedDevices)
+
+      setDevices(mergedDevices)
     } catch (err) {
       console.error('Failed to load devices:', err)
       setError(err.message || 'Failed to load devices')
@@ -87,121 +81,146 @@ function DeviceManagement({ accountAddress, onAddDevice }) {
     }
   }
 
-  const loadProposalDetails = async (deviceList) => {
-    if (!web3AuthProvider || !accountAddress) return
+  /**
+   * Merge local devices with on-chain passkeys
+   * - On-chain passkeys are the source of truth for active status
+   * - Local devices provide metadata (device name, type, attestation)
+   * - Devices not on-chain yet are marked as "pending"
+   */
+  const mergeDevicesWithPasskeys = (localDevices, passkeyData) => {
+    const merged = []
 
-    try {
-      const ethersProvider = new ethers.BrowserProvider(web3AuthProvider)
-      const contract = new ethers.Contract(accountAddress, accountABI, ethersProvider)
+    // Create a map of on-chain passkeys by passkeyId
+    const onChainPasskeys = new Map()
+    passkeyData.passkeyIds.forEach((passkeyId, index) => {
+      onChainPasskeys.set(passkeyId, {
+        passkeyId,
+        qx: passkeyData.qxList[index],
+        qy: passkeyData.qyList[index],
+        addedAt: Number(passkeyData.addedAtList[index]) * 1000, // Convert to milliseconds
+        active: passkeyData.activeList[index],
+        deviceId: passkeyData.deviceIdList[index],
+      })
+    })
 
-      const details = {}
-      for (const device of deviceList) {
-        if (device.proposalHash) {
-          try {
-            const proposal = await contract.pendingPublicKeyUpdates(device.proposalHash)
-            details[device.proposalHash] = {
-              executeAfter: Number(proposal.executeAfter),
-              executed: proposal.executed,
-              cancelled: proposal.cancelled,
-            }
-          } catch (err) {
-            console.error(`Failed to fetch proposal details for ${device.proposalHash}:`, err)
-          }
-        }
+    // Match local devices with on-chain passkeys
+    for (const localDevice of localDevices) {
+      // Calculate passkeyId from local device's public key
+      const passkeyId = ethers.keccak256(
+        ethers.solidityPacked(
+          ['bytes32', 'bytes32'],
+          [localDevice.publicKey.x, localDevice.publicKey.y]
+        )
+      )
+
+      const onChainPasskey = onChainPasskeys.get(passkeyId)
+
+      if (onChainPasskey) {
+        // Device is on-chain - merge metadata
+        merged.push({
+          ...localDevice,
+          passkeyId,
+          isActive: onChainPasskey.active,
+          onChainAddedAt: onChainPasskey.addedAt,
+          onChainDeviceId: onChainPasskey.deviceId,
+        })
+        // Remove from map so we can find orphaned on-chain passkeys later
+        onChainPasskeys.delete(passkeyId)
+      } else {
+        // Device is local-only (not on-chain yet) - mark as pending
+        merged.push({
+          ...localDevice,
+          passkeyId,
+          isActive: false,
+          isPending: true, // Not on-chain yet
+        })
       }
-      setProposalDetails(details)
-    } catch (err) {
-      console.error('Failed to load proposal details:', err)
     }
+
+    // Add any on-chain passkeys that don't have local metadata
+    for (const [passkeyId, onChainPasskey] of onChainPasskeys) {
+      merged.push({
+        deviceId: passkeyId, // Use passkeyId as deviceId
+        deviceName: ethers.decodeBytes32String(onChainPasskey.deviceId) || 'Unknown Device',
+        deviceType: 'unknown',
+        publicKey: {
+          x: onChainPasskey.qx,
+          y: onChainPasskey.qy,
+        },
+        passkeyId,
+        isActive: onChainPasskey.active,
+        onChainAddedAt: onChainPasskey.addedAt,
+        onChainDeviceId: onChainPasskey.deviceId,
+        createdAt: onChainPasskey.addedAt,
+      })
+    }
+
+    return merged
   }
 
-  const handleRemoveDevice = async (deviceId, deviceName) => {
-    if (!confirm(`Are you sure you want to remove "${deviceName}"? This action cannot be undone.`)) {
-      return
-    }
+  const handleRemoveDevice = async (device) => {
+    const displayName = device.deviceName || `${device.publicKey.x.slice(0, 10)}...${device.publicKey.x.slice(-8)}`
 
-    try {
-      setRemoving(deviceId)
-      setError('')
-      await removeDevice(signMessage, ownerAddress, accountAddress, deviceId)
-      await loadDevices() // Reload the list
-    } catch (err) {
-      console.error('Failed to remove device:', err)
-      setError(err.message || 'Failed to remove device')
-    } finally {
-      setRemoving(null)
-    }
-  }
+    // If device is on-chain (active), need to remove via UserOperation
+    if (device.isActive) {
+      // Check if this is the last passkey and 2FA is enabled
+      const activeCount = devices.filter(d => d.isActive).length
+      if (activeCount <= 1 && twoFactorEnabled) {
+        setError('Cannot remove the last passkey when 2FA is enabled. Disable 2FA first.')
+        return
+      }
 
-  const handleExecuteProposal = async (proposalHash, deviceName) => {
-    if (!web3AuthProvider || !ownerAddress) {
-      setError('Please connect your wallet')
-      return
-    }
+      if (!confirm(`Remove passkey "${displayName}" from the blockchain? This requires a transaction.`)) {
+        return
+      }
 
-    if (!confirm(`Execute passkey update for "${deviceName}"? This will activate this device.`)) {
-      return
-    }
+      try {
+        setRemoving(device.deviceId)
+        setError('')
 
-    try {
-      setExecuting(proposalHash)
-      setError('')
+        // Note: This requires passkey signature + owner signature (if 2FA enabled)
+        // For now, show error message that this needs to be implemented via UserOperation
+        setError('⚠️ On-chain passkey removal must be done through a UserOperation with passkey signature. This feature requires integration with the transaction sender.')
 
-      const ethersProvider = new ethers.BrowserProvider(web3AuthProvider)
-      const signer = await ethersProvider.getSigner()
-      const contract = new ethers.Contract(accountAddress, accountABI, signer)
+        // TODO: Implement via SDK
+        // const passkeyCredential = await getPasskeyCredential()
+        // const signWithPasskey = async (credential, data) => { ... }
+        // const ownerSignature = twoFactorEnabled ? await getOwnerSignature() : null
+        //
+        // await sdk.removePasskey({
+        //   accountAddress,
+        //   qx: device.publicKey.x,
+        //   qy: device.publicKey.y,
+        //   passkeyCredential,
+        //   signWithPasskey,
+        //   ownerSignature,
+        // })
+        //
+        // await loadDevices()
 
-      console.log('⚡ Executing proposal:', proposalHash)
+      } catch (err) {
+        console.error('Failed to remove passkey:', err)
+        setError(err.message || 'Failed to remove passkey')
+      } finally {
+        setRemoving(null)
+      }
+    } else {
+      // Device is local-only (not on-chain yet) - just remove from local storage
+      if (!confirm(`Remove local device "${displayName}"? This action cannot be undone.`)) {
+        return
+      }
 
-      const tx = await contract.executePublicKeyUpdate(proposalHash)
-      console.log('Transaction submitted:', tx.hash)
-
-      await tx.wait()
-      console.log('✅ Proposal executed successfully')
-
-      // Reload devices to show updated status
-      await loadDevices()
-    } catch (err) {
-      console.error('Failed to execute proposal:', err)
-      setError(err.message || 'Failed to execute proposal')
-    } finally {
-      setExecuting(null)
-    }
-  }
-
-  const handleCancelProposal = async (proposalHash, deviceName) => {
-    if (!web3AuthProvider || !ownerAddress) {
-      setError('Please connect your wallet')
-      return
-    }
-
-    if (!confirm(`Cancel passkey update for "${deviceName}"? This action cannot be undone.`)) {
-      return
-    }
-
-    try {
-      setCancelling(proposalHash)
-      setError('')
-
-      const ethersProvider = new ethers.BrowserProvider(web3AuthProvider)
-      const signer = await ethersProvider.getSigner()
-      const contract = new ethers.Contract(accountAddress, accountABI, signer)
-
-      console.log('❌ Cancelling proposal:', proposalHash)
-
-      const tx = await contract.cancelPendingAction(proposalHash)
-      console.log('Transaction submitted:', tx.hash)
-
-      await tx.wait()
-      console.log('✅ Proposal cancelled successfully')
-
-      // Reload devices to show updated status
-      await loadDevices()
-    } catch (err) {
-      console.error('Failed to cancel proposal:', err)
-      setError(err.message || 'Failed to cancel proposal')
-    } finally {
-      setCancelling(null)
+      try {
+        setRemoving(device.deviceId)
+        setError('')
+        await removeDevice(signMessage, ownerAddress, accountAddress, device.deviceId)
+        await loadDevices() // Reload the list
+      } catch (err) {
+        console.error('Failed to remove device:', err)
+        setError(err.message || 'Failed to remove device')
+      } finally {
+        setRemoving(null)
+      }
     }
   }
 
@@ -214,33 +233,6 @@ function DeviceManagement({ accountAddress, onAddDevice }) {
       hour: '2-digit',
       minute: '2-digit',
     })
-  }
-
-  const formatTimeRemaining = (executeAfterTimestamp) => {
-    if (!executeAfterTimestamp) return null
-
-    const now = Math.floor(Date.now() / 1000) // Current time in seconds
-    const executeAfter = executeAfterTimestamp // Already in seconds
-    const remainingSeconds = executeAfter - now
-
-    if (remainingSeconds <= 0) {
-      return { text: 'Ready to execute', canExecute: true, className: 'ready' }
-    }
-
-    const days = Math.floor(remainingSeconds / 86400)
-    const hours = Math.floor((remainingSeconds % 86400) / 3600)
-    const minutes = Math.floor((remainingSeconds % 3600) / 60)
-
-    let parts = []
-    if (days > 0) parts.push(`${days}d`)
-    if (hours > 0) parts.push(`${hours}h`)
-    if (minutes > 0 || parts.length === 0) parts.push(`${minutes}m`)
-
-    return {
-      text: parts.join(' '),
-      canExecute: false,
-      className: 'waiting',
-    }
   }
 
   const getDeviceIcon = (deviceType) => {
@@ -306,16 +298,16 @@ function DeviceManagement({ accountAddress, onAddDevice }) {
                   {!isAccountDeployed ? (
                     <span className="badge badge-info" style={{ whiteSpace: 'nowrap' }}>Pending deployment</span>
                   ) : device.isActive ? (
-                    <span className="badge badge-success">Active</span>
-                  ) : device.proposalHash ? (
-                    <span className="badge badge-warning">Pending (48h timelock)</span>
+                    <span className="badge badge-success">Active (On-chain)</span>
+                  ) : device.isPending ? (
+                    <span className="badge badge-warning">Pending (Not on-chain)</span>
                   ) : (
                     <span className="badge badge-secondary">Inactive</span>
                   )}
                   {/* Attestation badges (Phase 1) */}
                   {device.isHardwareBacked === true && (
                     <span className="badge badge-info" title="Hardware-backed authenticator">
-                      🔒 Hardware
+                      Hardware
                     </span>
                   )}
                   {device.isHardwareBacked === false && (
@@ -354,91 +346,25 @@ function DeviceManagement({ accountAddress, onAddDevice }) {
                     )}
                   </div>
                 )}
-                {device.proposalHash && (
-                  <>
-                    <div className="device-proposal-info">
-                      <span className="label">Proposal Hash:</span>
-                      <code className="key-preview">
-                        {device.proposalHash.slice(0, 10)}...{device.proposalHash.slice(-8)}
-                      </code>
-                      {device.proposalTxHash && (
-                        <a
-                          href={`${networkInfo.explorerUrl}/tx/${device.proposalTxHash}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="explorer-link"
-                          title="View proposal transaction on explorer"
-                        >
-                          <HiExternalLink />
-                        </a>
-                      )}
-                    </div>
-                    {proposalDetails[device.proposalHash] && (
-                      <div className="device-timelock-info">
-                        {(() => {
-                          const timeInfo = formatTimeRemaining(proposalDetails[device.proposalHash].executeAfter)
-                          return timeInfo ? (
-                            <div className={`timelock-status ${timeInfo.className}`}>
-                              {timeInfo.canExecute ? (
-                                <span className="timelock-ready" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                                  <CheckCircle size={14} />
-                                  {timeInfo.text}
-                                </span>
-                              ) : (
-                                <span className="timelock-waiting" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                                  <Clock size={14} />
-                                  Can be executed in: {timeInfo.text}
-                                </span>
-                              )}
-                            </div>
-                          ) : null
-                        })()}
-                      </div>
-                    )}
-                  </>
+                {/* Show on-chain device ID if available */}
+                {device.onChainDeviceId && (
+                  <div className="device-chain-info">
+                    <span className="label">On-chain ID:</span>
+                    <code className="key-preview">
+                      {ethers.decodeBytes32String(device.onChainDeviceId) || device.onChainDeviceId.slice(0, 10) + '...'}
+                    </code>
+                  </div>
                 )}
               </div>
               <div className="device-actions">
-                {device.proposalHash ? (
-                  <div className="proposal-actions">
-                    {(() => {
-                      const timeInfo = proposalDetails[device.proposalHash]
-                        ? formatTimeRemaining(proposalDetails[device.proposalHash].executeAfter)
-                        : null
-                      const canExecute = timeInfo?.canExecute ?? false
-
-                      return (
-                        <>
-                          <button
-                            className="btn btn-success btn-sm"
-                            onClick={() => handleExecuteProposal(device.proposalHash, device.deviceName)}
-                            disabled={executing === device.proposalHash || !canExecute}
-                            title={canExecute ? 'Execute this proposal' : 'Timelock not expired yet'}
-                          >
-                            {executing === device.proposalHash ? 'Executing...' : 'Execute'}
-                          </button>
-                          <button
-                            className="btn btn-danger btn-sm"
-                            onClick={() => handleCancelProposal(device.proposalHash, device.deviceName)}
-                            disabled={cancelling === device.proposalHash}
-                            title="Cancel this proposal"
-                          >
-                            {cancelling === device.proposalHash ? 'Cancelling...' : 'Cancel'}
-                          </button>
-                        </>
-                      )
-                    })()}
-                  </div>
-                ) : (
-                  <button
-                    className="btn btn-danger btn-sm"
-                    onClick={() => handleRemoveDevice(device.deviceId, device.deviceName)}
-                    disabled={removing === device.deviceId || device.isActive}
-                    title={device.isActive ? 'Cannot remove active device' : 'Remove this device'}
-                  >
-                    {removing === device.deviceId ? 'Removing...' : 'Remove'}
-                  </button>
-                )}
+                <button
+                  className="btn btn-danger btn-sm"
+                  onClick={() => handleRemoveDevice(device)}
+                  disabled={removing === device.deviceId}
+                  title={device.isActive ? 'Remove passkey from blockchain (requires transaction)' : 'Remove local device'}
+                >
+                  {removing === device.deviceId ? 'Removing...' : 'Remove'}
+                </button>
               </div>
             </div>
           ))}
