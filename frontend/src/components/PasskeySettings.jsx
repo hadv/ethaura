@@ -99,16 +99,12 @@ function PasskeySettingsV2({ accountAddress }) {
       const passkeyCredential = JSON.parse(storedCredential)
       console.log('🔑 Loaded passkey credential for 2FA toggle:', passkeyCredential.id)
 
-      // Get owner signature if 2FA is currently enabled (required for disabling)
-      let ownerSignature = null
-      if (!enable && accountInfo.twoFactorEnabled) {
-        console.log('🔐 2FA currently enabled - requesting owner signature to disable...')
-        // Similar issue as passkey removal - we need the userOpHash first
-        // For now, show a message
-        throw new Error('Disabling 2FA when it\'s currently enabled requires a more complex flow. This will be implemented in a future update.')
-      }
-
       console.log(`${enable ? '🔒 Enabling' : '🔓 Disabling'} 2FA...`)
+
+      // Determine if we need owner signature
+      // - Enabling 2FA: No owner signature needed (passkey only)
+      // - Disabling 2FA when enabled: Owner signature required (Step 1/2)
+      const needsOwnerSignature = !enable && accountInfo.twoFactorEnabled
 
       // Toggle 2FA via UserOperation
       const receipt = enable
@@ -116,13 +112,27 @@ function PasskeySettingsV2({ accountAddress }) {
             accountAddress,
             passkeyCredential,
             signWithPasskey,
-            ownerSignature,
           })
         : await sdk.disableTwoFactor({
             accountAddress,
             passkeyCredential,
             signWithPasskey,
-            ownerSignature,
+            getOwnerSignature: needsOwnerSignature
+              ? async (userOpHash, userOp) => {
+                  console.log('🔐 2FA enabled - requesting owner signature to disable (Step 1/2)...')
+                  console.log('🔐 UserOpHash:', userOpHash)
+
+                  setStatus('🔐 Step 1/2: Requesting signature from your social login account...')
+
+                  // Sign with owner (Web3Auth)
+                  const ownerSig = await signRawHash(userOpHash)
+                  console.log('🔐 Owner signature received (Step 1/2):', ownerSig)
+
+                  setStatus('🔑 Step 2/2: Signing with your passkey (biometric)...')
+
+                  return ownerSig
+                }
+              : null,
           })
 
       console.log(`✅ 2FA ${enable ? 'enabled' : 'disabled'} successfully:`, receipt)

@@ -610,6 +610,16 @@ export class P256AccountSDK {
   /**
    * Execute arbitrary call from P256Account
    * @param {Object} params - Parameters
+   * @param {string} params.accountAddress - P256Account address
+   * @param {string} params.targetAddress - Target contract address
+   * @param {bigint} params.value - ETH value to send
+   * @param {string} params.data - Encoded function call data
+   * @param {Object} params.passkeyCredential - Passkey credential for signing
+   * @param {Function} params.signWithPasskey - Function to sign with passkey
+   * @param {string} params.ownerSignature - Pre-computed owner signature (optional, for backward compatibility)
+   * @param {Function} params.getOwnerSignature - Callback to get owner signature (receives userOpHash, userOp)
+   * @param {boolean} params.needsDeployment - Whether account needs deployment
+   * @param {string} params.initCode - InitCode for deployment
    * @returns {Promise<Object>} UserOperation receipt
    */
   async executeCall({
@@ -620,6 +630,7 @@ export class P256AccountSDK {
     passkeyCredential,
     signWithPasskey,
     ownerSignature = null,
+    getOwnerSignature = null,
     needsDeployment = false,
     initCode = '0x',
   }) {
@@ -640,6 +651,15 @@ export class P256AccountSDK {
     // Get UserOperation hash
     const userOpHash = await getUserOpHash(userOp, this.provider, this.chainId)
 
+    // Get owner signature if callback provided (for 2FA mode)
+    // This allows the UI to show a confirmation dialog before signing
+    let finalOwnerSignature = ownerSignature
+    if (getOwnerSignature && !ownerSignature) {
+      console.log('🔐 Requesting owner signature via callback...')
+      finalOwnerSignature = await getOwnerSignature(userOpHash, userOp)
+      console.log('🔐 Owner signature received:', finalOwnerSignature)
+    }
+
     // Sign with passkey
     const userOpHashBytes = ethers.getBytes(userOpHash)
     const passkeySignatureRaw = await signWithPasskey(passkeyCredential, userOpHashBytes)
@@ -654,7 +674,7 @@ export class P256AccountSDK {
     }
 
     // Sign UserOperation
-    const signedUserOp = signUserOperation(userOp, passkeySignature, ownerSignature)
+    const signedUserOp = signUserOperation(userOp, passkeySignature, finalOwnerSignature)
 
     // Submit to bundler
     const receipt = await this.bundler.sendUserOperationAndWait(signedUserOp)

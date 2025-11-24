@@ -188,32 +188,36 @@ function DeviceManagement({ accountAddress, onAddDevice }) {
         const passkeyCredential = JSON.parse(storedCredential)
         console.log('🔑 Loaded passkey credential for removal:', passkeyCredential.id)
 
-        // Get owner signature if 2FA is enabled
-        let ownerSignature = null
-        if (twoFactorEnabled) {
-          console.log('🔐 2FA enabled - requesting owner signature...')
-          // We'll need to get the userOpHash first, then sign it
-          // For now, we'll pass null and let the SDK handle it
-          // The SDK's executeCall will build the UserOp and get the hash
-          // But we need to sign it before sending
-          // This is a limitation - we need to refactor to support this flow
-          // For now, show a message
-          throw new Error('2FA-enabled passkey removal requires a more complex flow. Please disable 2FA first, then remove the passkey.')
-        }
-
         console.log('🗑️ Removing passkey from blockchain:', {
           qx: device.publicKey.x,
           qy: device.publicKey.y,
+          twoFactorEnabled,
         })
 
         // Remove passkey via UserOperation
+        // If 2FA is enabled, the SDK will call getOwnerSignature callback
         const receipt = await sdk.removePasskey({
           accountAddress,
           qx: device.publicKey.x,
           qy: device.publicKey.y,
           passkeyCredential,
           signWithPasskey,
-          ownerSignature,
+          getOwnerSignature: twoFactorEnabled
+            ? async (userOpHash, userOp) => {
+                console.log('🔐 2FA enabled - requesting owner signature (Step 1/2)...')
+                console.log('🔐 UserOpHash:', userOpHash)
+
+                // Show confirmation to user
+                if (!confirm(`⚠️ 2FA Confirmation Required\n\nYou are about to remove passkey "${displayName}" from the blockchain.\n\nThis requires TWO signatures:\n1. Owner signature (social login) - Step 1/2\n2. Passkey signature (biometric) - Step 2/2\n\nClick OK to proceed with owner signature.`)) {
+                  throw new Error('User cancelled the operation')
+                }
+
+                // Sign with owner (Web3Auth)
+                const ownerSig = await signRawHash(userOpHash)
+                console.log('🔐 Owner signature received (Step 1/2):', ownerSig)
+                return ownerSig
+              }
+            : null,
         })
 
         console.log('✅ Passkey removed successfully:', receipt)

@@ -2,7 +2,8 @@ import { useState } from 'react'
 import { ethers } from 'ethers'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
 import { useNetwork } from '../contexts/NetworkContext'
-import { parsePublicKey, verifyAttestation } from '../utils/webauthn'
+import { useP256SDK } from '../hooks/useP256SDK'
+import { parsePublicKey, verifyAttestation, signWithPasskey } from '../utils/webauthn'
 import { addDevice } from '../lib/deviceManager'
 import '../styles/AddCurrentDevice.css'
 
@@ -11,8 +12,9 @@ import '../styles/AddCurrentDevice.css'
  * This replaces the old AddCurrentDevice.jsx which used the propose/execute pattern
  */
 function AddCurrentDeviceV2({ accountAddress, onComplete, onCancel }) {
-  const { address: ownerAddress, provider, signMessage } = useWeb3Auth()
+  const { address: ownerAddress, provider, signMessage, signRawHash } = useWeb3Auth()
   const { networkInfo } = useNetwork()
+  const sdk = useP256SDK()
   const [deviceName, setDeviceName] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -155,7 +157,63 @@ function AddCurrentDeviceV2({ accountAddress, onComplete, onCancel }) {
         attestationResult
       )
 
-      setStatus('✅ Passkey saved! It will be added to the blockchain when you make your first transaction.')
+      // Check if account is deployed
+      const rpcProvider = new ethers.JsonRpcProvider(networkInfo.rpcUrl)
+      const code = await rpcProvider.getCode(accountAddress)
+      const isDeployed = code !== '0x'
+
+      if (isDeployed && sdk) {
+        // Account is deployed - add passkey to blockchain immediately
+        setStatus('Adding passkey to blockchain...')
+
+        try {
+          // Get account info to check if 2FA is enabled
+          const accountInfo = await sdk.getAccountInfo(accountAddress)
+          const needsOwnerSignature = accountInfo.twoFactorEnabled
+
+          console.log('📝 Adding passkey to blockchain:', {
+            qx: publicKey.x,
+            qy: publicKey.y,
+            deviceId: ethers.id(deviceName.trim()),
+            twoFactorEnabled: accountInfo.twoFactorEnabled,
+          })
+
+          // Convert device name to bytes32 deviceId
+          const deviceId = ethers.id(deviceName.trim())
+
+          // Add passkey via UserOperation
+          await sdk.addPasskey({
+            accountAddress,
+            qx: publicKey.x,
+            qy: publicKey.y,
+            deviceId,
+            passkeyCredential: serializedCredential,
+            signWithPasskey,
+            getOwnerSignature: needsOwnerSignature
+              ? async (userOpHash, userOp) => {
+                  console.log('🔐 2FA enabled - requesting owner signature (Step 1/2)...')
+                  setStatus('🔐 Step 1/2: Requesting signature from your social login account...')
+
+                  const ownerSig = await signRawHash(userOpHash)
+                  console.log('🔐 Owner signature received (Step 1/2):', ownerSig)
+
+                  setStatus('🔑 Step 2/2: Signing with your passkey (biometric)...')
+
+                  return ownerSig
+                }
+              : null,
+          })
+
+          setStatus('✅ Passkey added to blockchain successfully!')
+        } catch (err) {
+          console.error('Failed to add passkey to blockchain:', err)
+          // Don't fail the whole operation - passkey is saved locally
+          setStatus('⚠️ Passkey saved locally but failed to add to blockchain. It will be added on your next transaction.')
+        }
+      } else {
+        // Account not deployed yet - passkey will be added on first transaction
+        setStatus('✅ Passkey saved! It will be added to the blockchain when you make your first transaction.')
+      }
 
       // Wait a moment then complete
       setTimeout(() => {
