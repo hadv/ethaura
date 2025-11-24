@@ -41,16 +41,19 @@ function cancelPasskeyRemoval(bytes32 actionHash) external
 - User can cancel with passkey signature
 - Marks passkey as inactive (preserves history)
 
-### 4. **Signature Verification**
+### 4. **Signature Verification (Gas Optimized)**
 
 #### validateUserOp
-- Checks WebAuthn signature against **ALL active passkeys** (OR logic)
+- **Client specifies passkeyId** in signature (O(1) lookup instead of O(n) loop)
+- Signature format: `webAuthnSig || passkeyId(32) || ownerSig(65)`
 - During counterfactual deployment: uses initial passkey from initCode
-- After deployment: iterates through all active passkeys
-- First valid signature passes verification
+- After deployment: direct lookup via passkeyId mapping
+- **Gas savings**: ~100k-900k gas depending on number of passkeys
 
 #### isValidSignature (EIP-1271)
-- Checks P256 signature against **ALL active passkeys** (OR logic)
+- **Two formats supported**:
+  1. **Optimized**: `r(32) || s(32) || passkeyId(32)` - 96 bytes (O(1) lookup)
+  2. **Legacy**: `r(32) || s(32)` - 64 bytes (loops through all passkeys for backward compatibility)
 - Fallback to deprecated qx/qy for backward compatibility
 
 ### 5. **View Functions**
@@ -105,11 +108,20 @@ function cancelPasskeyRemoval(bytes32 actionHash) external
 
 ## Gas Considerations
 
+### **Optimized with passkeyId Parameter**
+
 - **Adding passkey**: ~50k gas (storage write + array push)
-- **Signature verification**: O(n) where n = number of active passkeys
+- **Signature verification**: **O(1) constant time** - client specifies passkeyId
+  - **Gas cost**: ~100k gas (single passkey lookup + verification)
+  - **Gas savings vs loop**: 0-900k gas depending on number of passkeys
+  - **No worst case**: Always constant time regardless of passkey count
+
+### **Legacy Mode (backward compatibility)**
+
+- **Signature verification without passkeyId**: O(n) where n = number of active passkeys
   - Worst case: 10 passkeys × ~100k gas = ~1M gas
   - Average case: 2-3 passkeys × ~100k gas = ~200-300k gas
-  - Early exit optimization reduces actual cost
+  - Only used for backward compatibility with 64-byte EIP-1271 signatures
 
 ## Testing Requirements
 

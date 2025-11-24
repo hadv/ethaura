@@ -304,16 +304,17 @@ contract P256Account is IAccount, IERC1271, Ownable, Initializable {
      *      1. Owner-only: 65-byte ECDSA signature from owner
      *         - Used when no passkeys configured
      *         - Used when passkeys exist but twoFactorEnabled=false
-     *      2. Passkey with 2FA: WebAuthn signature (Solady compact format) + 65-byte ECDSA signature from owner
+     *      2. Passkey with 2FA: WebAuthn signature (Solady compact format) + passkeyId(32) + 65-byte ECDSA signature from owner
      *         - Used when passkeys exist and twoFactorEnabled=true
-     *         - Signature is checked against ALL registered active passkeys (OR logic)
+     *         - Client specifies which passkey to verify against (no loop needed)
      *
      *      WebAuthn signature format (2FA mode) - Solady compact encoding:
-     *      authDataLen(2) || authenticatorData || clientDataJSON || challengeIdx(2) || typeIdx(2) || r(32) || s(32) || ownerSig(65)
+     *      authDataLen(2) || authenticatorData || clientDataJSON || challengeIdx(2) || typeIdx(2) || r(32) || s(32) || passkeyId(32) || ownerSig(65)
      *
      *      SECURITY: The challenge field in clientDataJSON MUST contain the base64url-encoded userOpHash.
      *                This ensures the WebAuthn signature is actually authorizing this specific transaction.
-     *      SECURITY: Any active passkey can authorize (OR logic) - this provides device redundancy
+     *      SECURITY: Any active passkey can authorize - client specifies which one via passkeyId
+     *      GAS OPTIMIZATION: Client passes passkeyId to avoid looping through all passkeys (O(1) instead of O(n))
      */
     function _validateSignature(PackedUserOperation calldata userOp, bytes32 userOpHash)
         internal
@@ -332,15 +333,18 @@ contract P256Account is IAccount, IERC1271, Ownable, Initializable {
             return _recoverSigner(userOpHash, sig) == _owner ? 0 : 1;
         }
 
-        // Passkey with 2FA: requires both passkey and owner signatures
-        // Minimum: authDataLen(2) + authData(37) + clientData(20) + challengeIdx(2) + typeIdx(2) + r(32) + s(32) + ownerSig(65) = 192 bytes
-        if (sig.length < 192) return 1;
+        // Passkey with 2FA: requires WebAuthn signature + passkeyId + owner signature
+        // Minimum: authDataLen(2) + authData(37) + clientData(20) + challengeIdx(2) + typeIdx(2) + r(32) + s(32) + passkeyId(32) + ownerSig(65) = 224 bytes
+        if (sig.length < 224) return 1;
 
         // Extract owner signature (last 65 bytes)
         bytes calldata ownerSig = sig[sig.length - 65:];
 
-        // Extract WebAuthn compact signature (everything except owner signature)
-        bytes calldata webAuthnSig = sig[:sig.length - 65];
+        // Extract passkeyId (32 bytes before owner signature)
+        bytes32 passkeyId = bytes32(sig[sig.length - 97:sig.length - 65]);
+
+        // Extract WebAuthn compact signature (everything except passkeyId and owner signature)
+        bytes calldata webAuthnSig = sig[:sig.length - 97];
 
         // Decode WebAuthn signature using Solady's compact decoder
         // This handles the format: authDataLen(2) || authenticatorData || clientDataJSON || challengeIdx(2) || typeIdx(2) || r(32) || s(32)
@@ -348,8 +352,8 @@ contract P256Account is IAccount, IERC1271, Ownable, Initializable {
 
         bytes memory challenge = abi.encodePacked(userOpHash);
 
-        // SECURITY: Check signature against ALL active passkeys (OR logic)
-        // This allows any registered passkey to authorize the transaction
+        // SECURITY: Verify signature against the specified passkey (O(1) lookup)
+        // Client specifies which passkey they're using via passkeyId
         bool webAuthnValid = false;
 
         // During counterfactual deployment, check against the initial passkey from initCode
@@ -362,18 +366,18 @@ contract P256Account is IAccount, IERC1271, Ownable, Initializable {
                 _qy
             );
         } else {
-            // After deployment, check against all active passkeys
-            for (uint256 i = 0; i < passkeyIds.length && !webAuthnValid; i++) {
-                PasskeyInfo storage passkeyInfo = passkeys[passkeyIds[i]];
-                if (passkeyInfo.active) {
-                    webAuthnValid = WebAuthn.verify(
-                        challenge,
-                        true, // requireUserVerification - enforce UV flag for security
-                        auth,
-                        passkeyInfo.qx,
-                        passkeyInfo.qy
-                    );
-                }
+            // After deployment, check against the specified passkey
+            PasskeyInfo storage passkeyInfo = passkeys[passkeyId];
+
+            // SECURITY: Verify passkey exists and is active
+            if (passkeyInfo.active && passkeyInfo.qx != bytes32(0)) {
+                webAuthnValid = WebAuthn.verify(
+                    challenge,
+                    true, // requireUserVerification - enforce UV flag for security
+                    auth,
+                    passkeyInfo.qx,
+                    passkeyInfo.qy
+                );
             }
         }
 
@@ -481,9 +485,12 @@ contract P256Account is IAccount, IERC1271, Ownable, Initializable {
     /**
      * @notice Verify a signature according to EIP-1271
      * @param hash The hash of the data to verify
-     * @param signature The signature to verify (r || s, 64 bytes)
+     * @param signature The signature to verify
      * @return magicValue The EIP-1271 magic value if valid
-     * @dev SECURITY: Checks signature against ALL active passkeys (OR logic)
+     * @dev Supports two formats:
+     *      1. Legacy: r(32) || s(32) - 64 bytes (checks all passkeys for backward compatibility)
+     *      2. Optimized: r(32) || s(32) || passkeyId(32) - 96 bytes (O(1) lookup)
+     *      GAS OPTIMIZATION: Use 96-byte format with passkeyId to avoid looping
      */
     function isValidSignature(bytes32 hash, bytes calldata signature)
         external
@@ -491,7 +498,7 @@ contract P256Account is IAccount, IERC1271, Ownable, Initializable {
         override
         returns (bytes4 magicValue)
     {
-        if (signature.length != 64) {
+        if (signature.length != 64 && signature.length != 96) {
             revert InvalidSignatureLength();
         }
 
@@ -505,19 +512,30 @@ contract P256Account is IAccount, IERC1271, Ownable, Initializable {
         // Use SHA-256 for consistency with validateUserOp
         bytes32 messageHash = sha256(abi.encodePacked(hash));
 
-        // SECURITY: Check signature against ALL active passkeys (OR logic)
-        // Any registered active passkey can sign
         bool isValid = false;
-        for (uint256 i = 0; i < passkeyIds.length && !isValid; i++) {
-            PasskeyInfo storage passkeyInfo = passkeys[passkeyIds[i]];
-            if (passkeyInfo.active) {
+
+        // Optimized format: r || s || passkeyId (96 bytes)
+        if (signature.length == 96) {
+            bytes32 passkeyId = bytes32(signature[64:96]);
+            PasskeyInfo storage passkeyInfo = passkeys[passkeyId];
+
+            // SECURITY: Verify passkey exists and is active
+            if (passkeyInfo.active && passkeyInfo.qx != bytes32(0)) {
                 isValid = P256.verifySignature(messageHash, r, s, passkeyInfo.qx, passkeyInfo.qy);
             }
-        }
+        } else {
+            // Legacy format: r || s (64 bytes) - check all passkeys for backward compatibility
+            for (uint256 i = 0; i < passkeyIds.length && !isValid; i++) {
+                PasskeyInfo storage passkeyInfo = passkeys[passkeyIds[i]];
+                if (passkeyInfo.active) {
+                    isValid = P256.verifySignature(messageHash, r, s, passkeyInfo.qx, passkeyInfo.qy);
+                }
+            }
 
-        // Fallback to deprecated qx/qy for backward compatibility during transition
-        if (!isValid && qx != bytes32(0) && qy != bytes32(0)) {
-            isValid = P256.verifySignature(messageHash, r, s, qx, qy);
+            // Fallback to deprecated qx/qy for backward compatibility during transition
+            if (!isValid && qx != bytes32(0) && qy != bytes32(0)) {
+                isValid = P256.verifySignature(messageHash, r, s, qx, qy);
+            }
         }
 
         return isValid ? MAGICVALUE : bytes4(0);
