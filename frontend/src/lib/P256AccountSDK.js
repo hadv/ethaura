@@ -50,9 +50,10 @@ export class P256AccountSDK {
    * @param {string} ownerAddress - Owner address
    * @param {bigint} salt - Salt for CREATE2 (default 0)
    * @param {boolean} enable2FA - Whether to enable 2FA immediately (default: false)
+   * @param {string} deviceId - Device identifier (default: empty bytes32)
    * @returns {Promise<Object>} Account info
    */
-  async createAccount(passkeyPublicKey, ownerAddress, salt = 0n, enable2FA = false) {
+  async createAccount(passkeyPublicKey, ownerAddress, salt = 0n, enable2FA = false, deviceId = '0x0000000000000000000000000000000000000000000000000000000000000000') {
     let qx, qy
 
     if (passkeyPublicKey) {
@@ -72,6 +73,7 @@ export class P256AccountSDK {
       owner: ownerAddress,
       salt: salt.toString(),
       enable2FA,
+      deviceId,
       mode: passkeyPublicKey ? 'passkey' : 'owner-only',
     })
 
@@ -81,7 +83,7 @@ export class P256AccountSDK {
     console.log('🏠 SDK createAccount - got address from factory:', accountAddress)
 
     // Get initCode for deployment
-    const initCode = await this.accountManager.getInitCode(qx, qy, ownerAddress, salt, enable2FA)
+    const initCode = await this.accountManager.getInitCode(qx, qy, ownerAddress, salt, enable2FA, deviceId)
 
     // Get full account info (includes twoFactorEnabled, deposit, nonce)
     // Pass enable2FA so undeployed accounts know the intended 2FA state

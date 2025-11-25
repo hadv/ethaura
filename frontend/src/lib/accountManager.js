@@ -142,10 +142,11 @@ export class P256AccountManager {
    * @param {string} owner - Owner address
    * @param {bigint} salt - Salt for CREATE2
    * @param {boolean} enable2FA - Whether to enable 2FA immediately (default: false)
+   * @param {string} deviceId - Device identifier (default: empty bytes32)
    * @returns {Promise<string>} InitCode bytes
    */
-  async getInitCode(qx, qy, owner, salt = 0n, enable2FA = false) {
-    return await this.factory.getInitCode(qx, qy, owner, salt, enable2FA)
+  async getInitCode(qx, qy, owner, salt = 0n, enable2FA = false, deviceId = '0x0000000000000000000000000000000000000000000000000000000000000000') {
+    return await this.factory.getInitCode(qx, qy, owner, salt, enable2FA, deviceId)
   }
 
   /**
@@ -186,12 +187,13 @@ export class P256AccountManager {
    * @param {string} owner - Owner address
    * @param {bigint} salt - Salt for CREATE2
    * @param {boolean} enable2FA - Whether to enable 2FA immediately (default: false)
+   * @param {string} deviceId - Device identifier (default: empty bytes32)
    * @param {Object} signer - ethers signer
    * @returns {Promise<Object>} Transaction receipt
    */
-  async deployAccount(qx, qy, owner, salt = 0n, enable2FA = false, signer) {
+  async deployAccount(qx, qy, owner, salt = 0n, enable2FA = false, deviceId = '0x0000000000000000000000000000000000000000000000000000000000000000', signer) {
     const factoryWithSigner = this.factory.connect(signer)
-    const tx = await factoryWithSigner.createAccount(qx, qy, owner, salt, enable2FA)
+    const tx = await factoryWithSigner.createAccount(qx, qy, owner, salt, enable2FA, deviceId)
     return await tx.wait()
   }
 
