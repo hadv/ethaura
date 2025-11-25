@@ -38,10 +38,7 @@ contract DeployScript is Script {
         address deployer = vm.addr(deployerPrivateKey);
 
         // Prepare creation code (bytecode + constructor args)
-        bytes memory creationCode = abi.encodePacked(
-            type(P256AccountFactory).creationCode,
-            abi.encode(ENTRYPOINT_V07)
-        );
+        bytes memory creationCode = abi.encodePacked(type(P256AccountFactory).creationCode, abi.encode(ENTRYPOINT_V07));
 
         // Calculate init code hash dynamically
         bytes32 initCodeHash = keccak256(creationCode);
@@ -61,9 +58,9 @@ contract DeployScript is Script {
 
         // Deploy using Solady's CREATE2 factory
         // Call safeCreate2(bytes32 salt, bytes memory initializationCode)
-        (bool success, bytes memory returnData) = SOLADY_CREATE2_FACTORY.call{value: 0}(
-            abi.encodeWithSignature("safeCreate2(bytes32,bytes)", SALT, creationCode)
-        );
+        (bool success, bytes memory returnData) = SOLADY_CREATE2_FACTORY.call{
+            value: 0
+        }(abi.encodeWithSignature("safeCreate2(bytes32,bytes)", SALT, creationCode));
 
         require(success, "Solady CREATE2 factory deployment failed");
 
@@ -108,12 +105,7 @@ contract DeployScript is Script {
         pure
         returns (address)
     {
-        bytes32 hash = keccak256(abi.encodePacked(
-            bytes1(0xff),
-            deployer,
-            salt,
-            initCodeHash
-        ));
+        bytes32 hash = keccak256(abi.encodePacked(bytes1(0xff), deployer, salt, initCodeHash));
         return address(uint160(uint256(hash)));
     }
 }
