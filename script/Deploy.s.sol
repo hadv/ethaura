@@ -58,9 +58,9 @@ contract DeployScript is Script {
 
         // Deploy using Solady's CREATE2 factory
         // Call safeCreate2(bytes32 salt, bytes memory initializationCode)
-        (bool success, bytes memory returnData) = SOLADY_CREATE2_FACTORY.call{
-            value: 0
-        }(abi.encodeWithSignature("safeCreate2(bytes32,bytes)", SALT, creationCode));
+        (bool success, bytes memory returnData) = SOLADY_CREATE2_FACTORY.call{value: 0}(
+            abi.encodeWithSignature("safeCreate2(bytes32,bytes)", SALT, creationCode)
+        );
 
         require(success, "Solady CREATE2 factory deployment failed");
 
