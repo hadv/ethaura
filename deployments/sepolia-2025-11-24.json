@@ -1,0 +1,74 @@
+{
+  "network": "Sepolia Testnet",
+  "chainId": 11155111,
+  "deployedAt": "2025-11-24T00:00:00Z",
+  "deployer": "0x18Ee4C040568238643C07e7aFd6c53efc196D26b",
+  "version": "v2.0.0-implementation-in-salt",
+  "description": "Factory with implementation address in CREATE2 salt for version-specific account addresses",
+  "contracts": {
+    "EntryPoint": {
+      "address": "0x0000000071727De22E5E9d8BAf0edAc6f37da032",
+      "note": "Pre-deployed EntryPoint v0.7 (canonical address)"
+    },
+    "P256AccountFactory": {
+      "address": "0x0000005F6a0659138c929F0C425EF741dA91783D",
+      "deploymentTx": "0x2d0879396556fe0fcf5b9856ffc20e20129b671fc77a04822b306b43d8f95720",
+      "blockNumber": "CONFIRMED",
+      "gasUsed": "6240430",
+      "gasCost": "~0.006 ETH",
+      "salt": "0x18ee4c040568238643c07e7afd6c53efc196d26b87b5f6e96eb690bfb787e6bb",
+      "initCodeHash": "0x747dd63dfae991117debeb008f2fb0533bb59a6eee74ba0e197e21099d034c7a",
+      "create2Factory": "0x0000000000FFe8B47B3e2130213B802212439497",
+      "note": "Vanity address with 0x000000 prefix - deployed via Solady's CREATE2 factory (without --legacy flag)"
+    },
+    "P256Account": {
+      "address": "0x128a791b72cCF2Be25E634619F57D422e927877A",
+      "note": "Implementation contract (deployed by factory constructor)"
+    },
+    "SoladyERC1967Factory": {
+      "address": "0x0000000000006396FF2a80c067f99B3d2Ab4Df24",
+      "note": "Canonical Solady proxy factory"
+    }
+  },
+  "explorer": {
+    "factory": "https://sepolia.etherscan.io/address/0x0000005F6a0659138c929F0C425EF741dA91783D",
+    "implementation": "https://sepolia.etherscan.io/address/0x128a791b72cCF2Be25E634619F57D422e927877A",
+    "deploymentTx": "https://sepolia.etherscan.io/tx/0x2d0879396556fe0fcf5b9856ffc20e20129b671fc77a04822b306b43d8f95720"
+  },
+  "rpc": {
+    "public": "https://rpc.sepolia.org",
+    "alchemy": "https://eth-sepolia.g.alchemy.com/v2/YOUR_API_KEY",
+    "bundler": "https://api.pimlico.io/v2/sepolia/rpc?apikey=YOUR_API_KEY"
+  },
+  "features": {
+    "rip7212": false,
+    "erc4337": true,
+    "passkeySupport": true,
+    "twoFactorAuth": true,
+    "guardianRecovery": true,
+    "multiplePasskeys": true,
+    "implementationInSalt": true
+  },
+  "changes": [
+    "Modified _computeSalt() to include implementation address in CREATE2 salt",
+    "Salt formula: keccak256(owner, address(IMPLEMENTATION), salt) & ((1 << 96) - 1)",
+    "Different contract versions now get different account addresses",
+    "Allows reusing same salt (index 0) during development when contract code changes",
+    "Account address is independent of passkey (qx, qy) and 2FA settings"
+  ],
+  "notes": [
+    "This deployment uses a vanity address with 0x000000 prefix",
+    "The salt calculation now includes the implementation address",
+    "All 72 tests passing before deployment",
+    "Frontend .env files updated with new factory address",
+    "Deployment requires --legacy flag: forge script script/Deploy.s.sol:DeployScript --rpc-url $SEPOLIA_RPC_URL --broadcast --legacy",
+    "Init code hash with --legacy: 0x4e04c34fcd41071105645138364629f261a28c528dc14756a91f6b41fef6f0f3 (18,911 bytes)",
+    "Init code hash without --legacy: 0x747dd63dfae991117debeb008f2fb0533bb59a6eee74ba0e197e21099d034c7a (19,502 bytes)",
+    "The --legacy flag uses legacy optimizer settings which produce different bytecode",
+    "Salt 0xbfae1974f681bad305d92efe0f7441e1577e78371b463bb9abc8a16c6ca16fe3 produces vanity address 0x000000B5d8bDF5f7c208Ad680c7C6B17cd986291",
+    "IMPORTANT: Must use raw CREATE2 from deployer address, not Foundry's CREATE2 deployer",
+    "Foundry intercepts CREATE2 calls and routes them through 0x4e59b44847b379578588920cA78FbF26c0B4956C",
+    "To deploy with vanity address, need to use raw transaction or different deployment method"
+  ]
+}
+

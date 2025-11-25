@@ -159,24 +159,51 @@ contract P256AccountFactoryTest is Test {
     }
 
     /**
-     * Test: CREATE2 salt includes ONLY owner and salt (NOT passkey)
+     * Test: CREATE2 salt includes owner, implementation, and salt (NOT passkey)
      */
-    function test_SaltIncludesOnlyOwnerAndSalt() public view {
-        // Address should depend ONLY on owner and salt, NOT on passkey (qx, qy)
+    function test_SaltIncludesOwnerImplementationAndSalt() public view {
+        // Address should depend on owner, implementation, and salt, NOT on passkey (qx, qy)
         address addr1 = factory.getAddress(QX1, QY1, owner1, 0);
         address addr2 = factory.getAddress(QX2, QY1, owner1, 0); // Different qx
         address addr3 = factory.getAddress(QX1, QY2, owner1, 0); // Different qy
         address addr4 = factory.getAddress(QX1, QY1, owner2, 0); // Different owner
         address addr5 = factory.getAddress(QX1, QY1, owner1, 1); // Different salt
 
-        // qx should NOT affect address (same owner, same salt)
+        // qx should NOT affect address (same owner, same salt, same implementation)
         assertEq(addr1, addr2, "qx should NOT affect address");
-        // qy should NOT affect address (same owner, same salt)
+        // qy should NOT affect address (same owner, same salt, same implementation)
         assertEq(addr1, addr3, "qy should NOT affect address");
         // owner SHOULD affect address
         assertTrue(addr1 != addr4, "owner should affect address");
         // salt SHOULD affect address
         assertTrue(addr1 != addr5, "salt should affect address");
+    }
+
+    /**
+     * Test: Different implementations produce different addresses
+     * This allows reusing the same salt (index) during development when contract code changes
+     */
+    function test_DifferentImplementationsProduceDifferentAddresses() public {
+        // Get address with current implementation
+        address addr1 = factory.getAddress(QX1, QY1, owner1, 0);
+
+        // Deploy a new implementation (simulating contract upgrade during development)
+        P256Account newImplementation = new P256Account(entryPoint);
+
+        // Create a new factory with the new implementation
+        P256AccountFactory newFactory = new P256AccountFactory(entryPoint);
+
+        // Get address with new implementation (same owner, same salt)
+        address addr2 = newFactory.getAddress(QX1, QY1, owner1, 0);
+
+        // Addresses should be different because implementation changed
+        assertTrue(addr1 != addr2, "Different implementations should produce different addresses");
+
+        // Verify both factories have different implementations
+        assertTrue(
+            address(factory.IMPLEMENTATION()) != address(newFactory.IMPLEMENTATION()),
+            "Factories should have different implementations"
+        );
     }
 
     /**
