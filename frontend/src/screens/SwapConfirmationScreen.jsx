@@ -41,6 +41,7 @@ function SwapConfirmationScreen({
     amountOut,
     quote,
     slippage,
+    deadline,
     gasEstimate,
     minimumReceived,
   } = swapDetails
@@ -161,6 +162,13 @@ function SwapConfirmationScreen({
                       </span>
                     )}
                   </span>
+                </div>
+              )}
+
+              {deadline && (
+                <div className="confirm-detail-item">
+                  <span className="confirm-detail-label">Transaction Deadline</span>
+                  <span className="confirm-detail-value">{deadline} min</span>
                 </div>
               )}
             </div>

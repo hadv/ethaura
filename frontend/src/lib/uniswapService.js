@@ -363,17 +363,49 @@ export class UniswapV3Service {
   }
 
   /**
-   * Build approve and swap batch transaction with allowance optimization
+   * Build multicall calldata with deadline
+   * Wraps the swap call in a multicall to enforce transaction deadline
+   * @param {number} deadline - Unix timestamp deadline
+   * @param {string} swapCalldata - The swap function calldata
+   * @returns {string} Encoded multicall calldata
+   */
+  buildMulticallWithDeadline(deadline, swapCalldata) {
+    try {
+      console.log('🔨 Building multicall with deadline:', {
+        deadline,
+        deadlineDate: new Date(deadline * 1000).toISOString(),
+      })
+
+      // Encode multicall with deadline
+      const multicallData = this.swapRouter.interface.encodeFunctionData(
+        'multicall',
+        [BigInt(deadline), [swapCalldata]]
+      )
+
+      console.log('✅ Multicall with deadline built')
+      return multicallData
+    } catch (error) {
+      console.error('❌ Failed to build multicall with deadline:', error)
+      throw new Error(`Failed to build multicall with deadline: ${error.message}`)
+    }
+  }
+
+  /**
+   * Build approve and swap batch transaction with allowance optimization and deadline
    * @param {string} tokenIn - Input token address
    * @param {string} tokenOut - Output token address
    * @param {bigint} amountIn - Input amount in wei
    * @param {bigint} amountOutMinimum - Minimum output amount (with slippage)
    * @param {string} recipient - Recipient address (P256Account)
    * @param {number} fee - Pool fee tier (default: 3000 = 0.3%)
+   * @param {number} deadline - Unix timestamp deadline (optional, defaults to 10 minutes from now)
    * @returns {Promise<Object>} Batch transaction object with targets, values, and datas arrays
    */
-  async buildApproveAndSwap(tokenIn, tokenOut, amountIn, amountOutMinimum, recipient, fee = 3000) {
+  async buildApproveAndSwap(tokenIn, tokenOut, amountIn, amountOutMinimum, recipient, fee = 3000, deadline = null) {
     try {
+      // Default deadline: 10 minutes from now
+      const txDeadline = deadline || Math.floor(Date.now() / 1000) + (10 * 60)
+
       console.log('🔨 Building approve and swap batch:', {
         tokenIn,
         tokenOut,
@@ -381,6 +413,8 @@ export class UniswapV3Service {
         amountOutMinimum: amountOutMinimum.toString(),
         recipient,
         fee,
+        deadline: txDeadline,
+        deadlineDate: new Date(txDeadline * 1000).toISOString(),
       })
 
       const config = this.getConfig()
@@ -388,7 +422,7 @@ export class UniswapV3Service {
       // Check existing allowance
       const allowance = await this.checkAllowance(tokenIn, recipient, config.swapRouter)
 
-      // Build swap calldata
+      // Build swap calldata (inner call for multicall)
       const swapCalldata = this.buildSwapCalldata(
         tokenIn,
         tokenOut,
@@ -397,6 +431,9 @@ export class UniswapV3Service {
         recipient,
         fee
       )
+
+      // Wrap swap in multicall with deadline
+      const multicallData = this.buildMulticallWithDeadline(txDeadline, swapCalldata)
 
       // If allowance is sufficient, skip approval
       if (allowance >= amountIn) {
@@ -408,7 +445,7 @@ export class UniswapV3Service {
         const batch = {
           targets: [config.swapRouter],
           values: [0n],
-          datas: [swapCalldata],
+          datas: [multicallData],
         }
 
         console.log('✅ Swap-only batch built (no approval needed):', {
@@ -435,7 +472,7 @@ export class UniswapV3Service {
       const batch = {
         targets: [tokenIn, config.swapRouter],
         values: [0n, 0n],
-        datas: [approveCalldata, swapCalldata],
+        datas: [approveCalldata, multicallData],
       }
 
       console.log('✅ Approve and swap batch built:', {
