@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Web3AuthProvider, useWeb3Auth } from './contexts/Web3AuthContext'
 import { NetworkProvider } from './contexts/NetworkContext'
 import { WalletConnectProvider } from './contexts/WalletConnectContext'
+import { ToastProvider } from './contexts/ToastContext'
 import LoginScreen from './components/LoginScreen'
 import HomeScreen from './screens/HomeScreen'
 import WalletDetailScreen from './screens/WalletDetailScreen'
@@ -13,6 +14,7 @@ import ViewAllTokensScreen from './screens/ViewAllTokensScreen'
 import ViewAllTransactionsScreen from './screens/ViewAllTransactionsScreen'
 import SwapScreen from './screens/SwapScreen'
 import SwapConfirmationScreen from './screens/SwapConfirmationScreen'
+import ToastContainer from './components/Toast'
 import { GuardianRecoveryPortal } from './screens/GuardianRecoveryPortal'
 import RegisterDevicePage from './pages/RegisterDevicePage'
 import { storePasskeyCredential } from './lib/passkeyStorage'
@@ -540,13 +542,16 @@ function AppContent() {
   )
 }
 
-// Main App component with NetworkProvider, Web3AuthProvider, and WalletConnectProvider
+// Main App component with NetworkProvider, Web3AuthProvider, WalletConnectProvider, and ToastProvider
 function App() {
   return (
     <NetworkProvider>
       <Web3AuthProvider>
         <WalletConnectProvider>
-          <AppContent />
+          <ToastProvider>
+            <AppContent />
+            <ToastContainer />
+          </ToastProvider>
         </WalletConnectProvider>
       </Web3AuthProvider>
     </NetworkProvider>
