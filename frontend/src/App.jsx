@@ -12,6 +12,7 @@ import TransactionResultScreen from './screens/TransactionResultScreen'
 import ViewAllTokensScreen from './screens/ViewAllTokensScreen'
 import ViewAllTransactionsScreen from './screens/ViewAllTransactionsScreen'
 import SwapScreen from './screens/SwapScreen'
+import SwapConfirmationScreen from './screens/SwapConfirmationScreen'
 import { GuardianRecoveryPortal } from './screens/GuardianRecoveryPortal'
 import RegisterDevicePage from './pages/RegisterDevicePage'
 import { storePasskeyCredential } from './lib/passkeyStorage'
@@ -39,13 +40,14 @@ function AppContent() {
   }
 
   // Navigation state
-  const [currentScreen, setCurrentScreen] = useState('home') // 'home', 'wallet-detail', 'wallet-settings', 'add-wallet', 'new-wallet', 'send-transaction', 'signature-confirmation', 'transaction-result', 'view-all-tokens', 'view-all-transactions', 'swap'
+  const [currentScreen, setCurrentScreen] = useState('home') // 'home', 'wallet-detail', 'wallet-settings', 'add-wallet', 'new-wallet', 'send-transaction', 'signature-confirmation', 'transaction-result', 'view-all-tokens', 'view-all-transactions', 'swap', 'swap-confirmation'
   const [selectedWallet, setSelectedWallet] = useState(null)
   const [selectedToken, setSelectedToken] = useState(null) // Pre-selected token for send screen
   const [previousScreen, setPreviousScreen] = useState(null) // Track previous screen for proper back navigation
   const [signatureData, setSignatureData] = useState(null) // Data for signature confirmation screen
   const [signatureCallbacks, setSignatureCallbacks] = useState(null) // Callbacks for signature confirmation
   const [transactionData, setTransactionData] = useState(null) // Data for transaction result screen
+  const [swapDetails, setSwapDetails] = useState(null) // Data for swap confirmation screen
 
   // Helper to serialize credential (convert ArrayBuffers to base64)
   const serializeCredential = (cred) => {
@@ -270,6 +272,13 @@ function AppContent() {
     setCurrentScreen('swap')
   }
 
+  // Handle swap confirmation navigation
+  const handleSwapConfirm = (details, executeSwapFn) => {
+    setSwapDetails({ ...details, executeSwap: executeSwapFn })
+    setPreviousScreen(currentScreen)
+    setCurrentScreen('swap-confirmation')
+  }
+
   // Handle signature confirmation navigation
   const handleSignatureRequest = (data, onConfirm, onCancel) => {
     setSignatureData(data)
@@ -492,6 +501,25 @@ function AppContent() {
           onSettings={handleSettings}
           onWalletChange={handleWalletChange}
           credential={passkeyCredential}
+          onSwapConfirm={handleSwapConfirm}
+        />
+      )}
+
+      {currentScreen === 'swap-confirmation' && (
+        <SwapConfirmationScreen
+          wallet={selectedWallet}
+          swapDetails={swapDetails}
+          onBack={handleBack}
+          onConfirm={async () => {
+            if (swapDetails && swapDetails.executeSwap) {
+              await swapDetails.executeSwap()
+              // Navigate back to wallet detail after successful swap
+              setCurrentScreen('wallet-detail')
+            }
+          }}
+          onHome={handleHome}
+          onSettings={handleSettings}
+          onLogout={handleLogout}
         />
       )}
     </>
