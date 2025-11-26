@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { ArrowDownUp, AlertCircle, Loader } from 'lucide-react'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
 import { useNetwork } from '../contexts/NetworkContext'
+import { useToast } from '../contexts/ToastContext'
 import { useP256SDK } from '../hooks/useP256SDK'
 import { signWithPasskey } from '../utils/webauthn'
 import { UniswapV3Service } from '../lib/uniswapService'
@@ -19,6 +20,7 @@ import '../styles/SwapScreen.css'
 function SwapScreen({ wallet, onBack, onHome, onSettings, onLogout, onWalletChange, credential, onSwapConfirm }) {
   const { userInfo, address: ownerAddress } = useWeb3Auth()
   const { networkInfo } = useNetwork()
+  const { showSwapSuccess, showSwapError } = useToast()
   const sdk = useP256SDK()
 
   // Wallet state
@@ -344,6 +346,7 @@ function SwapScreen({ wallet, onBack, onHome, onSettings, onLogout, onWalletChan
     try {
       // Parse amount
       const decimals = tokenIn === 'ETH' ? 18 : tokenIn.decimals
+      const tokenOutDecimals = tokenOut === 'ETH' ? 18 : tokenOut.decimals
       // Limit decimal places to token's decimals to avoid parseUnits error
       const amountInTrimmed = parseFloat(amountIn).toFixed(decimals)
       const amountInWei = ethers.parseUnits(amountInTrimmed, decimals)
@@ -384,6 +387,14 @@ function SwapScreen({ wallet, onBack, onHome, onSettings, onLogout, onWalletChan
       console.log('✅ Swap successful:', result)
       setSwapSuccess(true)
 
+      // Show success toast notification
+      const amountOutFormatted = ethers.formatUnits(quote.amountOut, tokenOutDecimals)
+      showSwapSuccess(
+        { tokenIn, tokenOut, amountIn, amountOutFormatted },
+        result?.transactionHash || result?.hash,
+        networkInfo?.explorerUrl
+      )
+
       // Reset form
       setAmountIn('')
       setQuote(null)
@@ -393,6 +404,9 @@ function SwapScreen({ wallet, onBack, onHome, onSettings, onLogout, onWalletChan
     } catch (error) {
       console.error('❌ Swap failed:', error)
       setSwapError(error.message || 'Swap failed. Please try again.')
+
+      // Show error toast notification
+      showSwapError(error)
     } finally {
       setSwapping(false)
     }
