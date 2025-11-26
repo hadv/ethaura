@@ -5,6 +5,7 @@ import Header from '../components/Header'
 import SubHeader from '../components/SubHeader'
 import PriceImpactWarning from '../components/PriceImpactWarning'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
+import '../styles/SwapScreen.css'
 import '../styles/SwapConfirmationScreen.css'
 
 function SwapConfirmationScreen({
