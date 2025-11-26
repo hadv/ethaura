@@ -84,21 +84,20 @@
 .toast-explorer-link {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  justify-content: center;
   margin-top: 8px;
-  padding: 0;
+  padding: 4px;
   background: none;
   border: none;
-  font-size: 0.8125rem;
-  font-weight: 500;
   color: #3b82f6;
   cursor: pointer;
-  transition: color 0.2s;
+  border-radius: 4px;
+  transition: background-color 0.2s, color 0.2s;
 }
 
 .toast-explorer-link:hover {
   color: #2563eb;
-  text-decoration: underline;
+  background-color: #eff6ff;
 }
 
 /* Close Button */

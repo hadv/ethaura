@@ -23,9 +23,8 @@ function Toast({ toast }) {
         {title && <div className="toast-title">{title}</div>}
         <div className="toast-message">{message}</div>
         {txHash && explorerUrl && (
-          <button className="toast-explorer-link" onClick={handleExplorerClick}>
-            <span>View on Explorer</span>
-            <ExternalLink size={14} />
+          <button className="toast-explorer-link" onClick={handleExplorerClick} title="View on Explorer">
+            <ExternalLink size={16} />
           </button>
         )}
       </div>
