@@ -5,8 +5,8 @@ import Header from '../components/Header'
 import SubHeader from '../components/SubHeader'
 import PriceImpactWarning from '../components/PriceImpactWarning'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
-import '../styles/SendTransactionScreen.css'
 import '../styles/SwapConfirmationScreen.css'
+import '../styles/SendTransactionScreen.css'
 
 function SwapConfirmationScreen({
   wallet,
