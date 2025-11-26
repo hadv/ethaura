@@ -5,6 +5,7 @@ import Header from '../components/Header'
 import SubHeader from '../components/SubHeader'
 import PriceImpactWarning from '../components/PriceImpactWarning'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
+import ethIcon from '../assets/tokens/eth.svg'
 import '../styles/SwapConfirmationScreen.css'
 import '../styles/SendTransactionScreen.css'
 
@@ -47,6 +48,8 @@ function SwapConfirmationScreen({
   const tokenInSymbol = tokenIn === 'ETH' ? 'ETH' : tokenIn.symbol
   const tokenOutSymbol = tokenOut === 'ETH' ? 'ETH' : tokenOut.symbol
   const tokenOutDecimals = tokenOut === 'ETH' ? 18 : tokenOut.decimals
+  const tokenInIcon = tokenIn === 'ETH' ? ethIcon : tokenIn.icon
+  const tokenOutIcon = tokenOut === 'ETH' ? ethIcon : tokenOut.icon
 
   const handleConfirm = async () => {
     setConfirming(true)
@@ -86,6 +89,9 @@ function SwapConfirmationScreen({
             {/* Token Swap Visual */}
             <div className="confirm-swap-visual">
               <div className="confirm-token-box">
+                <div className="confirm-token-icon">
+                  <img src={tokenInIcon} alt={tokenInSymbol} />
+                </div>
                 <span className="confirm-token-label">You Pay</span>
                 <span className="confirm-token-amount">{parseFloat(amountIn).toFixed(6)}</span>
                 <span className="confirm-token-symbol">{tokenInSymbol}</span>
@@ -96,6 +102,9 @@ function SwapConfirmationScreen({
               </div>
 
               <div className="confirm-token-box">
+                <div className="confirm-token-icon">
+                  <img src={tokenOutIcon} alt={tokenOutSymbol} />
+                </div>
                 <span className="confirm-token-label">You Receive (estimated)</span>
                 <span className="confirm-token-amount">~{parseFloat(ethers.formatUnits(amountOut, tokenOutDecimals)).toFixed(6)}</span>
                 <span className="confirm-token-symbol">{tokenOutSymbol}</span>
