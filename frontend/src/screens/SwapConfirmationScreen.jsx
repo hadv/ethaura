@@ -93,8 +93,10 @@ function SwapConfirmationScreen({
                   <img src={tokenInIcon} alt={tokenInSymbol} />
                 </div>
                 <span className="confirm-token-label">You Pay</span>
-                <span className="confirm-token-amount">{parseFloat(amountIn).toFixed(6)}</span>
-                <span className="confirm-token-symbol">{tokenInSymbol}</span>
+                <div className="confirm-token-amount-row">
+                  <span className="confirm-token-amount">{parseFloat(amountIn).toFixed(6)}</span>
+                  <span className="confirm-token-symbol">{tokenInSymbol}</span>
+                </div>
               </div>
 
               <div className="confirm-arrow">
@@ -106,8 +108,10 @@ function SwapConfirmationScreen({
                   <img src={tokenOutIcon} alt={tokenOutSymbol} />
                 </div>
                 <span className="confirm-token-label">You Receive (estimated)</span>
-                <span className="confirm-token-amount">~{parseFloat(ethers.formatUnits(amountOut, tokenOutDecimals)).toFixed(6)}</span>
-                <span className="confirm-token-symbol">{tokenOutSymbol}</span>
+                <div className="confirm-token-amount-row">
+                  <span className="confirm-token-amount">~{parseFloat(ethers.formatUnits(amountOut, tokenOutDecimals)).toFixed(6)}</span>
+                  <span className="confirm-token-symbol">{tokenOutSymbol}</span>
+                </div>
               </div>
             </div>
 
