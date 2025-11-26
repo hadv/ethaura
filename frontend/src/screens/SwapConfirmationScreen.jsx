@@ -152,7 +152,13 @@ function SwapConfirmationScreen({
                       ? gasEstimate.gasCostEth.toFixed(8)
                       : gasEstimate.gasCostEth.toFixed(6)} ETH
                     {gasEstimate.gasCostUsd && (
-                      <span className="confirm-detail-usd"> (${gasEstimate.gasCostUsd.toFixed(2)})</span>
+                      <span className="confirm-detail-usd">
+                        {' ($'}
+                        {gasEstimate.gasCostUsd < 0.01
+                          ? gasEstimate.gasCostUsd.toFixed(4)
+                          : gasEstimate.gasCostUsd.toFixed(2)}
+                        {')'}
+                      </span>
                     )}
                   </span>
                 </div>
