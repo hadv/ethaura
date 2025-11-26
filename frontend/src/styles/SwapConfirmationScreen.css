@@ -1,56 +1,148 @@
-/* Swap Confirmation Screen - Uses same layout as SwapScreen */
+/* Swap Confirmation Screen - Centered Focused Layout */
 .swap-confirmation-screen {
   min-height: 100vh;
-  background: #f5f5f5;
+  background: #fafafa;
   display: flex;
   flex-direction: column;
+}
+
+/* Main Content - Centered */
+.confirm-content {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 32px 24px;
+}
+
+.confirm-card {
+  background: white;
+  border-radius: 16px;
+  padding: 32px;
+  width: 100%;
+  max-width: 480px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  border: 1px solid #e5e7eb;
 }
 
 /* Token Swap Visual */
-.token-swap-visual {
+.confirm-swap-visual {
   background: #f8f9fa;
   border-radius: 12px;
-  padding: 1.5rem;
-  margin-bottom: 1.5rem;
+  padding: 24px;
+  margin-bottom: 24px;
+}
+
+.confirm-token-box {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 1rem;
+  gap: 4px;
+  padding: 12px 0;
 }
 
-.token-amount-display {
-  width: 100%;
-  text-align: center;
+.confirm-token-label {
+  font-size: 0.8125rem;
+  color: #6b7280;
 }
 
-.token-label {
-  font-size: 0.875rem;
-  color: #6b6b6b;
-  margin-bottom: 0.5rem;
-}
-
-.token-amount {
-  font-size: 1.5rem;
+.confirm-token-amount {
+  font-size: 1.75rem;
   font-weight: 600;
   color: #1a1a1a;
 }
 
-.swap-arrow {
-  color: #6b6b6b;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0.5rem;
+.confirm-token-symbol {
+  font-size: 1rem;
+  font-weight: 500;
+  color: #374151;
 }
 
-/* Confirm Button */
-.confirm-swap-button {
+.confirm-arrow {
+  display: flex;
+  justify-content: center;
+  padding: 8px 0;
+  color: #9ca3af;
+}
+
+/* Transaction Details */
+.confirm-details {
+  border-top: 1px solid #e5e7eb;
+  padding-top: 20px;
+  margin-bottom: 20px;
+}
+
+.confirm-detail-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.confirm-detail-row:last-child {
+  border-bottom: none;
+}
+
+.confirm-detail-label {
+  font-size: 0.875rem;
+  color: #6b7280;
+}
+
+.confirm-detail-value {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #1a1a1a;
+  text-align: right;
+}
+
+.confirm-detail-usd {
+  color: #9ca3af;
+  font-weight: 400;
+}
+
+/* Price Impact Colors */
+.impact-low {
+  color: #10b981;
+}
+
+.impact-medium {
+  color: #f59e0b;
+}
+
+.impact-high {
+  color: #ef4444;
+}
+
+/* Error Message */
+.confirm-error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  padding: 12px 16px;
+  color: #dc2626;
+  font-size: 0.875rem;
+  margin-bottom: 16px;
+}
+
+/* Action Buttons */
+.confirm-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.confirm-btn-primary {
   width: 100%;
-  background: #6b6b6b;
+  background: #1a1a1a;
   color: white;
   border: none;
   border-radius: 12px;
-  padding: 1rem;
+  padding: 16px;
   font-size: 1rem;
   font-weight: 600;
   cursor: pointer;
@@ -58,61 +150,57 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 0.5rem;
-  margin-top: 1rem;
+  gap: 8px;
 }
 
-.confirm-swap-button:hover:not(:disabled) {
-  background: #5a5a5a;
+.confirm-btn-primary:hover:not(:disabled) {
+  background: #333;
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
-.confirm-swap-button:active:not(:disabled) {
-  transform: translateY(0);
+.confirm-btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
 }
 
-.confirm-swap-button:disabled {
-  opacity: 0.6;
+.confirm-btn-secondary {
+  width: 100%;
+  background: transparent;
+  color: #6b7280;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 14px;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.confirm-btn-secondary:hover:not(:disabled) {
+  background: #f9fafb;
+  border-color: #d1d5db;
+  color: #374151;
+}
+
+.confirm-btn-secondary:disabled {
+  opacity: 0.5;
   cursor: not-allowed;
 }
 
+/* Button Loader */
 .button-loader {
   animation: spin 1s linear infinite;
 }
 
 @keyframes spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-/* Back Link */
-.back-link {
-  background: none;
-  border: none;
-  color: #6b6b6b;
-  font-size: 0.9375rem;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.25rem;
-  padding: 0.75rem;
-  margin-top: 0.5rem;
-  transition: color 0.2s;
-}
-
-.back-link:hover:not(:disabled) {
-  color: #1a1a1a;
-}
-
-.back-link:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
 /* Error State */
@@ -121,35 +209,43 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 3rem 1rem;
+  padding: 48px 24px;
   text-align: center;
 }
 
 .error-state p {
   font-size: 1.125rem;
-  color: #6b6b6b;
-  margin-bottom: 1.5rem;
+  color: #6b7280;
+  margin-bottom: 24px;
 }
 
 .error-state button {
-  background: #6b6b6b;
+  background: #1a1a1a;
   color: white;
   border: none;
   border-radius: 8px;
-  padding: 0.75rem 1.5rem;
+  padding: 12px 24px;
   font-size: 1rem;
   cursor: pointer;
   transition: background 0.2s;
 }
 
 .error-state button:hover {
-  background: #5a5a5a;
+  background: #333;
 }
 
 /* Responsive */
-@media (max-width: 768px) {
-  .token-amount {
-    font-size: 1.25rem;
+@media (max-width: 540px) {
+  .confirm-content {
+    padding: 16px;
+  }
+
+  .confirm-card {
+    padding: 24px;
+  }
+
+  .confirm-token-amount {
+    font-size: 1.5rem;
   }
 }
 
