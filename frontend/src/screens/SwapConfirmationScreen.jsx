@@ -115,7 +115,9 @@ function SwapConfirmationScreen({
             <div className="confirm-rate-info">
               <div className="confirm-rate-label">Exchange Rate</div>
               <div className="confirm-rate-value">
+                <img src={tokenInIcon} alt={tokenInSymbol} className="rate-token-icon" />
                 1 {tokenInSymbol} = {(parseFloat(ethers.formatUnits(amountOut, tokenOutDecimals)) / parseFloat(amountIn)).toFixed(6)} {tokenOutSymbol}
+                <img src={tokenOutIcon} alt={tokenOutSymbol} className="rate-token-icon" />
               </div>
             </div>
 
@@ -124,6 +126,7 @@ function SwapConfirmationScreen({
               <div className="confirm-detail-item">
                 <span className="confirm-detail-label">Minimum Received</span>
                 <span className="confirm-detail-value">
+                  <img src={tokenOutIcon} alt={tokenOutSymbol} className="detail-token-icon" />
                   {parseFloat(ethers.formatUnits(minimumReceived, tokenOutDecimals)).toFixed(6)} {tokenOutSymbol}
                 </span>
               </div>
@@ -144,6 +147,7 @@ function SwapConfirmationScreen({
                 <div className="confirm-detail-item">
                   <span className="confirm-detail-label">Network Fee</span>
                   <span className="confirm-detail-value">
+                    <img src={ethIcon} alt="ETH" className="detail-token-icon" />
                     {gasEstimate.gasCostEth < 0.0001
                       ? gasEstimate.gasCostEth.toFixed(8)
                       : gasEstimate.gasCostEth.toFixed(6)} ETH
@@ -187,69 +191,13 @@ function SwapConfirmationScreen({
           </div>
         </div>
 
-        {/* Right Panel - Transaction Details */}
+        {/* Right Panel - Simulation & Risk Report (Placeholder) */}
         <div className="send-sidebar">
           <div className="sidebar-section">
-            <h3 className="sidebar-title">Transaction Details</h3>
-            <div className="sidebar-content">
-              <div className="sidebar-info-item">
-                <span className="sidebar-info-label">Exchange Rate</span>
-                <span className="sidebar-info-value">
-                  1 {tokenInSymbol} = {(parseFloat(ethers.formatUnits(amountOut, tokenOutDecimals)) / parseFloat(amountIn)).toFixed(6)} {tokenOutSymbol}
-                </span>
-              </div>
-
-              {quote && quote.priceImpact !== undefined && (
-                <div className="sidebar-info-item">
-                  <span className="sidebar-info-label">Price Impact</span>
-                  <span className={`sidebar-info-value ${
-                    quote.priceImpact < 2 ? 'impact-low' :
-                    quote.priceImpact < 5 ? 'impact-medium' : 'impact-high'
-                  }`}>
-                    {quote.priceImpact.toFixed(2)}%
-                  </span>
-                </div>
-              )}
-
-              <div className="sidebar-info-item">
-                <span className="sidebar-info-label">Slippage Tolerance</span>
-                <span className="sidebar-info-value">{slippage}%</span>
-              </div>
-
-              <div className="sidebar-info-item">
-                <span className="sidebar-info-label">Minimum Received</span>
-                <span className="sidebar-info-value">
-                  {parseFloat(ethers.formatUnits(minimumReceived, tokenOutDecimals)).toFixed(6)} {tokenOutSymbol}
-                </span>
-              </div>
-
-              {gasEstimate && (
-                <div className="sidebar-info-item">
-                  <span className="sidebar-info-label">Network Fee</span>
-                  <span className="sidebar-info-value">
-                    {gasEstimate.gasCostEth < 0.0001
-                      ? gasEstimate.gasCostEth.toFixed(8)
-                      : gasEstimate.gasCostEth.toFixed(6)} ETH
-                    {gasEstimate.gasCostUsd && (
-                      <div style={{ fontSize: '0.8125rem', color: '#9ca3af', marginTop: '2px' }}>
-                        ${gasEstimate.gasCostUsd.toFixed(2)}
-                      </div>
-                    )}
-                  </span>
-                </div>
-              )}
-
-              {gasEstimate && gasEstimate.gasPriceDisplay && (
-                <div className="sidebar-info-item">
-                  <span className="sidebar-info-label">Gas Price</span>
-                  <span className="sidebar-info-value">
-                    {gasEstimate.gasPriceDisplay.value.toLocaleString(undefined, {
-                      minimumFractionDigits: 0,
-                      maximumFractionDigits: gasEstimate.gasPriceDisplay.unit === 'Gwei' ? 2 : 0
-                    })} {gasEstimate.gasPriceDisplay.unit}
-                  </span>
-                </div>
-              )}
+            <h3 className="sidebar-title">Transaction Simulation</h3>
+            <div className="sidebar-placeholder">
+              <p className="placeholder-text">Transaction simulation and risk analysis will be displayed here.</p>
+              <p className="placeholder-subtext">Coming soon...</p>
             </div>
           </div>
         </div>

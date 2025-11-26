@@ -92,6 +92,16 @@
   font-size: 1rem;
   font-weight: 600;
   color: #0c4a6e;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.rate-token-icon {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
 }
 
 /* Key Details Section */
@@ -125,6 +135,16 @@
   font-weight: 600;
   color: #111827;
   text-align: right;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.detail-token-icon {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
 }
 
 .confirm-detail-usd {
@@ -264,6 +284,26 @@
 
 .error-state button:hover {
   background: #333;
+}
+
+/* Sidebar Placeholder */
+.sidebar-placeholder {
+  padding: 40px 20px;
+  text-align: center;
+}
+
+.placeholder-text {
+  font-size: 0.9375rem;
+  color: #6b7280;
+  margin: 0 0 8px 0;
+  line-height: 1.5;
+}
+
+.placeholder-subtext {
+  font-size: 0.8125rem;
+  color: #9ca3af;
+  margin: 0;
+  font-style: italic;
 }
 
 /* Responsive */
