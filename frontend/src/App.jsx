@@ -345,6 +345,20 @@ function AppContent() {
       // Go back to wallet detail
       setCurrentScreen(previousScreen || 'wallet-detail')
       setPreviousScreen(null)
+    } else if (currentScreen === 'swap-confirmation') {
+      // Go back to swap screen
+      setCurrentScreen('swap')
+      setSwapDetails(null)
+      setPreviousScreen(null)
+    } else if (currentScreen === 'swap') {
+      // Go back to the previous screen (either 'home' or 'wallet-detail')
+      if (previousScreen === 'home') {
+        setCurrentScreen('home')
+        setSelectedWallet(null)
+      } else {
+        setCurrentScreen('wallet-detail')
+      }
+      setPreviousScreen(null)
     } else if (currentScreen === 'add-wallet' || currentScreen === 'new-wallet') {
       setCurrentScreen('home')
       setPreviousScreen(null)
