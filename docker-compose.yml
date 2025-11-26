@@ -1,0 +1,200 @@
+version: '3.8'
+
+services:
+  # Nimbus Consensus Node (Ethereum Beacon Chain)
+  nimbus:
+    image: statusim/nimbus-eth2:multiarch-latest
+    container_name: ethaura-nimbus
+    restart: unless-stopped
+    networks:
+      - ethaura-network
+    ports:
+      - "9000:9000/tcp"   # P2P TCP
+      - "9000:9000/udp"   # P2P UDP
+    expose:
+      - "5052"            # REST API (internal only)
+    volumes:
+      - nimbus-data:/data
+      - ./logs/nimbus:/logs
+    command:
+      - --network=mainnet
+      - --data-dir=/data
+      - --web3-url=none
+      - --rest
+      - --rest-port=5052
+      - --rest-address=0.0.0.0
+      - --log-level=INFO
+      - --log-file=/logs/nimbus.log
+      - --max-peers=100
+      - --nat=extip:${SERVER_IP:-auto}
+      - --metrics
+      - --metrics-port=8008
+      - --metrics-address=0.0.0.0
+    environment:
+      - NETWORK=mainnet
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:5052/eth/v1/node/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 300s
+    deploy:
+      resources:
+        limits:
+          memory: 6G
+        reservations:
+          memory: 4G
+
+  # Helios Light Client (Trustless RPC)
+  helios:
+    build:
+      context: ./docker/helios
+      dockerfile: Dockerfile
+    container_name: ethaura-helios
+    restart: unless-stopped
+    networks:
+      - ethaura-network
+    ports:
+      - "127.0.0.1:8545:8545"  # RPC endpoint (localhost only)
+    expose:
+      - "8545"
+    volumes:
+      - helios-data:/home/helios/.helios
+      - ./helios-config.toml:/app/helios-config.toml:ro
+      - ./logs/helios:/logs
+    environment:
+      - NETWORK=${NETWORK:-mainnet}
+      - CONSENSUS_RPC=http://nimbus:5052
+      - EXECUTION_RPC=${MAINNET_RPC_URL}
+      - CHECKPOINT=${HELIOS_CHECKPOINT}
+      - RUST_LOG=info
+    depends_on:
+      nimbus:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8545", "-X", "POST", "-H", "Content-Type: application/json", "-d", '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 1G
+
+  # Frontend Application
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: ../docker/frontend/Dockerfile
+      args:
+        - VITE_WEB3AUTH_CLIENT_ID=${VITE_WEB3AUTH_CLIENT_ID}
+        - VITE_CHAIN_ID=${VITE_CHAIN_ID:-1}
+        - VITE_RPC_URL=${VITE_RPC_URL:-http://helios:8545}
+        - VITE_FACTORY_ADDRESS=${VITE_FACTORY_ADDRESS}
+        - VITE_ENTRYPOINT_ADDRESS=${VITE_ENTRYPOINT_ADDRESS:-0x0000000071727De22E5E9d8BAf0edAc6f37da032}
+    container_name: ethaura-frontend
+    restart: unless-stopped
+    networks:
+      - ethaura-network
+    ports:
+      - "${FRONTEND_PORT:-80}:80"
+      - "${FRONTEND_SSL_PORT:-443}:443"
+    volumes:
+      - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./docker/nginx/ssl:/etc/nginx/ssl:ro
+      - ./logs/nginx:/var/log/nginx
+    depends_on:
+      helios:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
+
+  # Prometheus (Monitoring)
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: ethaura-prometheus
+    restart: unless-stopped
+    networks:
+      - ethaura-network
+    ports:
+      - "127.0.0.1:9090:9090"
+    volumes:
+      - ./docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=30d'
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:9090/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 512M
+
+  # Grafana (Visualization)
+  grafana:
+    image: grafana/grafana:latest
+    container_name: ethaura-grafana
+    restart: unless-stopped
+    networks:
+      - ethaura-network
+    ports:
+      - "127.0.0.1:3001:3000"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./docker/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./docker/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+      - GF_INSTALL_PLUGINS=grafana-clock-panel
+      - GF_SERVER_ROOT_URL=http://localhost:3001
+    depends_on:
+      - prometheus
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
+
+networks:
+  ethaura-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+volumes:
+  nimbus-data:
+    driver: local
+  helios-data:
+    driver: local
+  prometheus-data:
+    driver: local
+  grafana-data:
+    driver: local
+

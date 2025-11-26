@@ -26,6 +26,16 @@ help:
 	@echo "Production Consensus Node (Linux only):"
 	@echo "  make consensus-setup  - Set up production consensus node"
 	@echo ""
+	@echo "Docker Production Deployment:"
+	@echo "  make docker-deploy    - Deploy with Docker Compose"
+	@echo "  make docker-start     - Start Docker services"
+	@echo "  make docker-stop      - Stop Docker services"
+	@echo "  make docker-restart   - Restart Docker services"
+	@echo "  make docker-logs      - View Docker logs"
+	@echo "  make docker-health    - Check Docker services health"
+	@echo "  make docker-backup    - Backup Docker volumes"
+	@echo "  make docker-clean     - Clean Docker resources"
+	@echo ""
 
 # Install dependencies
 install:
@@ -162,3 +172,56 @@ consensus-setup:
 	fi
 	@chmod +x scripts/setup-production-consensus.sh
 	@sudo ./scripts/setup-production-consensus.sh
+
+# Docker Production Deployment commands
+docker-deploy:
+	@echo "Deploying with Docker Compose..."
+	@chmod +x scripts/docker-deploy.sh
+	@./scripts/docker-deploy.sh
+
+docker-start:
+	@echo "Starting Docker services..."
+	@docker compose up -d
+	@echo "✅ Services started!"
+
+docker-stop:
+	@echo "Stopping Docker services..."
+	@docker compose down
+	@echo "✅ Services stopped!"
+
+docker-restart:
+	@echo "Restarting Docker services..."
+	@docker compose restart
+	@echo "✅ Services restarted!"
+
+docker-logs:
+	@echo "Viewing Docker logs (Ctrl+C to exit)..."
+	@docker compose logs -f
+
+docker-health:
+	@echo "Checking Docker services health..."
+	@chmod +x scripts/docker-health-check.sh
+	@./scripts/docker-health-check.sh
+
+docker-backup:
+	@echo "Backing up Docker volumes..."
+	@chmod +x scripts/docker-backup.sh
+	@./scripts/docker-backup.sh
+
+docker-clean:
+	@echo "Cleaning Docker resources..."
+	@docker compose down -v
+	@docker system prune -f
+	@echo "✅ Docker resources cleaned!"
+
+docker-build:
+	@echo "Building Docker images..."
+	@docker compose build --no-cache
+	@echo "✅ Docker images built!"
+
+docker-dev:
+	@echo "Starting development environment..."
+	@docker compose -f docker-compose.dev.yml up -d
+	@echo "✅ Development environment started!"
+	@echo "Frontend: http://localhost:3000"
+	@echo "Helios RPC: http://localhost:8545"
