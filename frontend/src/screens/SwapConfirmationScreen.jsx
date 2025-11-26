@@ -80,6 +80,9 @@ function SwapConfirmationScreen({
         <div className="send-main">
           {/* Swap Confirmation Card */}
           <div className="send-form-card">
+            {/* Title */}
+            <h2 className="confirm-title">Review Your Swap</h2>
+
             {/* Token Swap Visual */}
             <div className="confirm-swap-visual">
               <div className="confirm-token-box">
@@ -97,6 +100,50 @@ function SwapConfirmationScreen({
                 <span className="confirm-token-amount">~{parseFloat(ethers.formatUnits(amountOut, tokenOutDecimals)).toFixed(6)}</span>
                 <span className="confirm-token-symbol">{tokenOutSymbol}</span>
               </div>
+            </div>
+
+            {/* Exchange Rate Info */}
+            <div className="confirm-rate-info">
+              <div className="confirm-rate-label">Exchange Rate</div>
+              <div className="confirm-rate-value">
+                1 {tokenInSymbol} = {(parseFloat(ethers.formatUnits(amountOut, tokenOutDecimals)) / parseFloat(amountIn)).toFixed(6)} {tokenOutSymbol}
+              </div>
+            </div>
+
+            {/* Key Details */}
+            <div className="confirm-key-details">
+              <div className="confirm-detail-item">
+                <span className="confirm-detail-label">Minimum Received</span>
+                <span className="confirm-detail-value">
+                  {parseFloat(ethers.formatUnits(minimumReceived, tokenOutDecimals)).toFixed(6)} {tokenOutSymbol}
+                </span>
+              </div>
+
+              {quote && quote.priceImpact !== undefined && (
+                <div className="confirm-detail-item">
+                  <span className="confirm-detail-label">Price Impact</span>
+                  <span className={`confirm-detail-value ${
+                    quote.priceImpact < 2 ? 'impact-low' :
+                    quote.priceImpact < 5 ? 'impact-medium' : 'impact-high'
+                  }`}>
+                    {quote.priceImpact.toFixed(2)}%
+                  </span>
+                </div>
+              )}
+
+              {gasEstimate && (
+                <div className="confirm-detail-item">
+                  <span className="confirm-detail-label">Network Fee</span>
+                  <span className="confirm-detail-value">
+                    {gasEstimate.gasCostEth < 0.0001
+                      ? gasEstimate.gasCostEth.toFixed(8)
+                      : gasEstimate.gasCostEth.toFixed(6)} ETH
+                    {gasEstimate.gasCostUsd && (
+                      <span className="confirm-detail-usd"> (${gasEstimate.gasCostUsd.toFixed(2)})</span>
+                    )}
+                  </span>
+                </div>
+              )}
             </div>
 
             {/* Price Impact Warning */}

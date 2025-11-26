@@ -7,12 +7,20 @@
   background: #f5f5f5;
 }
 
+/* Title */
+.confirm-title {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #111827;
+  margin: 0 0 24px 0;
+}
+
 /* Token Swap Visual */
 .confirm-swap-visual {
   background: #f8f9fa;
   border-radius: 12px;
   padding: 24px;
-  margin-bottom: 24px;
+  margin-bottom: 20px;
 }
 
 .confirm-token-box {
@@ -45,6 +53,67 @@
   justify-content: center;
   padding: 8px 0;
   color: #9ca3af;
+}
+
+/* Exchange Rate Info */
+.confirm-rate-info {
+  background: #f0f9ff;
+  border: 1px solid #bae6fd;
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-bottom: 20px;
+  text-align: center;
+}
+
+.confirm-rate-label {
+  font-size: 0.8125rem;
+  color: #0369a1;
+  margin-bottom: 4px;
+}
+
+.confirm-rate-value {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #0c4a6e;
+}
+
+/* Key Details Section */
+.confirm-key-details {
+  background: #fafafa;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 20px;
+}
+
+.confirm-detail-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.confirm-detail-item:last-child {
+  border-bottom: none;
+}
+
+.confirm-detail-label {
+  font-size: 0.875rem;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.confirm-detail-value {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #111827;
+  text-align: right;
+}
+
+.confirm-detail-usd {
+  color: #9ca3af;
+  font-weight: 400;
+  font-size: 0.8125rem;
 }
 
 /* Price Impact Colors */
