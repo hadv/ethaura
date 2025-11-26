@@ -1,9 +1,10 @@
 /* Swap Confirmation Screen - Uses SendTransactionScreen layout */
 .swap-confirmation-screen {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0;
   min-height: 100vh;
-  background: #fafafa;
-  display: flex;
-  flex-direction: column;
+  background: #f5f5f5;
 }
 
 /* Token Swap Visual */

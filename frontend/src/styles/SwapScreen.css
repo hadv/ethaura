@@ -35,6 +35,8 @@
   grid-template-columns: 70% 1fr;
   gap: 0;
   min-height: calc(100vh - 153px);
+  max-width: 1400px;
+  margin: 0 auto;
 }
 
 .swap-main {
