@@ -9,31 +9,31 @@
 
 /* Title */
 .confirm-title {
-  font-size: 1.5rem;
+  font-size: 1.25rem;
   font-weight: 600;
   color: #111827;
-  margin: 0 0 24px 0;
+  margin: 0 0 16px 0;
 }
 
 /* Token Swap Visual */
 .confirm-swap-visual {
   background: #f8f9fa;
   border-radius: 12px;
-  padding: 24px;
-  margin-bottom: 20px;
+  padding: 20px;
+  margin-bottom: 16px;
 }
 
 .confirm-token-box {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
-  padding: 12px 0;
+  gap: 6px;
+  padding: 8px 0;
 }
 
 .confirm-token-icon {
-  width: 48px;
-  height: 48px;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
   background: white;
   display: flex;
@@ -43,24 +43,24 @@
 }
 
 .confirm-token-icon img {
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   object-fit: contain;
 }
 
 .confirm-token-label {
-  font-size: 0.8125rem;
+  font-size: 0.75rem;
   color: #6b7280;
 }
 
 .confirm-token-amount {
-  font-size: 1.75rem;
+  font-size: 1.5rem;
   font-weight: 600;
   color: #1a1a1a;
 }
 
 .confirm-token-symbol {
-  font-size: 1rem;
+  font-size: 0.9375rem;
   font-weight: 500;
   color: #374151;
 }
@@ -77,46 +77,36 @@
   background: #f0f9ff;
   border: 1px solid #bae6fd;
   border-radius: 8px;
-  padding: 12px 16px;
-  margin-bottom: 20px;
+  padding: 10px 14px;
+  margin-bottom: 16px;
   text-align: center;
 }
 
 .confirm-rate-label {
-  font-size: 0.8125rem;
+  font-size: 0.75rem;
   color: #0369a1;
-  margin-bottom: 4px;
+  margin-bottom: 2px;
 }
 
 .confirm-rate-value {
-  font-size: 1rem;
+  font-size: 0.9375rem;
   font-weight: 600;
   color: #0c4a6e;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-}
-
-.rate-token-icon {
-  width: 20px;
-  height: 20px;
-  object-fit: contain;
 }
 
 /* Key Details Section */
 .confirm-key-details {
   background: #fafafa;
   border-radius: 8px;
-  padding: 16px;
-  margin-bottom: 20px;
+  padding: 12px 14px;
+  margin-bottom: 16px;
 }
 
 .confirm-detail-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 10px 0;
+  padding: 8px 0;
   border-bottom: 1px solid #e5e7eb;
 }
 
@@ -125,32 +115,22 @@
 }
 
 .confirm-detail-label {
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
   color: #6b7280;
   font-weight: 500;
 }
 
 .confirm-detail-value {
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
   font-weight: 600;
   color: #111827;
   text-align: right;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 6px;
-}
-
-.detail-token-icon {
-  width: 16px;
-  height: 16px;
-  object-fit: contain;
 }
 
 .confirm-detail-usd {
   color: #9ca3af;
   font-weight: 400;
-  font-size: 0.8125rem;
+  font-size: 0.75rem;
 }
 
 /* Price Impact Colors */
@@ -184,8 +164,8 @@
 .confirm-actions {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  margin-top: 24px;
+  gap: 10px;
+  margin-top: 16px;
 }
 
 .confirm-btn-primary {

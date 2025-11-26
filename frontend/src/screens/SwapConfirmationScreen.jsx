@@ -115,9 +115,7 @@ function SwapConfirmationScreen({
             <div className="confirm-rate-info">
               <div className="confirm-rate-label">Exchange Rate</div>
               <div className="confirm-rate-value">
-                <img src={tokenInIcon} alt={tokenInSymbol} className="rate-token-icon" />
                 1 {tokenInSymbol} = {(parseFloat(ethers.formatUnits(amountOut, tokenOutDecimals)) / parseFloat(amountIn)).toFixed(6)} {tokenOutSymbol}
-                <img src={tokenOutIcon} alt={tokenOutSymbol} className="rate-token-icon" />
               </div>
             </div>
 
@@ -126,7 +124,6 @@ function SwapConfirmationScreen({
               <div className="confirm-detail-item">
                 <span className="confirm-detail-label">Minimum Received</span>
                 <span className="confirm-detail-value">
-                  <img src={tokenOutIcon} alt={tokenOutSymbol} className="detail-token-icon" />
                   {parseFloat(ethers.formatUnits(minimumReceived, tokenOutDecimals)).toFixed(6)} {tokenOutSymbol}
                 </span>
               </div>
@@ -147,7 +144,6 @@ function SwapConfirmationScreen({
                 <div className="confirm-detail-item">
                   <span className="confirm-detail-label">Network Fee</span>
                   <span className="confirm-detail-value">
-                    <img src={ethIcon} alt="ETH" className="detail-token-icon" />
                     {gasEstimate.gasCostEth < 0.0001
                       ? gasEstimate.gasCostEth.toFixed(8)
                       : gasEstimate.gasCostEth.toFixed(6)} ETH
