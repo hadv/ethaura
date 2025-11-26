@@ -1,28 +1,9 @@
-/* Swap Confirmation Screen - Centered Focused Layout */
+/* Swap Confirmation Screen - Uses SendTransactionScreen layout */
 .swap-confirmation-screen {
   min-height: 100vh;
   background: #fafafa;
   display: flex;
   flex-direction: column;
-}
-
-/* Main Content - Centered */
-.confirm-content {
-  flex: 1;
-  display: flex;
-  justify-content: center;
-  align-items: flex-start;
-  padding: 32px 24px;
-}
-
-.confirm-card {
-  background: white;
-  border-radius: 16px;
-  padding: 32px;
-  width: 100%;
-  max-width: 480px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-  border: 1px solid #e5e7eb;
 }
 
 /* Token Swap Visual */
@@ -65,53 +46,17 @@
   color: #9ca3af;
 }
 
-/* Transaction Details */
-.confirm-details {
-  border-top: 1px solid #e5e7eb;
-  padding-top: 20px;
-  margin-bottom: 20px;
-}
-
-.confirm-detail-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 10px 0;
-  border-bottom: 1px solid #f3f4f6;
-}
-
-.confirm-detail-row:last-child {
-  border-bottom: none;
-}
-
-.confirm-detail-label {
-  font-size: 0.875rem;
-  color: #6b7280;
-}
-
-.confirm-detail-value {
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: #1a1a1a;
-  text-align: right;
-}
-
-.confirm-detail-usd {
-  color: #9ca3af;
-  font-weight: 400;
-}
-
 /* Price Impact Colors */
 .impact-low {
-  color: #10b981;
+  color: #10b981 !important;
 }
 
 .impact-medium {
-  color: #f59e0b;
+  color: #f59e0b !important;
 }
 
 .impact-high {
-  color: #ef4444;
+  color: #ef4444 !important;
 }
 
 /* Error Message */
@@ -193,6 +138,12 @@
   cursor: not-allowed;
 }
 
+/* Sidebar value secondary text */
+.sidebar-info-value-secondary {
+  color: #9ca3af;
+  font-weight: 400;
+}
+
 /* Button Loader */
 .button-loader {
   animation: spin 1s linear infinite;
@@ -235,15 +186,7 @@
 }
 
 /* Responsive */
-@media (max-width: 540px) {
-  .confirm-content {
-    padding: 16px;
-  }
-
-  .confirm-card {
-    padding: 24px;
-  }
-
+@media (max-width: 768px) {
   .confirm-token-amount {
     font-size: 1.5rem;
   }
