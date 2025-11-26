@@ -16,7 +16,7 @@ import PriceImpactWarning from '../components/PriceImpactWarning'
 import PriceImpactConfirmModal from '../components/PriceImpactConfirmModal'
 import '../styles/SwapScreen.css'
 
-function SwapScreen({ wallet, onBack, onHome, onSettings, onLogout, onWalletChange, credential }) {
+function SwapScreen({ wallet, onBack, onHome, onSettings, onLogout, onWalletChange, credential, onSwapConfirm }) {
   const { userInfo, address: ownerAddress } = useWeb3Auth()
   const { networkInfo } = useNetwork()
   const sdk = useP256SDK()
@@ -296,7 +296,7 @@ function SwapScreen({ wallet, onBack, onHome, onSettings, onLogout, onWalletChan
     }
   }
 
-  // Handle swap button click - check price impact first
+  // Handle swap button click - navigate to confirmation screen
   const handleSwapClick = () => {
     if (!quote) return
 
@@ -306,14 +306,26 @@ function SwapScreen({ wallet, onBack, onHome, onSettings, onLogout, onWalletChan
       return
     }
 
-    // Show confirmation modal if price impact > 5%
-    if (quote.priceImpact > 5) {
-      setShowPriceImpactModal(true)
-      return
+    // Calculate minimum output with slippage
+    const uniswapService = new UniswapV3Service(sdk.provider, sdk.chainId)
+    const minimumReceived = uniswapService.calculateMinimumOutput(quote.amountOut, slippage)
+
+    // Prepare swap details for confirmation screen
+    const swapDetails = {
+      tokenIn,
+      tokenOut,
+      amountIn,
+      amountOut: quote.amountOut,
+      quote,
+      slippage,
+      gasEstimate,
+      minimumReceived,
     }
 
-    // Execute swap directly if price impact <= 5%
-    handleSwap()
+    // Navigate to confirmation screen with execute function
+    if (onSwapConfirm) {
+      onSwapConfirm(swapDetails, handleSwap)
+    }
   }
 
   // Handle swap execution

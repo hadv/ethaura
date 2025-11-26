@@ -81,6 +81,12 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
         echo "📦 Installing frontend dependencies..."
         cd frontend && npm install && cd ..
     fi
+
+    # Clear Vite cache to avoid stale chunk errors
+    if [ -d "frontend/node_modules/.vite" ]; then
+        echo "🧹 Clearing Vite cache..."
+        rm -rf frontend/node_modules/.vite
+    fi
     
     echo ""
     echo "✅ Starting backend on port 3001..."
