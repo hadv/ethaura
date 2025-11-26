@@ -75,12 +75,10 @@ function SwapConfirmationScreen({
       />
 
       {/* Main Content */}
-      <div className="swap-confirmation-content">
-        <div className="swap-confirmation-main">
-          {/* Swap Details Card */}
-          <div className="swap-details-card">
-            <h3 className="section-title">Swap Details</h3>
-
+      <div className="swap-content-wrapper">
+        <div className="swap-main">
+          {/* Swap Confirmation Card */}
+          <div className="swap-form-card">
             {/* Token Swap Visual */}
             <div className="token-swap-visual">
               <div className="token-amount-display">
@@ -102,91 +100,109 @@ function SwapConfirmationScreen({
               </div>
             </div>
 
-            {/* Exchange Rate */}
-            <div className="info-row">
-              <span className="info-label">Exchange Rate:</span>
-              <span className="info-value">
-                1 {tokenInSymbol} ≈ {(parseFloat(ethers.formatUnits(amountOut, tokenOutDecimals)) / parseFloat(amountIn)).toFixed(6)} {tokenOutSymbol}
-              </span>
-            </div>
-          </div>
+            {/* Price Impact Warning */}
+            {quote && quote.priceImpact > 2 && (
+              <PriceImpactWarning priceImpact={quote.priceImpact} />
+            )}
 
-          {/* Transaction Settings Card */}
-          <div className="transaction-settings-card">
-            <h3 className="section-title">Transaction Settings</h3>
-
-            <div className="info-row">
-              <span className="info-label">Slippage Tolerance:</span>
-              <span className="info-value">{slippage}%</span>
-            </div>
-
-            <div className="info-row">
-              <span className="info-label">Minimum Received:</span>
-              <span className="info-value">
-                {parseFloat(ethers.formatUnits(minimumReceived, tokenOutDecimals)).toFixed(6)} {tokenOutSymbol}
-              </span>
-            </div>
-
-            {quote && quote.priceImpact !== undefined && (
-              <div className="info-row">
-                <span className="info-label">Price Impact:</span>
-                <span className={`info-value price-impact-${quote.priceImpact > 5 ? 'high' : quote.priceImpact > 2 ? 'medium' : 'low'}`}>
-                  {quote.priceImpact.toFixed(2)}%
-                </span>
+            {/* Error Message */}
+            {error && (
+              <div className="swap-error">
+                <AlertCircle size={16} />
+                <span>{error}</span>
               </div>
             )}
+
+            {/* Confirm Button */}
+            <button
+              className="confirm-swap-button"
+              onClick={handleConfirm}
+              disabled={confirming}
+            >
+              {confirming && <Loader className="button-loader" size={20} />}
+              {confirming ? 'Confirming...' : 'Confirm Swap'}
+            </button>
+
+            {/* Back Link */}
+            <button className="back-link" onClick={onBack} disabled={confirming}>
+              <ChevronLeft size={16} />
+              Back to Swap
+            </button>
           </div>
+        </div>
 
-          {/* Network Fee Card */}
-          {gasEstimate && (
-            <div className="network-fee-card">
-              <h3 className="section-title">Network Fee</h3>
-
-              <div className="info-row">
-                <span className="info-label">Estimated Gas:</span>
-                <span className="info-value">
-                  ~{gasEstimate.gasCostEth.toFixed(6)} ETH
-                  {gasEstimate.gasCostUsd && ` ($${gasEstimate.gasCostUsd.toFixed(2)})`}
+        {/* Right Panel - Swap Details */}
+        <div className="swap-sidebar">
+          <div className="sidebar-section">
+            <h3 className="sidebar-title">Transaction Details</h3>
+            <div className="sidebar-content">
+              {/* Exchange Rate */}
+              <div className="sidebar-info-item">
+                <span className="sidebar-info-label">Exchange Rate:</span>
+                <span className="sidebar-info-value">
+                  1 {tokenInSymbol} ≈ {(parseFloat(ethers.formatUnits(amountOut, tokenOutDecimals)) / parseFloat(amountIn)).toFixed(6)} {tokenOutSymbol}
                 </span>
               </div>
 
-              <div className="info-row">
-                <span className="info-label">Gas Price:</span>
-                <span className="info-value">
-                  {gasEstimate.gasPriceDisplay.value.toLocaleString()} {gasEstimate.gasPriceDisplay.unit}
+              {/* Price Impact */}
+              {quote && quote.priceImpact !== undefined && (
+                <div className="sidebar-info-item">
+                  <span className="sidebar-info-label">Price Impact:</span>
+                  <span className="sidebar-info-value" style={{
+                    color: quote.priceImpact < 2 ? '#10b981' :
+                           quote.priceImpact < 5 ? '#ea580c' :
+                           '#dc2626'
+                  }}>
+                    {quote.priceImpact.toFixed(2)}%
+                  </span>
+                </div>
+              )}
+
+              {/* Slippage Tolerance */}
+              <div className="sidebar-info-item">
+                <span className="sidebar-info-label">Slippage Tolerance:</span>
+                <span className="sidebar-info-value">{slippage}%</span>
+              </div>
+
+              {/* Minimum Received */}
+              <div className="sidebar-info-item">
+                <span className="sidebar-info-label">Minimum Received:</span>
+                <span className="sidebar-info-value">
+                  {parseFloat(ethers.formatUnits(minimumReceived, tokenOutDecimals)).toFixed(6)} {tokenOutSymbol}
                 </span>
               </div>
+
+              {/* Network Fee */}
+              {gasEstimate && (
+                <div className="sidebar-info-item">
+                  <span className="sidebar-info-label">Network Fee:</span>
+                  <span className="sidebar-info-value">
+                    {gasEstimate.gasCostEth < 0.0001
+                      ? gasEstimate.gasCostEth.toFixed(8)
+                      : gasEstimate.gasCostEth.toFixed(6)} ETH
+                    {gasEstimate.gasCostUsd && (
+                      <div style={{ fontSize: '0.8125rem', color: '#9ca3af' }}>
+                        ${gasEstimate.gasCostUsd.toFixed(2)}
+                      </div>
+                    )}
+                  </span>
+                </div>
+              )}
+
+              {/* Gas Price */}
+              {gasEstimate && gasEstimate.gasPriceDisplay && (
+                <div className="sidebar-info-item">
+                  <span className="sidebar-info-label">Gas Price:</span>
+                  <span className="sidebar-info-value">
+                    {gasEstimate.gasPriceDisplay.value.toLocaleString(undefined, {
+                      minimumFractionDigits: 0,
+                      maximumFractionDigits: gasEstimate.gasPriceDisplay.unit === 'Gwei' ? 2 : 0
+                    })} {gasEstimate.gasPriceDisplay.unit}
+                  </span>
+                </div>
+              )}
             </div>
-          )}
-
-          {/* Price Impact Warning */}
-          {quote && quote.priceImpact > 2 && (
-            <PriceImpactWarning priceImpact={quote.priceImpact} />
-          )}
-
-          {/* Error Message */}
-          {error && (
-            <div className="swap-error">
-              <AlertCircle size={16} />
-              <span>{error}</span>
-            </div>
-          )}
-
-          {/* Confirm Button */}
-          <button
-            className="confirm-swap-button"
-            onClick={handleConfirm}
-            disabled={confirming}
-          >
-            {confirming && <Loader className="button-loader" size={20} />}
-            {confirming ? 'Confirming...' : 'Confirm Swap'}
-          </button>
-
-          {/* Back Link */}
-          <button className="back-link" onClick={onBack} disabled={confirming}>
-            <ChevronLeft size={16} />
-            Back to Swap
-          </button>
+          </div>
         </div>
       </div>
     </div>

@@ -1,44 +1,9 @@
-/* Swap Confirmation Screen */
+/* Swap Confirmation Screen - Uses same layout as SwapScreen */
 .swap-confirmation-screen {
   min-height: 100vh;
   background: #f5f5f5;
   display: flex;
   flex-direction: column;
-}
-
-.swap-confirmation-content {
-  flex: 1;
-  display: flex;
-  justify-content: center;
-  padding: 2rem 1rem;
-  max-width: 1400px;
-  margin: 0 auto;
-  width: 100%;
-}
-
-.swap-confirmation-main {
-  flex: 1;
-  max-width: 600px;
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
-}
-
-/* Cards */
-.swap-details-card,
-.transaction-settings-card,
-.network-fee-card {
-  background: white;
-  border-radius: 16px;
-  padding: 1.5rem;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-}
-
-.section-title {
-  font-size: 1.125rem;
-  font-weight: 600;
-  color: #1a1a1a;
-  margin: 0 0 1.25rem 0;
 }
 
 /* Token Swap Visual */
@@ -78,44 +43,6 @@
   padding: 0.5rem;
 }
 
-/* Info Rows */
-.info-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0.75rem 0;
-  border-bottom: 1px solid #f0f0f0;
-}
-
-.info-row:last-child {
-  border-bottom: none;
-}
-
-.info-label {
-  font-size: 0.9375rem;
-  color: #6b6b6b;
-}
-
-.info-value {
-  font-size: 0.9375rem;
-  font-weight: 500;
-  color: #1a1a1a;
-  text-align: right;
-}
-
-/* Price Impact Colors */
-.price-impact-low {
-  color: #16a34a;
-}
-
-.price-impact-medium {
-  color: #ea580c;
-}
-
-.price-impact-high {
-  color: #dc2626;
-}
-
 /* Confirm Button */
 .confirm-swap-button {
   width: 100%;
@@ -132,7 +59,7 @@
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  margin-top: 0.5rem;
+  margin-top: 1rem;
 }
 
 .confirm-swap-button:hover:not(:disabled) {
@@ -175,6 +102,7 @@
   justify-content: center;
   gap: 0.25rem;
   padding: 0.75rem;
+  margin-top: 0.5rem;
   transition: color 0.2s;
 }
 
@@ -185,19 +113,6 @@
 .back-link:disabled {
   opacity: 0.5;
   cursor: not-allowed;
-}
-
-/* Error Message */
-.swap-error {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  background: #fef2f2;
-  border: 1px solid #fecaca;
-  border-radius: 12px;
-  padding: 0.75rem 1rem;
-  color: #dc2626;
-  font-size: 0.875rem;
 }
 
 /* Error State */
@@ -233,26 +148,8 @@
 
 /* Responsive */
 @media (max-width: 768px) {
-  .swap-confirmation-content {
-    padding: 1rem;
-  }
-
-  .swap-confirmation-main {
-    gap: 1rem;
-  }
-
-  .swap-details-card,
-  .transaction-settings-card,
-  .network-fee-card {
-    padding: 1.25rem;
-  }
-
   .token-amount {
     font-size: 1.25rem;
-  }
-
-  .section-title {
-    font-size: 1rem;
   }
 }
 
