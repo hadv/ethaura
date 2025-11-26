@@ -1,9 +1,30 @@
-/* Swap Confirmation Screen - Uses SendTransactionScreen layout */
+/* Swap Confirmation Screen - Centered Card Layout */
 .swap-confirmation-screen {
   min-height: 100vh;
   background: #fafafa;
   display: flex;
   flex-direction: column;
+}
+
+/* Content Wrapper - Centers the card */
+.confirm-content-wrapper {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 40px 24px;
+  min-height: calc(100vh - 153px);
+}
+
+/* Main Card - Centered with max width */
+.confirm-main-card {
+  background: white;
+  border-radius: 16px;
+  padding: 32px;
+  width: 100%;
+  max-width: 560px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  border: 1px solid #e5e7eb;
 }
 
 /* Token Swap Visual */
@@ -44,6 +65,42 @@
   justify-content: center;
   padding: 8px 0;
   color: #9ca3af;
+}
+
+/* Transaction Details Section */
+.confirm-details-section {
+  border-top: 1px solid #e5e7eb;
+  padding-top: 20px;
+  margin-bottom: 20px;
+}
+
+.confirm-detail-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.confirm-detail-row:last-child {
+  border-bottom: none;
+}
+
+.confirm-detail-label {
+  font-size: 0.875rem;
+  color: #6b7280;
+}
+
+.confirm-detail-value {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #1a1a1a;
+  text-align: right;
+}
+
+.confirm-detail-usd {
+  color: #9ca3af;
+  font-weight: 400;
 }
 
 /* Price Impact Colors */
@@ -138,12 +195,6 @@
   cursor: not-allowed;
 }
 
-/* Sidebar value secondary text */
-.sidebar-info-value-secondary {
-  color: #9ca3af;
-  font-weight: 400;
-}
-
 /* Button Loader */
 .button-loader {
   animation: spin 1s linear infinite;
@@ -186,7 +237,15 @@
 }
 
 /* Responsive */
-@media (max-width: 768px) {
+@media (max-width: 640px) {
+  .confirm-content-wrapper {
+    padding: 24px 16px;
+  }
+
+  .confirm-main-card {
+    padding: 24px;
+  }
+
   .confirm-token-amount {
     font-size: 1.5rem;
   }
