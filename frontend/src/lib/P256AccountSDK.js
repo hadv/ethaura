@@ -796,6 +796,7 @@ export class P256AccountSDK {
    * @param {bigint} params.amountIn - Input amount (in token's smallest unit)
    * @param {bigint} params.amountOutMinimum - Minimum output amount (slippage protected)
    * @param {number} params.fee - Pool fee tier (500, 3000, or 10000). Default: 3000 (0.3%)
+   * @param {number} params.deadline - Unix timestamp deadline for the swap (optional)
    * @param {Object} params.passkeyCredential - Passkey credential for 2FA signing
    * @param {Function} params.signWithPasskey - Function to sign with passkey (2FA)
    * @param {string|null} params.ownerSignature - Owner signature (primary auth via Web3Auth)
@@ -811,6 +812,7 @@ export class P256AccountSDK {
     amountIn,
     amountOutMinimum,
     fee = 3000,
+    deadline = null,
     passkeyCredential,
     signWithPasskey,
     ownerSignature = null,
@@ -821,14 +823,15 @@ export class P256AccountSDK {
       // Initialize Uniswap V3 service
       const uniswapService = new UniswapV3Service(this.provider, this.chainId)
 
-      // Build approve + swap batch transaction
-      const { targets, values, datas } = uniswapService.buildApproveAndSwap(
+      // Build approve + swap batch transaction (with allowance optimization and deadline)
+      const { targets, values, datas } = await uniswapService.buildApproveAndSwap(
         tokenIn,
         tokenOut,
         amountIn,
         amountOutMinimum,
         accountAddress,
-        fee
+        fee,
+        deadline
       )
 
       console.log('🔄 SDK executeSwap - built batch transaction:', {
@@ -840,6 +843,8 @@ export class P256AccountSDK {
         amountIn: amountIn.toString(),
         amountOutMinimum: amountOutMinimum.toString(),
         fee,
+        deadline: deadline ? new Date(deadline * 1000).toISOString() : 'default (10 min)',
+        batchSize: targets.length,
       })
 
       // Execute batch via P256Account

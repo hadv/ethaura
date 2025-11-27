@@ -1,0 +1,73 @@
+.price-impact-warning {
+  border-radius: 8px;
+  border: 1.5px solid;
+  padding: 12px 14px;
+  margin: 12px 0;
+  transition: all 0.2s;
+}
+
+.price-impact-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.price-impact-icon {
+  flex-shrink: 0;
+}
+
+.price-impact-label {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.price-impact-message {
+  margin: 0;
+  margin-left: 26px;
+  font-size: 13px;
+  line-height: 1.5;
+  opacity: 0.9;
+}
+
+/* Severity levels */
+.price-impact-warning.medium {
+  animation: pulse-warning 2s ease-in-out infinite;
+}
+
+.price-impact-warning.high {
+  animation: pulse-warning 1.5s ease-in-out infinite;
+}
+
+.price-impact-warning.extreme {
+  animation: pulse-danger 1s ease-in-out infinite;
+}
+
+/* Compact mode */
+.price-impact-compact {
+  font-weight: 600;
+  font-size: 14px;
+  cursor: help;
+}
+
+/* Animations */
+@keyframes pulse-warning {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.85;
+  }
+}
+
+@keyframes pulse-danger {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.9;
+    transform: scale(1.01);
+  }
+}
+
