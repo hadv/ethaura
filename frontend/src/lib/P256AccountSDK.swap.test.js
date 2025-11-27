@@ -333,5 +333,224 @@ describe('P256AccountSDK > executeSwap()', () => {
       deadline
     )
   })
+
+  test('should handle zero amountIn gracefully', async () => {
+    const params = {
+      accountAddress: '0xAccountAddress',
+      tokenIn: '0xTokenIn',
+      tokenOut: '0xTokenOut',
+      amountIn: 0n,
+      amountOutMinimum: 0n,
+      fee: 3000,
+      passkeyCredential: { id: 'credential-id' },
+      signWithPasskey: vi.fn(),
+    }
+
+    const result = await sdk.executeSwap(params)
+
+    expect(result.success).toBe(true)
+    expect(mockBuildApproveAndSwap).toHaveBeenCalledWith(
+      params.tokenIn,
+      params.tokenOut,
+      0n,
+      0n,
+      params.accountAddress,
+      3000,
+      null
+    )
+  })
+
+  test('should handle large amountIn (max uint256)', async () => {
+    const maxUint256 = 2n ** 256n - 1n
+    const params = {
+      accountAddress: '0xAccountAddress',
+      tokenIn: '0xTokenIn',
+      tokenOut: '0xTokenOut',
+      amountIn: maxUint256,
+      amountOutMinimum: 0n,
+      fee: 3000,
+      passkeyCredential: { id: 'credential-id' },
+      signWithPasskey: vi.fn(),
+    }
+
+    const result = await sdk.executeSwap(params)
+
+    expect(result.success).toBe(true)
+    expect(mockBuildApproveAndSwap).toHaveBeenCalledWith(
+      params.tokenIn,
+      params.tokenOut,
+      maxUint256,
+      0n,
+      params.accountAddress,
+      3000,
+      null
+    )
+  })
+
+  test('should work with all supported fee tiers', async () => {
+    const feeTiers = [100, 500, 3000, 10000] // 0.01%, 0.05%, 0.3%, 1%
+
+    for (const fee of feeTiers) {
+      const params = {
+        accountAddress: '0xAccountAddress',
+        tokenIn: '0xTokenIn',
+        tokenOut: '0xTokenOut',
+        amountIn: 1000000n,
+        amountOutMinimum: 950000n,
+        fee,
+        passkeyCredential: { id: 'credential-id' },
+        signWithPasskey: vi.fn(),
+      }
+
+      await sdk.executeSwap(params)
+
+      expect(mockBuildApproveAndSwap).toHaveBeenLastCalledWith(
+        params.tokenIn,
+        params.tokenOut,
+        params.amountIn,
+        params.amountOutMinimum,
+        params.accountAddress,
+        fee,
+        null
+      )
+    }
+  })
+
+  test('should throw error when buildApproveAndSwap fails', async () => {
+    mockBuildApproveAndSwap.mockRejectedValue(new Error('Failed to build swap'))
+
+    const params = {
+      accountAddress: '0xAccountAddress',
+      tokenIn: '0xTokenIn',
+      tokenOut: '0xTokenOut',
+      amountIn: 1000000n,
+      amountOutMinimum: 950000n,
+      fee: 3000,
+      passkeyCredential: { id: 'credential-id' },
+      signWithPasskey: vi.fn(),
+    }
+
+    await expect(sdk.executeSwap(params)).rejects.toThrow('Failed to build swap')
+  })
+
+  test('should work without passkey credential for owner-only auth', async () => {
+    const params = {
+      accountAddress: '0xAccountAddress',
+      tokenIn: '0xTokenIn',
+      tokenOut: '0xTokenOut',
+      amountIn: 1000000n,
+      amountOutMinimum: 950000n,
+      fee: 3000,
+      passkeyCredential: null,
+      signWithPasskey: null,
+      ownerSignature: '0xOwnerSignature',
+    }
+
+    const result = await sdk.executeSwap(params)
+
+    expect(result.success).toBe(true)
+    expect(mockExecuteBatch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        passkeyCredential: null,
+        signWithPasskey: null,
+        ownerSignature: '0xOwnerSignature',
+      })
+    )
+  })
+
+  test('should handle network error gracefully', async () => {
+    mockExecuteBatch.mockRejectedValue(new Error('Network error: connection refused'))
+
+    const params = {
+      accountAddress: '0xAccountAddress',
+      tokenIn: '0xTokenIn',
+      tokenOut: '0xTokenOut',
+      amountIn: 1000000n,
+      amountOutMinimum: 950000n,
+      fee: 3000,
+      passkeyCredential: { id: 'credential-id' },
+      signWithPasskey: vi.fn(),
+    }
+
+    await expect(sdk.executeSwap(params)).rejects.toThrow('Network error')
+  })
+
+  test('should throw user-friendly error for user rejection', async () => {
+    mockExecuteBatch.mockRejectedValue(new Error('User rejected the request'))
+
+    const params = {
+      accountAddress: '0xAccountAddress',
+      tokenIn: '0xTokenIn',
+      tokenOut: '0xTokenOut',
+      amountIn: 1000000n,
+      amountOutMinimum: 950000n,
+      fee: 3000,
+      passkeyCredential: { id: 'credential-id' },
+      signWithPasskey: vi.fn(),
+    }
+
+    await expect(sdk.executeSwap(params)).rejects.toThrow('User rejected')
+  })
+
+  test('should work with both passkey and owner signature (2FA mode)', async () => {
+    const params = {
+      accountAddress: '0xAccountAddress',
+      tokenIn: '0xTokenIn',
+      tokenOut: '0xTokenOut',
+      amountIn: 1000000n,
+      amountOutMinimum: 950000n,
+      fee: 3000,
+      passkeyCredential: { id: 'credential-id' },
+      signWithPasskey: vi.fn(),
+      ownerSignature: '0xOwnerSignature',
+      needsDeployment: false,
+      initCode: '0x',
+    }
+
+    const result = await sdk.executeSwap(params)
+
+    expect(result.success).toBe(true)
+    expect(mockExecuteBatch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        passkeyCredential: params.passkeyCredential,
+        signWithPasskey: params.signWithPasskey,
+        ownerSignature: '0xOwnerSignature',
+      })
+    )
+  })
+
+  test('should throw user-friendly error for invalid token address', async () => {
+    mockExecuteBatch.mockRejectedValue(new Error('invalid address'))
+
+    const params = {
+      accountAddress: '0xAccountAddress',
+      tokenIn: 'invalid',
+      tokenOut: '0xTokenOut',
+      amountIn: 1000000n,
+      amountOutMinimum: 950000n,
+      fee: 3000,
+      passkeyCredential: { id: 'credential-id' },
+      signWithPasskey: vi.fn(),
+    }
+
+    await expect(sdk.executeSwap(params)).rejects.toThrow('invalid address')
+  })
+
+  test('should handle execution reverted error', async () => {
+    mockExecuteBatch.mockRejectedValue(new Error('execution reverted'))
+
+    const params = {
+      accountAddress: '0xAccountAddress',
+      tokenIn: '0xTokenIn',
+      tokenOut: '0xTokenOut',
+      amountIn: 1000000n,
+      amountOutMinimum: 950000n,
+      fee: 3000,
+      passkeyCredential: { id: 'credential-id' },
+      signWithPasskey: vi.fn(),
+    }
+
+    await expect(sdk.executeSwap(params)).rejects.toThrow('execution reverted')
+  })
 })
 
