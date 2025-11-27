@@ -81,7 +81,8 @@ describe('P256AccountSDK > executeSwap()', () => {
       params.amountIn,
       params.amountOutMinimum,
       params.accountAddress,
-      params.fee
+      params.fee,
+      null // deadline (null by default)
     )
 
     // Verify executeBatch was called with batch transaction
@@ -122,7 +123,8 @@ describe('P256AccountSDK > executeSwap()', () => {
       params.amountIn,
       params.amountOutMinimum,
       params.accountAddress,
-      3000 // default fee
+      3000, // default fee
+      null // deadline (null by default)
     )
   })
 
@@ -299,9 +301,37 @@ describe('P256AccountSDK > executeSwap()', () => {
         params.amountIn,
         params.amountOutMinimum,
         params.accountAddress,
-        fee
+        fee,
+        null // deadline (null by default)
       )
     }
+  })
+
+  test('should pass deadline parameter to buildApproveAndSwap', async () => {
+    const deadline = Math.floor(Date.now() / 1000) + 600 // 10 minutes from now
+    const params = {
+      accountAddress: '0xAccountAddress',
+      tokenIn: '0xTokenIn',
+      tokenOut: '0xTokenOut',
+      amountIn: 1000000n,
+      amountOutMinimum: 950000n,
+      fee: 3000,
+      deadline,
+      passkeyCredential: { id: 'credential-id' },
+      signWithPasskey: vi.fn(),
+    }
+
+    await sdk.executeSwap(params)
+
+    expect(mockBuildApproveAndSwap).toHaveBeenCalledWith(
+      params.tokenIn,
+      params.tokenOut,
+      params.amountIn,
+      params.amountOutMinimum,
+      params.accountAddress,
+      params.fee,
+      deadline
+    )
   })
 })
 
