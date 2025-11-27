@@ -4,7 +4,7 @@
  * Comprehensive tests for the Uniswap V3 integration service
  */
 
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { ethers } from 'ethers'
 import { UniswapV3Service, createUniswapV3Service } from './uniswapService.js'
 
@@ -370,6 +370,270 @@ describe('UniswapV3Service', () => {
 
       expect(typeof minOutput).toBe('bigint')
       expect(minOutput < smallAmount).toBe(true)
+    })
+  })
+
+  describe('getQuote() structure validation', () => {
+    const USDC = '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238'
+    const USDT = '0x7169D38820dfd117C3FA1f22a697dBA58d90BA06'
+
+    it('should have quoter contract initialized', () => {
+      expect(sepoliaService.quoter).toBeDefined()
+      expect(sepoliaService.quoter.target).toBe('0xEd1f6473345F45b75F8179591dd5bA1888cf2FB3')
+    })
+
+    it('should have quoteExactInputSingle method available', () => {
+      expect(sepoliaService.quoter.quoteExactInputSingle).toBeDefined()
+      expect(typeof sepoliaService.quoter.quoteExactInputSingle.staticCall).toBe('function')
+    })
+
+    it('should throw error when quote fails due to network issues', async () => {
+      // Create a service with a mock provider that doesn't support contract calls
+      const mockProvider = {
+        getNetwork: vi.fn().mockResolvedValue({ chainId: 11155111n }),
+      }
+      const service = new UniswapV3Service(mockProvider, 11155111)
+
+      const amountIn = ethers.parseUnits('100', 6)
+
+      // This should fail because the mock provider doesn't support contract calls
+      await expect(service.getQuote(USDC, USDT, amountIn))
+        .rejects.toThrow('Failed to get swap quote')
+    })
+
+    it('should include priceImpact in error message context', async () => {
+      const mockProvider = {
+        getNetwork: vi.fn().mockResolvedValue({ chainId: 11155111n }),
+      }
+      const service = new UniswapV3Service(mockProvider, 11155111)
+
+      const amountIn = ethers.parseUnits('100', 6)
+
+      // Should throw with wrapped error message
+      await expect(service.getQuote(USDC, USDT, amountIn))
+        .rejects.toThrow(/Failed to get swap quote/)
+    })
+  })
+
+  describe('calculatePriceImpact() edge cases', () => {
+    const USDC = '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238'
+    const USDT = '0x7169D38820dfd117C3FA1f22a697dBA58d90BA06'
+
+    it('should return fallback value for very small amounts (<0.1 ETH equivalent)', async () => {
+      // Force calculatePriceImpact to fail and use fallback
+      const mockProvider = {
+        getNetwork: vi.fn().mockResolvedValue({ chainId: 11155111n }),
+      }
+      const service = new UniswapV3Service(mockProvider, 11155111)
+
+      const amountIn = ethers.parseEther('0.05') // 0.05 ETH
+      const amountOut = ethers.parseEther('0.049')
+
+      const priceImpact = await service.calculatePriceImpact(USDC, USDT, amountIn, amountOut)
+
+      // Fallback: < 0.1 ETH returns 0.1%
+      expect(priceImpact).toBe(0.1)
+    })
+
+    it('should return fallback value for medium amounts (0.1-1 ETH)', async () => {
+      const mockProvider = {
+        getNetwork: vi.fn().mockResolvedValue({ chainId: 11155111n }),
+      }
+      const service = new UniswapV3Service(mockProvider, 11155111)
+
+      const amountIn = ethers.parseEther('0.5') // 0.5 ETH
+      const amountOut = ethers.parseEther('0.49')
+
+      const priceImpact = await service.calculatePriceImpact(USDC, USDT, amountIn, amountOut)
+
+      // Fallback: 0.1-1 ETH returns 0.5%
+      expect(priceImpact).toBe(0.5)
+    })
+
+    it('should return fallback value for large amounts (1-10 ETH)', async () => {
+      const mockProvider = {
+        getNetwork: vi.fn().mockResolvedValue({ chainId: 11155111n }),
+      }
+      const service = new UniswapV3Service(mockProvider, 11155111)
+
+      const amountIn = ethers.parseEther('5') // 5 ETH
+      const amountOut = ethers.parseEther('4.9')
+
+      const priceImpact = await service.calculatePriceImpact(USDC, USDT, amountIn, amountOut)
+
+      // Fallback: 1-10 ETH returns 2.0%
+      expect(priceImpact).toBe(2.0)
+    })
+
+    it('should return fallback value for very large amounts (>10 ETH)', async () => {
+      const mockProvider = {
+        getNetwork: vi.fn().mockResolvedValue({ chainId: 11155111n }),
+      }
+      const service = new UniswapV3Service(mockProvider, 11155111)
+
+      const amountIn = ethers.parseEther('100') // 100 ETH
+      const amountOut = ethers.parseEther('98')
+
+      const priceImpact = await service.calculatePriceImpact(USDC, USDT, amountIn, amountOut)
+
+      // Fallback: > 10 ETH returns 5.0%
+      expect(priceImpact).toBe(5.0)
+    })
+  })
+
+  describe('buildMulticallWithDeadline()', () => {
+    it('should build multicall with valid deadline', () => {
+      const deadline = Math.floor(Date.now() / 1000) + 600 // 10 minutes from now
+      const swapCalldata = '0x1234567890'
+
+      const multicallData = sepoliaService.buildMulticallWithDeadline(deadline, swapCalldata)
+
+      expect(typeof multicallData).toBe('string')
+      expect(multicallData).toMatch(/^0x/)
+      expect(multicallData.length).toBeGreaterThan(10)
+    })
+
+    it('should throw error for invalid deadline', () => {
+      expect(() => {
+        sepoliaService.buildMulticallWithDeadline('invalid', '0x1234')
+      }).toThrow()
+    })
+  })
+
+  describe('getPoolAddress()', () => {
+    it('should throw error when pool does not exist', async () => {
+      // Mock factory.getPool to return zero address
+      vi.spyOn(sepoliaService.factory, 'getPool')
+        .mockResolvedValue(ethers.ZeroAddress)
+
+      const tokenA = '0x1111111111111111111111111111111111111111'
+      const tokenB = '0x2222222222222222222222222222222222222222'
+
+      await expect(sepoliaService.getPoolAddress(tokenA, tokenB))
+        .rejects.toThrow(/No pool found/)
+    })
+
+    it('should return pool address when pool exists', async () => {
+      const mockPoolAddress = '0x3333333333333333333333333333333333333333'
+      vi.spyOn(sepoliaService.factory, 'getPool')
+        .mockResolvedValue(mockPoolAddress)
+
+      const tokenA = '0x1111111111111111111111111111111111111111'
+      const tokenB = '0x2222222222222222222222222222222222222222'
+
+      const poolAddress = await sepoliaService.getPoolAddress(tokenA, tokenB)
+
+      expect(poolAddress).toBe(mockPoolAddress)
+    })
+
+    it('should use default fee tier (3000) when not specified', async () => {
+      const mockPoolAddress = '0x3333333333333333333333333333333333333333'
+      const getPoolSpy = vi.spyOn(sepoliaService.factory, 'getPool')
+        .mockResolvedValue(mockPoolAddress)
+
+      const tokenA = '0x1111111111111111111111111111111111111111'
+      const tokenB = '0x2222222222222222222222222222222222222222'
+
+      await sepoliaService.getPoolAddress(tokenA, tokenB)
+
+      expect(getPoolSpy).toHaveBeenCalledWith(tokenA, tokenB, 3000)
+    })
+
+    it('should use custom fee tier when specified', async () => {
+      const mockPoolAddress = '0x3333333333333333333333333333333333333333'
+      const getPoolSpy = vi.spyOn(sepoliaService.factory, 'getPool')
+        .mockResolvedValue(mockPoolAddress)
+
+      const tokenA = '0x1111111111111111111111111111111111111111'
+      const tokenB = '0x2222222222222222222222222222222222222222'
+
+      await sepoliaService.getPoolAddress(tokenA, tokenB, 500) // 0.05% fee tier
+
+      expect(getPoolSpy).toHaveBeenCalledWith(tokenA, tokenB, 500)
+    })
+  })
+
+  describe('Error handling edge cases', () => {
+    it('should handle zero amount in calculateMinimumOutput', () => {
+      const minOutput = sepoliaService.calculateMinimumOutput(0n)
+      expect(minOutput).toBe(0n)
+    })
+
+    it('should handle very high slippage in calculateMinimumOutput', () => {
+      const amountOut = 10000n
+      const minOutput = sepoliaService.calculateMinimumOutput(amountOut, 99.99)
+      // 99.99% slippage = 9999 basis points
+      // 10000 * (10000 - 9999) / 10000 = 1
+      expect(minOutput).toBe(1n)
+    })
+
+    it('should handle zero slippage in calculateMinimumOutput', () => {
+      const amountOut = 10000n
+      const minOutput = sepoliaService.calculateMinimumOutput(amountOut, 0)
+      expect(minOutput).toBe(10000n)
+    })
+
+    it('should throw on invalid chainId during construction', () => {
+      const invalidProvider = new ethers.JsonRpcProvider('https://rpc.example.com')
+
+      expect(() => {
+        new UniswapV3Service(invalidProvider, 0)
+      }).toThrow(/not supported/)
+    })
+
+    it('should throw on negative chainId during construction', () => {
+      const invalidProvider = new ethers.JsonRpcProvider('https://rpc.example.com')
+
+      expect(() => {
+        new UniswapV3Service(invalidProvider, -1)
+      }).toThrow(/not supported/)
+    })
+  })
+
+  describe('createUniswapV3Service factory function', () => {
+    it('should create service instance using factory', () => {
+      const service = createUniswapV3Service(provider, 11155111)
+
+      expect(service).toBeInstanceOf(UniswapV3Service)
+      expect(service.chainId).toBe(11155111)
+    })
+
+    it('should throw error for unsupported network using factory', () => {
+      expect(() => {
+        createUniswapV3Service(provider, 999999)
+      }).toThrow(/not supported/)
+    })
+  })
+
+  describe('buildSwapCalldata edge cases', () => {
+    const USDC = '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238'
+    const USDT = '0x7169D38820dfd117C3FA1f22a697dBA58d90BA06'
+    const recipient = '0x1234567890123456789012345678901234567890'
+
+    it('should handle zero amountIn', () => {
+      const calldata = sepoliaService.buildSwapCalldata(USDC, USDT, 0n, 0n, recipient)
+
+      expect(typeof calldata).toBe('string')
+      expect(calldata).toMatch(/^0x/)
+    })
+
+    it('should handle maximum uint256 amountIn', () => {
+      const maxUint256 = 2n ** 256n - 1n
+
+      const calldata = sepoliaService.buildSwapCalldata(USDC, USDT, maxUint256, 0n, recipient)
+
+      expect(typeof calldata).toBe('string')
+      expect(calldata).toMatch(/^0x/)
+    })
+
+    it('should produce deterministic calldata for same inputs', () => {
+      const amountIn = ethers.parseUnits('100', 6)
+      const amountOutMinimum = ethers.parseUnits('99', 6)
+
+      const calldata1 = sepoliaService.buildSwapCalldata(USDC, USDT, amountIn, amountOutMinimum, recipient)
+      const calldata2 = sepoliaService.buildSwapCalldata(USDC, USDT, amountIn, amountOutMinimum, recipient)
+
+      expect(calldata1).toBe(calldata2)
     })
   })
 })

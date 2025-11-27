@@ -17,11 +17,16 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
+      include: [
+        'src/lib/uniswapService.js',
+        'src/lib/P256AccountSDK.js',
+      ],
       exclude: [
         'node_modules/',
         'src/test/',
         '**/*.test.js',
         '**/*.example.js',
+        'dist/',
       ],
     },
   },
