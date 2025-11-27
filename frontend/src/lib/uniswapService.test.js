@@ -192,38 +192,65 @@ describe('UniswapV3Service', () => {
     })
   })
 
+  describe('checkAllowance()', () => {
+    it('should return 0n on error', async () => {
+      const tokenAddress = '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238'
+      const ownerAddress = '0x1234567890123456789012345678901234567890'
+      const spenderAddress = '0x3bFA4769FB09eefC5a80d6E87c3B9C650f7Ae48E'
+
+      // Mock provider to throw error
+      const mockProvider = {
+        getNetwork: vi.fn().mockResolvedValue({ chainId: 11155111n }),
+      }
+      const service = new UniswapV3Service(mockProvider, 11155111)
+
+      const allowance = await service.checkAllowance(tokenAddress, ownerAddress, spenderAddress)
+
+      expect(allowance).toBe(0n)
+    })
+  })
+
   describe('buildApproveAndSwap()', () => {
     const USDC = '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238'
     const USDT = '0x7169D38820dfd117C3FA1f22a697dBA58d90BA06'
     const recipient = '0x1234567890123456789012345678901234567890'
 
-    it('should build approve and swap batch correctly', () => {
+    it('should build approve and swap batch correctly when allowance is insufficient', async () => {
       const amountIn = ethers.parseUnits('100', 6)
       const amountOutMinimum = ethers.parseUnits('99', 6)
 
-      const batch = sepoliaService.buildApproveAndSwap(USDC, USDT, amountIn, amountOutMinimum, recipient)
+      // Mock checkAllowance to return insufficient allowance
+      vi.spyOn(sepoliaService, 'checkAllowance').mockResolvedValue(0n)
+
+      const batch = await sepoliaService.buildApproveAndSwap(USDC, USDT, amountIn, amountOutMinimum, recipient)
 
       expect(Array.isArray(batch.targets)).toBe(true)
       expect(Array.isArray(batch.values)).toBe(true)
       expect(Array.isArray(batch.datas)).toBe(true)
     })
 
-    it('should have 2 calls (approve + swap)', () => {
+    it('should have 2 calls (approve + swap) when allowance is insufficient', async () => {
       const amountIn = ethers.parseUnits('100', 6)
       const amountOutMinimum = ethers.parseUnits('99', 6)
 
-      const batch = sepoliaService.buildApproveAndSwap(USDC, USDT, amountIn, amountOutMinimum, recipient)
+      // Mock checkAllowance to return insufficient allowance
+      vi.spyOn(sepoliaService, 'checkAllowance').mockResolvedValue(0n)
+
+      const batch = await sepoliaService.buildApproveAndSwap(USDC, USDT, amountIn, amountOutMinimum, recipient)
 
       expect(batch.targets.length).toBe(2)
       expect(batch.values.length).toBe(2)
       expect(batch.datas.length).toBe(2)
     })
 
-    it('should have first call to token (approve)', () => {
+    it('should have first call to token (approve) when allowance is insufficient', async () => {
       const amountIn = ethers.parseUnits('100', 6)
       const amountOutMinimum = ethers.parseUnits('99', 6)
 
-      const batch = sepoliaService.buildApproveAndSwap(USDC, USDT, amountIn, amountOutMinimum, recipient)
+      // Mock checkAllowance to return insufficient allowance
+      vi.spyOn(sepoliaService, 'checkAllowance').mockResolvedValue(0n)
+
+      const batch = await sepoliaService.buildApproveAndSwap(USDC, USDT, amountIn, amountOutMinimum, recipient)
 
       expect(batch.targets[0]).toBe(USDC)
       expect(batch.values[0]).toBe(0n)
@@ -231,17 +258,70 @@ describe('UniswapV3Service', () => {
       expect(batch.datas[0]).toMatch(/^0x/)
     })
 
-    it('should have second call to swap router', () => {
+    it('should have second call to swap router when allowance is insufficient', async () => {
       const amountIn = ethers.parseUnits('100', 6)
       const amountOutMinimum = ethers.parseUnits('99', 6)
 
-      const batch = sepoliaService.buildApproveAndSwap(USDC, USDT, amountIn, amountOutMinimum, recipient)
+      // Mock checkAllowance to return insufficient allowance
+      vi.spyOn(sepoliaService, 'checkAllowance').mockResolvedValue(0n)
+
+      const batch = await sepoliaService.buildApproveAndSwap(USDC, USDT, amountIn, amountOutMinimum, recipient)
       const config = sepoliaService.getConfig()
 
       expect(batch.targets[1]).toBe(config.swapRouter)
       expect(batch.values[1]).toBe(0n)
       expect(typeof batch.datas[1]).toBe('string')
       expect(batch.datas[1]).toMatch(/^0x/)
+    })
+
+    it('should skip approval when allowance is sufficient', async () => {
+      const amountIn = ethers.parseUnits('100', 6)
+      const amountOutMinimum = ethers.parseUnits('99', 6)
+
+      // Mock checkAllowance to return sufficient allowance
+      vi.spyOn(sepoliaService, 'checkAllowance').mockResolvedValue(ethers.parseUnits('200', 6))
+
+      const batch = await sepoliaService.buildApproveAndSwap(USDC, USDT, amountIn, amountOutMinimum, recipient)
+
+      // Should only have 1 call (swap only, no approval)
+      expect(batch.targets.length).toBe(1)
+      expect(batch.values.length).toBe(1)
+      expect(batch.datas.length).toBe(1)
+
+      // Should call swap router directly
+      const config = sepoliaService.getConfig()
+      expect(batch.targets[0]).toBe(config.swapRouter)
+      expect(batch.values[0]).toBe(0n)
+    })
+
+    it('should include approval when allowance is exactly equal to amountIn', async () => {
+      const amountIn = ethers.parseUnits('100', 6)
+      const amountOutMinimum = ethers.parseUnits('99', 6)
+
+      // Mock checkAllowance to return exact amount
+      vi.spyOn(sepoliaService, 'checkAllowance').mockResolvedValue(amountIn)
+
+      const batch = await sepoliaService.buildApproveAndSwap(USDC, USDT, amountIn, amountOutMinimum, recipient)
+
+      // Should only have 1 call (swap only) since allowance >= amountIn
+      expect(batch.targets.length).toBe(1)
+      expect(batch.values.length).toBe(1)
+      expect(batch.datas.length).toBe(1)
+    })
+
+    it('should include approval when allowance is slightly less than amountIn', async () => {
+      const amountIn = ethers.parseUnits('100', 6)
+      const amountOutMinimum = ethers.parseUnits('99', 6)
+
+      // Mock checkAllowance to return slightly less
+      vi.spyOn(sepoliaService, 'checkAllowance').mockResolvedValue(ethers.parseUnits('99.999999', 6))
+
+      const batch = await sepoliaService.buildApproveAndSwap(USDC, USDT, amountIn, amountOutMinimum, recipient)
+
+      // Should have 2 calls (approve + swap)
+      expect(batch.targets.length).toBe(2)
+      expect(batch.values.length).toBe(2)
+      expect(batch.datas.length).toBe(2)
     })
   })
 

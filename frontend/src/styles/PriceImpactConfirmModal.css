@@ -1,0 +1,221 @@
+.price-impact-modal-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  animation: fadeIn 0.2s ease-out;
+}
+
+.price-impact-modal {
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
+  max-width: 500px;
+  width: 90%;
+  max-height: 90vh;
+  overflow-y: auto;
+  animation: slideUp 0.3s ease-out;
+}
+
+.price-impact-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 24px 24px 16px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.price-impact-modal-title-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.price-impact-modal-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.price-impact-modal-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: #111827;
+  margin: 0;
+}
+
+.price-impact-modal-close {
+  background: none;
+  border: none;
+  color: #6b7280;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  transition: all 0.2s;
+}
+
+.price-impact-modal-close:hover {
+  background: #f3f4f6;
+  color: #111827;
+}
+
+.price-impact-modal-content {
+  padding: 24px;
+}
+
+.price-impact-modal-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 12px;
+  border: 1.5px solid;
+  margin-bottom: 20px;
+}
+
+.price-impact-modal-alert svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.price-impact-modal-alert-title {
+  font-size: 16px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.price-impact-modal-alert-message {
+  font-size: 14px;
+  line-height: 1.5;
+  opacity: 0.9;
+}
+
+.price-impact-modal-details {
+  background: #f9fafb;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 20px;
+}
+
+.price-impact-modal-details h4 {
+  font-size: 14px;
+  font-weight: 600;
+  color: #6b7280;
+  margin: 0 0 12px 0;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.price-impact-modal-detail-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.price-impact-modal-detail-row:last-child {
+  border-bottom: none;
+}
+
+.price-impact-modal-detail-row .label {
+  font-size: 14px;
+  color: #6b7280;
+}
+
+.price-impact-modal-detail-row .value {
+  font-size: 14px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.price-impact-modal-warning-text {
+  font-size: 13px;
+  line-height: 1.6;
+  color: #4b5563;
+}
+
+.price-impact-modal-warning-text p {
+  margin: 0 0 12px 0;
+}
+
+.price-impact-modal-warning-text p:last-child {
+  margin-bottom: 0;
+}
+
+.price-impact-modal-warning-text strong {
+  color: #111827;
+  font-weight: 600;
+}
+
+.price-impact-modal-actions {
+  display: flex;
+  gap: 12px;
+  padding: 16px 24px 24px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.price-impact-modal-btn {
+  flex: 1;
+  padding: 12px 20px;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: 2px solid;
+}
+
+.price-impact-modal-btn.cancel {
+  background: white;
+  color: #6b7280;
+  border-color: #d1d5db;
+}
+
+.price-impact-modal-btn.cancel:hover {
+  background: #f9fafb;
+  border-color: #9ca3af;
+  color: #374151;
+}
+
+.price-impact-modal-btn.confirm {
+  background: #dc2626;
+  color: white;
+  border-color: #dc2626;
+}
+
+.price-impact-modal-btn.confirm:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3);
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
