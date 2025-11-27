@@ -103,6 +103,7 @@ export const UNISWAP_V3_SWAP_ROUTER_ABI = [
   'function exactInput((bytes path, address recipient, uint256 amountIn, uint256 amountOutMinimum)) payable returns (uint256 amountOut)',
   'function exactOutputSingle((address tokenIn, address tokenOut, uint24 fee, address recipient, uint256 amountOut, uint256 amountInMaximum, uint160 sqrtPriceLimitX96)) payable returns (uint256 amountIn)',
   'function exactOutput((bytes path, address recipient, uint256 amountOut, uint256 amountInMaximum)) payable returns (uint256 amountIn)',
+  'function multicall(uint256 deadline, bytes[] calldata data) payable returns (bytes[] memory)',
 ]
 
 // Uniswap V3 QuoterV2 ABI

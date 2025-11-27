@@ -1,0 +1,227 @@
+.deadline-selector {
+  position: relative;
+}
+
+.deadline-trigger {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #f3f4f6;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #374151;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.deadline-trigger:hover {
+  background: #e5e7eb;
+  border-color: #d1d5db;
+}
+
+.deadline-trigger svg {
+  color: #6b7280;
+}
+
+.deadline-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 999;
+}
+
+.deadline-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 320px;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+  z-index: 1000;
+  padding: 16px;
+}
+
+.deadline-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.deadline-header h4 {
+  font-size: 16px;
+  font-weight: 600;
+  color: #111827;
+  margin: 0;
+}
+
+.deadline-close {
+  background: none;
+  border: none;
+  font-size: 24px;
+  color: #6b7280;
+  cursor: pointer;
+  padding: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.deadline-close:hover {
+  background: #f3f4f6;
+  color: #111827;
+}
+
+.deadline-warning {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #fef3c7;
+  border: 1px solid #fde68a;
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  color: #92400e;
+  font-size: 13px;
+}
+
+.deadline-warning.long {
+  background: #fef3c7;
+  border-color: #fde68a;
+  color: #92400e;
+}
+
+.deadline-warning svg {
+  flex-shrink: 0;
+  color: #f59e0b;
+}
+
+.deadline-presets {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.deadline-preset {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  background: #f9fafb;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 10px 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.deadline-preset:hover {
+  background: #f3f4f6;
+  border-color: #d1d5db;
+}
+
+.deadline-preset.active {
+  background: #eff6ff;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.deadline-preset .preset-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.deadline-preset .preset-description {
+  font-size: 11px;
+  color: #6b7280;
+  text-align: center;
+}
+
+.deadline-custom {
+  margin-bottom: 12px;
+}
+
+.deadline-custom label {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  color: #6b7280;
+  margin-bottom: 6px;
+}
+
+.deadline-custom .custom-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.deadline-custom .custom-input-wrapper input {
+  width: 100%;
+  background: #f9fafb;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 10px 40px 10px 12px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #111827;
+  outline: none;
+  transition: all 0.2s;
+}
+
+.deadline-custom .custom-input-wrapper input:focus,
+.deadline-custom .custom-input-wrapper input.active {
+  background: #eff6ff;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.deadline-custom .custom-input-wrapper input::placeholder {
+  color: #9ca3af;
+}
+
+/* Remove number input arrows */
+.deadline-custom .custom-input-wrapper input::-webkit-outer-spin-button,
+.deadline-custom .custom-input-wrapper input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.deadline-custom .custom-input-wrapper input[type=number] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+.deadline-custom .input-suffix {
+  position: absolute;
+  right: 12px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #6b7280;
+  pointer-events: none;
+}
+
+.deadline-info {
+  background: #f9fafb;
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+.deadline-info p {
+  margin: 0;
+  font-size: 12px;
+  color: #6b7280;
+  line-height: 1.5;
+}

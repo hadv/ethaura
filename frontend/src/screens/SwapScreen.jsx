@@ -13,6 +13,7 @@ import Header from '../components/Header'
 import SubHeader from '../components/SubHeader'
 import TokenSelector from '../components/TokenSelector'
 import SlippageSelector from '../components/SlippageSelector'
+import DeadlineSelector from '../components/DeadlineSelector'
 import PriceImpactWarning from '../components/PriceImpactWarning'
 import PriceImpactConfirmModal from '../components/PriceImpactConfirmModal'
 import '../styles/SwapScreen.css'
@@ -44,6 +45,7 @@ function SwapScreen({ wallet, onBack, onHome, onSettings, onLogout, onWalletChan
 
   // Settings
   const [slippage, setSlippage] = useState(0.5) // 0.5% default
+  const [deadline, setDeadline] = useState(10) // 10 minutes default
 
   // Price impact confirmation
   const [showPriceImpactModal, setShowPriceImpactModal] = useState(false)
@@ -312,6 +314,9 @@ function SwapScreen({ wallet, onBack, onHome, onSettings, onLogout, onWalletChan
     const uniswapService = new UniswapV3Service(sdk.provider, sdk.chainId)
     const minimumReceived = uniswapService.calculateMinimumOutput(quote.amountOut, slippage)
 
+    // Calculate deadline timestamp
+    const deadlineTimestamp = Math.floor(Date.now() / 1000) + (deadline * 60)
+
     // Prepare swap details for confirmation screen
     const swapDetails = {
       tokenIn,
@@ -320,6 +325,8 @@ function SwapScreen({ wallet, onBack, onHome, onSettings, onLogout, onWalletChan
       amountOut: quote.amountOut,
       quote,
       slippage,
+      deadline,
+      deadlineTimestamp,
       gasEstimate,
       minimumReceived,
     }
@@ -369,6 +376,9 @@ function SwapScreen({ wallet, onBack, onHome, onSettings, onLogout, onWalletChan
         }
       })
 
+      // Calculate deadline timestamp (deadline is in minutes)
+      const deadlineTimestamp = Math.floor(Date.now() / 1000) + (deadline * 60)
+
       // Execute swap
       const result = await sdk.executeSwap({
         accountAddress: selectedWallet.address,
@@ -377,6 +387,7 @@ function SwapScreen({ wallet, onBack, onHome, onSettings, onLogout, onWalletChan
         amountIn: amountInWei,
         amountOutMinimum,
         fee: 3000, // 0.3% fee tier
+        deadline: deadlineTimestamp,
         passkeyCredential,
         signWithPasskey,
         ownerSignature: null, // TODO: Add owner signature for 2FA if enabled
@@ -622,6 +633,7 @@ function SwapScreen({ wallet, onBack, onHome, onSettings, onLogout, onWalletChan
           {/* Settings Bar */}
           <div className="swap-settings-bar">
             <SlippageSelector value={slippage} onChange={setSlippage} />
+            <DeadlineSelector value={deadline} onChange={setDeadline} />
           </div>
 
           {/* Swap Form Card */}
@@ -904,6 +916,10 @@ function SwapScreen({ wallet, onBack, onHome, onSettings, onLogout, onWalletChan
               <div className="sidebar-info-item">
                 <span className="sidebar-info-label">Slippage Tolerance:</span>
                 <span className="sidebar-info-value">{slippage}%</span>
+              </div>
+              <div className="sidebar-info-item">
+                <span className="sidebar-info-label">Transaction Deadline:</span>
+                <span className="sidebar-info-value">{deadline} min</span>
               </div>
               <div className="sidebar-info-item">
                 <span className="sidebar-info-label">Fee Tier:</span>
