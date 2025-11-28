@@ -82,7 +82,8 @@ describe('P256AccountSDK > executeSwap()', () => {
       params.amountOutMinimum,
       params.accountAddress,
       params.fee,
-      null // deadline (null by default)
+      null, // deadline (null by default)
+      { isNativeEthIn: false, isNativeEthOut: false } // ETH swap options
     )
 
     // Verify executeBatch was called with batch transaction
@@ -124,7 +125,8 @@ describe('P256AccountSDK > executeSwap()', () => {
       params.amountOutMinimum,
       params.accountAddress,
       3000, // default fee
-      null // deadline (null by default)
+      null, // deadline (null by default)
+      { isNativeEthIn: false, isNativeEthOut: false } // ETH swap options
     )
   })
 
@@ -302,7 +304,8 @@ describe('P256AccountSDK > executeSwap()', () => {
         params.amountOutMinimum,
         params.accountAddress,
         fee,
-        null // deadline (null by default)
+        null, // deadline (null by default)
+        { isNativeEthIn: false, isNativeEthOut: false } // ETH swap options
       )
     }
   })
@@ -330,7 +333,8 @@ describe('P256AccountSDK > executeSwap()', () => {
       params.amountOutMinimum,
       params.accountAddress,
       params.fee,
-      deadline
+      deadline,
+      { isNativeEthIn: false, isNativeEthOut: false } // ETH swap options
     )
   })
 
@@ -356,7 +360,8 @@ describe('P256AccountSDK > executeSwap()', () => {
       0n,
       params.accountAddress,
       3000,
-      null
+      null,
+      { isNativeEthIn: false, isNativeEthOut: false }
     )
   })
 
@@ -383,7 +388,8 @@ describe('P256AccountSDK > executeSwap()', () => {
       0n,
       params.accountAddress,
       3000,
-      null
+      null,
+      { isNativeEthIn: false, isNativeEthOut: false }
     )
   })
 
@@ -411,7 +417,8 @@ describe('P256AccountSDK > executeSwap()', () => {
         params.amountOutMinimum,
         params.accountAddress,
         fee,
-        null
+        null,
+        { isNativeEthIn: false, isNativeEthOut: false }
       )
     }
   })

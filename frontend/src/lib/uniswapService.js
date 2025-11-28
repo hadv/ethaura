@@ -391,100 +391,274 @@ export class UniswapV3Service {
   }
 
   /**
+   * Check if an address is the WETH contract for this network
+   * @param {string} address - Address to check
+   * @returns {boolean} True if address is WETH
+   */
+  isWeth(address) {
+    const config = this.getConfig()
+    return address.toLowerCase() === config.weth.toLowerCase()
+  }
+
+  /**
+   * Build WETH deposit calldata (wrap ETH → WETH)
+   * @returns {string} Encoded deposit() calldata
+   */
+  buildWrapCalldata() {
+    return this.weth.interface.encodeFunctionData('deposit', [])
+  }
+
+  /**
+   * Build WETH withdraw calldata (unwrap WETH → ETH)
+   * @param {bigint} amount - Amount of WETH to unwrap
+   * @returns {string} Encoded withdraw(amount) calldata
+   */
+  buildUnwrapCalldata(amount) {
+    return this.weth.interface.encodeFunctionData('withdraw', [amount])
+  }
+
+  /**
    * Build approve and swap batch transaction with allowance optimization and deadline
-   * @param {string} tokenIn - Input token address
-   * @param {string} tokenOut - Output token address
+   * Handles native ETH swaps automatically via WETH wrapping/unwrapping
+   * @param {string} tokenIn - Input token address (use 'ETH' or WETH address for native ETH)
+   * @param {string} tokenOut - Output token address (use 'ETH' or WETH address for native ETH)
    * @param {bigint} amountIn - Input amount in wei
    * @param {bigint} amountOutMinimum - Minimum output amount (with slippage)
    * @param {string} recipient - Recipient address (P256Account)
    * @param {number} fee - Pool fee tier (default: 3000 = 0.3%)
    * @param {number} deadline - Unix timestamp deadline (optional, defaults to 10 minutes from now)
+   * @param {Object} options - Additional options
+   * @param {boolean} options.isNativeEthIn - True if swapping native ETH (will wrap to WETH first)
+   * @param {boolean} options.isNativeEthOut - True if receiving native ETH (will unwrap WETH after)
    * @returns {Promise<Object>} Batch transaction object with targets, values, and datas arrays
    */
-  async buildApproveAndSwap(tokenIn, tokenOut, amountIn, amountOutMinimum, recipient, fee = 3000, deadline = null) {
+  async buildApproveAndSwap(tokenIn, tokenOut, amountIn, amountOutMinimum, recipient, fee = 3000, deadline = null, options = {}) {
     try {
+      const { isNativeEthIn = false, isNativeEthOut = false } = options
+
       // Default deadline: 10 minutes from now
       const txDeadline = deadline || Math.floor(Date.now() / 1000) + (10 * 60)
+      const config = this.getConfig()
+
+      // For native ETH swaps, use WETH address in the actual swap
+      const actualTokenIn = isNativeEthIn ? config.weth : tokenIn
+      const actualTokenOut = isNativeEthOut ? config.weth : tokenOut
 
       console.log('🔨 Building approve and swap batch:', {
-        tokenIn,
-        tokenOut,
+        tokenIn: actualTokenIn,
+        tokenOut: actualTokenOut,
         amountIn: amountIn.toString(),
         amountOutMinimum: amountOutMinimum.toString(),
         recipient,
         fee,
         deadline: txDeadline,
         deadlineDate: new Date(txDeadline * 1000).toISOString(),
+        isNativeEthIn,
+        isNativeEthOut,
       })
 
-      const config = this.getConfig()
-
-      // Check existing allowance
-      const allowance = await this.checkAllowance(tokenIn, recipient, config.swapRouter)
-
-      // Build swap calldata (inner call for multicall)
-      const swapCalldata = this.buildSwapCalldata(
-        tokenIn,
-        tokenOut,
-        amountIn,
-        amountOutMinimum,
-        recipient,
-        fee
-      )
-
-      // Wrap swap in multicall with deadline
-      const multicallData = this.buildMulticallWithDeadline(txDeadline, swapCalldata)
-
-      // If allowance is sufficient, skip approval
-      if (allowance >= amountIn) {
-        console.log('✅ Sufficient allowance, skipping approval:', {
-          allowance: allowance.toString(),
-          required: amountIn.toString(),
-        })
-
-        const batch = {
-          targets: [config.swapRouter],
-          values: [0n],
-          datas: [multicallData],
-        }
-
-        console.log('✅ Swap-only batch built (no approval needed):', {
-          targets: batch.targets,
-          values: batch.values.map(v => v.toString()),
-        })
-
-        return batch
+      // Handle ETH → ERC20 swap (wrap ETH first)
+      if (isNativeEthIn) {
+        return this._buildEthToTokenSwap(actualTokenIn, actualTokenOut, amountIn, amountOutMinimum, recipient, fee, txDeadline, config)
       }
 
-      // Allowance insufficient, include approval
-      console.log('⚠️ Insufficient allowance, including approval:', {
-        allowance: allowance.toString(),
-        required: amountIn.toString(),
-      })
+      // Handle ERC20 → ETH swap (unwrap WETH after)
+      if (isNativeEthOut) {
+        return this._buildTokenToEthSwap(actualTokenIn, actualTokenOut, amountIn, amountOutMinimum, recipient, fee, txDeadline, config)
+      }
 
-      const tokenContract = new ethers.Contract(tokenIn, ERC20_ABI, this.provider)
-      const approveCalldata = tokenContract.interface.encodeFunctionData('approve', [
-        config.swapRouter,
-        amountIn,
-      ])
+      // Standard ERC20 → ERC20 swap
+      return this._buildTokenToTokenSwap(actualTokenIn, actualTokenOut, amountIn, amountOutMinimum, recipient, fee, txDeadline, config)
+    } catch (error) {
+      console.error('❌ Failed to build approve and swap batch:', error)
+      throw new Error(`Failed to build approve and swap batch: ${error.message}`)
+    }
+  }
 
-      // Return batch transaction with approval
+  /**
+   * Build ETH → ERC20 swap batch (wrap + approve + swap)
+   * @private
+   */
+  async _buildEthToTokenSwap(wethAddress, tokenOut, amountIn, amountOutMinimum, recipient, fee, deadline, config) {
+    console.log('🔄 Building ETH → Token swap (with WETH wrapping)')
+
+    // Build wrap calldata (WETH.deposit())
+    const wrapCalldata = this.buildWrapCalldata()
+
+    // Build approve calldata (approve WETH to SwapRouter)
+    const approveCalldata = this.weth.interface.encodeFunctionData('approve', [
+      config.swapRouter,
+      amountIn,
+    ])
+
+    // Build swap calldata
+    const swapCalldata = this.buildSwapCalldata(
+      wethAddress,
+      tokenOut,
+      amountIn,
+      amountOutMinimum,
+      recipient,
+      fee
+    )
+
+    // Wrap swap in multicall with deadline
+    const multicallData = this.buildMulticallWithDeadline(deadline, swapCalldata)
+
+    // Batch: wrap ETH → approve WETH → swap WETH for token
+    const batch = {
+      targets: [config.weth, config.weth, config.swapRouter],
+      values: [amountIn, 0n, 0n], // Send ETH value for deposit
+      datas: [wrapCalldata, approveCalldata, multicallData],
+    }
+
+    console.log('✅ ETH → Token swap batch built:', {
+      steps: ['wrap ETH', 'approve WETH', 'swap WETH→Token'],
+      targets: batch.targets,
+      values: batch.values.map(v => v.toString()),
+    })
+
+    return batch
+  }
+
+  /**
+   * Build ERC20 → ETH swap batch (approve + swap + unwrap)
+   * @private
+   */
+  async _buildTokenToEthSwap(tokenIn, wethAddress, amountIn, amountOutMinimum, recipient, fee, deadline, config) {
+    console.log('🔄 Building Token → ETH swap (with WETH unwrapping)')
+
+    // Check existing allowance for tokenIn
+    const allowance = await this.checkAllowance(tokenIn, recipient, config.swapRouter)
+
+    // Build swap calldata - recipient is the account itself to receive WETH first
+    const swapCalldata = this.buildSwapCalldata(
+      tokenIn,
+      wethAddress,
+      amountIn,
+      amountOutMinimum,
+      recipient, // Swap to self, then unwrap
+      fee
+    )
+
+    // Wrap swap in multicall with deadline
+    const multicallData = this.buildMulticallWithDeadline(deadline, swapCalldata)
+
+    // Build unwrap calldata (WETH.withdraw())
+    // Use amountOutMinimum as the amount to unwrap (conservative estimate)
+    const unwrapCalldata = this.buildUnwrapCalldata(amountOutMinimum)
+
+    // Build batch based on allowance
+    if (allowance >= amountIn) {
+      console.log('✅ Sufficient allowance, skipping approval')
+
+      // Batch: swap token → WETH, then unwrap WETH → ETH
       const batch = {
-        targets: [tokenIn, config.swapRouter],
+        targets: [config.swapRouter, config.weth],
         values: [0n, 0n],
-        datas: [approveCalldata, multicallData],
+        datas: [multicallData, unwrapCalldata],
       }
 
-      console.log('✅ Approve and swap batch built:', {
+      console.log('✅ Token → ETH swap batch built (no approval):', {
+        steps: ['swap Token→WETH', 'unwrap WETH'],
         targets: batch.targets,
         values: batch.values.map(v => v.toString()),
       })
 
       return batch
-    } catch (error) {
-      console.error('❌ Failed to build approve and swap batch:', error)
-      throw new Error(`Failed to build approve and swap batch: ${error.message}`)
     }
+
+    // Build approve calldata
+    const tokenContract = new ethers.Contract(tokenIn, ERC20_ABI, this.provider)
+    const approveCalldata = tokenContract.interface.encodeFunctionData('approve', [
+      config.swapRouter,
+      amountIn,
+    ])
+
+    // Batch: approve token → swap token → WETH → unwrap WETH → ETH
+    const batch = {
+      targets: [tokenIn, config.swapRouter, config.weth],
+      values: [0n, 0n, 0n],
+      datas: [approveCalldata, multicallData, unwrapCalldata],
+    }
+
+    console.log('✅ Token → ETH swap batch built (with approval):', {
+      steps: ['approve Token', 'swap Token→WETH', 'unwrap WETH'],
+      targets: batch.targets,
+      values: batch.values.map(v => v.toString()),
+    })
+
+    return batch
+  }
+
+  /**
+   * Build standard ERC20 → ERC20 swap batch (approve + swap)
+   * @private
+   */
+  async _buildTokenToTokenSwap(tokenIn, tokenOut, amountIn, amountOutMinimum, recipient, fee, deadline, config) {
+    console.log('🔄 Building Token → Token swap')
+
+    // Check existing allowance
+    const allowance = await this.checkAllowance(tokenIn, recipient, config.swapRouter)
+
+    // Build swap calldata (inner call for multicall)
+    const swapCalldata = this.buildSwapCalldata(
+      tokenIn,
+      tokenOut,
+      amountIn,
+      amountOutMinimum,
+      recipient,
+      fee
+    )
+
+    // Wrap swap in multicall with deadline
+    const multicallData = this.buildMulticallWithDeadline(deadline, swapCalldata)
+
+    // If allowance is sufficient, skip approval
+    if (allowance >= amountIn) {
+      console.log('✅ Sufficient allowance, skipping approval:', {
+        allowance: allowance.toString(),
+        required: amountIn.toString(),
+      })
+
+      const batch = {
+        targets: [config.swapRouter],
+        values: [0n],
+        datas: [multicallData],
+      }
+
+      console.log('✅ Swap-only batch built (no approval needed):', {
+        targets: batch.targets,
+        values: batch.values.map(v => v.toString()),
+      })
+
+      return batch
+    }
+
+    // Allowance insufficient, include approval
+    console.log('⚠️ Insufficient allowance, including approval:', {
+      allowance: allowance.toString(),
+      required: amountIn.toString(),
+    })
+
+    const tokenContract = new ethers.Contract(tokenIn, ERC20_ABI, this.provider)
+    const approveCalldata = tokenContract.interface.encodeFunctionData('approve', [
+      config.swapRouter,
+      amountIn,
+    ])
+
+    // Return batch transaction with approval
+    const batch = {
+      targets: [tokenIn, config.swapRouter],
+      values: [0n, 0n],
+      datas: [approveCalldata, multicallData],
+    }
+
+    console.log('✅ Approve and swap batch built:', {
+      targets: batch.targets,
+      values: batch.values.map(v => v.toString()),
+    })
+
+    return batch
   }
 
   /**

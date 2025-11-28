@@ -789,10 +789,11 @@ export class P256AccountSDK {
 
   /**
    * Execute token swap via Uniswap V3
+   * Supports native ETH swaps via automatic WETH wrapping/unwrapping
    * @param {Object} params - Swap parameters
    * @param {string} params.accountAddress - P256Account address
-   * @param {string} params.tokenIn - Input token address
-   * @param {string} params.tokenOut - Output token address
+   * @param {string} params.tokenIn - Input token address (or WETH address for native ETH)
+   * @param {string} params.tokenOut - Output token address (or WETH address for native ETH)
    * @param {bigint} params.amountIn - Input amount (in token's smallest unit)
    * @param {bigint} params.amountOutMinimum - Minimum output amount (slippage protected)
    * @param {number} params.fee - Pool fee tier (500, 3000, or 10000). Default: 3000 (0.3%)
@@ -802,6 +803,8 @@ export class P256AccountSDK {
    * @param {string|null} params.ownerSignature - Owner signature (primary auth via Web3Auth)
    * @param {boolean} params.needsDeployment - Whether account needs deployment
    * @param {string} params.initCode - InitCode for deployment (if needed)
+   * @param {boolean} params.isNativeEthIn - True if swapping native ETH (wraps to WETH first)
+   * @param {boolean} params.isNativeEthOut - True if receiving native ETH (unwraps WETH after)
    * @returns {Promise<Object>} UserOperation receipt
    * @throws {Error} If swap fails with user-friendly error message
    */
@@ -818,12 +821,14 @@ export class P256AccountSDK {
     ownerSignature = null,
     needsDeployment = false,
     initCode = '0x',
+    isNativeEthIn = false,
+    isNativeEthOut = false,
   }) {
     try {
       // Initialize Uniswap V3 service
       const uniswapService = new UniswapV3Service(this.provider, this.chainId)
 
-      // Build approve + swap batch transaction (with allowance optimization and deadline)
+      // Build approve + swap batch transaction (with allowance optimization, deadline, and ETH handling)
       const { targets, values, datas } = await uniswapService.buildApproveAndSwap(
         tokenIn,
         tokenOut,
@@ -831,7 +836,8 @@ export class P256AccountSDK {
         amountOutMinimum,
         accountAddress,
         fee,
-        deadline
+        deadline,
+        { isNativeEthIn, isNativeEthOut }
       )
 
       console.log('🔄 SDK executeSwap - built batch transaction:', {
