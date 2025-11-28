@@ -362,9 +362,13 @@ function SwapScreen({ wallet, onBack, onHome, onSettings, onLogout, onWalletChan
       const uniswapService = new UniswapV3Service(sdk.provider, sdk.chainId)
       const amountOutMinimum = uniswapService.calculateMinimumOutput(quote.amountOut, slippage)
 
-      // Get token addresses
-      const tokenInAddress = tokenIn === 'ETH' ? uniswapService.getConfig().weth : tokenIn.address
-      const tokenOutAddress = tokenOut === 'ETH' ? uniswapService.getConfig().weth : tokenOut.address
+      // Determine if we're swapping native ETH (not WETH token)
+      const isNativeEthIn = tokenIn === 'ETH'
+      const isNativeEthOut = tokenOut === 'ETH'
+
+      // Get token addresses (use WETH address for native ETH swaps)
+      const tokenInAddress = isNativeEthIn ? uniswapService.getConfig().weth : tokenIn.address
+      const tokenOutAddress = isNativeEthOut ? uniswapService.getConfig().weth : tokenOut.address
 
       // Sign with passkey
       const passkeyCredential = credential || await navigator.credentials.get({
@@ -379,7 +383,14 @@ function SwapScreen({ wallet, onBack, onHome, onSettings, onLogout, onWalletChan
       // Calculate deadline timestamp (deadline is in minutes)
       const deadlineTimestamp = Math.floor(Date.now() / 1000) + (deadline * 60)
 
-      // Execute swap
+      console.log('🔄 Executing swap:', {
+        isNativeEthIn,
+        isNativeEthOut,
+        tokenIn: isNativeEthIn ? 'ETH (native)' : tokenIn.symbol,
+        tokenOut: isNativeEthOut ? 'ETH (native)' : tokenOut.symbol,
+      })
+
+      // Execute swap with ETH wrapping/unwrapping if needed
       const result = await sdk.executeSwap({
         accountAddress: selectedWallet.address,
         tokenIn: tokenInAddress,
@@ -393,6 +404,8 @@ function SwapScreen({ wallet, onBack, onHome, onSettings, onLogout, onWalletChan
         ownerSignature: null, // TODO: Add owner signature for 2FA if enabled
         needsDeployment: false, // TODO: Check if account needs deployment
         initCode: '0x',
+        isNativeEthIn,
+        isNativeEthOut,
       })
 
       console.log('✅ Swap successful:', result)
