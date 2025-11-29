@@ -1,0 +1,35 @@
+{
+  "network": "sepolia",
+  "chainId": 11155111,
+  "deployer": "0x18Ee4C040568238643C07e7aFd6c53efc196D26b",
+  "deployedAt": "2024-11-28",
+  "blockNumber": 9729085,
+  "transactionHash": "0xf337387edbb47eeb3fce9ef2062237b8e966c1297eb203e1e8448b73389cc713",
+  "contracts": {
+    "P256AccountFactory": {
+      "address": "0x0000000000569C25b117231B791C9ACaD7A930c7",
+      "verified": true
+    },
+    "P256Account": {
+      "address": "0xcd506C3632c03817b1b938e6440558dA8d2ea328",
+      "note": "Implementation contract (proxies point to this)",
+      "verified": false
+    },
+    "EntryPoint": {
+      "address": "0x0000000071727De22E5E9d8BAf0edAc6f37da032",
+      "note": "ERC-4337 EntryPoint v0.7 (canonical)"
+    },
+    "SoladyERC1967Factory": {
+      "address": "0x0000000000006396FF2a80c067f99B3d2Ab4Df24",
+      "note": "Solady's canonical ERC-1967 proxy factory"
+    }
+  },
+  "salt": "0x18ee4c040568238643c07e7afd6c53efc196d26b000000000000000dc8cf832f",
+  "initCodeHash": "0x747dd63dfae991117debeb008f2fb0533bb59a6eee74ba0e197e21099d034c7a",
+  "notes": [
+    "Factory address is deterministic - same on all networks with this salt",
+    "Factory has 0x0000000000 vanity prefix (5 zero bytes)",
+    "Uses Solady CREATE2 factory at 0x0000000000FFe8B47B3e2130213B802212439497"
+  ]
+}
+

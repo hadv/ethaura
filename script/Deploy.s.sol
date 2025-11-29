@@ -26,10 +26,11 @@ contract DeployScript is Script {
     // Solady's canonical CREATE2 factory (deployed on all major chains)
     address constant SOLADY_CREATE2_FACTORY = 0x0000000000FFe8B47B3e2130213B802212439497;
 
-    // Salt for CREATE2 deployment (vanity salt for 0x000000 prefix)
+    // Salt for CREATE2 deployment (vanity salt for 0x0000000000 prefix - 5 zero bytes!)
     // IMPORTANT: Use the SAME salt on ALL networks to get the same factory address
     // First 20 bytes must match deployer address (0x18Ee4C040568238643C07e7aFd6c53efc196D26b) for Solady factory
-    bytes32 constant SALT = 0x18ee4c040568238643c07e7afd6c53efc196d26b0f10d82f707b9d93af2fdde6;
+    // Predicted factory address: 0x0000000000569C25b117231B791C9ACaD7A930c7
+    bytes32 constant SALT = 0x18ee4c040568238643c07e7afd6c53efc196d26b000000000000000dc8cf832f;
 
     function run() external {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");

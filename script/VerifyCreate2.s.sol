@@ -9,8 +9,11 @@ import {Script, console2} from "forge-std/Script.sol";
  */
 contract VerifyCreate2Script is Script {
     function run() external pure {
-        address deployer = 0x18Ee4C040568238643C07e7aFd6c53efc196D26b;
-        bytes32 salt = 0x1eb54b512d3bb151834ddb91521c2344e3b598a3facafb4d2c2b633c93e628c1;
+        // Solady's ImmutableCreate2Factory - the actual deployer for CREATE2
+        address deployer = 0x0000000000FFe8B47B3e2130213B802212439497;
+        // Salt to verify (first 20 bytes = your EOA address)
+        bytes32 salt = 0x18ee4c040568238643c07e7afd6c53efc196d26b000000000000000dc8cf832f;
+        // Init code hash for P256AccountFactory (run GetInitCodeHash.s.sol to get this)
         bytes32 initCodeHash = 0x747dd63dfae991117debeb008f2fb0533bb59a6eee74ba0e197e21099d034c7a;
 
         bytes32 hash = keccak256(abi.encodePacked(bytes1(0xff), deployer, salt, initCodeHash));
