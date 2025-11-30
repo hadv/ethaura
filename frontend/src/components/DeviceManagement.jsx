@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Smartphone, Tablet, Monitor, Key, Trash2 } from 'lucide-react'
+import { Smartphone, Tablet, Monitor, Key, Trash2, Calendar, Clock, Fingerprint, Cpu } from 'lucide-react'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
 import { useNetwork } from '../contexts/NetworkContext'
 import { useP256SDK } from '../hooks/useP256SDK'
@@ -291,13 +291,6 @@ function DeviceManagement({ accountAddress, onAddDevice }) {
     <div className="device-management">
       <div className="device-header">
         <h3>Registered Devices</h3>
-        <button
-          className="btn btn-primary"
-          onClick={onAddDevice}
-          disabled={!ownerAddress}
-        >
-          + Add Device
-        </button>
       </div>
 
       {error && <div className="error-message">{error}</div>}
@@ -334,7 +327,7 @@ function DeviceManagement({ accountAddress, onAddDevice }) {
                   ) : (
                     <span className="badge badge-secondary">Inactive</span>
                   )}
-                  {/* Attestation badges (Phase 1) */}
+                  {/* FIDO Security Badges */}
                   {device.isHardwareBacked === true && (
                     <span className="badge badge-info" title="Hardware-backed authenticator">
                       Hardware
@@ -345,61 +338,62 @@ function DeviceManagement({ accountAddress, onAddDevice }) {
                       Software
                     </span>
                   )}
+                  {device.isFido2Certified && (
+                    <span className="badge badge-success" title={`FIDO2 Certified: ${device.certificationLevel || 'Certified'}`}>
+                      FIDO {device.certificationLevel?.replace('FIDO_CERTIFIED_', '') || 'Certified'}
+                    </span>
+                  )}
                 </div>
-                <div className="device-dates">
-                  <div>
-                    <span className="label">Added:</span> {formatDate(device.createdAt)}
+                <div className="device-stats">
+                  <div className="stat-item">
+                    <Calendar size={14} className="stat-icon" />
+                    <span>{formatDate(device.createdAt)}</span>
                   </div>
                   {device.lastUsedAt && (
-                    <div>
-                      <span className="label">Last used:</span> {formatDate(device.lastUsedAt)}
+                    <div className="stat-item">
+                      <Clock size={14} className="stat-icon" />
+                      <span>{formatDate(device.lastUsedAt)}</span>
+                    </div>
+                  )}
+                  <div className="stat-item">
+                    <Fingerprint size={14} className="stat-icon" />
+                    <code>{device.publicKey.x.slice(0, 8)}...{device.publicKey.x.slice(-6)}</code>
+                  </div>
+                  {(device.authenticatorName || (device.aaguid && device.aaguid !== '00000000-0000-0000-0000-000000000000')) && (
+                    <div className="stat-item">
+                      <Cpu size={14} className="stat-icon" />
+                      <span>{device.authenticatorName || device.aaguid}</span>
                     </div>
                   )}
                 </div>
-                <div className="device-key-info">
-                  <span className="label">Public Key:</span>
-                  <code className="key-preview">
-                    {device.publicKey.x.slice(0, 10)}...{device.publicKey.x.slice(-8)}
-                  </code>
-                </div>
-                {/* Attestation info (Phase 1) */}
-                {device.aaguid && device.aaguid !== '00000000-0000-0000-0000-000000000000' && (
-                  <div className="device-attestation-info">
-                    <span className="label">Authenticator:</span>
-                    <code className="key-preview" title={`AAGUID: ${device.aaguid}`}>
-                      {device.aaguid.slice(0, 8)}...{device.aaguid.slice(-12)}
-                    </code>
-                    {device.attestationFormat && (
-                      <span className="attestation-format" title="Attestation format">
-                        ({device.attestationFormat})
-                      </span>
-                    )}
-                  </div>
-                )}
-                {/* Show on-chain device ID if available */}
-                {device.onChainDeviceId && (
-                  <div className="device-chain-info">
-                    <span className="label">On-chain ID:</span>
-                    <code className="key-preview">
-                      {ethers.decodeBytes32String(device.onChainDeviceId) || device.onChainDeviceId.slice(0, 10) + '...'}
-                    </code>
-                  </div>
-                )}
               </div>
-              <div className="device-actions">
-                <button
-                  className="btn btn-danger btn-sm"
-                  onClick={() => handleRemoveDevice(device)}
-                  disabled={removing === device.deviceId}
-                  title={device.isActive ? 'Remove passkey from blockchain (requires transaction)' : 'Remove local device'}
-                >
-                  {removing === device.deviceId ? 'Removing...' : 'Remove'}
-                </button>
-              </div>
+              <button
+                className="device-remove-btn"
+                onClick={() => handleRemoveDevice(device)}
+                disabled={removing === device.deviceId}
+                title={device.isActive ? 'Remove passkey from blockchain (requires transaction)' : 'Remove local device'}
+              >
+                {removing === device.deviceId ? (
+                  <span className="spinner-small"></span>
+                ) : (
+                  <Trash2 size={18} />
+                )}
+              </button>
             </div>
           ))}
         </div>
       )}
+
+      {/* Add Device Button at the end */}
+      <div className="device-footer">
+        <button
+          className="btn btn-primary"
+          onClick={onAddDevice}
+          disabled={!ownerAddress}
+        >
+          + Add Device
+        </button>
+      </div>
     </div>
   )
 }

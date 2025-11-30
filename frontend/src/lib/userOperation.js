@@ -312,12 +312,14 @@ export function signUserOperationOwnerOnly(userOp, ownerSignature) {
  * @param {Object} userOp - UserOperation
  * @param {Object} passkeySignature - { r, s, authenticatorData, clientDataJSON } from passkey
  * @param {string} ownerSignature - ECDSA signature from owner (for 2FA)
+ * @param {string} passkeyId - Passkey ID (32 bytes hex) for 2FA mode
  * @returns {Object} UserOperation with signature
  *
  * Solady compact encoding format:
- * authDataLen(2) || authenticatorData || clientDataJSON || challengeIdx(2) || typeIdx(2) || r(32) || s(32) [|| ownerSig(65)]
+ * - Passkey only: authDataLen(2) || authenticatorData || clientDataJSON || challengeIdx(2) || typeIdx(2) || r(32) || s(32)
+ * - 2FA mode: authDataLen(2) || authenticatorData || clientDataJSON || challengeIdx(2) || typeIdx(2) || r(32) || s(32) || passkeyId(32) || ownerSig(65)
  */
-export function signUserOperation(userOp, passkeySignature, ownerSignature = null) {
+export function signUserOperation(userOp, passkeySignature, ownerSignature = null, passkeyId = null) {
   const { r, s, authenticatorData, clientDataJSON } = passkeySignature
 
   // Remove 0x prefix if present
@@ -353,15 +355,40 @@ export function signUserOperation(userOp, passkeySignature, ownerSignature = nul
   const typeIndexHex = typeIndex.toString(16).padStart(4, '0')
 
   // Build signature using Solady compact encoding:
-  // authDataLen(2) || authenticatorData || clientDataJSON || challengeIdx(2) || typeIdx(2) || r(32) || s(32) [|| ownerSig(65)]
+  // authDataLen(2) || authenticatorData || clientDataJSON || challengeIdx(2) || typeIdx(2) || r(32) || s(32)
   let signature = '0x' + authDataLenHex + authDataHex + clientDataHex + challengeIndexHex + typeIndexHex + rClean + sClean
 
-  // If 2FA is enabled, append owner signature
+  // If 2FA is enabled, append passkeyId (32 bytes) and owner signature (65 bytes)
   let ownerSigLength = 0
+  let passkeyIdLength = 0
   if (ownerSignature) {
+    // For 2FA mode, we need to include passkeyId before owner signature
+    // Contract format: webAuthnSig || passkeyId(32) || ownerSig(65)
+
+    // Use provided passkeyId or generate from public key
+    let passkeyIdHex = passkeyId
+    if (passkeyIdHex) {
+      passkeyIdHex = passkeyIdHex.startsWith('0x') ? passkeyIdHex.slice(2) : passkeyIdHex
+    } else {
+      // Default: use zero bytes (for counterfactual deployment, contract uses initCode passkey)
+      passkeyIdHex = '0'.repeat(64) // 32 bytes of zeros
+    }
+
+    // Ensure passkeyId is exactly 32 bytes (64 hex chars)
+    if (passkeyIdHex.length < 64) {
+      passkeyIdHex = passkeyIdHex.padStart(64, '0')
+    } else if (passkeyIdHex.length > 64) {
+      passkeyIdHex = passkeyIdHex.slice(0, 64)
+    }
+
+    passkeyIdLength = 32
+    signature += passkeyIdHex
+
     const ownerSigClean = ownerSignature.startsWith('0x') ? ownerSignature.slice(2) : ownerSignature
     ownerSigLength = ownerSigClean.length / 2
-    console.log('📝 Appending owner signature:', {
+    console.log('📝 Appending passkeyId and owner signature (2FA mode):', {
+      passkeyIdHex: passkeyIdHex,
+      passkeyIdLength: passkeyIdLength,
       ownerSignatureRaw: ownerSignature,
       ownerSignatureClean: ownerSigClean,
       ownerSigByteLength: ownerSigLength,
@@ -376,8 +403,10 @@ export function signUserOperation(userOp, passkeySignature, ownerSignature = nul
     typeIndex: typeIndex,
     rLength: rClean.length / 2,
     sLength: sClean.length / 2,
+    passkeyIdLength: passkeyIdLength,
     ownerSigLength: ownerSigLength,
     totalSignatureLength: signature.length / 2 - 1, // -1 for '0x'
+    is2FAMode: !!ownerSignature,
   })
 
   return {

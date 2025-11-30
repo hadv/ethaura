@@ -402,7 +402,7 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onSwap
       })
 
       // Create account with owner-only mode (no passkey)
-      // User can add passkey later via settings
+      // User can add passkey later via Settings > Device Management
       const saltBigInt = BigInt(indexNum)
 
       console.log('🧂 Salt calculation:', {
@@ -416,7 +416,7 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onSwap
 
       // Add timeout to prevent indefinite hanging
       const createAccountPromise = sdk.createAccount(
-        null, // no passkey for now
+        null, // no passkey - owner-only mode
         ownerAddress,
         saltBigInt,
         false // 2FA disabled

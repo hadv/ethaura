@@ -27,7 +27,13 @@ function DonutChart({ data, size = 200 }) {
 
     return data.map((item, index) => {
       const percentage = (item.value / total) * 100
-      const angle = (percentage / 100) * 360
+      let angle = (percentage / 100) * 360
+
+      // Handle 100% case - use 359.99 degrees to avoid degenerate arc
+      if (angle >= 360) {
+        angle = 359.99
+      }
+
       const endAngle = currentAngle + angle
 
       // Calculate arc path for pie slice

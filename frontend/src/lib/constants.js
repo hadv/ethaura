@@ -42,8 +42,6 @@ export const P256_ACCOUNT_FACTORY_ABI = [
 export const P256_ACCOUNT_ABI = [
   // Core account functions
   'function owner() view returns (address)',
-  'function qx() view returns (bytes32)',
-  'function qy() view returns (bytes32)',
   'function execute(address dest, uint256 value, bytes calldata func) external',
   'function executeBatch(address[] calldata dest, uint256[] calldata value, bytes[] calldata func) external',
   'function enableTwoFactor() external',
@@ -53,6 +51,14 @@ export const P256_ACCOUNT_ABI = [
   'function addDeposit() payable',
   'function withdrawDepositTo(address payable withdrawAddress, uint256 amount) external',
   'function getNonce() view returns (uint256)',
+  // Multi-passkey management
+  'function getPasskeyByIndex(uint256 index) view returns (bytes32 passkeyId, bytes32 qx, bytes32 qy, uint256 addedAt, bool active)',
+  'function getPasskeyById(bytes32 passkeyId) view returns (bytes32 qx, bytes32 qy, uint256 addedAt, bool active)',
+  'function getPasskeys(uint256 offset, uint256 limit) view returns (bytes32[] passkeyIdList, bytes32[] qxList, bytes32[] qyList, uint256[] addedAtList, bool[] activeList, bytes32[] deviceIdList, uint256 total)',
+  'function getActivePasskeyCount() view returns (uint256)',
+  'function passkeys(bytes32 passkeyId) view returns (bytes32 qx, bytes32 qy, uint256 addedAt, bool active, bytes32 deviceId)',
+  'function addPasskey(bytes32 newQx, bytes32 newQy, bytes32 deviceId) external',
+  'function removePasskey(bytes32 qx, bytes32 qy) external',
   // Guardian management
   'function addGuardian(address guardian) external',
   'function removeGuardian(address guardian) external',

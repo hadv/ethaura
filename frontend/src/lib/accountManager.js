@@ -285,23 +285,70 @@ export class P256AccountManager {
   }
 
   /**
-   * Get public key X coordinate from account
+   * Get the first passkey (primary passkey) from account
    * @param {string} accountAddress - Account address
-   * @returns {Promise<string>} Public key X coordinate (bytes32)
+   * @returns {Promise<{passkeyId: string, qx: string, qy: string, addedAt: number, active: boolean} | null>} First passkey or null if none
    */
-  async getPublicKeyX(accountAddress) {
+  async getFirstPasskey(accountAddress) {
     const account = this.getAccountContract(accountAddress)
-    return await account.qx()
+    try {
+      const [passkeyId, qx, qy, addedAt, active] = await account.getPasskeyByIndex(0)
+      return { passkeyId, qx, qy, addedAt: Number(addedAt), active }
+    } catch {
+      // No passkeys configured
+      return null
+    }
   }
 
   /**
-   * Get public key Y coordinate from account
+   * Get all passkeys from account
    * @param {string} accountAddress - Account address
-   * @returns {Promise<string>} Public key Y coordinate (bytes32)
+   * @param {number} offset - Starting index (default 0)
+   * @param {number} limit - Max number to return (default 10)
+   * @returns {Promise<Object>} Passkeys data with arrays format
    */
-  async getPublicKeyY(accountAddress) {
+  async getPasskeys(accountAddress, offset = 0, limit = 10) {
     const account = this.getAccountContract(accountAddress)
-    return await account.qy()
+    try {
+      const [passkeyIdList, qxList, qyList, addedAtList, activeList, deviceIdList, total] =
+        await account.getPasskeys(offset, limit)
+
+      // Return in array format for DeviceManagement compatibility
+      return {
+        passkeyIds: Array.from(passkeyIdList),
+        qxList: Array.from(qxList),
+        qyList: Array.from(qyList),
+        addedAtList: Array.from(addedAtList),
+        activeList: Array.from(activeList),
+        deviceIdList: Array.from(deviceIdList),
+        total: Number(total),
+      }
+    } catch {
+      return {
+        passkeyIds: [],
+        qxList: [],
+        qyList: [],
+        addedAtList: [],
+        activeList: [],
+        deviceIdList: [],
+        total: 0,
+      }
+    }
+  }
+
+  /**
+   * Get active passkey count from account
+   * @param {string} accountAddress - Account address
+   * @returns {Promise<number>} Number of active passkeys
+   */
+  async getActivePasskeyCount(accountAddress) {
+    const account = this.getAccountContract(accountAddress)
+    try {
+      const count = await account.getActivePasskeyCount()
+      return Number(count)
+    } catch {
+      return 0
+    }
   }
 
   /**
@@ -356,17 +403,19 @@ export class P256AccountManager {
 
       try {
         console.log('🔍 Fetching deployed account info...')
-        const [twoFactorEnabled, deposit, nonce, qx, qy] = await Promise.all([
+        const [twoFactorEnabled, deposit, nonce, firstPasskey] = await Promise.all([
           this.isTwoFactorEnabled(accountAddress),
           this.getDeposit(accountAddress),
           this.getNonce(accountAddress),
-          this.getPublicKeyX(accountAddress),
-          this.getPublicKeyY(accountAddress),
+          this.getFirstPasskey(accountAddress),
         ])
 
-        // Determine if account has a passkey (qx and qy are non-zero)
-        const hasPasskey = qx !== '0x0000000000000000000000000000000000000000000000000000000000000000' &&
-                          qy !== '0x0000000000000000000000000000000000000000000000000000000000000000'
+        // Get qx, qy from first passkey (if exists)
+        const qx = firstPasskey?.qx || '0x0000000000000000000000000000000000000000000000000000000000000000'
+        const qy = firstPasskey?.qy || '0x0000000000000000000000000000000000000000000000000000000000000000'
+
+        // Determine if account has a passkey
+        const hasPasskey = firstPasskey !== null && firstPasskey.active
 
         const accountInfo = {
           address: accountAddress,
@@ -377,6 +426,7 @@ export class P256AccountManager {
           qx,
           qy,
           hasPasskey,
+          passkeyId: firstPasskey?.passkeyId || null,
         }
 
         console.log('✅ Successfully fetched deployed account info:', accountInfo)
@@ -405,6 +455,7 @@ export class P256AccountManager {
           qx: '0x0000000000000000000000000000000000000000000000000000000000000000',
           qy: '0x0000000000000000000000000000000000000000000000000000000000000000',
           hasPasskey: false,
+          passkeyId: null,
         }
 
         // Cache the result

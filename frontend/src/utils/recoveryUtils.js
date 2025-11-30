@@ -47,16 +47,23 @@ export const getGuardianThreshold = async (accountAddress, provider) => {
 }
 
 /**
- * Get current public key for an account
+ * Get current public key for an account (first/primary passkey)
  * @param {string} accountAddress - P256Account address
  * @param {Object} provider - Ethers provider
- * @returns {Promise<{qx: string, qy: string}>}
+ * @returns {Promise<{passkeyId: string, qx: string, qy: string} | null>}
  */
 export const getCurrentPublicKey = async (accountAddress, provider) => {
   const contract = getP256AccountContract(accountAddress, provider)
-  const qx = await contract.qx()
-  const qy = await contract.qy()
-  return { qx, qy }
+  try {
+    const [passkeyId, qx, qy, , active] = await contract.getPasskeyByIndex(0)
+    if (!active) {
+      return null
+    }
+    return { passkeyId, qx, qy }
+  } catch {
+    // No passkeys configured
+    return null
+  }
 }
 
 /**

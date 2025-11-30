@@ -6,6 +6,7 @@ import { useP256SDK } from '../hooks/useP256SDK'
 import { signWithPasskey } from '../utils/webauthn'
 import { ethers } from 'ethers'
 import DeviceManagement from './DeviceManagement'
+import AddDeviceFlow from './AddDeviceFlow'
 import '../styles/PasskeySettings.css'
 
 /**
@@ -155,6 +156,23 @@ function PasskeySettingsV2({ accountAddress }) {
     return (
       <div className="passkey-settings">
         <p>Loading account information...</p>
+      </div>
+    )
+  }
+
+  // Show AddDeviceFlow when user clicks "Add Device"
+  if (showAddDevice) {
+    return (
+      <div className="passkey-settings">
+        <AddDeviceFlow
+          accountAddress={accountAddress}
+          onComplete={() => {
+            setShowAddDevice(false)
+            // Reload account info after adding device
+            loadAccountInfo()
+          }}
+          onCancel={() => setShowAddDevice(false)}
+        />
       </div>
     )
   }

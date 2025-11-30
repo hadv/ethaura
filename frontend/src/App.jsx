@@ -17,7 +17,8 @@ import SwapConfirmationScreen from './screens/SwapConfirmationScreen'
 import ToastContainer from './components/Toast'
 import { GuardianRecoveryPortal } from './screens/GuardianRecoveryPortal'
 import RegisterDevicePage from './pages/RegisterDevicePage'
-import { storePasskeyCredential } from './lib/passkeyStorage'
+import { storePasskeyCredential, serializeCredential } from './lib/passkeyStorage'
+import { getDevices } from './lib/deviceManager'
 
 // Inner component that uses Web3Auth context
 function AppContent() {
@@ -140,10 +141,10 @@ function AppContent() {
         console.log(`🔍 Loading passkey credential for account: ${accountAddress}`)
         setCredentialLoading(true)
 
-        // Load from localStorage (legacy support)
+        // First, try to load from localStorage
         const storageKey = `ethaura_passkey_credential_${accountAddress.toLowerCase()}`
         console.log(`💾 Checking localStorage with key: ${storageKey}`)
-        const stored = localStorage.getItem(storageKey)
+        let stored = localStorage.getItem(storageKey)
 
         if (stored) {
           console.log(`📦 Found stored credential in localStorage (${stored.length} chars)`)
@@ -156,15 +157,57 @@ function AppContent() {
             publicKeyY: credential.publicKey?.y?.slice(0, 20) + '...',
           })
           setPasskeyCredential(credential)
-        } else {
-          console.log(`❌ No passkey credential found in localStorage for account: ${accountAddress}`)
-          console.log(`🔍 All localStorage keys:`, Object.keys(localStorage).filter(k => k.includes('passkey')))
-          setPasskeyCredential(null)
+          setCredentialLoading(false)
+          return
         }
 
+        // Fallback: Try to recover credential from backend (devices API)
+        console.log(`🔄 localStorage empty, attempting to recover from backend...`)
+        try {
+          const devices = await getDevices(signMessage, address, accountAddress)
+          console.log(`📱 Retrieved ${devices.length} devices from backend`)
+
+          // Find an active device with credential data
+          const activeDevice = devices.find(d => d.isActive && d.credentialId && d.rawId)
+          if (activeDevice) {
+            console.log(`✅ Found active device with credential: ${activeDevice.deviceName}`)
+
+            // Reconstruct the credential object from backend data
+            const recoveredCredential = {
+              id: activeDevice.credentialId,
+              rawId: activeDevice.rawId,
+              publicKey: activeDevice.publicKey,
+            }
+
+            console.log(`🔑 Recovered credential details:`, {
+              id: recoveredCredential.id,
+              hasRawId: !!recoveredCredential.rawId,
+              hasPublicKey: !!recoveredCredential.publicKey,
+              publicKeyX: recoveredCredential.publicKey?.x?.slice(0, 20) + '...',
+              publicKeyY: recoveredCredential.publicKey?.y?.slice(0, 20) + '...',
+            })
+
+            // Save to localStorage for future use
+            const serialized = serializeCredential(recoveredCredential)
+            localStorage.setItem(storageKey, serialized)
+            console.log(`💾 Saved recovered credential to localStorage`)
+
+            setPasskeyCredential(recoveredCredential)
+            setCredentialLoading(false)
+            return
+          } else {
+            console.log(`ℹ️  No active device with credential found in backend`)
+          }
+        } catch (backendError) {
+          console.log(`⚠️  Failed to recover from backend:`, backendError.message)
+        }
+
+        console.log(`❌ No passkey credential found for account: ${accountAddress}`)
+        console.log(`🔍 All localStorage keys:`, Object.keys(localStorage).filter(k => k.includes('passkey')))
+        setPasskeyCredential(null)
         setCredentialLoading(false)
       } catch (error) {
-        console.error('❌ Error loading credential from localStorage:', error)
+        console.error('❌ Error loading credential:', error)
         console.error('Error details:', error.message)
         setPasskeyCredential(null)
         setCredentialLoading(false)

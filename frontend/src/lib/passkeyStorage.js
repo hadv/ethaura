@@ -6,6 +6,20 @@
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001'
 
 /**
+ * Serialize a credential to JSON string for storage
+ * @param {Object} credential - Passkey credential to serialize
+ * @returns {string} Serialized credential as JSON string
+ */
+export function serializeCredential(credential) {
+  try {
+    return JSON.stringify(credential)
+  } catch (error) {
+    console.error('❌ Error serializing credential:', error)
+    throw error
+  }
+}
+
+/**
  * Deserialize a credential from JSON string or object
  * Converts base64-encoded strings back to proper format
  * @param {string|Object} data - Serialized credential (JSON string or object)
