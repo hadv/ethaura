@@ -1,20 +1,28 @@
 # 🔐 ΞTHΛURΛ - P256 Account Abstraction with Passkeys & Web3Auth
 
-ΞTHΛURΛ là một implementation hoàn chỉnh của ERC-4337 Account Abstraction sử dụng chữ ký P-256/secp256r1 và WebAuthn/Passkeys, kết hợp với Web3Auth cho social login. Dự án tận dụng EIP-7951 precompile có sẵn trên Sepolia testnet sau Fusaka upgrade để verify chữ ký P-256 một cách hiệu quả.
+```
+  ╭──────────────────────────────╮
+  │  Ξ T H Λ U R Λ               │
+  │  ═══════════════             │
+  │  ERC-4337 Smart Wallet       │
+  ╰──────────────────────────────╯
+```
+
+ΞTHΛURΛ is a complete implementation of ERC-4337 Account Abstraction using P-256/secp256r1 signatures and WebAuthn/Passkeys, combined with Web3Auth for social login. The project leverages the EIP-7951 precompile available on Sepolia testnet after the Fusaka upgrade to efficiently verify P-256 signatures.
 
 **🆕 Now with Helios Light Client support for trustless RPC access!**
 
-## ✨ Tính năng
+## ✨ Features
 
 ### Smart Contract Features
-- ✅ **P-256 Signature Support**: Sử dụng đường cong secp256r1 thay vì secp256k1 truyền thống
-- ✅ **WebAuthn/Passkeys**: Tích hợp với Secure Enclave, Touch ID, Face ID, Windows Hello
-- ✅ **ERC-4337 Compatible**: Tuân thủ chuẩn Account Abstraction v0.7
-- ✅ **Gas Efficient**: Sử dụng native precompile (~6,900 gas) thay vì Solidity verification
+- ✅ **P-256 Signature Support**: Uses secp256r1 curve instead of traditional secp256k1
+- ✅ **WebAuthn/Passkeys**: Integrates with Secure Enclave, Touch ID, Face ID, Windows Hello
+- ✅ **ERC-4337 Compatible**: Compliant with Account Abstraction v0.7 standard
+- ✅ **Gas Efficient**: Uses native precompile (~6,900 gas) instead of Solidity verification
 - ✅ **Two-Factor Authentication (2FA)**: Optional dual signature mode (passkey + owner key)
 - ✅ **ERC-1967 Proxy Pattern**: 60-70% gas savings on deployment (~312k gas vs ~500-700k)
-- ✅ **Factory Pattern**: Deploy deterministic accounts với CREATE2
-- ✅ **EIP-1271 Support**: Tương thích với dApp signatures
+- ✅ **Factory Pattern**: Deploy deterministic accounts with CREATE2
+- ✅ **EIP-1271 Support**: Compatible with dApp signatures
 - 🛡️ **Guardian-Based Social Recovery**: Decentralized account recovery with multi-sig guardians (owner auto-added as first guardian)
 - ⏰ **Timelock Protection**: 48-hour delay for administrative changes, 24-hour for recovery
 - 🔒 **No Owner Bypass**: Owner cannot execute transactions directly (passkey required)
@@ -36,7 +44,7 @@
 - ⚡ **Fast Sync**: Light client syncs in seconds
 - 💾 **Minimal Storage**: No need for full node storage
 
-## 🏗️ Kiến trúc
+## 🏗️ Architecture
 
 ### Smart Contracts
 
@@ -74,7 +82,7 @@ frontend/
 - Foundry (for smart contracts)
 - Browser with WebAuthn support
 
-### 1. Clone và cài đặt dependencies
+### 1. Clone and Install Dependencies
 
 ```bash
 # Clone repository
@@ -102,7 +110,7 @@ npm install
    - **Whitelist URLs**: `http://localhost:5173` (and your production domain)
 5. Copy the **Client ID**
 
-### 3. Cấu hình environment
+### 3. Configure Environment
 
 **Backend (.env):**
 ```bash
@@ -128,7 +136,7 @@ VITE_FACTORY_ADDRESS=your_factory_address_after_deployment
 VITE_ENTRYPOINT_ADDRESS=0x0000000071727De22E5E9d8BAf0edAc6f37da032
 ```
 
-### 4. Build và test contracts
+### 4. Build and Test Contracts
 
 ```bash
 # Build contracts
@@ -178,52 +186,52 @@ cd frontend
 npm run dev
 ```
 
-Frontend sẽ chạy tại `http://localhost:3000`
+Frontend will run at `http://localhost:3000`
 
-## 📖 Cách sử dụng
+## 📖 Usage Guide
 
-### 1. Login với Web3Auth
+### 1. Login with Web3Auth
 
-1. Mở frontend demo tại `http://localhost:5173`
+1. Open the frontend demo at `http://localhost:5173`
 2. Click "🚀 Login with Web3Auth"
-3. Chọn login method:
+3. Choose a login method:
    - 🔵 Google
    - 🔵 Facebook
    - 🐦 Twitter
    - 📧 Email (Passwordless)
-4. Xác thực với social account
-5. Web3Auth wallet được tạo tự động (no seed phrases!)
-6. User info và wallet address được hiển thị
+4. Authenticate with your social account
+5. Web3Auth wallet is created automatically (no seed phrases!)
+6. User info and wallet address are displayed
 
-### 2. Tạo Passkey
+### 2. Create Passkey
 
 1. Click "Create Passkey"
-2. Xác thực với Touch ID/Face ID/Windows Hello
-3. Passkey được lưu trong device
-4. Public key (qx, qy) sẽ được hiển thị
+2. Authenticate with Touch ID/Face ID/Windows Hello
+3. Passkey is saved on your device
+4. Public key (qx, qy) will be displayed
 
-### 3. Deploy Account với 2FA
+### 3. Deploy Account with 2FA
 
-1. Nhập factory address (từ deployment)
-2. Owner address tự động lấy từ Web3Auth wallet
+1. Enter the factory address (from deployment)
+2. Owner address is automatically retrieved from Web3Auth wallet
 3. Click "🚀 Deploy Account with 2FA"
-4. Account được deploy với 2FA enabled
-5. Account address sẽ được tạo deterministically
+4. Account is deployed with 2FA enabled
+5. Account address is created deterministically
 
-### 4. Gửi Transaction với 2FA
+### 4. Send Transaction with 2FA
 
-1. Nhập target address và amount
+1. Enter the target address and amount
 2. Click "🔐 Send Transaction (2FA)"
-3. **Bước 1**: Ký với Passkey (Touch ID/Face ID)
-4. **Bước 2**: Ký với Web3Auth wallet (automatic)
-5. Signatures được combine (129 bytes)
-6. UserOperation được submit lên bundler
-7. EntryPoint validates cả 2 signatures
+3. **Step 1**: Sign with Passkey (Touch ID/Face ID)
+4. **Step 2**: Sign with Web3Auth wallet (automatic)
+5. Signatures are combined (129 bytes)
+6. UserOperation is submitted to the bundler
+7. EntryPoint validates both signatures
 8. Transaction executed! ✅
 
 ### Signature Details
 
-Khi 2FA enabled, bạn sẽ thấy:
+When 2FA is enabled, you will see:
 - **Passkey Signature (P-256)**: r, s values (64 bytes)
 - **Owner Signature (ECDSA)**: Web3Auth wallet signature (65 bytes)
 - **Combined Signature**: 129 bytes total (ready for 2FA validation)
@@ -331,10 +339,10 @@ forge script script/CreateAccount.s.sol:CreateAccountScript \
   --broadcast
 ```
 
-### Mainnet (khi ready)
+### Mainnet (when ready)
 
 ```bash
-# CẢNH BÁO: Kiểm tra kỹ trước khi deploy mainnet!
+# WARNING: Review carefully before deploying to mainnet!
 forge script script/Deploy.s.sol:DeployScript \
   --rpc-url mainnet \
   --broadcast \
