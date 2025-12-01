@@ -9,6 +9,8 @@ out/
 
 # Dotenv file
 .env
+.env.production
+.env.local
 
 # Node modules
 node_modules/
@@ -27,4 +29,13 @@ frontend/coverage/
 # OS
 .DS_Store
 Thumbs.db
+
+# Docker
+logs/
+backups/
+docker/nginx/ssl/*.pem
+docker/nginx/ssl/*.key
+
+# Helios
+.helios/
 
