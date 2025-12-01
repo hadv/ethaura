@@ -79,9 +79,16 @@ function AddMobileDeviceV2({ accountAddress, onComplete, onCancel }) {
             x: deviceData.qx,
             y: deviceData.qy,
           },
+          // Include response if available (for attestation)
+          response: deviceData.response || null,
         }
 
         const attestationMetadata = deviceData.attestationMetadata || null
+
+        // Store in localStorage so TransactionSender can find it for deployment
+        // This is critical for 2FA to work on first transaction
+        console.log('💾 Storing mobile passkey in localStorage for deployment...')
+        localStorage.setItem(`passkey_${accountAddress}`, JSON.stringify(credential))
 
         // Save device to database first
         setStatus('Saving device to database...')

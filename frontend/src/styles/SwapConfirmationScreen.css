@@ -1,0 +1,302 @@
+/* Swap Confirmation Screen - Uses SendTransactionScreen layout */
+.swap-confirmation-screen {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0;
+  min-height: 100vh;
+  background: #f5f5f5;
+}
+
+/* Title */
+.confirm-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #111827;
+  margin: 0 0 16px 0;
+}
+
+/* Token Swap Visual */
+.confirm-swap-visual {
+  background: #f8f9fa;
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 16px;
+}
+
+.confirm-token-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 0;
+}
+
+.confirm-token-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.confirm-token-icon img {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+}
+
+.confirm-token-label {
+  font-size: 0.75rem;
+  color: #6b7280;
+}
+
+.confirm-token-amount-row {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.confirm-token-amount {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+.confirm-token-symbol {
+  font-size: 1rem;
+  font-weight: 500;
+  color: #6b7280;
+}
+
+.confirm-arrow {
+  display: flex;
+  justify-content: center;
+  padding: 8px 0;
+  color: #9ca3af;
+}
+
+/* Exchange Rate Info */
+.confirm-rate-info {
+  background: #f0f9ff;
+  border: 1px solid #bae6fd;
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin-bottom: 16px;
+  text-align: center;
+}
+
+.confirm-rate-label {
+  font-size: 0.75rem;
+  color: #0369a1;
+  margin-bottom: 2px;
+}
+
+.confirm-rate-value {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: #0c4a6e;
+}
+
+/* Key Details Section */
+.confirm-key-details {
+  background: #fafafa;
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin-bottom: 16px;
+}
+
+.confirm-detail-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.confirm-detail-item:last-child {
+  border-bottom: none;
+}
+
+.confirm-detail-label {
+  font-size: 0.8125rem;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.confirm-detail-value {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #111827;
+  text-align: right;
+}
+
+.confirm-detail-usd {
+  color: #9ca3af;
+  font-weight: 400;
+  font-size: 0.75rem;
+}
+
+/* Price Impact Colors */
+.impact-low {
+  color: #10b981 !important;
+}
+
+.impact-medium {
+  color: #f59e0b !important;
+}
+
+.impact-high {
+  color: #ef4444 !important;
+}
+
+/* Error Message */
+.confirm-error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  padding: 12px 16px;
+  color: #dc2626;
+  font-size: 0.875rem;
+  margin-bottom: 16px;
+}
+
+/* Action Buttons */
+.confirm-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.confirm-btn-primary {
+  width: 100%;
+  background: #1a1a1a;
+  color: white;
+  border: none;
+  border-radius: 12px;
+  padding: 16px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.confirm-btn-primary:hover:not(:disabled) {
+  background: #333;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.confirm-btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.confirm-btn-secondary {
+  width: 100%;
+  background: transparent;
+  color: #6b7280;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 14px;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.confirm-btn-secondary:hover:not(:disabled) {
+  background: #f9fafb;
+  border-color: #d1d5db;
+  color: #374151;
+}
+
+.confirm-btn-secondary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Button Loader */
+.button-loader {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Error State */
+.error-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
+  text-align: center;
+}
+
+.error-state p {
+  font-size: 1.125rem;
+  color: #6b7280;
+  margin-bottom: 24px;
+}
+
+.error-state button {
+  background: #1a1a1a;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 12px 24px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.error-state button:hover {
+  background: #333;
+}
+
+/* Sidebar Placeholder */
+.sidebar-placeholder {
+  padding: 40px 20px;
+  text-align: center;
+}
+
+.placeholder-text {
+  font-size: 0.9375rem;
+  color: #6b7280;
+  margin: 0 0 8px 0;
+  line-height: 1.5;
+}
+
+.placeholder-subtext {
+  font-size: 0.8125rem;
+  color: #9ca3af;
+  margin: 0;
+  font-style: italic;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .confirm-token-amount {
+    font-size: 1.5rem;
+  }
+}
+
+

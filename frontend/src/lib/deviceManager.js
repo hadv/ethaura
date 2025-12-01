@@ -127,6 +127,55 @@ export async function getDevices(signMessageFn, ownerAddress, accountAddress) {
 }
 
 /**
+ * Get active device credential from backend (public endpoint, no auth required)
+ * Used to sync localStorage when credential is missing
+ * @param {string} accountAddress - Smart account address
+ * @param {string} publicKeyX - Optional public key X to filter by (for matching on-chain passkey)
+ * @returns {Promise<Object|null>} Active device credential or null
+ */
+export async function getActiveDeviceCredential(accountAddress, publicKeyX = null) {
+  try {
+    console.log('🔍 Fetching active device credential from backend...', publicKeyX ? `(qx: ${publicKeyX.slice(0, 20)}...)` : '')
+
+    const params = new URLSearchParams()
+    if (publicKeyX) {
+      params.set('publicKeyX', publicKeyX)
+    }
+
+    const url = `${BACKEND_URL}/api/devices/${accountAddress}/active${params.toString() ? '?' + params.toString() : ''}`
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    })
+
+    if (response.status === 404) {
+      console.log('ℹ️  No active device found in backend')
+      return null
+    }
+
+    if (!response.ok) {
+      const error = await response.json()
+      throw new Error(error.error || 'Failed to get active device')
+    }
+
+    const result = await response.json()
+    console.log('✅ Got active device credential:', {
+      deviceName: result.deviceName,
+      deviceType: result.deviceType,
+      credentialId: result.credential?.id?.slice(0, 20) + '...',
+      totalDevices: result.devices?.length || 1,
+    })
+
+    return result
+  } catch (error) {
+    console.error('❌ Error fetching active device:', error)
+    return null
+  }
+}
+
+/**
  * Remove a device
  * @param {Function} signMessageFn - Sign message function
  * @param {string} ownerAddress - Owner address

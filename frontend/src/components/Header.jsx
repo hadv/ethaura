@@ -1,6 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { HiLogout } from 'react-icons/hi'
-import { IoCopyOutline, IoCheckmark, IoOpenOutline } from 'react-icons/io5'
+import { LogOut, Copy, Check, ExternalLink } from 'lucide-react'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
 import { useNetwork } from '../contexts/NetworkContext'
 import { Identicon } from '../utils/identicon.jsx'
@@ -126,9 +125,9 @@ const Header = ({
                     </div>
                     <div className="copy-action">
                       {copied ? (
-                        <IoCheckmark className="copy-icon success" />
+                        <Check className="copy-icon success" size={16} />
                       ) : (
-                        <IoCopyOutline className="copy-icon" />
+                        <Copy className="copy-icon" size={16} />
                       )}
                     </div>
                   </button>
@@ -137,7 +136,7 @@ const Header = ({
                     onClick={openExplorer}
                     title="View on Explorer"
                   >
-                    <IoOpenOutline className="explorer-icon" />
+                    <ExternalLink className="explorer-icon" size={16} />
                     <span className="explorer-text">View on Explorer</span>
                   </button>
                 </div>
@@ -149,7 +148,7 @@ const Header = ({
                     className="profile-logout-btn"
                     onClick={handleLogout}
                   >
-                    <HiLogout className="logout-icon" />
+                    <LogOut className="logout-icon" size={16} />
                     <span className="logout-text">Logout</span>
                   </button>
                 </div>

@@ -401,7 +401,7 @@ export async function activateDevice(accountAddress, newPublicKeyX) {
 export async function getDevices(accountAddress) {
   const rows = await allAsync(`
     SELECT
-      device_id, device_name, device_type, credential_id,
+      device_id, device_name, device_type, credential_id, raw_id,
       public_key_x, public_key_y, is_active,
       proposal_hash, proposal_tx_hash,
       aaguid, attestation_format, is_hardware_backed, authenticator_name,
@@ -417,6 +417,7 @@ export async function getDevices(accountAddress) {
     deviceName: row.device_name,
     deviceType: row.device_type,
     credentialId: row.credential_id,
+    rawId: row.raw_id, // Include rawId for credential recovery
     publicKey: {
       x: row.public_key_x,
       y: row.public_key_y,

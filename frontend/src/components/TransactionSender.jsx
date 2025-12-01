@@ -9,8 +9,10 @@ import { ethers } from 'ethers'
 import { buildSendEthUserOp, getUserOpHash, signUserOperation, signUserOperationOwnerOnly, packAccountGasLimits, packGasFees, encodeExecute } from '../lib/userOperation'
 import { getUserFriendlyMessage, getSuggestedAction, isRetryableError } from '../lib/errors'
 import { formatPublicKeyForContract } from '../lib/accountManager'
-import { SUPPORTED_TOKENS, ERC20_ABI, ethIcon } from '../lib/constants'
+import { SUPPORTED_TOKENS, ERC20_ABI } from '../lib/constants'
 import { walletDataCache } from '../lib/walletDataCache'
+import { getActiveDeviceCredential } from '../lib/deviceManager'
+import TokenSelector from './TokenSelector'
 import '../styles/TransactionSender.css'
 
 function TransactionSender({ accountAddress, credential, accountConfig, onSignatureRequest, preSelectedToken, onTransactionBroadcast, onAccountInfoChange }) {
@@ -32,9 +34,8 @@ function TransactionSender({ accountAddress, credential, accountConfig, onSignat
   const [loadedCredential, setLoadedCredential] = useState(null) // Store credential loaded from fallback
 
   // Token-related state
-  const [selectedToken, setSelectedToken] = useState(null) // null = ETH, otherwise token object
+  const [selectedToken, setSelectedToken] = useState('ETH') // 'ETH' = ETH, otherwise token object
   const [tokenBalances, setTokenBalances] = useState({}) // Map of token address -> balance
-  const [showTokenDropdown, setShowTokenDropdown] = useState(false)
   const [availableTokens, setAvailableTokens] = useState([])
 
   // Helper function to request signature with user confirmation via screen navigation
@@ -138,13 +139,21 @@ function TransactionSender({ accountAddress, credential, accountConfig, onSignat
               // (e.g., navigating directly from Settings to Send)
               console.log('🔄 Attempting to load credential from localStorage as fallback...')
               try {
-                const { retrievePasskeyCredential } = await import('../lib/passkeyStorage.js')
-                const storageKey = `ethaura_passkey_credential_${accountAddress.toLowerCase()}`
-                const stored = localStorage.getItem(storageKey)
+                const { deserializeCredential } = await import('../lib/passkeyStorage.js')
+
+                // Try both localStorage key formats
+                // Format 1: Used by AddCurrentDevice - passkey_${address}
+                // Format 2: Used by older code - ethaura_passkey_credential_${address}
+                let stored = localStorage.getItem(`passkey_${accountAddress}`)
+                let keyUsed = `passkey_${accountAddress}`
+
+                if (!stored) {
+                  stored = localStorage.getItem(`ethaura_passkey_credential_${accountAddress.toLowerCase()}`)
+                  keyUsed = `ethaura_passkey_credential_${accountAddress.toLowerCase()}`
+                }
 
                 if (stored) {
-                  console.log('📦 Found credential in localStorage!')
-                  const { deserializeCredential } = await import('../lib/passkeyStorage.js')
+                  console.log(`📦 Found credential in localStorage (key: ${keyUsed})!`)
                   const fallbackCredential = deserializeCredential(stored)
 
                   if (fallbackCredential?.publicKey) {
@@ -160,7 +169,7 @@ function TransactionSender({ accountAddress, credential, accountConfig, onSignat
                     console.warn('⚠️  Credential loaded but has no publicKey')
                   }
                 } else {
-                  console.log('❌ No credential found in localStorage')
+                  console.log('❌ No credential found in localStorage (checked both key formats)')
                   console.log('Account will deploy in OWNER-ONLY mode')
                 }
               } catch (err) {
@@ -438,18 +447,28 @@ function TransactionSender({ accountAddress, credential, accountConfig, onSignat
         const accountContract = new ethers.Contract(
           accountAddress,
           [
-            'function qx() view returns (bytes32)',
-            'function qy() view returns (bytes32)',
+            'function getPasskeyByIndex(uint256 index) view returns (bytes32 passkeyId, bytes32 qx, bytes32 qy, uint256 addedAt, bool active)',
             'function twoFactorEnabled() view returns (bool)',
           ],
           sdk.provider
         )
 
-        const [qx, qy, twoFactorEnabled] = await Promise.all([
-          accountContract.qx(),
-          accountContract.qy(),
-          accountContract.twoFactorEnabled(),
-        ])
+        let qx = '0x0000000000000000000000000000000000000000000000000000000000000000'
+        let qy = '0x0000000000000000000000000000000000000000000000000000000000000000'
+        let passkeyId = null
+
+        try {
+          const [_passkeyId, _qx, _qy, , active] = await accountContract.getPasskeyByIndex(0)
+          if (active) {
+            qx = _qx
+            qy = _qy
+            passkeyId = _passkeyId
+          }
+        } catch {
+          // No passkeys configured
+        }
+
+        const twoFactorEnabled = await accountContract.twoFactorEnabled()
 
         onChainQx = qx
         onChainQy = qy
@@ -459,6 +478,7 @@ function TransactionSender({ accountAddress, credential, accountConfig, onSignat
           accountAddress,
           qx: onChainQx,
           qy: onChainQy,
+          passkeyId,
           twoFactorEnabled: onChainTwoFactorEnabled,
         })
 
@@ -467,23 +487,101 @@ function TransactionSender({ accountAddress, credential, accountConfig, onSignat
           ...accountInfo,
           qx: onChainQx,
           qy: onChainQy,
+          passkeyId,
           twoFactorEnabled: onChainTwoFactorEnabled,
           hasPasskey: onChainQx !== '0x0000000000000000000000000000000000000000000000000000000000000000',
           isDeployed: true,
           deployed: true,
         }
       } else {
-        console.log('⚠️ Account NOT deployed yet - using accountInfo from creation config')
-        // For undeployed accounts, use the accountInfo from creation
-        // This should have the passkey and 2FA settings from when the account was created
-        onChainQx = accountInfo.qx || '0x0000000000000000000000000000000000000000000000000000000000000000'
-        onChainQy = accountInfo.qy || '0x0000000000000000000000000000000000000000000000000000000000000000'
-        onChainTwoFactorEnabled = accountInfo.twoFactorEnabled || false
+        console.log('⚠️ Account NOT deployed yet - checking for locally stored passkey...')
 
-        console.log('📋 Using accountInfo for undeployed account:', {
+        // For undeployed accounts, check if user has added a passkey locally
+        // If so, we need to regenerate initCode with that passkey so deployment includes it
+        let credentialToCheck = credential || loadedCredential
+
+        // CRITICAL: If no credential in props/state, try to load directly from localStorage
+        // AddCurrentDevice stores as `passkey_${accountAddress}`, so we check both formats
+        if (!credentialToCheck?.publicKey) {
+          console.log('🔍 No credential in props/state, checking localStorage directly...')
+
+          // Try the format used by AddCurrentDevice
+          const storedPasskey = localStorage.getItem(`passkey_${accountAddress}`)
+          if (storedPasskey) {
+            try {
+              credentialToCheck = JSON.parse(storedPasskey)
+              console.log('✅ Found passkey in localStorage (passkey_${address} format):', {
+                hasPublicKey: !!credentialToCheck?.publicKey,
+                credentialId: credentialToCheck?.id,
+              })
+            } catch (e) {
+              console.warn('Failed to parse stored passkey:', e)
+            }
+          }
+
+          // Also try the other format as fallback
+          if (!credentialToCheck?.publicKey) {
+            const storedCredential = localStorage.getItem(`ethaura_passkey_credential_${accountAddress.toLowerCase()}`)
+            if (storedCredential) {
+              try {
+                credentialToCheck = JSON.parse(storedCredential)
+                console.log('✅ Found passkey in localStorage (ethaura_passkey_credential format):', {
+                  hasPublicKey: !!credentialToCheck?.publicKey,
+                })
+              } catch (e) {
+                console.warn('Failed to parse stored credential:', e)
+              }
+            }
+          }
+        }
+
+        if (credentialToCheck?.publicKey) {
+          console.log('🔑 Found local passkey - will deploy with passkey and 2FA enabled!')
+          const { qx: passkeyQx, qy: passkeyQy } = formatPublicKeyForContract(credentialToCheck.publicKey)
+          onChainQx = passkeyQx
+          onChainQy = passkeyQy
+          // IMPORTANT: Enable 2FA so passkey is required for all transactions
+          // This matches EthAura security model: passkey required, owner cannot bypass
+          onChainTwoFactorEnabled = true
+
+          // CRITICAL: Regenerate initCode with the passkey AND 2FA enabled
+          console.log('🔄 Regenerating initCode with passkey and 2FA...')
+          const newInitCode = await sdk.accountManager.getInitCode(
+            passkeyQx,
+            passkeyQy,
+            accountInfo.owner,
+            accountInfo.salt || 0n,
+            true, // Enable 2FA so passkey is required for all transactions
+            ethers.ZeroHash // deviceId
+          )
+
+          // Update currentAccountInfo with new initCode
+          currentAccountInfo = {
+            ...accountInfo,
+            qx: passkeyQx,
+            qy: passkeyQy,
+            twoFactorEnabled: true,
+            initCode: newInitCode,
+          }
+
+          console.log('✅ InitCode regenerated with passkey + 2FA:', {
+            qx: passkeyQx,
+            qy: passkeyQy,
+            twoFactorEnabled: true,
+            initCodeLength: newInitCode.length,
+          })
+        } else {
+          console.log('📋 No local passkey found - deploying in owner-only mode')
+          onChainQx = accountInfo.qx || '0x0000000000000000000000000000000000000000000000000000000000000000'
+          onChainQy = accountInfo.qy || '0x0000000000000000000000000000000000000000000000000000000000000000'
+          onChainTwoFactorEnabled = accountInfo.twoFactorEnabled || false
+        }
+
+        console.log('📋 Using config for undeployed account:', {
           qx: onChainQx,
           qy: onChainQy,
           twoFactorEnabled: onChainTwoFactorEnabled,
+          hasLocalPasskey: !!credentialToCheck?.publicKey,
         })
       }
 
@@ -528,8 +626,99 @@ function TransactionSender({ accountAddress, credential, accountConfig, onSignat
             : '1️⃣ Passkey signature only'),
       })
 
-      // Use loadedCredential as fallback
-      const credentialToUse = credential || loadedCredential
+      // Use loadedCredential as fallback, or load directly from localStorage if needed
+      let credentialToUse = credential || loadedCredential
+
+      // If no credential in state/props, try loading from localStorage directly
+      // This is needed for deployed accounts on subsequent transactions
+      if (!credentialToUse?.publicKey) {
+        console.log('🔍 No credential in props/state for deployed account, checking localStorage...')
+
+        // Try the format used by AddCurrentDevice
+        const storedPasskey = localStorage.getItem(`passkey_${accountAddress}`)
+        if (storedPasskey) {
+          try {
+            credentialToUse = JSON.parse(storedPasskey)
+            console.log('✅ Loaded passkey from localStorage for deployed account:', {
+              hasPublicKey: !!credentialToUse?.publicKey,
+              credentialId: credentialToUse?.id,
+            })
+          } catch (e) {
+            console.warn('Failed to parse stored passkey:', e)
+          }
+        }
+
+        // Also try the other format as fallback
+        if (!credentialToUse?.publicKey) {
+          const storedCredential = localStorage.getItem(`ethaura_passkey_credential_${accountAddress.toLowerCase()}`)
+          if (storedCredential) {
+            try {
+              credentialToUse = JSON.parse(storedCredential)
+              console.log('✅ Loaded passkey from localStorage (alternate format):', {
+                hasPublicKey: !!credentialToUse?.publicKey,
+              })
+            } catch (e) {
+              console.warn('Failed to parse stored credential:', e)
+            }
+          }
+        }
+
+        // If still no credential, try fetching from backend database
+        // Match against on-chain passkeys to find the correct one
+        if (!credentialToUse?.publicKey) {
+          console.log('🔍 No credential in localStorage, fetching from backend...')
+          setStatus('Syncing passkey from server...')
+
+          // Get on-chain passkeys to match against
+          let onChainPasskeys = []
+          if (currentAccountInfo.isDeployed && sdk) {
+            try {
+              const accountContract = new ethers.Contract(
+                accountAddress,
+                ['function getPasskeys() view returns (tuple(bytes32 passkeyId, bytes32 qx, bytes32 qy, uint256 addedAt, bool active)[] memory)'],
+                sdk.provider
+              )
+              const passkeys = await accountContract.getPasskeys()
+              onChainPasskeys = passkeys.filter(p => p.active).map(p => ({
+                qx: p.qx,
+                qy: p.qy,
+              }))
+              console.log(`🔑 Found ${onChainPasskeys.length} active on-chain passkeys`)
+            } catch (err) {
+              console.warn('Could not fetch on-chain passkeys:', err)
+            }
+          }
+
+          // Fetch from backend and try to match with on-chain passkeys
+          for (const onChainPasskey of onChainPasskeys) {
+            const activeDevice = await getActiveDeviceCredential(accountAddress, onChainPasskey.qx)
+            if (activeDevice?.credential) {
+              credentialToUse = activeDevice.credential
+              // Save to localStorage for future use
+              localStorage.setItem(`passkey_${accountAddress}`, JSON.stringify(credentialToUse))
+              console.log('✅ Synced passkey from backend and saved to localStorage:', {
+                deviceName: activeDevice.deviceName,
+                deviceType: activeDevice.deviceType,
+                credentialId: credentialToUse?.id?.slice(0, 20) + '...',
+              })
+              break // Found a match, stop searching
+            }
+          }
+
+          // If no on-chain passkeys or no match, try getting any active device
+          if (!credentialToUse?.publicKey) {
+            const activeDevice = await getActiveDeviceCredential(accountAddress)
+            if (activeDevice?.credential) {
+              credentialToUse = activeDevice.credential
+              localStorage.setItem(`passkey_${accountAddress}`, JSON.stringify(credentialToUse))
+              console.log('✅ Synced passkey from backend (no on-chain match):', {
+                deviceName: activeDevice.deviceName,
+                credentialId: credentialToUse?.id?.slice(0, 20) + '...',
+              })
+            }
+          }
+        }
+      }
 
       console.log('🔐 Credential Info:', {
         hasCredential: !!credential,
@@ -559,37 +748,39 @@ function TransactionSender({ accountAddress, credential, accountConfig, onSignat
         }
 
         console.log('🔐 Passkey Credential:', {
-          id: credential?.id,
-          publicKey: credential?.publicKey,
+          id: credentialToUse?.id,
+          publicKey: credentialToUse?.publicKey,
         })
 
-        // Verify public key matches what's in the contract
-        if (currentAccountInfo.isDeployed && credential?.publicKey) {
+        // Verify public key matches ANY active passkey in the contract (multi-passkey support)
+        if (currentAccountInfo.isDeployed && credentialToUse?.publicKey) {
           try {
             const accountContract = new ethers.Contract(
               accountAddress,
-              ['function qx() view returns (bytes32)', 'function qy() view returns (bytes32)'],
+              ['function getPasskeys() view returns (tuple(bytes32 passkeyId, bytes32 qx, bytes32 qy, uint256 addedAt, bool active)[] memory)'],
               sdk.provider
             )
-            const [contractQx, contractQy] = await Promise.all([
-              accountContract.qx(),
-              accountContract.qy()
-            ])
 
-            const { qx: credentialQx, qy: credentialQy } = credential.publicKey
+            // Get all passkeys and find a match
+            const passkeys = await accountContract.getPasskeys()
+            const { qx: credentialQx, qy: credentialQy } = credentialToUse.publicKey
+
+            const matchingPasskey = passkeys.find(p =>
+              p.active &&
+              p.qx.toLowerCase() === credentialQx.toLowerCase() &&
+              p.qy.toLowerCase() === credentialQy.toLowerCase()
+            )
 
             console.log('🔍 Public Key Verification:', {
-              contractQx,
-              contractQy,
+              totalPasskeys: passkeys.length,
+              activePasskeys: passkeys.filter(p => p.active).length,
               credentialQx,
               credentialQy,
-              qxMatch: contractQx.toLowerCase() === credentialQx.toLowerCase(),
-              qyMatch: contractQy.toLowerCase() === credentialQy.toLowerCase(),
+              foundMatch: !!matchingPasskey,
             })
 
-            if (contractQx.toLowerCase() !== credentialQx.toLowerCase() ||
-                contractQy.toLowerCase() !== credentialQy.toLowerCase()) {
-              setError('⚠️ Public key mismatch! The passkey does not match the account.')
+            if (!matchingPasskey) {
+              setError('⚠️ Public key mismatch! The passkey does not match any active passkey on this account.')
               setLoading(false)
               return
             }
@@ -693,7 +884,7 @@ function TransactionSender({ accountAddress, credential, accountConfig, onSignat
 
       // Build UserOp based on whether we're sending ETH or ERC-20 token
       let userOp
-      if (selectedToken) {
+      if (selectedToken && selectedToken !== 'ETH') {
         // Fetch decimals from contract if not already cached
         if (!selectedToken.decimalsFromChain) {
           const tokenContract = new ethers.Contract(selectedToken.address, ERC20_ABI, sdk.provider)
@@ -842,15 +1033,43 @@ function TransactionSender({ accountAddress, credential, accountConfig, onSignat
         // Passkey account: Sign with passkey (and optionally owner for 2FA)
         setStatus('🔑 Signing with Passkey (Touch ID/Face ID)...')
 
+        // Load passkey credential - try state/props first, then localStorage
+        let passkeyCredential = credential || loadedCredential
+        if (!passkeyCredential?.publicKey) {
+          const storedPasskey = localStorage.getItem(`passkey_${accountAddress}`)
+          if (storedPasskey) {
+            try {
+              passkeyCredential = JSON.parse(storedPasskey)
+            } catch (e) {
+              console.warn('Failed to parse stored passkey:', e)
+            }
+          }
+          if (!passkeyCredential?.publicKey) {
+            const storedCredential = localStorage.getItem(`ethaura_passkey_credential_${accountAddress.toLowerCase()}`)
+            if (storedCredential) {
+              try {
+                passkeyCredential = JSON.parse(storedCredential)
+              } catch (e) {
+                console.warn('Failed to parse stored credential:', e)
+              }
+            }
+          }
+        }
+        if (!passkeyCredential) {
+          throw new Error('No passkey credential available for signing. Please ensure the passkey is loaded.')
+        }
+
         // Get credential ID (support both old and new format)
-        const credentialId = credential.rawId || credential.credentialId
+        const credentialId = passkeyCredential.rawId || passkeyCredential.credentialId || passkeyCredential.id
         const credentialIdBytes = credentialId instanceof ArrayBuffer
           ? new Uint8Array(credentialId)
-          : new Uint8Array(credentialId)
+          : (typeof credentialId === 'string'
+              ? new Uint8Array(credentialId.split('').map(c => c.charCodeAt(0)))
+              : new Uint8Array(credentialId))
 
         console.log('🔑 Using credential:', {
           credentialId: Array.from(credentialIdBytes).map(b => b.toString(16).padStart(2, '0')).join(''),
-          publicKey: credential.publicKey,
+          publicKey: passkeyCredential.publicKey,
         })
 
         // Step 4: Check if 2FA is enabled - if so, get Web3Auth signature FIRST
@@ -920,8 +1139,20 @@ function TransactionSender({ accountAddress, credential, accountConfig, onSignat
         setStatus(`🔑 ${stepLabel}: Signing with your passkey (biometric)...`)
         console.log(`🔑 Signing with passkey (${stepLabel})...`)
 
-        // Use loadedCredential as fallback if credential prop is not available
-        const credentialToUse = credential || loadedCredential
+        // Load passkey credential - try state/props first, then localStorage
+        let credentialToUse = credential || loadedCredential
+        if (!credentialToUse?.publicKey) {
+          const storedPasskey = localStorage.getItem(`passkey_${accountAddress}`)
+          if (storedPasskey) {
+            try { credentialToUse = JSON.parse(storedPasskey) } catch (e) { /* ignore */ }
+          }
+          if (!credentialToUse?.publicKey) {
+            const storedCredential = localStorage.getItem(`ethaura_passkey_credential_${accountAddress.toLowerCase()}`)
+            if (storedCredential) {
+              try { credentialToUse = JSON.parse(storedCredential) } catch (e) { /* ignore */ }
+            }
+          }
+        }
         if (!credentialToUse) {
           throw new Error('No credential available for signing. Please ensure the passkey is loaded.')
         }
@@ -969,10 +1200,28 @@ function TransactionSender({ accountAddress, credential, accountConfig, onSignat
 
         // Step 7: Combine signatures
         setStatus('Preparing final signature...')
+
+        // Generate passkeyId = keccak256(abi.encodePacked(qx, qy)) for 2FA mode
+        // Use the qx/qy from the credential's public key
+        let passkeyIdForSignature = null
+        if (ownerSig && passkeyCredential?.publicKey) {
+          const { qx: credQx, qy: credQy } = formatPublicKeyForContract(passkeyCredential.publicKey)
+          // keccak256(abi.encodePacked(qx, qy)) - remove 0x prefixes and concatenate
+          const qxClean = credQx.startsWith('0x') ? credQx.slice(2) : credQx
+          const qyClean = credQy.startsWith('0x') ? credQy.slice(2) : credQy
+          passkeyIdForSignature = ethers.keccak256('0x' + qxClean + qyClean)
+          console.log('🔑 Generated passkeyId for 2FA:', {
+            qx: credQx,
+            qy: credQy,
+            passkeyId: passkeyIdForSignature,
+          })
+        }
+
         signedUserOp = signUserOperation(
           userOp,
           passkeySignature,
-          ownerSig
+          ownerSig,
+          passkeyIdForSignature
         )
         setCombinedSignature(signedUserOp.signature)
       }
@@ -1031,7 +1280,7 @@ function TransactionSender({ accountAddress, credential, accountConfig, onSignat
 
         // Reload balances
         await loadBalanceInfo(accountAddress)
-        if (selectedToken) {
+        if (selectedToken && selectedToken !== 'ETH') {
           await loadTokenBalances(accountAddress)
         }
       }
@@ -1076,7 +1325,7 @@ function TransactionSender({ accountAddress, credential, accountConfig, onSignat
 
   // Handle Max button
   const handleMaxAmount = () => {
-    if (selectedToken) {
+    if (selectedToken && selectedToken !== 'ETH') {
       // For ERC-20 tokens, use full balance
       const tokenBalance = tokenBalances[selectedToken.address] || '0'
       setAmount(tokenBalance)
@@ -1090,8 +1339,29 @@ function TransactionSender({ accountAddress, credential, accountConfig, onSignat
   // Handle token selection
   const handleTokenSelect = (token) => {
     setSelectedToken(token)
-    setShowTokenDropdown(false)
     setAmount('') // Clear amount when switching tokens
+  }
+
+  // Get formatted token balances for TokenSelector component
+  const getFormattedTokenBalances = () => {
+    const formatted = {}
+
+    for (const token of availableTokens) {
+      const balance = tokenBalances[token.address]
+      if (balance) {
+        formatted[token.address] = parseFloat(balance).toFixed(4)
+      } else {
+        formatted[token.address] = '0.0000'
+      }
+    }
+
+    return formatted
+  }
+
+  // Get formatted ETH balance for TokenSelector component
+  const getFormattedEthBalance = () => {
+    if (!balanceInfo?.accountBalance) return '0.0000'
+    return parseFloat(balanceInfo.accountBalance).toFixed(4)
   }
 
   // Load token balances when account address or available tokens change
@@ -1132,83 +1402,14 @@ function TransactionSender({ accountAddress, credential, accountConfig, onSignat
       </div>
 
       {/* Token Selector */}
-      <div className="token-selector" onClick={() => setShowTokenDropdown(!showTokenDropdown)}>
-        <div className="token-info">
-          {selectedToken ? (
-            <>
-              <div className="token-icon">
-                <img src={selectedToken.icon} alt={selectedToken.symbol} />
-              </div>
-              <div className="token-details">
-                <div className="token-name">{selectedToken.name}</div>
-                <div className="token-available">
-                  Available: {tokenBalances[selectedToken.address] || '0.0000'} {selectedToken.symbol}
-                </div>
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="token-icon">
-                <img src={ethIcon} alt="ETH" />
-              </div>
-              <div className="token-details">
-                <div className="token-name">Ether</div>
-                <div className="token-available">
-                  Available: {balanceInfo ? parseFloat(balanceInfo.accountBalance).toFixed(4) : '0.0000'} ETH
-                </div>
-              </div>
-            </>
-          )}
-        </div>
-        <div className="token-dropdown-icon">▼</div>
-
-        {/* Token Dropdown */}
-        {showTokenDropdown && (
-          <div className="token-dropdown" onClick={(e) => e.stopPropagation()}>
-            {/* ETH Option */}
-            <div
-              className={`token-dropdown-item ${!selectedToken ? 'selected' : ''}`}
-              onClick={() => handleTokenSelect(null)}
-            >
-              <div className="token-icon">
-                <img src={ethIcon} alt="ETH" />
-              </div>
-              <div className="token-dropdown-details">
-                <div className="token-dropdown-name">Ether</div>
-                <div className="token-dropdown-symbol">ETH</div>
-              </div>
-              <div className="token-dropdown-balance">
-                {balanceInfo ? parseFloat(balanceInfo.accountBalance).toFixed(4) : '0.0000'}
-              </div>
-            </div>
-
-            {/* ERC-20 Token Options - Only show tokens with balance > 0 */}
-            {availableTokens
-              .filter((token) => {
-                const balance = parseFloat(tokenBalances[token.address] || '0')
-                return balance > 0
-              })
-              .map((token) => (
-                <div
-                  key={token.address}
-                  className={`token-dropdown-item ${selectedToken?.address === token.address ? 'selected' : ''}`}
-                  onClick={() => handleTokenSelect(token)}
-                >
-                  <div className="token-icon">
-                    <img src={token.icon} alt={token.symbol} />
-                  </div>
-                  <div className="token-dropdown-details">
-                    <div className="token-dropdown-name">{token.name}</div>
-                    <div className="token-dropdown-symbol">{token.symbol}</div>
-                  </div>
-                  <div className="token-dropdown-balance">
-                    {tokenBalances[token.address] || '0.0000'}
-                  </div>
-                </div>
-              ))}
-          </div>
-        )}
-      </div>
+      <TokenSelector
+        selectedToken={selectedToken}
+        onTokenSelect={handleTokenSelect}
+        availableTokens={availableTokens}
+        tokenBalances={getFormattedTokenBalances()}
+        ethBalance={getFormattedEthBalance()}
+        showAllTokens={false}
+      />
 
       {/* To Address Section */}
       <div className="to-section">

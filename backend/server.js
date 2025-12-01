@@ -331,6 +331,68 @@ app.get('/api/devices/:accountAddress', async (req, res) => {
 })
 
 /**
+ * GET /api/devices/:accountAddress/active
+ * Get all active device credentials for localStorage sync
+ * This is a public endpoint (no auth required) - only returns credential ID and public key
+ * Query param: ?publicKeyX=0x... to filter by specific public key
+ */
+app.get('/api/devices/:accountAddress/active', async (req, res) => {
+  try {
+    const { accountAddress } = req.params
+    const { publicKeyX } = req.query
+
+    console.log(`🔍 Getting active devices for account: ${accountAddress}${publicKeyX ? ` (filtering by qx: ${publicKeyX.slice(0, 20)}...)` : ''}`)
+
+    const devices = await getDevices(accountAddress)
+    let activeDevices = devices.filter(d => d.isActive)
+
+    if (activeDevices.length === 0) {
+      return res.status(404).json({
+        error: 'No active device found',
+      })
+    }
+
+    // If publicKeyX is provided, filter to find matching device
+    if (publicKeyX) {
+      const matchingDevice = activeDevices.find(d =>
+        d.publicKey?.x?.toLowerCase() === publicKeyX.toLowerCase()
+      )
+      if (matchingDevice) {
+        activeDevices = [matchingDevice]
+      }
+    }
+
+    // Return all active devices (or filtered one)
+    res.json({
+      success: true,
+      devices: activeDevices.map(d => ({
+        credential: {
+          id: d.credentialId,
+          rawId: d.rawId,
+          publicKey: d.publicKey,
+        },
+        deviceName: d.deviceName,
+        deviceType: d.deviceType,
+      })),
+      // For backwards compatibility, also return first device as primary
+      credential: {
+        id: activeDevices[0].credentialId,
+        rawId: activeDevices[0].rawId,
+        publicKey: activeDevices[0].publicKey,
+      },
+      deviceName: activeDevices[0].deviceName,
+      deviceType: activeDevices[0].deviceType,
+    })
+  } catch (error) {
+    console.error('Error getting active devices:', error)
+    res.status(500).json({
+      error: 'Failed to get active devices',
+      details: error.message,
+    })
+  }
+})
+
+/**
  * DELETE /api/devices/:accountAddress/:deviceId
  * Remove a device
  */
@@ -566,6 +628,7 @@ app.post('/api/sessions/:sessionId/complete', async (req, res) => {
       deviceType,
       credentialId: credential.id,
       rawId: credential.rawId,
+      response: credential.response || null, // Include attestation response for localStorage storage
       attestationMetadata, // NEW: Phase 1 - include attestation metadata
     }
 

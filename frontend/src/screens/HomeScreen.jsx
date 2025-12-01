@@ -1,12 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
-import { TrendingUp, TrendingDown, AlertTriangle, Lightbulb } from 'lucide-react'
+import { TrendingUp, TrendingDown, AlertTriangle, Lightbulb, ArrowLeftRight, ArrowUp, ArrowDown, MoreVertical, Plus, Pencil, Trash2, Wallet } from 'lucide-react'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
 import { useNetwork } from '../contexts/NetworkContext'
 import { useP256SDK } from '../hooks/useP256SDK'
 import { ethers } from 'ethers'
-import { BsThreeDotsVertical, BsPlus } from 'react-icons/bs'
-import { HiArrowUp, HiArrowDown } from 'react-icons/hi'
-import { HiPencil, HiTrash, HiOutlineWallet } from 'react-icons/hi2'
 import Header from '../components/Header'
 import { Identicon } from '../utils/identicon.jsx'
 import ReceiveModal from '../components/ReceiveModal'
@@ -18,7 +15,7 @@ import { createTransactionHistoryService } from '../lib/transactionService'
 import '../styles/HomeScreen.css'
 import logo from '../assets/logo.svg'
 
-function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onLogout }) {
+function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onSwap, onLogout }) {
   const { userInfo, address: ownerAddress } = useWeb3Auth()
   const { networkInfo } = useNetwork()
   const sdk = useP256SDK()
@@ -405,7 +402,7 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onLogo
       })
 
       // Create account with owner-only mode (no passkey)
-      // User can add passkey later via settings
+      // User can add passkey later via Settings > Device Management
       const saltBigInt = BigInt(indexNum)
 
       console.log('🧂 Salt calculation:', {
@@ -419,7 +416,7 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onLogo
 
       // Add timeout to prevent indefinite hanging
       const createAccountPromise = sdk.createAccount(
-        null, // no passkey for now
+        null, // no passkey - owner-only mode
         ownerAddress,
         saltBigInt,
         false // 2FA disabled
@@ -622,6 +619,15 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onLogo
     onSend(wallets[0])
   }
 
+  // Swap handler - use first wallet
+  const handleSwapClick = () => {
+    if (wallets.length === 0) {
+      return
+    }
+    // Use the first wallet as the selected one
+    onSwap(wallets[0])
+  }
+
   return (
     <div className="home-screen">
       {/* Header */}
@@ -651,15 +657,23 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onLogo
             {/* Action Buttons */}
             <div className="action-buttons">
               <button
+                className="action-btn swap-btn"
+                onClick={handleSwapClick}
+                disabled={wallets.length === 0}
+              >
+                <ArrowLeftRight className="btn-icon" size={18} />
+                Swap
+              </button>
+              <button
                 className="action-btn send-btn"
                 onClick={handleSendClick}
                 disabled={wallets.length === 0}
               >
-                <HiArrowUp className="btn-icon" />
+                <ArrowUp className="btn-icon" size={18} />
                 Send
               </button>
               <button className="action-btn receive-btn" onClick={handleReceiveClick}>
-                <HiArrowDown className="btn-icon" />
+                <ArrowDown className="btn-icon" size={18} />
                 Receive
               </button>
             </div>
@@ -670,7 +684,7 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onLogo
             <div className="section-header">
               <h2 className="section-title">My Wallets</h2>
               <button className="add-wallet-btn" onClick={() => setShowAddModal(true)} title="Add Wallet">
-                <BsPlus className="add-icon" />
+                <Plus className="add-icon" size={24} />
               </button>
             </div>
 
@@ -682,7 +696,7 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onLogo
             ) : wallets.length === 0 ? (
               <div className="empty-state">
                 <div className="empty-icon">
-                  <HiOutlineWallet />
+                  <Wallet size={48} />
                 </div>
                 <h3>No Wallets Yet</h3>
                 <p>Create a new smart account or add an existing one</p>
@@ -719,7 +733,7 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onLogo
                           className="wallet-menu-btn"
                           onClick={(e) => handleMenuClick(e, wallet)}
                         >
-                          <BsThreeDotsVertical className="menu-icon" />
+                          <MoreVertical className="menu-icon" size={18} />
                         </button>
                         {openMenuId === wallet.id && (
                           <div className="wallet-menu-dropdown">
@@ -727,14 +741,14 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onLogo
                               className="menu-item rename-item"
                               onClick={() => handleRenameClick(wallet)}
                             >
-                              <HiPencil className="menu-item-icon" />
+                              <Pencil className="menu-item-icon" size={16} />
                               Rename
                             </button>
                             <button
                               className="menu-item delete-item"
                               onClick={() => handleDeleteClick(wallet)}
                             >
-                              <HiTrash className="menu-item-icon" />
+                              <Trash2 className="menu-item-icon" size={16} />
                               Remove
                             </button>
                           </div>
@@ -973,7 +987,7 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onLogo
           <div className="modal-content edit-modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <div className="modal-icon">
-                <HiPencil />
+                <Pencil size={24} />
               </div>
               <h2>Edit name</h2>
               <button className="modal-close" onClick={handleCancelEdit}>×</button>

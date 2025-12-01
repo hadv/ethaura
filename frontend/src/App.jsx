@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Web3AuthProvider, useWeb3Auth } from './contexts/Web3AuthContext'
 import { NetworkProvider } from './contexts/NetworkContext'
 import { WalletConnectProvider } from './contexts/WalletConnectContext'
+import { ToastProvider } from './contexts/ToastContext'
 import LoginScreen from './components/LoginScreen'
 import HomeScreen from './screens/HomeScreen'
 import WalletDetailScreen from './screens/WalletDetailScreen'
@@ -11,9 +12,13 @@ import SignatureConfirmationScreen from './screens/SignatureConfirmationScreen'
 import TransactionResultScreen from './screens/TransactionResultScreen'
 import ViewAllTokensScreen from './screens/ViewAllTokensScreen'
 import ViewAllTransactionsScreen from './screens/ViewAllTransactionsScreen'
+import SwapScreen from './screens/SwapScreen'
+import SwapConfirmationScreen from './screens/SwapConfirmationScreen'
+import ToastContainer from './components/Toast'
 import { GuardianRecoveryPortal } from './screens/GuardianRecoveryPortal'
 import RegisterDevicePage from './pages/RegisterDevicePage'
-import { storePasskeyCredential } from './lib/passkeyStorage'
+import { storePasskeyCredential, serializeCredential } from './lib/passkeyStorage'
+import { getDevices } from './lib/deviceManager'
 
 // Inner component that uses Web3Auth context
 function AppContent() {
@@ -38,13 +43,14 @@ function AppContent() {
   }
 
   // Navigation state
-  const [currentScreen, setCurrentScreen] = useState('home') // 'home', 'wallet-detail', 'wallet-settings', 'add-wallet', 'new-wallet', 'send-transaction', 'signature-confirmation', 'transaction-result', 'view-all-tokens', 'view-all-transactions'
+  const [currentScreen, setCurrentScreen] = useState('home') // 'home', 'wallet-detail', 'wallet-settings', 'add-wallet', 'new-wallet', 'send-transaction', 'signature-confirmation', 'transaction-result', 'view-all-tokens', 'view-all-transactions', 'swap', 'swap-confirmation'
   const [selectedWallet, setSelectedWallet] = useState(null)
   const [selectedToken, setSelectedToken] = useState(null) // Pre-selected token for send screen
   const [previousScreen, setPreviousScreen] = useState(null) // Track previous screen for proper back navigation
   const [signatureData, setSignatureData] = useState(null) // Data for signature confirmation screen
   const [signatureCallbacks, setSignatureCallbacks] = useState(null) // Callbacks for signature confirmation
   const [transactionData, setTransactionData] = useState(null) // Data for transaction result screen
+  const [swapDetails, setSwapDetails] = useState(null) // Data for swap confirmation screen
 
   // Helper to serialize credential (convert ArrayBuffers to base64)
   const serializeCredential = (cred) => {
@@ -135,10 +141,10 @@ function AppContent() {
         console.log(`🔍 Loading passkey credential for account: ${accountAddress}`)
         setCredentialLoading(true)
 
-        // Load from localStorage (legacy support)
+        // First, try to load from localStorage
         const storageKey = `ethaura_passkey_credential_${accountAddress.toLowerCase()}`
         console.log(`💾 Checking localStorage with key: ${storageKey}`)
-        const stored = localStorage.getItem(storageKey)
+        let stored = localStorage.getItem(storageKey)
 
         if (stored) {
           console.log(`📦 Found stored credential in localStorage (${stored.length} chars)`)
@@ -151,15 +157,57 @@ function AppContent() {
             publicKeyY: credential.publicKey?.y?.slice(0, 20) + '...',
           })
           setPasskeyCredential(credential)
-        } else {
-          console.log(`❌ No passkey credential found in localStorage for account: ${accountAddress}`)
-          console.log(`🔍 All localStorage keys:`, Object.keys(localStorage).filter(k => k.includes('passkey')))
-          setPasskeyCredential(null)
+          setCredentialLoading(false)
+          return
         }
 
+        // Fallback: Try to recover credential from backend (devices API)
+        console.log(`🔄 localStorage empty, attempting to recover from backend...`)
+        try {
+          const devices = await getDevices(signMessage, address, accountAddress)
+          console.log(`📱 Retrieved ${devices.length} devices from backend`)
+
+          // Find an active device with credential data
+          const activeDevice = devices.find(d => d.isActive && d.credentialId && d.rawId)
+          if (activeDevice) {
+            console.log(`✅ Found active device with credential: ${activeDevice.deviceName}`)
+
+            // Reconstruct the credential object from backend data
+            const recoveredCredential = {
+              id: activeDevice.credentialId,
+              rawId: activeDevice.rawId,
+              publicKey: activeDevice.publicKey,
+            }
+
+            console.log(`🔑 Recovered credential details:`, {
+              id: recoveredCredential.id,
+              hasRawId: !!recoveredCredential.rawId,
+              hasPublicKey: !!recoveredCredential.publicKey,
+              publicKeyX: recoveredCredential.publicKey?.x?.slice(0, 20) + '...',
+              publicKeyY: recoveredCredential.publicKey?.y?.slice(0, 20) + '...',
+            })
+
+            // Save to localStorage for future use
+            const serialized = serializeCredential(recoveredCredential)
+            localStorage.setItem(storageKey, serialized)
+            console.log(`💾 Saved recovered credential to localStorage`)
+
+            setPasskeyCredential(recoveredCredential)
+            setCredentialLoading(false)
+            return
+          } else {
+            console.log(`ℹ️  No active device with credential found in backend`)
+          }
+        } catch (backendError) {
+          console.log(`⚠️  Failed to recover from backend:`, backendError.message)
+        }
+
+        console.log(`❌ No passkey credential found for account: ${accountAddress}`)
+        console.log(`🔍 All localStorage keys:`, Object.keys(localStorage).filter(k => k.includes('passkey')))
+        setPasskeyCredential(null)
         setCredentialLoading(false)
       } catch (error) {
-        console.error('❌ Error loading credential from localStorage:', error)
+        console.error('❌ Error loading credential:', error)
         console.error('Error details:', error.message)
         setPasskeyCredential(null)
         setCredentialLoading(false)
@@ -244,6 +292,12 @@ function AppContent() {
     setCurrentScreen('send-transaction')
   }
 
+  const handleSwapFromHome = (wallet) => {
+    setSelectedWallet(wallet)
+    setPreviousScreen(currentScreen)
+    setCurrentScreen('swap')
+  }
+
   const handleWalletChange = (wallet) => {
     setSelectedWallet(wallet)
   }
@@ -256,6 +310,18 @@ function AppContent() {
   const handleViewAllTransactions = () => {
     setPreviousScreen(currentScreen)
     setCurrentScreen('view-all-transactions')
+  }
+
+  const handleSwap = () => {
+    setPreviousScreen(currentScreen)
+    setCurrentScreen('swap')
+  }
+
+  // Handle swap confirmation navigation
+  const handleSwapConfirm = (details, executeSwapFn) => {
+    setSwapDetails({ ...details, executeSwap: executeSwapFn })
+    setPreviousScreen(currentScreen)
+    setCurrentScreen('swap-confirmation')
   }
 
   // Handle signature confirmation navigation
@@ -324,6 +390,20 @@ function AppContent() {
       // Go back to wallet detail
       setCurrentScreen(previousScreen || 'wallet-detail')
       setPreviousScreen(null)
+    } else if (currentScreen === 'swap-confirmation') {
+      // Go back to swap screen
+      setCurrentScreen('swap')
+      setSwapDetails(null)
+      setPreviousScreen(null)
+    } else if (currentScreen === 'swap') {
+      // Go back to the previous screen (either 'home' or 'wallet-detail')
+      if (previousScreen === 'home') {
+        setCurrentScreen('home')
+        setSelectedWallet(null)
+      } else {
+        setCurrentScreen('wallet-detail')
+      }
+      setPreviousScreen(null)
     } else if (currentScreen === 'add-wallet' || currentScreen === 'new-wallet') {
       setCurrentScreen('home')
       setPreviousScreen(null)
@@ -375,6 +455,7 @@ function AppContent() {
         <HomeScreen
           onWalletClick={handleWalletClick}
           onSend={handleSendFromHome}
+          onSwap={handleSwapFromHome}
           onLogout={handleLogout}
         />
       )}
@@ -390,6 +471,7 @@ function AppContent() {
           onLogout={handleLogout}
           onViewAllTokens={handleViewAllTokens}
           onViewAllTransactions={handleViewAllTransactions}
+          onSwap={handleSwap}
         />
       )}
 
@@ -468,17 +550,51 @@ function AppContent() {
           onWalletChange={handleWalletClick}
         />
       )}
+
+      {currentScreen === 'swap' && (
+        <SwapScreen
+          wallet={selectedWallet}
+          onBack={handleBack}
+          onHome={handleHome}
+          onLogout={handleLogout}
+          onSettings={handleSettings}
+          onWalletChange={handleWalletChange}
+          credential={passkeyCredential}
+          onSwapConfirm={handleSwapConfirm}
+        />
+      )}
+
+      {currentScreen === 'swap-confirmation' && (
+        <SwapConfirmationScreen
+          wallet={selectedWallet}
+          swapDetails={swapDetails}
+          onBack={handleBack}
+          onConfirm={async () => {
+            if (swapDetails && swapDetails.executeSwap) {
+              await swapDetails.executeSwap()
+              // Navigate back to wallet detail after successful swap
+              setCurrentScreen('wallet-detail')
+            }
+          }}
+          onHome={handleHome}
+          onSettings={handleSettings}
+          onLogout={handleLogout}
+        />
+      )}
     </>
   )
 }
 
-// Main App component with NetworkProvider, Web3AuthProvider, and WalletConnectProvider
+// Main App component with NetworkProvider, Web3AuthProvider, WalletConnectProvider, and ToastProvider
 function App() {
   return (
     <NetworkProvider>
       <Web3AuthProvider>
         <WalletConnectProvider>
-          <AppContent />
+          <ToastProvider>
+            <AppContent />
+            <ToastContainer />
+          </ToastProvider>
         </WalletConnectProvider>
       </Web3AuthProvider>
     </NetworkProvider>

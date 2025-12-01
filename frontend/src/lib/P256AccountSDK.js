@@ -14,6 +14,7 @@ import {
   encodeExecuteBatch,
 } from './userOperation.js'
 import { ENTRYPOINT_ADDRESS } from './constants.js'
+import { UniswapV3Service } from './uniswapService.js'
 
 /**
  * P256AccountSDK - Main SDK class
@@ -784,6 +785,113 @@ export class P256AccountSDK {
     const receipt = await this.bundler.sendUserOperationAndWait(signedUserOp)
 
     return receipt
+  }
+
+  /**
+   * Execute token swap via Uniswap V3
+   * Supports native ETH swaps via automatic WETH wrapping/unwrapping
+   * @param {Object} params - Swap parameters
+   * @param {string} params.accountAddress - P256Account address
+   * @param {string} params.tokenIn - Input token address (or WETH address for native ETH)
+   * @param {string} params.tokenOut - Output token address (or WETH address for native ETH)
+   * @param {bigint} params.amountIn - Input amount (in token's smallest unit)
+   * @param {bigint} params.amountOutMinimum - Minimum output amount (slippage protected)
+   * @param {number} params.fee - Pool fee tier (500, 3000, or 10000). Default: 3000 (0.3%)
+   * @param {number} params.deadline - Unix timestamp deadline for the swap (optional)
+   * @param {Object} params.passkeyCredential - Passkey credential for 2FA signing
+   * @param {Function} params.signWithPasskey - Function to sign with passkey (2FA)
+   * @param {string|null} params.ownerSignature - Owner signature (primary auth via Web3Auth)
+   * @param {boolean} params.needsDeployment - Whether account needs deployment
+   * @param {string} params.initCode - InitCode for deployment (if needed)
+   * @param {boolean} params.isNativeEthIn - True if swapping native ETH (wraps to WETH first)
+   * @param {boolean} params.isNativeEthOut - True if receiving native ETH (unwraps WETH after)
+   * @returns {Promise<Object>} UserOperation receipt
+   * @throws {Error} If swap fails with user-friendly error message
+   */
+  async executeSwap({
+    accountAddress,
+    tokenIn,
+    tokenOut,
+    amountIn,
+    amountOutMinimum,
+    fee = 3000,
+    deadline = null,
+    passkeyCredential,
+    signWithPasskey,
+    ownerSignature = null,
+    needsDeployment = false,
+    initCode = '0x',
+    isNativeEthIn = false,
+    isNativeEthOut = false,
+  }) {
+    try {
+      // Initialize Uniswap V3 service
+      const uniswapService = new UniswapV3Service(this.provider, this.chainId)
+
+      // Build approve + swap batch transaction (with allowance optimization, deadline, and ETH handling)
+      const { targets, values, datas } = await uniswapService.buildApproveAndSwap(
+        tokenIn,
+        tokenOut,
+        amountIn,
+        amountOutMinimum,
+        accountAddress,
+        fee,
+        deadline,
+        { isNativeEthIn, isNativeEthOut }
+      )
+
+      console.log('🔄 SDK executeSwap - built batch transaction:', {
+        targets,
+        values,
+        datas: datas.map((d) => d.slice(0, 10) + '...'),
+        tokenIn,
+        tokenOut,
+        amountIn: amountIn.toString(),
+        amountOutMinimum: amountOutMinimum.toString(),
+        fee,
+        deadline: deadline ? new Date(deadline * 1000).toISOString() : 'default (10 min)',
+        batchSize: targets.length,
+      })
+
+      // Execute batch via P256Account
+      return await this.executeBatch({
+        accountAddress,
+        targets,
+        values,
+        datas,
+        passkeyCredential,
+        signWithPasskey,
+        ownerSignature,
+        needsDeployment,
+        initCode,
+      })
+    } catch (error) {
+      // Handle swap-specific errors with user-friendly messages
+      const errorMessage = error.message.toLowerCase()
+
+      if (errorMessage.includes('insufficient balance') || errorMessage.includes('transfer amount exceeds balance')) {
+        throw new Error('Insufficient token balance for swap')
+      }
+
+      if (errorMessage.includes('too little received') || errorMessage.includes('slippage')) {
+        throw new Error('Price moved too much. Try increasing slippage tolerance.')
+      }
+
+      if (errorMessage.includes('insufficient liquidity') || errorMessage.includes('no liquidity')) {
+        throw new Error('Not enough liquidity for this swap')
+      }
+
+      if (errorMessage.includes('deadline') || errorMessage.includes('expired')) {
+        throw new Error('Transaction took too long. Please try again.')
+      }
+
+      if (errorMessage.includes('gas estimation failed') || errorMessage.includes('cannot estimate gas')) {
+        throw new Error('Unable to estimate gas. Check token balances and allowances.')
+      }
+
+      // Re-throw original error if not a known swap error
+      throw error
+    }
   }
 
   /**

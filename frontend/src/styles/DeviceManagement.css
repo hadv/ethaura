@@ -3,9 +3,6 @@
 }
 
 .device-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
   margin-bottom: 24px;
 }
 
@@ -13,6 +10,16 @@
   margin: 0;
   font-size: 1.5rem;
   color: #333;
+}
+
+.device-footer {
+  margin-top: 24px;
+  display: flex;
+  justify-content: center;
+}
+
+.device-footer .btn {
+  min-width: 200px;
 }
 
 .no-devices {
@@ -48,6 +55,7 @@
   border: 1px solid #e0e0e0;
   border-radius: 8px;
   transition: box-shadow 0.2s;
+  position: relative;
 }
 
 .device-card:hover {
@@ -86,70 +94,64 @@
   text-transform: capitalize;
 }
 
-.device-dates {
-  font-size: 0.9rem;
-  color: #666;
-  margin-bottom: 8px;
+.device-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 12px;
 }
 
-.device-dates > div {
-  margin: 4px 0;
-}
-
-.device-dates .label {
-  font-weight: 500;
-  color: #495057;
-}
-
-.device-key-info {
-  font-size: 0.85rem;
-  color: #666;
-  margin-top: 8px;
-}
-
-.device-key-info .label {
-  font-weight: 500;
-  color: #495057;
-}
-
-.key-preview {
-  display: inline-block;
-  padding: 2px 6px;
-  background: #f8f9fa;
-  border: 1px solid #dee2e6;
-  border-radius: 4px;
-  font-family: 'Courier New', monospace;
-  font-size: 0.8rem;
-  color: #495057;
-  margin-left: 4px;
-}
-
-/* Attestation Info (Phase 1) */
-.device-attestation-info {
-  font-size: 0.85rem;
-  color: #666;
-  margin-top: 4px;
+.device-stats .stat-item {
   display: flex;
   align-items: center;
-  gap: 4px;
-}
-
-.device-attestation-info .label {
-  font-weight: 500;
-  color: #495057;
-}
-
-.attestation-format {
+  gap: 6px;
+  padding: 6px 10px;
+  background: #f8fafc;
+  border-radius: 20px;
   font-size: 0.75rem;
-  color: #6b7280;
-  font-style: italic;
-  margin-left: 4px;
+  color: #64748b;
 }
 
-.device-actions {
+.device-stats .stat-icon {
+  color: #94a3b8;
+  flex-shrink: 0;
+}
+
+.device-stats .stat-item code {
+  font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+  font-size: 0.7rem;
+}
+
+.device-remove-btn {
+  background: none;
+  border: none;
+  padding: 8px;
+  cursor: pointer;
+  color: #9ca3af;
+  border-radius: 6px;
+  transition: all 0.2s;
   display: flex;
-  flex-direction: column;
-  gap: 8px;
+  align-items: center;
+  justify-content: center;
+}
+
+.device-remove-btn:hover {
+  color: #ef4444;
+  background: #fef2f2;
+}
+
+.device-remove-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.device-remove-btn .spinner-small {
+  width: 18px;
+  height: 18px;
+  border: 2px solid #e5e7eb;
+  border-top-color: #6366f1;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
 }
 
 .btn-sm {
@@ -233,12 +235,10 @@
     font-size: 2rem;
   }
 
-  .device-actions {
-    width: 100%;
-  }
-
-  .device-actions button {
-    width: 100%;
+  .device-remove-btn {
+    position: absolute;
+    top: 12px;
+    right: 12px;
   }
 }
 

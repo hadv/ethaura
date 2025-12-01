@@ -42,8 +42,6 @@ export const P256_ACCOUNT_FACTORY_ABI = [
 export const P256_ACCOUNT_ABI = [
   // Core account functions
   'function owner() view returns (address)',
-  'function qx() view returns (bytes32)',
-  'function qy() view returns (bytes32)',
   'function execute(address dest, uint256 value, bytes calldata func) external',
   'function executeBatch(address[] calldata dest, uint256[] calldata value, bytes[] calldata func) external',
   'function enableTwoFactor() external',
@@ -53,6 +51,14 @@ export const P256_ACCOUNT_ABI = [
   'function addDeposit() payable',
   'function withdrawDepositTo(address payable withdrawAddress, uint256 amount) external',
   'function getNonce() view returns (uint256)',
+  // Multi-passkey management
+  'function getPasskeyByIndex(uint256 index) view returns (bytes32 passkeyId, bytes32 qx, bytes32 qy, uint256 addedAt, bool active)',
+  'function getPasskeyById(bytes32 passkeyId) view returns (bytes32 qx, bytes32 qy, uint256 addedAt, bool active)',
+  'function getPasskeys(uint256 offset, uint256 limit) view returns (bytes32[] passkeyIdList, bytes32[] qxList, bytes32[] qyList, uint256[] addedAtList, bool[] activeList, bytes32[] deviceIdList, uint256 total)',
+  'function getActivePasskeyCount() view returns (uint256)',
+  'function passkeys(bytes32 passkeyId) view returns (bytes32 qx, bytes32 qy, uint256 addedAt, bool active, bytes32 deviceId)',
+  'function addPasskey(bytes32 newQx, bytes32 newQy, bytes32 deviceId) external',
+  'function removePasskey(bytes32 qx, bytes32 qy) external',
   // Guardian management
   'function addGuardian(address guardian) external',
   'function removeGuardian(address guardian) external',
@@ -97,8 +103,35 @@ export const ERC20_ABI = [
   'function transferFrom(address from, address to, uint256 amount) returns (bool)',
 ]
 
+// Uniswap V3 SwapRouter02 ABI
+export const UNISWAP_V3_SWAP_ROUTER_ABI = [
+  'function exactInputSingle((address tokenIn, address tokenOut, uint24 fee, address recipient, uint256 amountIn, uint256 amountOutMinimum, uint160 sqrtPriceLimitX96)) payable returns (uint256 amountOut)',
+  'function exactInput((bytes path, address recipient, uint256 amountIn, uint256 amountOutMinimum)) payable returns (uint256 amountOut)',
+  'function exactOutputSingle((address tokenIn, address tokenOut, uint24 fee, address recipient, uint256 amountOut, uint256 amountInMaximum, uint160 sqrtPriceLimitX96)) payable returns (uint256 amountIn)',
+  'function exactOutput((bytes path, address recipient, uint256 amountOut, uint256 amountInMaximum)) payable returns (uint256 amountIn)',
+  'function multicall(uint256 deadline, bytes[] calldata data) payable returns (bytes[] memory)',
+]
+
+// Uniswap V3 QuoterV2 ABI
+export const UNISWAP_V3_QUOTER_V2_ABI = [
+  'function quoteExactInputSingle((address tokenIn, address tokenOut, uint256 amountIn, uint24 fee, uint160 sqrtPriceLimitX96)) view returns (uint256 amountOut, uint160 sqrtPriceX96After, uint32 initializedTicksCrossed, uint256 gasEstimate)',
+  'function quoteExactInput(bytes path, uint256 amountIn) view returns (uint256 amountOut, uint160[] sqrtPriceX96AfterList, uint32[] initializedTicksCrossedList, uint256 gasEstimate)',
+  'function quoteExactOutputSingle((address tokenIn, address tokenOut, uint256 amountOut, uint24 fee, uint160 sqrtPriceLimitX96)) view returns (uint256 amountIn, uint160 sqrtPriceX96After, uint32 initializedTicksCrossed, uint256 gasEstimate)',
+  'function quoteExactOutput(bytes path, uint256 amountOut) view returns (uint256 amountIn, uint160[] sqrtPriceX96AfterList, uint32[] initializedTicksCrossedList, uint256 gasEstimate)',
+]
+
+// WETH ABI
+export const WETH_ABI = [
+  'function deposit() payable',
+  'function withdraw(uint256 amount)',
+  'function balanceOf(address account) view returns (uint256)',
+  'function approve(address spender, uint256 amount) returns (bool)',
+  'function transfer(address to, uint256 amount) returns (bool)',
+]
+
 // Import token icons
 import ethIcon from '../assets/tokens/eth.svg'
+import wethIcon from '../assets/tokens/weth.svg'
 import linkIcon from '../assets/tokens/link.svg'
 import pyusdIcon from '../assets/tokens/pyusd.svg'
 import uniIcon from '../assets/tokens/uni.svg'
@@ -122,6 +155,14 @@ export { ethIcon }
 // Supported ERC-20 tokens by network
 export const SUPPORTED_TOKENS = {
   sepolia: [
+    {
+      symbol: 'WETH',
+      name: 'Wrapped Ether',
+      address: '0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14',
+      decimals: 18,
+      icon: wethIcon,
+      isWeth: true, // Flag to identify WETH
+    },
     {
       symbol: 'USDC',
       name: 'USD Coin',
@@ -161,6 +202,14 @@ export const SUPPORTED_TOKENS = {
     // The addresses below are for demonstration - verify before use in production
   ],
   mainnet: [
+    {
+      symbol: 'WETH',
+      name: 'Wrapped Ether',
+      address: '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2',
+      decimals: 18,
+      icon: wethIcon,
+      isWeth: true, // Flag to identify WETH
+    },
     {
       symbol: 'USDC',
       name: 'USD Coin',

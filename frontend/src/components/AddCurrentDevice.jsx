@@ -204,7 +204,31 @@ function AddCurrentDeviceV2({ accountAddress, onComplete, onCancel }) {
               : null,
           })
 
-          setStatus('✅ Passkey added to blockchain successfully!')
+          setStatus('✅ Passkey added to blockchain!')
+
+          // Enable 2FA if not already enabled (so passkey is required for all transactions)
+          if (!accountInfo.twoFactorEnabled) {
+            console.log('🔐 Enabling 2FA to require passkey for all transactions...')
+            setStatus('🔐 Enabling 2FA to require passkey...')
+
+            await sdk.enableTwoFactor({
+              accountAddress,
+              passkeyCredential: serializedCredential,
+              signWithPasskey,
+              // For enableTwoFactor, we need owner signature since 2FA is not yet enabled
+              // The contract will verify owner-only signature (65 bytes)
+              getOwnerSignature: async (userOpHash, userOp) => {
+                console.log('🔐 Requesting owner signature to enable 2FA...')
+                setStatus('🔐 Requesting signature to enable 2FA...')
+                const ownerSig = await signRawHash(userOpHash)
+                return ownerSig
+              },
+            })
+
+            console.log('✅ 2FA enabled successfully!')
+          }
+
+          setStatus('✅ Passkey added and 2FA enabled!')
         } catch (err) {
           console.error('Failed to add passkey to blockchain:', err)
           // Don't fail the whole operation - passkey is saved locally
