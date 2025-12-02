@@ -10,10 +10,10 @@ This document describes the modular architecture for migrating P256Account to ER
 P256ModularAccount (Core Account)
 ├── Validators (Type 1)
 │   ├── P256MFAValidatorModule - Owner (mandatory) + Passkey (when MFA enabled)
+│   ├── SessionKeyValidatorModule - Session keys with time bounds, target restrictions, spending limits
 │   └── PQMFAValidatorModule - Dilithium + MFA (future: post-quantum)
 │
 ├── Executors (Type 2)
-│   ├── PasskeyManagerModule - Add/remove passkeys
 │   ├── SocialRecoveryModule - Guardian management + recovery with threshold + timelock
 │   ├── HookManagerModule - Install/uninstall user hooks
 │   └── LargeTransactionExecutorModule - Timelock for high-value txs (built-in, disabled by default)
@@ -120,17 +120,17 @@ mapping(address account => bool) mfaEnabled;       // MFA toggle
 **Interface:**
 ```solidity
 interface IP256MFAValidatorModule is IValidator {
-    // Passkey management (called by PasskeyManagerModule)
-    function addPasskey(address account, bytes32 qx, bytes32 qy, bytes32 deviceId) external;
-    function removePasskey(address account, bytes32 passkeyId) external;
+    // Passkey management (called by account)
+    function addPasskey(bytes32 qx, bytes32 qy, bytes32 deviceId) external;
+    function removePasskey(bytes32 passkeyId) external;
 
     // MFA management
-    function enableMFA(address account) external;
-    function disableMFA(address account) external;
+    function enableMFA() external;
+    function disableMFA() external;
     function isMFAEnabled(address account) external view returns (bool);
 
-    // Owner management
-    function setOwner(address account, address newOwner) external;
+    // Owner management (called by SocialRecoveryModule during recovery)
+    function setOwner(address newOwner) external;
     function getOwner(address account) external view returns (address);
 
     // View functions
@@ -140,19 +140,81 @@ interface IP256MFAValidatorModule is IValidator {
 }
 ```
 
-## Executor Modules
+### 2. SessionKeyValidatorModule (Type 1)
 
-### 2. PasskeyManagerModule (Type 2)
+**Purpose:** Validate session key signatures with granular permissions for gasless/automated transactions
 
-**Purpose:** Manage passkeys on P256ValidatorModule
+**Storage (per account):**
+```solidity
+struct SessionKeyPermission {
+    address sessionKey;        // EOA that can sign
+    uint48 validAfter;         // Start timestamp
+    uint48 validUntil;         // Expiry timestamp
+    address[] allowedTargets;  // Contracts it can call (empty = any)
+    bytes4[] allowedSelectors; // Functions it can call (empty = any)
+    uint256 spendLimitPerTx;   // Max ETH per transaction (0 = unlimited)
+    uint256 spendLimitTotal;   // Max ETH total (0 = unlimited)
+}
+
+struct SessionKeyData {
+    bool active;
+    uint48 validAfter;
+    uint48 validUntil;
+    uint256 spendLimitPerTx;
+    uint256 spendLimitTotal;
+    uint256 spentTotal;
+}
+
+mapping(address account => mapping(address sessionKey => SessionKeyData)) sessionKeys;
+mapping(address account => address[]) sessionKeyList;
+mapping(address account => mapping(address sessionKey => mapping(address target => bool))) allowedTargets;
+mapping(address account => mapping(address sessionKey => mapping(bytes4 selector => bool))) allowedSelectors;
+```
 
 **Interface:**
 ```solidity
-interface IPasskeyManagerModule is IExecutor {
-    function addPasskey(bytes32 qx, bytes32 qy, bytes32 deviceId) external;
-    function removePasskey(bytes32 passkeyId) external;
+interface ISessionKeyValidatorModule is IValidator {
+    // Session key management (called by account)
+    function createSessionKey(SessionKeyPermission calldata permission) external;
+    function revokeSessionKey(address sessionKey) external;
+
+    // View functions
+    function getSessionKey(address account, address sessionKey)
+        external view returns (bool active, uint48 validAfter, uint48 validUntil,
+            uint256 limitPerTx, uint256 limitTotal, uint256 spentTotal);
+    function getSessionKeys(address account) external view returns (address[] memory);
+    function getSessionKeyCount(address account) external view returns (uint256);
+    function isSessionKeyValid(address account, address sessionKey) external view returns (bool);
+    function isTargetAllowed(address account, address sessionKey, address target) external view returns (bool);
+    function isSelectorAllowed(address account, address sessionKey, bytes4 selector) external view returns (bool);
 }
 ```
+
+**Use Cases:**
+- **Gaming:** Allow game backend to submit moves without user signing each one
+- **Trading bots:** Automated trading within spending limits
+- **Subscriptions:** Recurring payments to specific addresses
+- **Batch operations:** DeFi automation with selector restrictions
+
+**Signature Format:**
+```
+┌────────────────────┬─────────────────────────┐
+│ Session Key (20B)  │ ECDSA Signature (65B)   │
+└────────────────────┴─────────────────────────┘
+Total: 85 bytes
+```
+
+**Validation Flow:**
+```
+1. Extract sessionKey address from signature prefix
+2. Verify session key is active and within time bounds
+3. Verify ECDSA signature from session key
+4. Check target and selector permissions
+5. Check and update spending limits
+6. Return validation success
+```
+
+## Executor Modules
 
 ### 3. SocialRecoveryModule (Type 2)
 
