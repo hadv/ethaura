@@ -173,7 +173,10 @@ contract P256MFAValidatorModule is IValidator {
         address owner = $.owners[account];
         bool mfaEnabled = $.mfaEnabled[account];
 
-        bytes calldata sig = userOp.signature;
+        // Signature format: [validator(20B)][actualSignature]
+        // Skip first 20 bytes (validator address) - already validated by AuraAccount
+        if (userOp.signature.length < 20) return VALIDATION_FAILED;
+        bytes calldata sig = userOp.signature[20:];
 
         // Owner-only mode: no MFA required
         if (!mfaEnabled) {
@@ -220,12 +223,18 @@ contract P256MFAValidatorModule is IValidator {
     }
 
     /// @inheritdoc IValidator
+    /// @dev Signature format: [validator(20B)][actualSignature]
+    ///      Skip first 20 bytes (validator address) - already validated by AuraAccount
     function isValidSignatureWithSender(address, bytes32 hash, bytes calldata signature)
         external
         view
         override
         returns (bytes4)
     {
+        // Skip first 20 bytes (validator address)
+        if (signature.length < 20) return bytes4(0xffffffff);
+        bytes calldata sig = signature[20:];
+
         P256MFAValidatorStorage storage $ = _getStorage();
         address account = msg.sender;
         address owner = $.owners[account];
@@ -233,16 +242,16 @@ contract P256MFAValidatorModule is IValidator {
 
         // Owner-only mode
         if (!mfaEnabled) {
-            if (signature.length != 65) return bytes4(0xffffffff);
-            return _verifyOwnerSignature(hash, signature, owner) ? ERC1271_MAGIC_VALUE : bytes4(0xffffffff);
+            if (sig.length != 65) return bytes4(0xffffffff);
+            return _verifyOwnerSignature(hash, sig, owner) ? ERC1271_MAGIC_VALUE : bytes4(0xffffffff);
         }
 
         // MFA mode: same format as validateUserOp
-        if (signature.length < 224) return bytes4(0xffffffff);
+        if (sig.length < 224) return bytes4(0xffffffff);
 
-        bytes calldata ownerSig = signature[signature.length - 65:];
-        bytes32 passkeyId = bytes32(signature[signature.length - 97:signature.length - 65]);
-        bytes calldata webAuthnSig = signature[:signature.length - 97];
+        bytes calldata ownerSig = sig[sig.length - 65:];
+        bytes32 passkeyId = bytes32(sig[sig.length - 97:sig.length - 65]);
+        bytes calldata webAuthnSig = sig[:sig.length - 97];
 
         PasskeyInfo storage passkeyInfo = $.passkeys[account][passkeyId];
         if (!passkeyInfo.active || passkeyInfo.qx == bytes32(0)) return bytes4(0xffffffff);

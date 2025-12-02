@@ -163,6 +163,10 @@ contract SessionKeyValidatorModule is IValidator {
     //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IValidator
+    /// @dev Signature format: [validator(20B)][sessionKey(20B)][ecdsaSig(65B)]
+    ///      - First 20 bytes: validator address (already validated by AuraAccount)
+    ///      - Next 20 bytes: session key address
+    ///      - Last 65 bytes: ECDSA signature from session key
     function validateUserOp(PackedUserOperation calldata userOp, bytes32 userOpHash)
         external
         override
@@ -171,12 +175,13 @@ contract SessionKeyValidatorModule is IValidator {
         SessionKeyValidatorStorage storage $ = _getStorage();
         address account = msg.sender;
 
-        // Signature format: sessionKey (20 bytes) + ECDSA signature (65 bytes)
-        bytes calldata sig = userOp.signature;
-        if (sig.length != 85) return VALIDATION_FAILED;
+        // Signature format: [validator(20B)][sessionKey(20B)][ecdsaSig(65B)] = 105 bytes
+        bytes calldata fullSig = userOp.signature;
+        if (fullSig.length != 105) return VALIDATION_FAILED;
 
-        address sessionKey = address(bytes20(sig[:20]));
-        bytes calldata ecdsaSig = sig[20:85];
+        // Skip first 20 bytes (validator address)
+        address sessionKey = address(bytes20(fullSig[20:40]));
+        bytes calldata ecdsaSig = fullSig[40:105];
 
         // Check session key exists and is active
         SessionKeyData storage keyData = $.sessionKeys[account][sessionKey];
@@ -201,6 +206,7 @@ contract SessionKeyValidatorModule is IValidator {
     }
 
     /// @inheritdoc IValidator
+    /// @dev Signature format: [validator(20B)][sessionKey(20B)][ecdsaSig(65B)] = 105 bytes
     function isValidSignatureWithSender(address sender, bytes32 hash, bytes calldata signature)
         external
         view
@@ -209,11 +215,12 @@ contract SessionKeyValidatorModule is IValidator {
     {
         SessionKeyValidatorStorage storage $ = _getStorage();
 
-        // Signature format: sessionKey (20 bytes) + ECDSA signature (65 bytes)
-        if (signature.length != 85) return bytes4(0xffffffff);
+        // Signature format: [validator(20B)][sessionKey(20B)][ecdsaSig(65B)] = 105 bytes
+        if (signature.length != 105) return bytes4(0xffffffff);
 
-        address sessionKey = address(bytes20(signature[:20]));
-        bytes calldata ecdsaSig = signature[20:85];
+        // Skip first 20 bytes (validator address)
+        address sessionKey = address(bytes20(signature[20:40]));
+        bytes calldata ecdsaSig = signature[40:105];
 
         SessionKeyData storage keyData = $.sessionKeys[sender][sessionKey];
         if (!keyData.active) return bytes4(0xffffffff);

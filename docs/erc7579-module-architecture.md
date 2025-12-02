@@ -67,7 +67,7 @@ Long-term: FullPQValidatorModule (Dilithium only, when ECDSA deprecated)
 - May require off-chain verification with on-chain proof
 - EIP-7212 equivalent for Dilithium precompile would help
 
-## Core Account: P256ModularAccount
+## Core Account: AuraAccount
 
 ### Responsibilities
 - ERC-4337 validateUserOp delegation to validators
@@ -75,9 +75,41 @@ Long-term: FullPQValidatorModule (Dilithium only, when ECDSA deprecated)
 - Module installation/uninstallation
 - ERC-1271 signature validation forwarding
 
+### Signature-Based Validator Selection
+
+AuraAccount uses **signature-based validator selection** instead of nonce-based selection. The validator address is encoded in the first 20 bytes of the signature:
+
+```
+┌──────────────────────┬─────────────────────────┐
+│ Validator Addr (20B) │ Actual Signature (var)  │
+└──────────────────────┴─────────────────────────┘
+```
+
+**Security Benefits:**
+- Validator is cryptographically bound to the signature
+- No frontend nonce encoding complexity
+- Prevents validator injection attacks (must be installed)
+- Prevents downgrade attacks (validator must verify its own signature format)
+
+**Validation Flow:**
+```
+1. Extract validator address from signature[0:20]
+2. Verify validator is installed (CRITICAL security check)
+3. Pass full userOp to validator's validateUserOp()
+4. Validator extracts its own signature format from signature[20:]
+5. Return validation result
+```
+
+**Example Signatures:**
+
+| Validator | Signature Format |
+|-----------|------------------|
+| P256MFAValidatorModule | `[validator(20B)][ownerSig(65B)][passkeySig(~70B)]` |
+| SessionKeyValidatorModule | `[validator(20B)][sessionKey(20B)][ecdsaSig(65B)]` |
+
 ### Key Interfaces
 ```solidity
-interface IP256ModularAccount is IERC7579Account {
+interface IAuraAccount is IERC7579Account {
     // Account initialization
     function initialize(
         address defaultValidator,
@@ -85,9 +117,6 @@ interface IP256ModularAccount is IERC7579Account {
         address hook,
         bytes calldata hookData
     ) external;
-    
-    // Validator selection (encoded in userOp.nonce)
-    function getActiveValidator() external view returns (address);
 }
 ```
 

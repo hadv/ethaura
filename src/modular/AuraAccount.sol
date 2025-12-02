@@ -163,6 +163,11 @@ contract AuraAccount is IAccount, IERC7579Account, Initializable {
 
     /**
      * @notice Validate a user operation (ERC-4337)
+     * @dev Uses signature-based validator selection:
+     *      - First 20 bytes of signature = validator address
+     *      - Remaining bytes = actual signature for the validator
+     *      This approach prevents validator injection attacks since the validator
+     *      must be installed and the signature format is validator-specific.
      * @param userOp The user operation
      * @param userOpHash The hash of the user operation
      * @param missingAccountFunds Funds to prefund
@@ -173,13 +178,19 @@ contract AuraAccount is IAccount, IERC7579Account, Initializable {
         onlyEntryPoint
         returns (uint256 validationData)
     {
-        // Get the active validator (first in linked list for now)
-        address validator = _validators[SENTINEL];
-        if (validator == SENTINEL || validator == address(0)) {
-            revert NoValidatorInstalled();
+        // Extract validator address from signature prefix (first 20 bytes)
+        if (userOp.signature.length < 20) {
+            revert InvalidValidator();
+        }
+        address validator = address(bytes20(userOp.signature[0:20]));
+
+        // CRITICAL: Verify validator is installed to prevent malicious validator injection
+        if (_validators[validator] == address(0)) {
+            revert InvalidValidator();
         }
 
-        // Delegate validation to the validator module
+        // Delegate validation to the selected validator module
+        // The validator is responsible for extracting its own signature format from signature[20:]
         validationData = IValidator(validator).validateUserOp(userOp, userOpHash);
 
         // Pay prefund
@@ -495,14 +506,22 @@ contract AuraAccount is IAccount, IERC7579Account, Initializable {
     //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IERC7579Account
+    /// @dev Uses signature-based validator selection (same as validateUserOp):
+    ///      - First 20 bytes = validator address
+    ///      - Remaining bytes = actual signature for the validator
     function isValidSignature(bytes32 hash, bytes calldata signature) external view returns (bytes4) {
-        // Get the active validator
-        address validator = _validators[SENTINEL];
-        if (validator == SENTINEL || validator == address(0)) {
+        // Extract validator from signature prefix
+        if (signature.length < 20) {
+            return bytes4(0xffffffff);
+        }
+        address validator = address(bytes20(signature[0:20]));
+
+        // Verify validator is installed
+        if (_validators[validator] == address(0)) {
             return bytes4(0xffffffff);
         }
 
-        // Delegate to validator
+        // Delegate to validator (validator extracts its signature format from signature[20:])
         return IValidator(validator).isValidSignatureWithSender(msg.sender, hash, signature);
     }
 

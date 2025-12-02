@@ -286,7 +286,9 @@ contract AuraAccountTest is Test {
 
     function test_IsValidSignature() public view {
         bytes32 hash = keccak256("test");
-        bytes4 result = account.isValidSignature(hash, "");
+        // Signature format: [validator(20B)][actualSignature]
+        bytes memory signature = abi.encodePacked(address(validator));
+        bytes4 result = account.isValidSignature(hash, signature);
         assertEq(result, bytes4(0x1626ba7e));
     }
 
@@ -294,7 +296,9 @@ contract AuraAccountTest is Test {
         validator.setValidation(address(account), false);
 
         bytes32 hash = keccak256("test");
-        bytes4 result = account.isValidSignature(hash, "");
+        // Signature format: [validator(20B)][actualSignature]
+        bytes memory signature = abi.encodePacked(address(validator));
+        bytes4 result = account.isValidSignature(hash, signature);
         assertEq(result, bytes4(0xffffffff));
     }
 
