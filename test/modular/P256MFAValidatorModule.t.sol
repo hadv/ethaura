@@ -4,7 +4,7 @@ pragma solidity ^0.8.23;
 import {Test} from "forge-std/Test.sol";
 import {AuraAccount} from "../../src/modular/AuraAccount.sol";
 import {AuraAccountFactory} from "../../src/modular/AuraAccountFactory.sol";
-import {P256MFAValidatorModule} from "../../src/modular/modules/P256MFAValidatorModule.sol";
+import {P256MFAValidatorModule} from "../../src/modular/modules/validators/P256MFAValidatorModule.sol";
 import {ERC1967FactoryConstants} from "solady/utils/ERC1967FactoryConstants.sol";
 import {MODULE_TYPE_VALIDATOR} from "@erc7579/interfaces/IERC7579Module.sol";
 import {PackedUserOperation} from "@account-abstraction/interfaces/PackedUserOperation.sol";
@@ -36,7 +36,7 @@ contract P256MFAValidatorModuleTest is Test {
         // Create account with P256MFAValidatorModule
         // Init data: owner, qx, qy, deviceId, enableMFA
         bytes memory initData = abi.encode(owner, QX, QY, bytes32("Test Device"), true);
-        
+
         address accountAddr = factory.createAccount(
             owner,
             address(validator),
@@ -111,7 +111,7 @@ contract P256MFAValidatorModuleTest is Test {
 
         // Get the passkey ID
         bytes32 passkeyId = keccak256(abi.encodePacked(newQx, newQy));
-        
+
         // Remove the passkey
         validator.removePasskey(passkeyId);
         assertEq(validator.getPasskeyCount(address(account)), 1);

@@ -51,8 +51,7 @@ contract P256MFAValidatorModule is IValidator {
     }
 
     // keccak256(abi.encode(uint256(keccak256("ethaura.storage.P256MFAValidatorModule")) - 1)) & ~bytes32(uint256(0xff))
-    bytes32 private constant STORAGE_LOCATION =
-        0x8a0c9d8ec1d9f8b8c1a5e6f7d8e9f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d600;
+    bytes32 private constant STORAGE_LOCATION = 0x8a0c9d8ec1d9f8b8c1a5e6f7d8e9f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d600;
 
     /*//////////////////////////////////////////////////////////////
                                 EVENTS
@@ -109,18 +108,18 @@ contract P256MFAValidatorModule is IValidator {
         // Decode: owner, qx, qy, deviceId, enableMFA
         (address owner, bytes32 qx, bytes32 qy, bytes32 deviceId, bool shouldEnableMFA) =
             abi.decode(data, (address, bytes32, bytes32, bytes32, bool));
-        
+
         if (owner == address(0)) revert InvalidOwner();
-        
+
         // Set owner
         $.owners[msg.sender] = owner;
         emit OwnerSet(msg.sender, owner);
-        
+
         // Add passkey if provided
         if (qx != bytes32(0) && qy != bytes32(0)) {
             _addPasskeyInternal(msg.sender, qx, qy, deviceId);
         }
-        
+
         // Enable MFA if requested (requires passkey)
         if (shouldEnableMFA) {
             if ($.passkeyCount[msg.sender] == 0) revert MFARequiresPasskey();
@@ -132,13 +131,13 @@ contract P256MFAValidatorModule is IValidator {
     /// @inheritdoc IModule
     function onUninstall(bytes calldata) external override {
         P256MFAValidatorStorage storage $ = _getStorage();
-        
+
         // Clear owner
         delete $.owners[msg.sender];
-        
+
         // Clear MFA
         delete $.mfaEnabled[msg.sender];
-        
+
         // Clear all passkeys
         bytes32[] storage ids = $.passkeyIds[msg.sender];
         for (uint256 i = 0; i < ids.length; i++) {
@@ -251,13 +250,7 @@ contract P256MFAValidatorModule is IValidator {
         WebAuthn.WebAuthnAuth memory auth = WebAuthn.tryDecodeAuthCompactCalldata(webAuthnSig);
         bytes memory challenge = abi.encodePacked(hash);
 
-        bool webAuthnValid = WebAuthn.verify(
-            challenge,
-            true,
-            auth,
-            passkeyInfo.qx,
-            passkeyInfo.qy
-        );
+        bool webAuthnValid = WebAuthn.verify(challenge, true, auth, passkeyInfo.qx, passkeyInfo.qy);
 
         if (!webAuthnValid) return bytes4(0xffffffff);
         if (!_verifyOwnerSignature(hash, ownerSig, owner)) return bytes4(0xffffffff);
@@ -269,11 +262,7 @@ contract P256MFAValidatorModule is IValidator {
                         SIGNATURE VERIFICATION
     //////////////////////////////////////////////////////////////*/
 
-    function _verifyOwnerSignature(bytes32 hash, bytes calldata signature, address owner)
-        internal
-        view
-        returns (bool)
-    {
+    function _verifyOwnerSignature(bytes32 hash, bytes calldata signature, address owner) internal view returns (bool) {
         address recovered = ECDSA.recover(hash, signature);
         return recovered == owner;
     }
@@ -333,13 +322,8 @@ contract P256MFAValidatorModule is IValidator {
 
         if ($.passkeys[account][passkeyId].active) revert PasskeyAlreadyExists();
 
-        $.passkeys[account][passkeyId] = PasskeyInfo({
-            qx: qx,
-            qy: qy,
-            addedAt: block.timestamp,
-            active: true,
-            deviceId: deviceId
-        });
+        $.passkeys[account][passkeyId] =
+            PasskeyInfo({qx: qx, qy: qy, addedAt: block.timestamp, active: true, deviceId: deviceId});
 
         $.passkeyIds[account].push(passkeyId);
         $.passkeyCount[account]++;
