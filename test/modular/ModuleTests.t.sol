@@ -49,16 +49,15 @@ contract MultiHookTest is Test {
             vm.etch(ERC1967FactoryConstants.ADDRESS, ERC1967FactoryConstants.BYTECODE);
         }
 
-        factory = new AuraAccountFactory();
         validator = new MockValidator();
+        factory = new AuraAccountFactory(address(validator));
         multiHook = new MultiHook();
         hook1 = new MockHook();
         hook2 = new MockHook();
         target = new MockTarget();
 
         // Create account with MultiHook as global hook
-        address accountAddr =
-            factory.createAccount(owner, address(validator), abi.encode(true), address(multiHook), "", 0);
+        address accountAddr = factory.createAccount(owner, abi.encode(true), address(multiHook), "", 0);
         account = AuraAccount(payable(accountAddr));
         vm.deal(address(account), 10 ether);
     }
@@ -178,12 +177,12 @@ contract LargeTransactionExecutorModuleTest is Test {
             vm.etch(ERC1967FactoryConstants.ADDRESS, ERC1967FactoryConstants.BYTECODE);
         }
 
-        factory = new AuraAccountFactory();
         validator = new MockValidator();
+        factory = new AuraAccountFactory(address(validator));
         executor = new LargeTransactionExecutorModule();
         target = new MockTarget();
 
-        address accountAddr = factory.createAccount(owner, address(validator), abi.encode(true), address(0), "", 0);
+        address accountAddr = factory.createAccount(owner, abi.encode(true), address(0), "", 0);
         account = AuraAccount(payable(accountAddr));
         vm.deal(address(account), 10 ether);
 
@@ -324,16 +323,15 @@ contract LargeTransactionGuardHookTest is Test {
             vm.etch(ERC1967FactoryConstants.ADDRESS, ERC1967FactoryConstants.BYTECODE);
         }
 
-        factory = new AuraAccountFactory();
         validator = new MockValidator();
+        factory = new AuraAccountFactory(address(validator));
         executor = new LargeTransactionExecutorModule();
         guardHook = new LargeTransactionGuardHook();
         target = new MockTarget();
 
         // Create account with guard hook
-        address accountAddr = factory.createAccount(
-            owner, address(validator), abi.encode(true), address(guardHook), abi.encode(address(executor)), 0
-        );
+        address accountAddr =
+            factory.createAccount(owner, abi.encode(true), address(guardHook), abi.encode(address(executor)), 0);
         account = AuraAccount(payable(accountAddr));
         vm.deal(address(account), 10 ether);
 
@@ -407,16 +405,15 @@ contract HookManagerModuleTest is Test {
             vm.etch(ERC1967FactoryConstants.ADDRESS, ERC1967FactoryConstants.BYTECODE);
         }
 
-        factory = new AuraAccountFactory();
         validator = new MockValidator();
+        factory = new AuraAccountFactory(address(validator));
         multiHook = new MultiHook();
         hookManager = new HookManagerModule();
         hook1 = new MockHook();
 
         // Create account with MultiHook
-        address accountAddr = factory.createAccount(
-            owner, address(validator), abi.encode(true), address(multiHook), abi.encode(address(hookManager)), 0
-        );
+        address accountAddr =
+            factory.createAccount(owner, abi.encode(true), address(multiHook), abi.encode(address(hookManager)), 0);
         account = AuraAccount(payable(accountAddr));
         vm.deal(address(account), 10 ether);
 

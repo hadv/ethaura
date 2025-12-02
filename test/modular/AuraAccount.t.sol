@@ -40,19 +40,18 @@ contract AuraAccountTest is Test {
             vm.etch(ERC1967FactoryConstants.ADDRESS, ERC1967FactoryConstants.BYTECODE);
         }
 
-        // Deploy factory
-        factory = new AuraAccountFactory();
-
         // Deploy mock modules
         validator = new MockValidator();
         executor = new MockExecutor();
         hook = new MockHook();
         target = new MockTarget();
 
-        // Create account with validator
+        // Deploy factory with the mandatory P256MFAValidator (using mock for tests)
+        factory = new AuraAccountFactory(address(validator));
+
+        // Create account (factory uses the mandatory P256MFAValidator)
         address accountAddr = factory.createAccount(
             owner,
-            address(validator),
             abi.encode(true), // shouldValidate = true
             address(0), // no hook
             "",
@@ -71,13 +70,12 @@ contract AuraAccountTest is Test {
     function test_Initialize() public view {
         assertEq(account.accountId(), "ethaura.aura.0.1.0");
         assertTrue(account.isModuleInstalled(MODULE_TYPE_VALIDATOR, address(validator), ""));
-        assertEq(account.getValidatorCount(), 1);
+        assertEq(account.getValidator(), address(validator));
     }
 
     function test_InitializeWithHook() public {
         address accountAddr = factory.createAccount(
             owner,
-            address(validator),
             abi.encode(true),
             address(hook),
             "",
@@ -280,44 +278,28 @@ contract AuraAccountTest is Test {
         account.uninstallModule(MODULE_TYPE_EXECUTOR, address(executor), "");
     }
 
-    function test_RevertUninstallLastValidator() public {
-        // Account has only one validator installed (from setUp)
-        assertEq(account.getValidatorCount(), 1);
-
-        // Trying to uninstall the last validator should revert
+    function test_RevertUninstallValidator() public {
+        // Single validator model: cannot uninstall validator, must use install to replace
         vm.prank(ENTRYPOINT);
-        vm.expectRevert(AuraAccount.CannotRemoveLastValidator.selector);
+        vm.expectRevert(AuraAccount.CannotUninstallValidator.selector);
         account.uninstallModule(MODULE_TYPE_VALIDATOR, address(validator), "");
 
         // Validator should still be installed
         assertTrue(account.isModuleInstalled(MODULE_TYPE_VALIDATOR, address(validator), ""));
     }
 
-    function test_UninstallValidatorWithMultiple() public {
-        // Install a second validator
+    function test_ReplaceValidator() public {
+        // Single validator model: installing a new validator replaces the old one
         MockValidator validator2 = new MockValidator();
+
+        // Install new validator (this replaces the old one)
         vm.prank(ENTRYPOINT);
         account.installModule(MODULE_TYPE_VALIDATOR, address(validator2), abi.encode(true));
-        assertEq(account.getValidatorCount(), 2);
 
-        // Now we can uninstall one validator (not the last)
-        vm.prank(ENTRYPOINT);
-        account.uninstallModule(MODULE_TYPE_VALIDATOR, address(validator2), "");
-
-        // Should have one validator remaining
-        assertEq(account.getValidatorCount(), 1);
-        assertTrue(account.isModuleInstalled(MODULE_TYPE_VALIDATOR, address(validator), ""));
-        assertFalse(account.isModuleInstalled(MODULE_TYPE_VALIDATOR, address(validator2), ""));
-    }
-
-    function test_RevertUninstallSentinel() public {
-        // SENTINEL = address(0x1) is the linked list marker
-        // Attempting to uninstall it should revert to prevent list corruption
-        address SENTINEL = address(0x1);
-
-        vm.prank(ENTRYPOINT);
-        vm.expectRevert(abi.encodeWithSelector(AuraAccount.InvalidModule.selector, SENTINEL));
-        account.uninstallModule(MODULE_TYPE_VALIDATOR, SENTINEL, "");
+        // New validator is now installed, old one is not
+        assertEq(account.getValidator(), address(validator2));
+        assertTrue(account.isModuleInstalled(MODULE_TYPE_VALIDATOR, address(validator2), ""));
+        assertFalse(account.isModuleInstalled(MODULE_TYPE_VALIDATOR, address(validator), ""));
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -326,8 +308,8 @@ contract AuraAccountTest is Test {
 
     function test_IsValidSignature() public view {
         bytes32 hash = keccak256("test");
-        // Signature format: [validator(20B)][actualSignature]
-        bytes memory signature = abi.encodePacked(address(validator));
+        // Single validator model: signature is directly passed to the validator
+        bytes memory signature = "";
         bytes4 result = account.isValidSignature(hash, signature);
         assertEq(result, bytes4(0x1626ba7e));
     }
@@ -336,8 +318,8 @@ contract AuraAccountTest is Test {
         validator.setValidation(address(account), false);
 
         bytes32 hash = keccak256("test");
-        // Signature format: [validator(20B)][actualSignature]
-        bytes memory signature = abi.encodePacked(address(validator));
+        // Single validator model: signature is directly passed to the validator
+        bytes memory signature = "";
         bytes4 result = account.isValidSignature(hash, signature);
         assertEq(result, bytes4(0xffffffff));
     }

@@ -32,17 +32,18 @@ contract SocialRecoveryModuleTest is Test {
             vm.etch(ERC1967FactoryConstants.ADDRESS, ERC1967FactoryConstants.BYTECODE);
         }
 
-        // Deploy factory and modules
-        factory = new AuraAccountFactory();
+        // Deploy modules
         validator = new P256MFAValidatorModule();
         recovery = new SocialRecoveryModule();
 
-        // Create account with P256MFAValidatorModule
+        // Deploy factory with mandatory P256MFAValidator
+        factory = new AuraAccountFactory(address(validator));
+
+        // Create account (factory uses P256MFAValidatorModule as mandatory default)
         bytes memory validatorData = abi.encode(owner, QX, QY, bytes32("Test Device"), true);
 
         address accountAddr = factory.createAccount(
             owner,
-            address(validator),
             validatorData,
             address(0), // no hook
             "",

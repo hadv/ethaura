@@ -57,16 +57,12 @@ contract AuraAccount is IAccount, IERC7579Account, Initializable {
     /// @notice Account implementation ID
     string public constant ACCOUNT_ID = "ethaura.aura.0.1.0";
 
-    /// @notice Sentinel address for linked list
-    address internal constant SENTINEL = address(0x1);
-
     /*//////////////////////////////////////////////////////////////
                                 STORAGE
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Installed validators (linked list)
-    mapping(address => address) internal _validators;
-    uint256 internal _validatorCount;
+    /// @notice The single installed validator (P256MFAValidator by default, can be upgraded to PQMFAValidator)
+    address internal _validator;
 
     /// @notice Installed executors
     mapping(address => bool) internal _executors;
@@ -91,8 +87,7 @@ contract AuraAccount is IAccount, IERC7579Account, Initializable {
     error UnsupportedExecutionMode(ModeCode mode);
     error ExecutionFailed();
     error InvalidValidator();
-    error NoValidatorInstalled();
-    error CannotRemoveLastValidator();
+    error CannotUninstallValidator();
 
     /*//////////////////////////////////////////////////////////////
                                MODIFIERS
@@ -138,13 +133,12 @@ contract AuraAccount is IAccount, IERC7579Account, Initializable {
         external
         initializer
     {
-        // Initialize validator linked list
-        _validators[SENTINEL] = SENTINEL;
+        // Validator is required - factory enforces P256MFAValidator as default
+        if (defaultValidator == address(0)) revert InvalidValidator();
 
-        // Install default validator
-        if (defaultValidator != address(0)) {
-            _installValidator(defaultValidator, validatorData);
-        }
+        // Install the single validator
+        _validator = defaultValidator;
+        IValidator(defaultValidator).onInstall(validatorData);
 
         // Install hook if provided
         if (hook != address(0)) {
@@ -164,11 +158,8 @@ contract AuraAccount is IAccount, IERC7579Account, Initializable {
 
     /**
      * @notice Validate a user operation (ERC-4337)
-     * @dev Uses signature-based validator selection:
-     *      - First 20 bytes of signature = validator address
-     *      - Remaining bytes = actual signature for the validator
-     *      This approach prevents validator injection attacks since the validator
-     *      must be installed and the signature format is validator-specific.
+     * @dev Single validator model - delegates directly to the installed validator.
+     *      Signature format is validator-specific (no prefix needed).
      * @param userOp The user operation
      * @param userOpHash The hash of the user operation
      * @param missingAccountFunds Funds to prefund
@@ -179,20 +170,8 @@ contract AuraAccount is IAccount, IERC7579Account, Initializable {
         onlyEntryPoint
         returns (uint256 validationData)
     {
-        // Extract validator address from signature prefix (first 20 bytes)
-        if (userOp.signature.length < 20) {
-            revert InvalidValidator();
-        }
-        address validator = address(bytes20(userOp.signature[0:20]));
-
-        // CRITICAL: Verify validator is installed to prevent malicious validator injection
-        if (_validators[validator] == address(0)) {
-            revert InvalidValidator();
-        }
-
-        // Delegate validation to the selected validator module
-        // The validator is responsible for extracting its own signature format from signature[20:]
-        validationData = IValidator(validator).validateUserOp(userOp, userOpHash);
+        // Delegate validation to the single installed validator
+        validationData = IValidator(_validator).validateUserOp(userOp, userOpHash);
 
         // Pay prefund
         if (missingAccountFunds > 0) {
@@ -368,11 +347,11 @@ contract AuraAccount is IAccount, IERC7579Account, Initializable {
         payable
         onlyEntryPointOrSelf
     {
-        // Prevent uninstalling address(0) or SENTINEL (linked list marker)
-        if (module == address(0) || module == SENTINEL) revert InvalidModule(module);
+        if (module == address(0)) revert InvalidModule(module);
 
         if (moduleTypeId == MODULE_TYPE_VALIDATOR) {
-            _uninstallValidator(module, deInitData);
+            // Single validator model: cannot uninstall, must use installModule to replace
+            revert CannotUninstallValidator();
         } else if (moduleTypeId == MODULE_TYPE_EXECUTOR) {
             _uninstallExecutor(module, deInitData);
         } else if (moduleTypeId == MODULE_TYPE_FALLBACK) {
@@ -390,49 +369,28 @@ contract AuraAccount is IAccount, IERC7579Account, Initializable {
                        VALIDATOR MANAGEMENT
     //////////////////////////////////////////////////////////////*/
 
+    /**
+     * @notice Install (or replace) the validator
+     * @dev Single validator model: installing a new validator atomically replaces the existing one.
+     *      This is the only way to switch validators (e.g., from P256MFA to PQMFAValidator).
+     */
     function _installValidator(address validator, bytes calldata data) internal {
-        if (_validators[validator] != address(0)) {
-            revert ModuleAlreadyInstalled(validator);
+        address oldValidator = _validator;
+
+        // If same validator, just reinitialize
+        if (oldValidator == validator) {
+            IValidator(validator).onInstall(data);
+            return;
         }
 
-        // Add to linked list (insert at head)
-        _validators[validator] = _validators[SENTINEL];
-        _validators[SENTINEL] = validator;
-        _validatorCount++;
+        // Uninstall old validator first (if any)
+        if (oldValidator != address(0)) {
+            IValidator(oldValidator).onUninstall("");
+        }
 
-        // Call onInstall
+        // Install new validator
+        _validator = validator;
         IValidator(validator).onInstall(data);
-    }
-
-    function _uninstallValidator(address validator, bytes calldata data) internal {
-        if (_validators[validator] == address(0)) {
-            revert ModuleNotInstalled(validator);
-        }
-
-        // CRITICAL: Prevent uninstalling the last validator (would permanently lock account)
-        if (_validatorCount == 1) {
-            revert CannotRemoveLastValidator();
-        }
-
-        // Find previous in linked list
-        address prev = SENTINEL;
-        address current = _validators[SENTINEL];
-        while (current != SENTINEL && current != validator) {
-            prev = current;
-            current = _validators[current];
-        }
-
-        if (current != validator) {
-            revert ModuleNotInstalled(validator);
-        }
-
-        // Remove from linked list
-        _validators[prev] = _validators[validator];
-        _validators[validator] = address(0);
-        _validatorCount--;
-
-        // Call onUninstall
-        IValidator(validator).onUninstall(data);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -513,23 +471,10 @@ contract AuraAccount is IAccount, IERC7579Account, Initializable {
     //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IERC7579Account
-    /// @dev Uses signature-based validator selection (same as validateUserOp):
-    ///      - First 20 bytes = validator address
-    ///      - Remaining bytes = actual signature for the validator
+    /// @dev Single validator model - delegates directly to the installed validator
     function isValidSignature(bytes32 hash, bytes calldata signature) external view returns (bytes4) {
-        // Extract validator from signature prefix
-        if (signature.length < 20) {
-            return bytes4(0xffffffff);
-        }
-        address validator = address(bytes20(signature[0:20]));
-
-        // Verify validator is installed
-        if (_validators[validator] == address(0)) {
-            return bytes4(0xffffffff);
-        }
-
-        // Delegate to validator (validator extracts its signature format from signature[20:])
-        return IValidator(validator).isValidSignatureWithSender(msg.sender, hash, signature);
+        // Delegate to the single installed validator
+        return IValidator(_validator).isValidSignatureWithSender(msg.sender, hash, signature);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -569,7 +514,7 @@ contract AuraAccount is IAccount, IERC7579Account, Initializable {
         (additionalContext); // Silence unused variable warning
 
         if (moduleTypeId == MODULE_TYPE_VALIDATOR) {
-            return _validators[module] != address(0);
+            return _validator == module;
         } else if (moduleTypeId == MODULE_TYPE_EXECUTOR) {
             return _executors[module];
         } else if (moduleTypeId == MODULE_TYPE_FALLBACK) {
@@ -628,10 +573,10 @@ contract AuraAccount is IAccount, IERC7579Account, Initializable {
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @notice Get the number of installed validators
+     * @notice Get the installed validator address
      */
-    function getValidatorCount() external view returns (uint256) {
-        return _validatorCount;
+    function getValidator() external view returns (address) {
+        return _validator;
     }
 
     /**
