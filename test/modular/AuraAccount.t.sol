@@ -310,6 +310,16 @@ contract AuraAccountTest is Test {
         assertFalse(account.isModuleInstalled(MODULE_TYPE_VALIDATOR, address(validator2), ""));
     }
 
+    function test_RevertUninstallSentinel() public {
+        // SENTINEL = address(0x1) is the linked list marker
+        // Attempting to uninstall it should revert to prevent list corruption
+        address SENTINEL = address(0x1);
+
+        vm.prank(ENTRYPOINT);
+        vm.expectRevert(abi.encodeWithSelector(AuraAccount.InvalidModule.selector, SENTINEL));
+        account.uninstallModule(MODULE_TYPE_VALIDATOR, SENTINEL, "");
+    }
+
     /*//////////////////////////////////////////////////////////////
                           ERC-1271 TESTS
     //////////////////////////////////////////////////////////////*/

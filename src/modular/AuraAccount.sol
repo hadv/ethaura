@@ -368,7 +368,8 @@ contract AuraAccount is IAccount, IERC7579Account, Initializable {
         payable
         onlyEntryPointOrSelf
     {
-        if (module == address(0)) revert InvalidModule(module);
+        // Prevent uninstalling address(0) or SENTINEL (linked list marker)
+        if (module == address(0) || module == SENTINEL) revert InvalidModule(module);
 
         if (moduleTypeId == MODULE_TYPE_VALIDATOR) {
             _uninstallValidator(module, deInitData);
