@@ -9,8 +9,8 @@ import {AuraAccount} from "./AuraAccount.sol";
  * @title AuraAccountFactory
  * @notice Factory for deploying AuraAccount instances
  * @dev Uses Solady's canonical ERC1967Factory for hyper-optimized proxy deployment
- *      All accounts are initialized with P256MFAValidatorModule as the mandatory default validator.
- *      Users can upgrade to PQMFAValidatorModule later for post-quantum security.
+ *      All accounts are initialized with the configured default validator.
+ *      Users can upgrade to a different validator later (e.g., for post-quantum security).
  */
 contract AuraAccountFactory {
     /*//////////////////////////////////////////////////////////////
@@ -20,9 +20,9 @@ contract AuraAccountFactory {
     /// @notice The account implementation address
     address public immutable accountImplementation;
 
-    /// @notice The mandatory P256MFAValidator module address
-    /// @dev All accounts use this as the default validator at creation
-    address public immutable p256MFAValidator;
+    /// @notice The default validator module address
+    /// @dev All accounts use this as the initial validator at creation
+    address public immutable validator;
 
     /// @notice Solady's canonical ERC1967Factory for deploying proxies
     /// @dev Uses the canonical address: 0x0000000000006396FF2a80c067f99B3d2Ab4Df24
@@ -46,16 +46,16 @@ contract AuraAccountFactory {
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @notice Deploy the factory with the mandatory P256MFAValidator address
-     * @param _p256MFAValidator The P256MFAValidatorModule address (mandatory for all accounts)
+     * @notice Deploy the factory with the default validator address
+     * @param _validator The default validator module address (used for all accounts)
      */
-    constructor(address _p256MFAValidator) {
-        if (_p256MFAValidator == address(0)) revert InvalidValidator();
+    constructor(address _validator) {
+        if (_validator == address(0)) revert InvalidValidator();
 
         // Deploy the implementation
         accountImplementation = address(new AuraAccount());
-        // Set the mandatory validator
-        p256MFAValidator = _p256MFAValidator;
+        // Set the default validator
+        validator = _validator;
         // Use Solady's canonical ERC1967Factory (saves deployment gas)
         PROXY_FACTORY = ERC1967Factory(ERC1967FactoryConstants.ADDRESS);
     }
@@ -65,9 +65,9 @@ contract AuraAccountFactory {
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @notice Create a new modular account with P256MFAValidator as mandatory default
+     * @notice Create a new modular account with the configured default validator
      * @param owner The owner address (e.g., Web3Auth address)
-     * @param validatorData Initialization data for the P256MFAValidator
+     * @param validatorData Initialization data for the validator
      * @param hook The global hook address (optional, address(0) for none)
      * @param hookData Initialization data for the hook
      * @param salt Salt for CREATE2 deterministic deployment
@@ -92,12 +92,12 @@ contract AuraAccountFactory {
         bytes32 finalSalt = _computeSalt(owner, salt);
 
         // Deploy proxy using Solady's canonical ERC1967Factory
-        // Always initialize with P256MFAValidator as the mandatory default
+        // Initialize with the configured default validator
         account = PROXY_FACTORY.deployDeterministicAndCall(
             accountImplementation,
             address(0), // No admin - proxies are not upgradeable
             finalSalt,
-            abi.encodeCall(AuraAccount.initialize, (p256MFAValidator, validatorData, hook, hookData))
+            abi.encodeCall(AuraAccount.initialize, (validator, validatorData, hook, hookData))
         );
 
         emit AccountCreated(account, owner, salt);

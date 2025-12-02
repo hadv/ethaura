@@ -123,22 +123,22 @@ contract AuraAccount is IAccount, IERC7579Account, Initializable {
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @notice Initialize the account with a default validator
-     * @param defaultValidator The default validator module address
+     * @notice Initialize the account with a validator
+     * @param validator The validator module address
      * @param validatorData Initialization data for the validator
      * @param hook The global hook address (optional, address(0) for none)
      * @param hookData Initialization data for the hook
      */
-    function initialize(address defaultValidator, bytes calldata validatorData, address hook, bytes calldata hookData)
+    function initialize(address validator, bytes calldata validatorData, address hook, bytes calldata hookData)
         external
         initializer
     {
-        // Validator is required - factory enforces P256MFAValidator as default
-        if (defaultValidator == address(0)) revert InvalidValidator();
+        // Validator is required
+        if (validator == address(0)) revert InvalidValidator();
 
         // Install the single validator
-        _validator = defaultValidator;
-        IValidator(defaultValidator).onInstall(validatorData);
+        _validator = validator;
+        IValidator(validator).onInstall(validatorData);
 
         // Install hook if provided
         if (hook != address(0)) {
