@@ -7,6 +7,13 @@ evm_version = "cancun"
 optimizer = true
 optimizer_runs = 1000000
 via_ir = true
+remappings = [
+    "@openzeppelin/=lib/openzeppelin-contracts/",
+    "@account-abstraction/=lib/account-abstraction/contracts/",
+    "forge-std/=lib/forge-std/src/",
+    "@erc7579/=lib/erc7579-implementation/src/",
+    "solady/=lib/solady/src/"
+]
 
 [rpc_endpoints]
 sepolia = "${SEPOLIA_RPC_URL}"
