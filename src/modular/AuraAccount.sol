@@ -92,6 +92,7 @@ contract AuraAccount is IAccount, IERC7579Account, Initializable {
     error ExecutionFailed();
     error InvalidValidator();
     error NoValidatorInstalled();
+    error CannotRemoveLastValidator();
 
     /*//////////////////////////////////////////////////////////////
                                MODIFIERS
@@ -405,6 +406,11 @@ contract AuraAccount is IAccount, IERC7579Account, Initializable {
     function _uninstallValidator(address validator, bytes calldata data) internal {
         if (_validators[validator] == address(0)) {
             revert ModuleNotInstalled(validator);
+        }
+
+        // CRITICAL: Prevent uninstalling the last validator (would permanently lock account)
+        if (_validatorCount == 1) {
+            revert CannotRemoveLastValidator();
         }
 
         // Find previous in linked list

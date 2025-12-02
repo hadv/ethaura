@@ -280,6 +280,36 @@ contract AuraAccountTest is Test {
         account.uninstallModule(MODULE_TYPE_EXECUTOR, address(executor), "");
     }
 
+    function test_RevertUninstallLastValidator() public {
+        // Account has only one validator installed (from setUp)
+        assertEq(account.getValidatorCount(), 1);
+
+        // Trying to uninstall the last validator should revert
+        vm.prank(ENTRYPOINT);
+        vm.expectRevert(AuraAccount.CannotRemoveLastValidator.selector);
+        account.uninstallModule(MODULE_TYPE_VALIDATOR, address(validator), "");
+
+        // Validator should still be installed
+        assertTrue(account.isModuleInstalled(MODULE_TYPE_VALIDATOR, address(validator), ""));
+    }
+
+    function test_UninstallValidatorWithMultiple() public {
+        // Install a second validator
+        MockValidator validator2 = new MockValidator();
+        vm.prank(ENTRYPOINT);
+        account.installModule(MODULE_TYPE_VALIDATOR, address(validator2), abi.encode(true));
+        assertEq(account.getValidatorCount(), 2);
+
+        // Now we can uninstall one validator (not the last)
+        vm.prank(ENTRYPOINT);
+        account.uninstallModule(MODULE_TYPE_VALIDATOR, address(validator2), "");
+
+        // Should have one validator remaining
+        assertEq(account.getValidatorCount(), 1);
+        assertTrue(account.isModuleInstalled(MODULE_TYPE_VALIDATOR, address(validator), ""));
+        assertFalse(account.isModuleInstalled(MODULE_TYPE_VALIDATOR, address(validator2), ""));
+    }
+
     /*//////////////////////////////////////////////////////////////
                           ERC-1271 TESTS
     //////////////////////////////////////////////////////////////*/
