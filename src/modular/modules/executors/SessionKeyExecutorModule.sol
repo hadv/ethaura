@@ -25,13 +25,13 @@ contract SessionKeyExecutorModule is IExecutor {
 
     /// @notice Session key permission structure
     struct SessionKeyPermission {
-        address sessionKey;         // EOA that can sign
-        uint48 validAfter;          // Start timestamp
-        uint48 validUntil;          // Expiry timestamp
-        address[] allowedTargets;   // Contracts it can call (empty = any)
-        bytes4[] allowedSelectors;  // Functions it can call (empty = any)
-        uint256 spendLimitPerTx;    // Max ETH per transaction (0 = unlimited)
-        uint256 spendLimitTotal;    // Max ETH total (0 = unlimited)
+        address sessionKey; // EOA that can sign
+        uint48 validAfter; // Start timestamp
+        uint48 validUntil; // Expiry timestamp
+        address[] allowedTargets; // Contracts it can call (empty = any)
+        bytes4[] allowedSelectors; // Functions it can call (empty = any)
+        uint256 spendLimitPerTx; // Max ETH per transaction (0 = unlimited)
+        uint256 spendLimitTotal; // Max ETH total (0 = unlimited)
     }
 
     /// @notice Internal storage for a session key
@@ -42,7 +42,7 @@ contract SessionKeyExecutorModule is IExecutor {
         uint256 spendLimitPerTx;
         uint256 spendLimitTotal;
         uint256 spentTotal;
-        uint256 nonce;              // Replay protection
+        uint256 nonce; // Replay protection
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -78,11 +78,7 @@ contract SessionKeyExecutorModule is IExecutor {
     event SessionKeyRevoked(address indexed account, address indexed sessionKey);
     event SessionKeySpent(address indexed account, address indexed sessionKey, uint256 amount);
     event SessionKeyExecuted(
-        address indexed account,
-        address indexed sessionKey,
-        address target,
-        uint256 value,
-        bytes4 selector
+        address indexed account, address indexed sessionKey, address target, uint256 value, bytes4 selector
     );
 
     /*//////////////////////////////////////////////////////////////
@@ -192,16 +188,7 @@ contract SessionKeyExecutorModule is IExecutor {
         if (nonce != keyData.nonce) revert InvalidNonce();
 
         // Verify signature
-        bytes32 messageHash = keccak256(
-            abi.encodePacked(
-                account,
-                target,
-                value,
-                keccak256(data),
-                nonce,
-                block.chainid
-            )
-        );
+        bytes32 messageHash = keccak256(abi.encodePacked(account, target, value, keccak256(data), nonce, block.chainid));
         address recovered = messageHash.toEthSignedMessageHash().recover(signature);
         if (recovered != sessionKey) revert InvalidSignature();
 
@@ -220,18 +207,10 @@ contract SessionKeyExecutorModule is IExecutor {
         ++keyData.nonce;
 
         // Execute via the account
-        bytes[] memory results = IERC7579Account(account).executeFromExecutor(
-            _encodeExecutionMode(),
-            abi.encodePacked(target, value, data)
-        );
+        bytes[] memory results =
+            IERC7579Account(account).executeFromExecutor(_encodeExecutionMode(), abi.encodePacked(target, value, data));
 
-        emit SessionKeyExecuted(
-            account,
-            sessionKey,
-            target,
-            value,
-            data.length >= 4 ? bytes4(data[:4]) : bytes4(0)
-        );
+        emit SessionKeyExecuted(account, sessionKey, target, value, data.length >= 4 ? bytes4(data[:4]) : bytes4(0));
 
         // Return first result (single execution)
         return results.length > 0 ? results[0] : bytes("");
