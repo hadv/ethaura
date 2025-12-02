@@ -86,30 +86,20 @@ bytes32 constant P256_MFA_VALIDATOR_STORAGE_LOCATION =
     keccak256(abi.encode(uint256(keccak256("ethaura.storage.P256MFAValidatorModule")) - 1)) & ~bytes32(uint256(0xff));
 ```
 
-### GuardianManagerModule Storage
-
-**Namespace:** `ethaura.storage.GuardianManagerModule`
-
-```solidity
-/// @custom:storage-location erc7201:ethaura.storage.GuardianManagerModule
-struct GuardianStorage {
-    mapping(address account => mapping(address guardian => bool)) isGuardian;
-    mapping(address account => address[]) guardianList;
-    mapping(address account => uint256) threshold;
-}
-
-bytes32 constant GUARDIAN_STORAGE_LOCATION = 
-    keccak256(abi.encode(uint256(keccak256("ethaura.storage.GuardianManagerModule")) - 1)) & ~bytes32(uint256(0xff));
-```
-
 ### SocialRecoveryModule Storage
 
 **Namespace:** `ethaura.storage.SocialRecoveryModule`
 
+Combines guardian management and recovery in a single module.
+
 ```solidity
 /// @custom:storage-location erc7201:ethaura.storage.SocialRecoveryModule
-struct RecoveryStorage {
-    // Per-account configuration
+struct SocialRecoveryStorage {
+    // Guardian management
+    mapping(address account => mapping(address guardian => bool)) isGuardian;
+    mapping(address account => address[]) guardianList;
+
+    // Recovery configuration
     mapping(address account => RecoveryConfig) config;
 
     // Recovery requests
@@ -137,7 +127,7 @@ struct RecoveryRequest {
     bool cancelled;
 }
 
-bytes32 constant RECOVERY_STORAGE_LOCATION =
+bytes32 constant SOCIAL_RECOVERY_STORAGE_LOCATION =
     keccak256(abi.encode(uint256(keccak256("ethaura.storage.SocialRecoveryModule")) - 1)) & ~bytes32(uint256(0xff));
 ```
 
@@ -220,7 +210,6 @@ bytes32 constant LARGE_TX_GUARD_STORAGE_LOCATION =
 |-----------|-----------|---------------------|
 | P256ModularAccount | ethaura.storage.P256ModularAccount | 0x... (calculated at compile) |
 | P256MFAValidatorModule | ethaura.storage.P256MFAValidatorModule | 0x... |
-| GuardianManagerModule | ethaura.storage.GuardianManagerModule | 0x... |
 | SocialRecoveryModule | ethaura.storage.SocialRecoveryModule | 0x... |
 | HookManagerModule | ethaura.storage.HookManagerModule | 0x... |
 | LargeTransactionExecutorModule | ethaura.storage.LargeTransactionExecutorModule | 0x... |

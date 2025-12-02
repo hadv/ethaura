@@ -14,8 +14,7 @@ P256ModularAccount (Core Account)
 │
 ├── Executors (Type 2)
 │   ├── PasskeyManagerModule - Add/remove passkeys
-│   ├── GuardianManagerModule - Guardian CRUD operations
-│   ├── SocialRecoveryModule - Recovery with threshold + timelock
+│   ├── SocialRecoveryModule - Guardian management + recovery with threshold + timelock
 │   ├── HookManagerModule - Install/uninstall user hooks
 │   └── LargeTransactionExecutorModule - Timelock for high-value txs (built-in, disabled by default)
 │
@@ -155,34 +154,17 @@ interface IPasskeyManagerModule is IExecutor {
 }
 ```
 
-### 3. GuardianManagerModule (Type 2)
+### 3. SocialRecoveryModule (Type 2)
 
-**Purpose:** Manage guardians for social recovery
+**Purpose:** Guardian management + social recovery with **threshold** and **timelock**
 
 **Storage (per account):**
 ```solidity
+// Guardian management
 mapping(address account => mapping(address guardian => bool)) guardians;
 mapping(address account => address[]) guardianList;
-mapping(address account => uint256) guardianThreshold;
-```
 
-**Interface:**
-```solidity
-interface IGuardianManagerModule is IExecutor {
-    function addGuardian(address guardian) external;
-    function removeGuardian(address guardian) external;
-    function setThreshold(uint256 threshold) external;
-    function getGuardians(address account) external view returns (address[] memory);
-    function isGuardian(address account, address guardian) external view returns (bool);
-}
-```
-
-### 4. SocialRecoveryModule (Type 2)
-
-**Purpose:** Handle social recovery with **threshold** and **timelock**
-
-**Storage (per account):**
-```solidity
+// Recovery configuration
 struct RecoveryConfig {
     uint256 threshold;          // e.g., 2 for "2 of 3 guardians"
     uint256 timelockPeriod;     // e.g., 24 hours (86400 seconds)
@@ -209,7 +191,14 @@ mapping(address account => mapping(uint256 => RecoveryRequest)) recoveryRequests
 **Interface:**
 ```solidity
 interface ISocialRecoveryModule is IExecutor {
-    // Configuration (called by account owner)
+    // Guardian management (called by account owner)
+    function addGuardian(address guardian) external;
+    function removeGuardian(address guardian) external;
+    function getGuardians(address account) external view returns (address[] memory);
+    function isGuardian(address account, address guardian) external view returns (bool);
+    function getGuardianCount(address account) external view returns (uint256);
+
+    // Recovery configuration (called by account owner)
     function setRecoveryConfig(uint256 threshold, uint256 timelockPeriod) external;
     function getRecoveryConfig(address account) external view returns (uint256 threshold, uint256 timelockPeriod);
 
