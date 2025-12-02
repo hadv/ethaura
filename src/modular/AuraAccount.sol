@@ -27,7 +27,6 @@ import {
     CALLTYPE_SINGLE,
     CALLTYPE_BATCH,
     CALLTYPE_STATIC,
-    CALLTYPE_DELEGATECALL,
     EXECTYPE_DEFAULT,
     EXECTYPE_TRY
 } from "@erc7579/lib/ModeLib.sol";
@@ -233,9 +232,9 @@ contract AuraAccount is IAccount, IERC7579Account, Initializable {
             returnData = _executeBatch(executionCalldata, execType);
         } else if (callType == CALLTYPE_STATIC) {
             returnData = _executeStatic(executionCalldata);
-        } else if (callType == CALLTYPE_DELEGATECALL) {
-            returnData = _executeDelegatecall(executionCalldata, execType);
         } else {
+            // CALLTYPE_DELEGATECALL and other modes are not supported
+            // Delegatecall is disabled for security - can corrupt account storage
             revert UnsupportedExecutionMode(mode);
         }
     }
@@ -290,26 +289,6 @@ contract AuraAccount is IAccount, IERC7579Account, Initializable {
         (success, returnData[0]) = target.staticcall(data);
 
         if (!success) {
-            revert ExecutionFailed();
-        }
-    }
-
-    /**
-     * @notice Execute a delegate call (DANGEROUS - use with care)
-     */
-    function _executeDelegatecall(bytes calldata executionCalldata, ExecType execType)
-        internal
-        returns (bytes[] memory returnData)
-    {
-        (address target,, bytes calldata data) = ExecutionLib.decodeSingle(executionCalldata);
-
-        // TODO: Add whitelist check for delegatecall targets
-
-        returnData = new bytes[](1);
-        bool success;
-        (success, returnData[0]) = target.delegatecall(data);
-
-        if (execType == EXECTYPE_DEFAULT && !success) {
             revert ExecutionFailed();
         }
     }
@@ -485,14 +464,10 @@ contract AuraAccount is IAccount, IERC7579Account, Initializable {
     function supportsExecutionMode(ModeCode mode) external pure returns (bool) {
         (CallType callType, ExecType execType,,) = ModeLib.decode(mode);
 
-        // Support single, batch, static calls
+        // Support single, batch, static calls only
+        // Delegatecall is disabled for security - can corrupt account storage
         if (callType == CALLTYPE_SINGLE || callType == CALLTYPE_BATCH || callType == CALLTYPE_STATIC) {
             // Support default and try exec types
-            return execType == EXECTYPE_DEFAULT || execType == EXECTYPE_TRY;
-        }
-
-        // Delegatecall is optional and dangerous
-        if (callType == CALLTYPE_DELEGATECALL) {
             return execType == EXECTYPE_DEFAULT || execType == EXECTYPE_TRY;
         }
 
