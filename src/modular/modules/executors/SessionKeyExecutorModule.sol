@@ -1,26 +1,22 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.23;
 
-import {PackedUserOperation} from "@account-abstraction/interfaces/PackedUserOperation.sol";
-import {
-    IModule,
-    IValidator,
-    MODULE_TYPE_VALIDATOR,
-    VALIDATION_SUCCESS,
-    VALIDATION_FAILED
-} from "@erc7579/interfaces/IERC7579Module.sol";
+import {IModule, IExecutor, MODULE_TYPE_EXECUTOR} from "@erc7579/interfaces/IERC7579Module.sol";
+import {IERC7579Account} from "@erc7579/interfaces/IERC7579Account.sol";
+import {ModeLib, ModeCode} from "@erc7579/lib/ModeLib.sol";
 import {ECDSA} from "solady/utils/ECDSA.sol";
 
 /**
- * @title SessionKeyValidatorModule
- * @notice ERC-7579 Validator Module for Session Keys with permissions and spending limits
- * @dev Enables gasless, signature-less transactions for dApps (gaming, trading bots, etc.)
+ * @title SessionKeyExecutorModule
+ * @notice ERC-7579 Executor Module for Session Keys with permissions and spending limits
+ * @dev Enables delegated execution for dApps (gaming, trading bots, etc.)
  *      - Session keys are EOAs with limited permissions
  *      - Supports time-bounded sessions (validAfter, validUntil)
  *      - Supports target/selector whitelisting
  *      - Supports per-tx and total spending limits
+ *      - Execution via executeFromExecutor (not validateUserOp)
  */
-contract SessionKeyValidatorModule is IValidator {
+contract SessionKeyExecutorModule is IExecutor {
     using ECDSA for bytes32;
 
     /*//////////////////////////////////////////////////////////////
@@ -29,13 +25,13 @@ contract SessionKeyValidatorModule is IValidator {
 
     /// @notice Session key permission structure
     struct SessionKeyPermission {
-        address sessionKey; // EOA that can sign
-        uint48 validAfter; // Start timestamp
-        uint48 validUntil; // Expiry timestamp
-        address[] allowedTargets; // Contracts it can call (empty = any)
-        bytes4[] allowedSelectors; // Functions it can call (empty = any)
-        uint256 spendLimitPerTx; // Max ETH per transaction (0 = unlimited)
-        uint256 spendLimitTotal; // Max ETH total (0 = unlimited)
+        address sessionKey;         // EOA that can sign
+        uint48 validAfter;          // Start timestamp
+        uint48 validUntil;          // Expiry timestamp
+        address[] allowedTargets;   // Contracts it can call (empty = any)
+        bytes4[] allowedSelectors;  // Functions it can call (empty = any)
+        uint256 spendLimitPerTx;    // Max ETH per transaction (0 = unlimited)
+        uint256 spendLimitTotal;    // Max ETH total (0 = unlimited)
     }
 
     /// @notice Internal storage for a session key
@@ -46,15 +42,15 @@ contract SessionKeyValidatorModule is IValidator {
         uint256 spendLimitPerTx;
         uint256 spendLimitTotal;
         uint256 spentTotal;
-        // Stored separately for gas efficiency
+        uint256 nonce;              // Replay protection
     }
 
     /*//////////////////////////////////////////////////////////////
                           ERC-7201 STORAGE
     //////////////////////////////////////////////////////////////*/
 
-    /// @custom:storage-location erc7201:ethaura.storage.SessionKeyValidatorModule
-    struct SessionKeyValidatorStorage {
+    /// @custom:storage-location erc7201:ethaura.storage.SessionKeyExecutorModule
+    struct SessionKeyExecutorStorage {
         // Per-account session key storage
         mapping(address account => mapping(address sessionKey => SessionKeyData)) sessionKeys;
         mapping(address account => address[]) sessionKeyList;
@@ -62,18 +58,15 @@ contract SessionKeyValidatorModule is IValidator {
         // Target/selector permissions stored separately
         mapping(address account => mapping(address sessionKey => address[])) allowedTargets;
         mapping(address account => mapping(address sessionKey => bytes4[])) allowedSelectors;
-        // Account owner (can manage session keys)
-        mapping(address account => address) owners;
     }
 
-    // keccak256(abi.encode(uint256(keccak256("ethaura.storage.SessionKeyValidatorModule")) - 1)) & ~bytes32(uint256(0xff))
-    bytes32 private constant STORAGE_LOCATION = 0x96ac80b66f1fc01632bfcc8f443eba4e1a9afd53fde13b3cf2ab8d3626e18300;
+    // keccak256(abi.encode(uint256(keccak256("ethaura.storage.SessionKeyExecutorModule")) - 1)) & ~bytes32(uint256(0xff))
+    bytes32 private constant STORAGE_LOCATION = 0x7f8c9a3e5d1b2c4a6e8f0d2c4b6a8e0f2d4c6b8a0e2f4d6c8b0a2e4f6d8c0b00;
 
     /*//////////////////////////////////////////////////////////////
                                 EVENTS
     //////////////////////////////////////////////////////////////*/
 
-    event OwnerSet(address indexed account, address indexed owner);
     event SessionKeyCreated(
         address indexed account,
         address indexed sessionKey,
@@ -84,13 +77,18 @@ contract SessionKeyValidatorModule is IValidator {
     );
     event SessionKeyRevoked(address indexed account, address indexed sessionKey);
     event SessionKeySpent(address indexed account, address indexed sessionKey, uint256 amount);
+    event SessionKeyExecuted(
+        address indexed account,
+        address indexed sessionKey,
+        address target,
+        uint256 value,
+        bytes4 selector
+    );
 
     /*//////////////////////////////////////////////////////////////
                                 ERRORS
     //////////////////////////////////////////////////////////////*/
 
-    error OnlyOwner();
-    error InvalidOwner();
     error InvalidSessionKey();
     error SessionKeyAlreadyExists();
     error SessionKeyDoesNotExist();
@@ -103,12 +101,14 @@ contract SessionKeyValidatorModule is IValidator {
     error SpendLimitTotalExceeded();
     error InvalidSignature();
     error InvalidTimeRange();
+    error InvalidNonce();
+    error SelfCallNotAllowed();
 
     /*//////////////////////////////////////////////////////////////
                           STORAGE ACCESS
     //////////////////////////////////////////////////////////////*/
 
-    function _getStorage() internal pure returns (SessionKeyValidatorStorage storage $) {
+    function _getStorage() internal pure returns (SessionKeyExecutorStorage storage $) {
         bytes32 location = STORAGE_LOCATION;
         assembly {
             $.slot := location
@@ -120,20 +120,13 @@ contract SessionKeyValidatorModule is IValidator {
     //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IModule
-    function onInstall(bytes calldata data) external override {
-        SessionKeyValidatorStorage storage $ = _getStorage();
-
-        // Decode: owner
-        address owner = abi.decode(data, (address));
-        if (owner == address(0)) revert InvalidOwner();
-
-        $.owners[msg.sender] = owner;
-        emit OwnerSet(msg.sender, owner);
+    function onInstall(bytes calldata) external override {
+        // No initialization needed - session keys are created separately
     }
 
     /// @inheritdoc IModule
     function onUninstall(bytes calldata) external override {
-        SessionKeyValidatorStorage storage $ = _getStorage();
+        SessionKeyExecutorStorage storage $ = _getStorage();
 
         // Revoke all session keys
         address[] storage keys = $.sessionKeyList[msg.sender];
@@ -145,102 +138,116 @@ contract SessionKeyValidatorModule is IValidator {
         }
         delete $.sessionKeyList[msg.sender];
         delete $.sessionKeyCount[msg.sender];
-        delete $.owners[msg.sender];
     }
 
     /// @inheritdoc IModule
     function isModuleType(uint256 moduleTypeId) external pure override returns (bool) {
-        return moduleTypeId == MODULE_TYPE_VALIDATOR;
+        return moduleTypeId == MODULE_TYPE_EXECUTOR;
     }
 
     /// @inheritdoc IModule
-    function isInitialized(address account) external view override returns (bool) {
-        return _getStorage().owners[account] != address(0);
+    function isInitialized(address) external pure override returns (bool) {
+        // Module is initialized if installed (checked by account)
+        return true;
     }
 
     /*//////////////////////////////////////////////////////////////
-                      IValidator INTERFACE
+                      SESSION KEY EXECUTION
     //////////////////////////////////////////////////////////////*/
 
-    /// @inheritdoc IValidator
-    /// @dev Signature format: [validator(20B)][sessionKey(20B)][ecdsaSig(65B)]
-    ///      - First 20 bytes: validator address (already validated by AuraAccount)
-    ///      - Next 20 bytes: session key address
-    ///      - Last 65 bytes: ECDSA signature from session key
-    function validateUserOp(PackedUserOperation calldata userOp, bytes32 userOpHash)
-        external
-        override
-        returns (uint256)
-    {
-        SessionKeyValidatorStorage storage $ = _getStorage();
-        address account = msg.sender;
+    /**
+     * @notice Execute a transaction using a session key
+     * @dev Anyone can call this (relayer pattern), but signature must be valid
+     * @param account The account to execute from
+     * @param sessionKey The session key that signed the request
+     * @param target The target contract to call
+     * @param value The ETH value to send
+     * @param data The calldata to send
+     * @param nonce The session key nonce (for replay protection)
+     * @param signature The ECDSA signature from the session key
+     */
+    function executeWithSessionKey(
+        address account,
+        address sessionKey,
+        address target,
+        uint256 value,
+        bytes calldata data,
+        uint256 nonce,
+        bytes calldata signature
+    ) external returns (bytes memory) {
+        SessionKeyExecutorStorage storage $ = _getStorage();
 
-        // Signature format: [validator(20B)][sessionKey(20B)][ecdsaSig(65B)] = 105 bytes
-        bytes calldata fullSig = userOp.signature;
-        if (fullSig.length != 105) return VALIDATION_FAILED;
-
-        // Skip first 20 bytes (validator address)
-        address sessionKey = address(bytes20(fullSig[20:40]));
-        bytes calldata ecdsaSig = fullSig[40:105];
+        // Prevent self-calls (could be used to bypass permissions)
+        if (target == account) revert SelfCallNotAllowed();
 
         // Check session key exists and is active
         SessionKeyData storage keyData = $.sessionKeys[account][sessionKey];
-        if (!keyData.active) return VALIDATION_FAILED;
+        if (!keyData.active) revert SessionKeyNotActive();
 
         // Check time bounds
-        if (block.timestamp < keyData.validAfter) return VALIDATION_FAILED;
-        if (block.timestamp > keyData.validUntil) return VALIDATION_FAILED;
+        if (block.timestamp < keyData.validAfter) revert SessionKeyNotYetValid();
+        if (block.timestamp > keyData.validUntil) revert SessionKeyExpired();
 
-        // Verify ECDSA signature
-        address recovered = userOpHash.toEthSignedMessageHash().recover(ecdsaSig);
-        if (recovered != sessionKey) return VALIDATION_FAILED;
+        // Check nonce
+        if (nonce != keyData.nonce) revert InvalidNonce();
 
-        // Validate target and selector permissions
-        if (!_validatePermissions(account, sessionKey, userOp)) return VALIDATION_FAILED;
+        // Verify signature
+        bytes32 messageHash = keccak256(
+            abi.encodePacked(
+                account,
+                target,
+                value,
+                keccak256(data),
+                nonce,
+                block.chainid
+            )
+        );
+        address recovered = messageHash.toEthSignedMessageHash().recover(signature);
+        if (recovered != sessionKey) revert InvalidSignature();
+
+        // Validate target permissions
+        _validateTarget(account, sessionKey, target);
+
+        // Validate selector permissions
+        if (data.length >= 4) {
+            _validateSelector(account, sessionKey, bytes4(data[:4]));
+        }
 
         // Validate and update spending limits
-        uint256 txValue = _extractValue(userOp);
-        if (!_validateAndUpdateSpending(account, sessionKey, txValue)) return VALIDATION_FAILED;
+        _validateAndUpdateSpending(account, sessionKey, value);
 
-        return VALIDATION_SUCCESS;
-    }
+        // Increment nonce
+        ++keyData.nonce;
 
-    /// @inheritdoc IValidator
-    /// @dev Signature format: [validator(20B)][sessionKey(20B)][ecdsaSig(65B)] = 105 bytes
-    function isValidSignatureWithSender(address sender, bytes32 hash, bytes calldata signature)
-        external
-        view
-        override
-        returns (bytes4)
-    {
-        SessionKeyValidatorStorage storage $ = _getStorage();
+        // Execute via the account
+        bytes[] memory results = IERC7579Account(account).executeFromExecutor(
+            _encodeExecutionMode(),
+            abi.encodePacked(target, value, data)
+        );
 
-        // Signature format: [validator(20B)][sessionKey(20B)][ecdsaSig(65B)] = 105 bytes
-        if (signature.length != 105) return bytes4(0xffffffff);
+        emit SessionKeyExecuted(
+            account,
+            sessionKey,
+            target,
+            value,
+            data.length >= 4 ? bytes4(data[:4]) : bytes4(0)
+        );
 
-        // Skip first 20 bytes (validator address)
-        address sessionKey = address(bytes20(signature[20:40]));
-        bytes calldata ecdsaSig = signature[40:105];
-
-        SessionKeyData storage keyData = $.sessionKeys[sender][sessionKey];
-        if (!keyData.active) return bytes4(0xffffffff);
-        if (block.timestamp < keyData.validAfter) return bytes4(0xffffffff);
-        if (block.timestamp > keyData.validUntil) return bytes4(0xffffffff);
-
-        address recovered = hash.toEthSignedMessageHash().recover(ecdsaSig);
-        if (recovered != sessionKey) return bytes4(0xffffffff);
-
-        return bytes4(0x1626ba7e); // ERC1271_MAGIC_VALUE
+        // Return first result (single execution)
+        return results.length > 0 ? results[0] : bytes("");
     }
 
     /*//////////////////////////////////////////////////////////////
                       SESSION KEY MANAGEMENT
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Create a new session key with permissions
-    /// @param permission The session key permission structure
+    /**
+     * @notice Create a new session key with permissions
+     * @dev Only the account can call this (via execute)
+     * @param permission The session key permission structure
+     */
     function createSessionKey(SessionKeyPermission calldata permission) external {
-        SessionKeyValidatorStorage storage $ = _getStorage();
+        SessionKeyExecutorStorage storage $ = _getStorage();
         address account = msg.sender;
 
         if (permission.sessionKey == address(0)) revert InvalidSessionKey();
@@ -254,7 +261,8 @@ contract SessionKeyValidatorModule is IValidator {
             validUntil: permission.validUntil,
             spendLimitPerTx: permission.spendLimitPerTx,
             spendLimitTotal: permission.spendLimitTotal,
-            spentTotal: 0
+            spentTotal: 0,
+            nonce: 0
         });
 
         // Store allowed targets and selectors
@@ -279,10 +287,13 @@ contract SessionKeyValidatorModule is IValidator {
         );
     }
 
-    /// @notice Revoke a session key
-    /// @param sessionKey The session key address to revoke
+    /**
+     * @notice Revoke a session key
+     * @dev Only the account can call this (via execute)
+     * @param sessionKey The session key address to revoke
+     */
     function revokeSessionKey(address sessionKey) external {
-        SessionKeyValidatorStorage storage $ = _getStorage();
+        SessionKeyExecutorStorage storage $ = _getStorage();
         address account = msg.sender;
 
         if (!$.sessionKeys[account][sessionKey].active) revert SessionKeyDoesNotExist();
@@ -312,11 +323,6 @@ contract SessionKeyValidatorModule is IValidator {
                           VIEW FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Get owner of an account
-    function getOwner(address account) external view returns (address) {
-        return _getStorage().owners[account];
-    }
-
     /// @notice Get session key data
     function getSessionKey(address account, address sessionKey)
         external
@@ -327,12 +333,20 @@ contract SessionKeyValidatorModule is IValidator {
             uint48 validUntil,
             uint256 spendLimitPerTx,
             uint256 spendLimitTotal,
-            uint256 spentTotal
+            uint256 spentTotal,
+            uint256 nonce
         )
     {
         SessionKeyData storage data = _getStorage().sessionKeys[account][sessionKey];
-        return
-            (data.active, data.validAfter, data.validUntil, data.spendLimitPerTx, data.spendLimitTotal, data.spentTotal);
+        return (
+            data.active,
+            data.validAfter,
+            data.validUntil,
+            data.spendLimitPerTx,
+            data.spendLimitTotal,
+            data.spentTotal,
+            data.nonce
+        );
     }
 
     /// @notice Get session key count for an account
@@ -361,106 +375,67 @@ contract SessionKeyValidatorModule is IValidator {
         return data.active && block.timestamp >= data.validAfter && block.timestamp <= data.validUntil;
     }
 
+    /// @notice Get the current nonce for a session key
+    function getSessionKeyNonce(address account, address sessionKey) external view returns (uint256) {
+        return _getStorage().sessionKeys[account][sessionKey].nonce;
+    }
+
     /*//////////////////////////////////////////////////////////////
                       INTERNAL FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
-    /// @dev Validate target and selector permissions
-    function _validatePermissions(address account, address sessionKey, PackedUserOperation calldata userOp)
-        internal
-        view
-        returns (bool)
-    {
-        SessionKeyValidatorStorage storage $ = _getStorage();
-
-        // Extract target and selector from callData
-        // callData format: execute(mode, executionCalldata) where executionCalldata = (target, value, data)
-        if (userOp.callData.length < 4) return true; // No call to validate
-
-        bytes4 executeSelector = bytes4(userOp.callData[:4]);
-
-        // Only validate for execute calls
-        if (executeSelector != bytes4(keccak256("execute(bytes32,bytes)"))) return true;
-
-        // Decode the execution calldata to get target
-        // Skip first 4 bytes (selector) + 32 bytes (mode) + 32 bytes (offset) + 32 bytes (length)
-        if (userOp.callData.length < 100) return true;
-
-        // The executionCalldata contains: target (20 bytes) + value (32 bytes) + data
-        bytes calldata execData = userOp.callData[100:];
-        if (execData.length < 52) return true;
-
-        address target = address(bytes20(execData[:20]));
-        bytes4 selector = bytes4(0);
-        if (execData.length >= 56) {
-            // data starts at offset 52, selector is first 4 bytes
-            selector = bytes4(execData[52:56]);
-        }
-
-        // Check allowed targets (empty = any target allowed)
+    /// @dev Validate target permissions
+    function _validateTarget(address account, address sessionKey, address target) internal view {
+        SessionKeyExecutorStorage storage $ = _getStorage();
         address[] storage targets = $.allowedTargets[account][sessionKey];
-        if (targets.length > 0) {
-            bool targetAllowed = false;
-            for (uint256 i = 0; i < targets.length; i++) {
-                if (targets[i] == target) {
-                    targetAllowed = true;
-                    break;
-                }
-            }
-            if (!targetAllowed) return false;
-        }
 
-        // Check allowed selectors (empty = any selector allowed)
+        // Empty = any target allowed
+        if (targets.length == 0) return;
+
+        for (uint256 i = 0; i < targets.length; i++) {
+            if (targets[i] == target) return;
+        }
+        revert TargetNotAllowed();
+    }
+
+    /// @dev Validate selector permissions
+    function _validateSelector(address account, address sessionKey, bytes4 selector) internal view {
+        SessionKeyExecutorStorage storage $ = _getStorage();
         bytes4[] storage selectors = $.allowedSelectors[account][sessionKey];
-        if (selectors.length > 0 && selector != bytes4(0)) {
-            bool selectorAllowed = false;
-            for (uint256 i = 0; i < selectors.length; i++) {
-                if (selectors[i] == selector) {
-                    selectorAllowed = true;
-                    break;
-                }
-            }
-            if (!selectorAllowed) return false;
-        }
 
-        return true;
+        // Empty = any selector allowed
+        if (selectors.length == 0) return;
+
+        for (uint256 i = 0; i < selectors.length; i++) {
+            if (selectors[i] == selector) return;
+        }
+        revert SelectorNotAllowed();
     }
 
     /// @dev Validate and update spending limits
-    function _validateAndUpdateSpending(address account, address sessionKey, uint256 value) internal returns (bool) {
-        if (value == 0) return true;
+    function _validateAndUpdateSpending(address account, address sessionKey, uint256 value) internal {
+        if (value == 0) return;
 
-        SessionKeyValidatorStorage storage $ = _getStorage();
+        SessionKeyExecutorStorage storage $ = _getStorage();
         SessionKeyData storage keyData = $.sessionKeys[account][sessionKey];
 
         // Check per-tx limit (0 = unlimited)
         if (keyData.spendLimitPerTx > 0 && value > keyData.spendLimitPerTx) {
-            return false;
+            revert SpendLimitPerTxExceeded();
         }
 
         // Check total limit (0 = unlimited)
         if (keyData.spendLimitTotal > 0 && keyData.spentTotal + value > keyData.spendLimitTotal) {
-            return false;
+            revert SpendLimitTotalExceeded();
         }
 
         // Update spent amount
         keyData.spentTotal += value;
         emit SessionKeySpent(account, sessionKey, value);
-
-        return true;
     }
 
-    /// @dev Extract value from UserOperation
-    function _extractValue(PackedUserOperation calldata userOp) internal pure returns (uint256) {
-        // callData format: execute(mode, executionCalldata) where executionCalldata = (target, value, data)
-        if (userOp.callData.length < 132) return 0;
-
-        // Skip first 4 bytes (selector) + 32 bytes (mode) + 32 bytes (offset) + 32 bytes (length) + 20 bytes (target)
-        // Value is at offset 120 (20 bytes after target in executionCalldata)
-        bytes calldata execData = userOp.callData[100:];
-        if (execData.length < 52) return 0;
-
-        // Value is 32 bytes starting at offset 20 (after target address)
-        return uint256(bytes32(execData[20:52]));
+    /// @dev Encode execution mode for single call
+    function _encodeExecutionMode() internal pure returns (ModeCode) {
+        return ModeLib.encodeSimpleSingle();
     }
 }

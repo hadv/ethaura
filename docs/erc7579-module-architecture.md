@@ -10,12 +10,12 @@ This document describes the modular architecture for migrating P256Account to ER
 P256ModularAccount (Core Account)
 ├── Validators (Type 1)
 │   ├── P256MFAValidatorModule - Owner (mandatory) + Passkey (when MFA enabled)
-│   ├── SessionKeyValidatorModule - Session keys with time bounds, target restrictions, spending limits
 │   └── PQMFAValidatorModule - Dilithium + MFA (future: post-quantum)
 │
 ├── Executors (Type 2)
 │   ├── SocialRecoveryModule - Guardian management + recovery with threshold + timelock
 │   ├── HookManagerModule - Install/uninstall user hooks
+│   ├── SessionKeyExecutorModule - Session keys with time bounds, target restrictions, spending limits
 │   └── LargeTransactionExecutorModule - Timelock for high-value txs (built-in, disabled by default)
 │
 ├── Fallback (Type 3)
@@ -27,6 +27,12 @@ P256ModularAccount (Core Account)
         ├── LargeTransactionGuardHook - Built-in (disabled by default, threshold = type(uint256).max)
         └── User-installed hooks (WhitelistHook, SpendingLimitHook, etc.)
 ```
+
+**Why SessionKeyExecutorModule is an Executor (not Validator):**
+- Session keys have temporal validity (expire after `validUntil`)
+- If SessionKey was a Validator and user removed P256MFAValidator, the account would be permanently locked after session keys expire
+- As an Executor, P256MFAValidator remains the only validator, ensuring the "last validator" protection works correctly
+- Cleaner architecture: session keys are "delegated execution" not "alternative authentication"
 
 **Key Design Decisions:**
 - No separate ECDSAValidatorModule - recovery handled by SocialRecoveryModule (Executor)
@@ -105,7 +111,8 @@ AuraAccount uses **signature-based validator selection** instead of nonce-based 
 | Validator | Signature Format |
 |-----------|------------------|
 | P256MFAValidatorModule | `[validator(20B)][ownerSig(65B)][passkeySig(~70B)]` |
-| SessionKeyValidatorModule | `[validator(20B)][sessionKey(20B)][ecdsaSig(65B)]` |
+
+Note: SessionKeyExecutorModule is an Executor (not Validator), so it doesn't use the signature-based validator selection. Instead, it validates session key signatures internally when `executeWithSessionKey()` is called.
 
 ### Key Interfaces
 ```solidity
@@ -169,9 +176,17 @@ interface IP256MFAValidatorModule is IValidator {
 }
 ```
 
-### 2. SessionKeyValidatorModule (Type 1)
+## Executor Modules
 
-**Purpose:** Validate session key signatures with granular permissions for gasless/automated transactions
+### 2. SessionKeyExecutorModule (Type 2)
+
+**Purpose:** Execute transactions on behalf of the account using session keys with granular permissions for gasless/automated transactions
+
+**Why Executor (not Validator):**
+- Session keys have temporal validity (expire after `validUntil`)
+- If SessionKey was a Validator and user removed P256MFAValidator, the account would be permanently locked after session keys expire
+- As an Executor, P256MFAValidator remains the only validator, ensuring the "last validator" protection works correctly
+- Cleaner architecture: session keys are "delegated execution" not "alternative authentication"
 
 **Storage (per account):**
 ```solidity
@@ -198,14 +213,26 @@ mapping(address account => mapping(address sessionKey => SessionKeyData)) sessio
 mapping(address account => address[]) sessionKeyList;
 mapping(address account => mapping(address sessionKey => mapping(address target => bool))) allowedTargets;
 mapping(address account => mapping(address sessionKey => mapping(bytes4 selector => bool))) allowedSelectors;
+mapping(address account => mapping(address sessionKey => uint256)) nonces;  // Replay protection
 ```
 
 **Interface:**
 ```solidity
-interface ISessionKeyValidatorModule is IValidator {
+interface ISessionKeyExecutorModule is IExecutor {
     // Session key management (called by account)
     function createSessionKey(SessionKeyPermission calldata permission) external;
     function revokeSessionKey(address sessionKey) external;
+
+    // Execution (called by anyone with valid session key signature)
+    function executeWithSessionKey(
+        address account,
+        address sessionKey,
+        address target,
+        uint256 value,
+        bytes calldata data,
+        uint256 nonce,
+        bytes calldata signature
+    ) external returns (bytes memory);
 
     // View functions
     function getSessionKey(address account, address sessionKey)
@@ -216,6 +243,7 @@ interface ISessionKeyValidatorModule is IValidator {
     function isSessionKeyValid(address account, address sessionKey) external view returns (bool);
     function isTargetAllowed(address account, address sessionKey, address target) external view returns (bool);
     function isSelectorAllowed(address account, address sessionKey, bytes4 selector) external view returns (bool);
+    function getNonce(address account, address sessionKey) external view returns (uint256);
 }
 ```
 
@@ -227,23 +255,21 @@ interface ISessionKeyValidatorModule is IValidator {
 
 **Signature Format:**
 ```
-┌────────────────────┬─────────────────────────┐
-│ Session Key (20B)  │ ECDSA Signature (65B)   │
-└────────────────────┴─────────────────────────┘
-Total: 85 bytes
+Message: keccak256(account, target, value, keccak256(data), nonce, chainId)
+Signature: ECDSA signature from session key (65 bytes)
 ```
 
-**Validation Flow:**
+**Execution Flow:**
 ```
-1. Extract sessionKey address from signature prefix
+1. Anyone calls executeWithSessionKey() with session key signature
 2. Verify session key is active and within time bounds
-3. Verify ECDSA signature from session key
-4. Check target and selector permissions
-5. Check and update spending limits
-6. Return validation success
+3. Verify nonce matches expected value (replay protection)
+4. Verify ECDSA signature from session key over (account, target, value, data, nonce, chainId)
+5. Check target and selector permissions
+6. Check and update spending limits
+7. Increment nonce
+8. Call account.executeFromExecutor() to execute the transaction
 ```
-
-## Executor Modules
 
 ### 3. SocialRecoveryModule (Type 2)
 
