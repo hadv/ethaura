@@ -9,7 +9,8 @@ This document describes the modular architecture for migrating P256Account to ER
 ```
 P256ModularAccount (Core Account)
 ├── Validators (Type 1)
-│   └── P256MFAValidatorModule - Owner (mandatory) + Passkey (when MFA enabled)
+│   ├── P256MFAValidatorModule - Owner (mandatory) + Passkey (when MFA enabled)
+│   └── PQMFAValidatorModule - Dilithium + MFA (future: post-quantum)
 │
 ├── Executors (Type 2)
 │   ├── PasskeyManagerModule - Add/remove passkeys
@@ -35,6 +36,37 @@ P256ModularAccount (Core Account)
 - Recovery timelock enforced inside SocialRecoveryModule (not via hook)
 - LargeTransactionExecutorModule + LargeTransactionGuardHook installed at init (disabled by default)
 - Set threshold to enable large tx protection (threshold = type(uint256).max means disabled)
+- Post-quantum upgrade path: swap P256MFAValidatorModule → PQMFAValidatorModule (no account upgrade needed)
+
+## Future Work: Post-Quantum Validator
+
+### PQMFAValidatorModule (Planned)
+
+**Purpose:** Post-quantum resistant MFA validation using Dilithium signatures
+
+**Status:** Future implementation (when post-quantum standards mature)
+
+**Design Notes:**
+- Uses CRYSTALS-Dilithium (NIST FIPS 204) for signature verification
+- Same MFA pattern: Owner (mandatory) + PQ signature (when MFA enabled)
+- Drop-in replacement for P256MFAValidatorModule
+- Migration: uninstall P256MFAValidatorModule, install PQMFAValidatorModule
+- No account contract upgrade required (modular architecture benefit)
+
+**Migration Path:**
+```
+Current: P256MFAValidatorModule (ECDSA + P256)
+    ↓
+Future:  PQMFAValidatorModule (ECDSA + Dilithium)
+    ↓
+Long-term: FullPQValidatorModule (Dilithium only, when ECDSA deprecated)
+```
+
+**Considerations:**
+- Dilithium signature size: ~2.4KB (vs P256: 64 bytes)
+- Gas costs will be higher for on-chain verification
+- May require off-chain verification with on-chain proof
+- EIP-7212 equivalent for Dilithium precompile would help
 
 ## Core Account: P256ModularAccount
 
