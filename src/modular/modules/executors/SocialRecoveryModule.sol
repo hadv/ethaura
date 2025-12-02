@@ -1,11 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.23;
 
-import {
-    IModule,
-    IExecutor,
-    MODULE_TYPE_EXECUTOR
-} from "@erc7579/interfaces/IERC7579Module.sol";
+import {IModule, IExecutor, MODULE_TYPE_EXECUTOR} from "@erc7579/interfaces/IERC7579Module.sol";
 import {IERC7579Account} from "@erc7579/interfaces/IERC7579Account.sol";
 import {
     ModeLib,
@@ -15,7 +11,7 @@ import {
     MODE_DEFAULT,
     ModePayload
 } from "@erc7579/lib/ModeLib.sol";
-import {P256MFAValidatorModule} from "./P256MFAValidatorModule.sol";
+import {P256MFAValidatorModule} from "../validators/P256MFAValidatorModule.sol";
 
 /**
  * @title SocialRecoveryModule
@@ -53,8 +49,8 @@ contract SocialRecoveryModule is IExecutor {
     }
 
     struct RecoveryConfig {
-        uint256 threshold;       // e.g., 2 for "2 of 3 guardians"
-        uint256 timelockPeriod;  // e.g., 24 hours
+        uint256 threshold; // e.g., 2 for "2 of 3 guardians"
+        uint256 timelockPeriod; // e.g., 24 hours
     }
 
     struct RecoveryRequest {
@@ -63,15 +59,14 @@ contract SocialRecoveryModule is IExecutor {
         address newOwner;
         uint256 approvalCount;
         uint256 initiatedAt;
-        uint256 executeAfter;   // Set when threshold met
+        uint256 executeAfter; // Set when threshold met
         bool thresholdMet;
         bool executed;
         bool cancelled;
     }
 
     // keccak256(abi.encode(uint256(keccak256("ethaura.storage.SocialRecoveryModule")) - 1)) & ~bytes32(uint256(0xff))
-    bytes32 private constant STORAGE_LOCATION =
-        0x9a1e5f7d8c2b3a4e6f0d1c2b3a4e5f6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a00;
+    bytes32 private constant STORAGE_LOCATION = 0x9a1e5f7d8c2b3a4e6f0d1c2b3a4e5f6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a00;
 
     /*//////////////////////////////////////////////////////////////
                                 EVENTS
@@ -129,17 +124,17 @@ contract SocialRecoveryModule is IExecutor {
     /// @inheritdoc IModule
     function onInstall(bytes calldata data) external override {
         SocialRecoveryStorage storage $ = _getStorage();
-        
+
         // Decode: threshold, timelockPeriod, guardians[]
-        (uint256 threshold, uint256 timelockPeriod, address[] memory guardians) = 
+        (uint256 threshold, uint256 timelockPeriod, address[] memory guardians) =
             abi.decode(data, (uint256, uint256, address[]));
-        
+
         // Set config
         $.config[msg.sender] = RecoveryConfig({
             threshold: threshold > 0 ? threshold : 1,
             timelockPeriod: timelockPeriod > 0 ? timelockPeriod : DEFAULT_TIMELOCK
         });
-        
+
         // Add guardians
         for (uint256 i = 0; i < guardians.length; i++) {
             if (!$.isGuardian[msg.sender][guardians[i]]) {
@@ -148,7 +143,7 @@ contract SocialRecoveryModule is IExecutor {
                 emit GuardianAdded(msg.sender, guardians[i]);
             }
         }
-        
+
         emit RecoveryConfigUpdated(msg.sender, $.config[msg.sender].threshold, timelockPeriod);
     }
 
@@ -227,10 +222,7 @@ contract SocialRecoveryModule is IExecutor {
         if (threshold == 0) revert InvalidThreshold();
         if (threshold > $.guardianList[msg.sender].length) revert InvalidThreshold();
 
-        $.config[msg.sender] = RecoveryConfig({
-            threshold: threshold,
-            timelockPeriod: timelockPeriod
-        });
+        $.config[msg.sender] = RecoveryConfig({threshold: threshold, timelockPeriod: timelockPeriod});
 
         emit RecoveryConfigUpdated(msg.sender, threshold, timelockPeriod);
     }
@@ -246,12 +238,7 @@ contract SocialRecoveryModule is IExecutor {
      * @param newQy New passkey Y coordinate
      * @param newOwner New owner address
      */
-    function initiateRecovery(
-        address account,
-        bytes32 newQx,
-        bytes32 newQy,
-        address newOwner
-    ) external {
+    function initiateRecovery(address account, bytes32 newQx, bytes32 newQy, address newOwner) external {
         SocialRecoveryStorage storage $ = _getStorage();
 
         if (!$.isGuardian[account][msg.sender]) revert NotGuardian();
@@ -324,11 +311,7 @@ contract SocialRecoveryModule is IExecutor {
      * @param nonce The recovery request nonce
      * @param validatorModule The P256MFAValidatorModule to update
      */
-    function executeRecovery(
-        address account,
-        uint256 nonce,
-        address validatorModule
-    ) external {
+    function executeRecovery(address account, uint256 nonce, address validatorModule) external {
         SocialRecoveryStorage storage $ = _getStorage();
         RecoveryRequest storage request = $.requests[account][nonce];
 
@@ -354,23 +337,20 @@ contract SocialRecoveryModule is IExecutor {
             );
 
             // Execute via the account
-            IERC7579Account(account).executeFromExecutor(
-                _encodeExecutionMode(),
-                abi.encodePacked(validatorModule, uint256(0), updateCalldata)
-            );
+            IERC7579Account(account)
+                .executeFromExecutor(
+                    _encodeExecutionMode(), abi.encodePacked(validatorModule, uint256(0), updateCalldata)
+                );
         }
 
         // Update owner if provided
         if (request.newOwner != address(0)) {
-            updateCalldata = abi.encodeWithSelector(
-                P256MFAValidatorModule.setOwner.selector,
-                request.newOwner
-            );
+            updateCalldata = abi.encodeWithSelector(P256MFAValidatorModule.setOwner.selector, request.newOwner);
 
-            IERC7579Account(account).executeFromExecutor(
-                _encodeExecutionMode(),
-                abi.encodePacked(validatorModule, uint256(0), updateCalldata)
-            );
+            IERC7579Account(account)
+                .executeFromExecutor(
+                    _encodeExecutionMode(), abi.encodePacked(validatorModule, uint256(0), updateCalldata)
+                );
         }
 
         emit RecoveryExecuted(account, nonce);
@@ -398,12 +378,7 @@ contract SocialRecoveryModule is IExecutor {
      * @dev ModeCode: 0x00 for single call, no delegatecall
      */
     function _encodeExecutionMode() internal pure returns (ModeCode) {
-        return ModeLib.encode(
-            CALLTYPE_SINGLE,
-            EXECTYPE_DEFAULT,
-            MODE_DEFAULT,
-            ModePayload.wrap(bytes22(0))
-        );
+        return ModeLib.encode(CALLTYPE_SINGLE, EXECTYPE_DEFAULT, MODE_DEFAULT, ModePayload.wrap(bytes22(0)));
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -449,17 +424,21 @@ contract SocialRecoveryModule is IExecutor {
     /**
      * @notice Get recovery request details
      */
-    function getRecoveryRequest(address account, uint256 nonce) external view returns (
-        bytes32 newPasskeyQx,
-        bytes32 newPasskeyQy,
-        address newOwner,
-        uint256 approvalCount,
-        uint256 initiatedAt,
-        uint256 executeAfter,
-        bool thresholdMet,
-        bool executed,
-        bool cancelled
-    ) {
+    function getRecoveryRequest(address account, uint256 nonce)
+        external
+        view
+        returns (
+            bytes32 newPasskeyQx,
+            bytes32 newPasskeyQy,
+            address newOwner,
+            uint256 approvalCount,
+            uint256 initiatedAt,
+            uint256 executeAfter,
+            bool thresholdMet,
+            bool executed,
+            bool cancelled
+        )
+    {
         RecoveryRequest storage request = _getStorage().requests[account][nonce];
         return (
             request.newPasskeyQx,

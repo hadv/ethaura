@@ -4,8 +4,8 @@ pragma solidity ^0.8.23;
 import {Test} from "forge-std/Test.sol";
 import {AuraAccount} from "../../src/modular/AuraAccount.sol";
 import {AuraAccountFactory} from "../../src/modular/AuraAccountFactory.sol";
-import {P256MFAValidatorModule} from "../../src/modular/modules/P256MFAValidatorModule.sol";
-import {SocialRecoveryModule} from "../../src/modular/modules/SocialRecoveryModule.sol";
+import {P256MFAValidatorModule} from "../../src/modular/modules/validators/P256MFAValidatorModule.sol";
+import {SocialRecoveryModule} from "../../src/modular/modules/executors/SocialRecoveryModule.sol";
 import {ERC1967FactoryConstants} from "solady/utils/ERC1967FactoryConstants.sol";
 import {MODULE_TYPE_VALIDATOR, MODULE_TYPE_EXECUTOR} from "@erc7579/interfaces/IERC7579Module.sol";
 
@@ -39,7 +39,7 @@ contract SocialRecoveryModuleTest is Test {
 
         // Create account with P256MFAValidatorModule
         bytes memory validatorData = abi.encode(owner, QX, QY, bytes32("Test Device"), true);
-        
+
         address accountAddr = factory.createAccount(
             owner,
             address(validator),
@@ -54,9 +54,9 @@ contract SocialRecoveryModuleTest is Test {
         address[] memory guardians = new address[](2);
         guardians[0] = guardian1;
         guardians[1] = guardian2;
-        
+
         bytes memory recoveryData = abi.encode(
-            uint256(2),      // threshold: 2 of 2
+            uint256(2), // threshold: 2 of 2
             uint256(24 hours), // timelock
             guardians
         );
@@ -136,8 +136,7 @@ contract SocialRecoveryModuleTest is Test {
             bytes32 storedQy,
             address storedOwner,
             uint256 approvalCount,
-            uint256 initiatedAt,
-            ,
+            uint256 initiatedAt,,
             bool thresholdMet,
             bool executed,
             bool cancelled
@@ -166,14 +165,8 @@ contract SocialRecoveryModuleTest is Test {
         vm.prank(guardian2);
         recovery.approveRecovery(address(account), 0);
 
-        (
-            ,,,
-            uint256 approvalCount,
-            ,
-            uint256 executeAfter,
-            bool thresholdMet,
-            ,
-        ) = recovery.getRecoveryRequest(address(account), 0);
+        (,,, uint256 approvalCount,, uint256 executeAfter, bool thresholdMet,,) =
+            recovery.getRecoveryRequest(address(account), 0);
 
         assertEq(approvalCount, 2);
         assertTrue(thresholdMet);
@@ -193,10 +186,7 @@ contract SocialRecoveryModuleTest is Test {
         vm.prank(address(account));
         recovery.cancelRecovery(0);
 
-        (
-            ,,,,,,,,
-            bool cancelled
-        ) = recovery.getRecoveryRequest(address(account), 0);
+        (,,,,,,,, bool cancelled) = recovery.getRecoveryRequest(address(account), 0);
 
         assertTrue(cancelled);
     }
