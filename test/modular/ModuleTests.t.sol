@@ -503,6 +503,16 @@ contract ERC721ReceiverModuleTest is Test {
         bytes4 result = receiver.onERC721Received(address(this), address(this), 1, "");
         assertEq(result, bytes4(keccak256("onERC721Received(address,address,uint256,bytes)")));
     }
+
+    function test_OnInstall() public {
+        // Should not revert
+        receiver.onInstall("");
+    }
+
+    function test_OnUninstall() public {
+        // Should not revert
+        receiver.onUninstall("");
+    }
 }
 
 /*//////////////////////////////////////////////////////////////
@@ -546,6 +556,537 @@ contract ERC1155ReceiverModuleTest is Test {
         // IERC1155Receiver interface ID
         bytes4 interfaceId = type(IERC1155Receiver).interfaceId;
         assertTrue(receiver.supportsInterface(interfaceId));
+    }
+
+    function test_OnInstall() public {
+        // Should not revert
+        receiver.onInstall("");
+    }
+
+    function test_OnUninstall() public {
+        // Should not revert
+        receiver.onUninstall("");
+    }
+}
+
+/*//////////////////////////////////////////////////////////////
+            ADDITIONAL MULTI HOOK TESTS
+//////////////////////////////////////////////////////////////*/
+
+contract MultiHookAdditionalTest is Test {
+    AuraAccountFactory public factory;
+    AuraAccount public account;
+    MockValidator public validator;
+    MultiHook public multiHook;
+    MockHook public hook1;
+    MockHook public hook2;
+    MockTarget public target;
+
+    address public constant ENTRYPOINT = 0x0000000071727De22E5E9d8BAf0edAc6f37da032;
+    address owner = address(0x1234);
+
+    function setUp() public {
+        if (ERC1967FactoryConstants.ADDRESS.code.length == 0) {
+            vm.etch(ERC1967FactoryConstants.ADDRESS, ERC1967FactoryConstants.BYTECODE);
+        }
+
+        validator = new MockValidator();
+        factory = new AuraAccountFactory(address(validator));
+        multiHook = new MultiHook();
+        hook1 = new MockHook();
+        hook2 = new MockHook();
+        target = new MockTarget();
+
+        address accountAddr = factory.createAccount(owner, abi.encode(true), address(multiHook), "", 0);
+        account = AuraAccount(payable(accountAddr));
+        vm.deal(address(account), 10 ether);
+    }
+
+    function test_IsModuleType() public view {
+        assertTrue(multiHook.isModuleType(MODULE_TYPE_HOOK));
+        assertFalse(multiHook.isModuleType(MODULE_TYPE_VALIDATOR));
+    }
+
+    function test_IsInitialized() public view {
+        assertTrue(multiHook.isInitialized(address(account)));
+    }
+
+    function test_OnUninstall() public {
+        vm.startPrank(address(account));
+        multiHook.addHook(address(hook1));
+        multiHook.addHook(address(hook2));
+        vm.stopPrank();
+
+        vm.prank(address(account));
+        multiHook.onUninstall("");
+
+        address[] memory hooks = multiHook.getHooks(address(account));
+        assertEq(hooks.length, 0);
+    }
+
+    function test_GetHooks() public {
+        address[] memory hooks = multiHook.getHooks(address(account));
+        assertEq(hooks.length, 0);
+
+        vm.startPrank(address(account));
+        multiHook.addHook(address(hook1));
+        hooks = multiHook.getHooks(address(account));
+        assertEq(hooks.length, 1);
+
+        multiHook.addHook(address(hook2));
+        hooks = multiHook.getHooks(address(account));
+        assertEq(hooks.length, 2);
+        vm.stopPrank();
+    }
+
+    function test_RevertAddHook_InvalidHook() public {
+        vm.prank(address(account));
+        vm.expectRevert(MultiHook.InvalidHook.selector);
+        multiHook.addHook(address(0));
+    }
+
+    function test_OnInstallWithManager() public {
+        // Create a new account with manager set during install
+        address manager = address(0x5678);
+        address accountAddr = factory.createAccount(owner, abi.encode(true), address(multiHook), abi.encode(manager), 1);
+        AuraAccount newAccount = AuraAccount(payable(accountAddr));
+
+        assertEq(multiHook.getManager(address(newAccount)), manager);
+    }
+
+    function test_PreCheckWithNoHooks() public {
+        // preCheck with no hooks should return empty bytes
+        vm.prank(address(account));
+        bytes memory result = multiHook.preCheck(address(this), 0, "");
+        (address[] memory hooks, bytes[] memory contexts) = abi.decode(result, (address[], bytes[]));
+        assertEq(hooks.length, 0);
+        assertEq(contexts.length, 0);
+    }
+
+    function test_PostCheckWithNoHooks() public {
+        // postCheck with empty data should not revert
+        address[] memory hooks = new address[](0);
+        bytes[] memory contexts = new bytes[](0);
+        bytes memory preCheckData = abi.encode(hooks, contexts);
+        multiHook.postCheck(preCheckData);
+    }
+
+    function test_RevertAddDuplicateHook() public {
+        vm.startPrank(address(account));
+        multiHook.addHook(address(hook1));
+
+        vm.expectRevert(abi.encodeWithSelector(MultiHook.HookAlreadyInstalled.selector, address(hook1)));
+        multiHook.addHook(address(hook1));
+        vm.stopPrank();
+    }
+
+    function test_RevertRemoveNonExistentHook() public {
+        vm.prank(address(account));
+        vm.expectRevert(abi.encodeWithSelector(MultiHook.HookNotInstalled.selector, address(hook1)));
+        multiHook.removeHook(address(hook1));
+    }
+
+    function test_PreCheckWithHooks() public {
+        // Add hooks
+        vm.startPrank(address(account));
+        multiHook.addHook(address(hook1));
+        multiHook.addHook(address(hook2));
+        vm.stopPrank();
+
+        // preCheck should call all hooks
+        vm.prank(address(account));
+        bytes memory result = multiHook.preCheck(address(this), 1 ether, "");
+        (address[] memory hooks, bytes[] memory contexts) = abi.decode(result, (address[], bytes[]));
+        assertEq(hooks.length, 2);
+        assertEq(contexts.length, 2);
+    }
+
+    function test_PostCheckWithHooks() public {
+        // Add hooks
+        vm.startPrank(address(account));
+        multiHook.addHook(address(hook1));
+        multiHook.addHook(address(hook2));
+        vm.stopPrank();
+
+        // First do preCheck to get the data
+        vm.prank(address(account));
+        bytes memory preCheckData = multiHook.preCheck(address(this), 1 ether, "");
+
+        // Then postCheck should not revert
+        multiHook.postCheck(preCheckData);
+    }
+
+    function test_RemoveHookFromMiddle() public {
+        MockHook hook3 = new MockHook();
+
+        vm.startPrank(address(account));
+        multiHook.addHook(address(hook1));
+        multiHook.addHook(address(hook2));
+        multiHook.addHook(address(hook3));
+
+        // Remove middle hook
+        multiHook.removeHook(address(hook2));
+        vm.stopPrank();
+
+        address[] memory hooks = multiHook.getHooks(address(account));
+        assertEq(hooks.length, 2);
+        assertFalse(multiHook.isHookInstalled(address(account), address(hook2)));
+    }
+}
+
+/*//////////////////////////////////////////////////////////////
+        ADDITIONAL LARGE TRANSACTION EXECUTOR TESTS
+//////////////////////////////////////////////////////////////*/
+
+contract LargeTransactionExecutorAdditionalTest is Test {
+    AuraAccountFactory public factory;
+    AuraAccount public account;
+    MockValidator public validator;
+    LargeTransactionExecutorModule public executor;
+    MockTarget public target;
+
+    address public constant ENTRYPOINT = 0x0000000071727De22E5E9d8BAf0edAc6f37da032;
+    address owner = address(0x1234);
+
+    uint256 constant THRESHOLD = 1 ether;
+    uint256 constant TIMELOCK = 1 hours;
+
+    function setUp() public {
+        if (ERC1967FactoryConstants.ADDRESS.code.length == 0) {
+            vm.etch(ERC1967FactoryConstants.ADDRESS, ERC1967FactoryConstants.BYTECODE);
+        }
+
+        validator = new MockValidator();
+        factory = new AuraAccountFactory(address(validator));
+        executor = new LargeTransactionExecutorModule();
+        target = new MockTarget();
+
+        address accountAddr = factory.createAccount(owner, abi.encode(true), address(0), "", 0);
+        account = AuraAccount(payable(accountAddr));
+        vm.deal(address(account), 10 ether);
+
+        vm.prank(ENTRYPOINT);
+        account.installModule(MODULE_TYPE_EXECUTOR, address(executor), abi.encode(THRESHOLD, TIMELOCK));
+    }
+
+    function test_IsModuleType() public view {
+        assertTrue(executor.isModuleType(MODULE_TYPE_EXECUTOR));
+        assertFalse(executor.isModuleType(MODULE_TYPE_VALIDATOR));
+    }
+
+    function test_IsInitialized() public view {
+        assertTrue(executor.isInitialized(address(account)));
+    }
+
+    function test_OnUninstall() public {
+        vm.prank(address(account));
+        executor.onUninstall("");
+
+        assertFalse(executor.isInitialized(address(account)));
+    }
+
+    function test_SetTimelockPeriod() public {
+        vm.prank(address(account));
+        executor.setTimelockPeriod(2 hours);
+
+        assertEq(executor.getTimelockPeriod(address(account)), 2 hours);
+    }
+
+    function test_RevertCancelNonExistentTransaction() public {
+        bytes32 txHash = keccak256("nonexistent");
+
+        vm.prank(address(account));
+        vm.expectRevert(LargeTransactionExecutorModule.TransactionNotFound.selector);
+        executor.cancel(txHash);
+    }
+
+    function test_CancelledTransactionCannotBeExecuted() public {
+        bytes memory callData = abi.encodeCall(MockTarget.setValue, (100));
+
+        vm.prank(address(account));
+        executor.execute(address(target), 2 ether, callData);
+
+        bytes32 txHash = keccak256(abi.encode(address(account), address(target), 2 ether, callData));
+
+        vm.prank(address(account));
+        executor.cancel(txHash);
+
+        // Warp past timelock
+        vm.warp(block.timestamp + TIMELOCK + 1);
+
+        // Try to execute - should fail because cancelled
+        vm.prank(address(account));
+        vm.expectRevert(LargeTransactionExecutorModule.TransactionWasCancelled.selector);
+        executor.execute(address(target), 2 ether, callData);
+    }
+
+    function test_RevertCancelAlreadyExecutedTransaction() public {
+        bytes memory callData = abi.encodeCall(MockTarget.setValue, (100));
+
+        vm.prank(address(account));
+        executor.execute(address(target), 2 ether, callData);
+
+        bytes32 txHash = keccak256(abi.encode(address(account), address(target), 2 ether, callData));
+
+        vm.warp(block.timestamp + TIMELOCK + 1);
+
+        vm.prank(address(account));
+        executor.execute(address(target), 2 ether, callData);
+
+        vm.prank(address(account));
+        vm.expectRevert(LargeTransactionExecutorModule.TransactionAlreadyExecuted.selector);
+        executor.cancel(txHash);
+    }
+
+    function test_GetPendingTxHashes() public {
+        bytes memory callData1 = abi.encodeCall(MockTarget.setValue, (100));
+        bytes memory callData2 = abi.encodeCall(MockTarget.setValue, (200));
+
+        vm.startPrank(address(account));
+        executor.execute(address(target), 2 ether, callData1);
+        executor.execute(address(target), 3 ether, callData2);
+        vm.stopPrank();
+
+        bytes32[] memory hashes = executor.getPendingTxHashes(address(account));
+        assertEq(hashes.length, 2);
+    }
+
+    function test_GetPendingTx() public {
+        bytes memory callData = abi.encodeCall(MockTarget.setValue, (100));
+
+        vm.prank(address(account));
+        executor.execute(address(target), 2 ether, callData);
+
+        bytes32 txHash = keccak256(abi.encode(address(account), address(target), 2 ether, callData));
+
+        (
+            address txTarget,
+            uint256 txValue,
+            bytes memory txData,
+            uint256 proposedAt,
+            uint256 executeAfter,
+            bool executed,
+            bool cancelled
+        ) = executor.getPendingTx(address(account), txHash);
+
+        assertEq(txTarget, address(target));
+        assertEq(txValue, 2 ether);
+        assertEq(txData, callData);
+        assertGt(proposedAt, 0);
+        assertEq(executeAfter, proposedAt + TIMELOCK);
+        assertFalse(executed);
+        assertFalse(cancelled);
+    }
+
+    function test_GetThreshold() public view {
+        assertEq(executor.getThreshold(address(account)), THRESHOLD);
+    }
+
+    function test_GetThreshold_Uninitialized() public view {
+        // Uninitialized account should return max
+        assertEq(executor.getThreshold(address(0x9999)), type(uint256).max);
+    }
+
+    function test_Disable() public {
+        vm.prank(address(account));
+        executor.disable();
+
+        assertEq(executor.getThreshold(address(account)), type(uint256).max);
+    }
+}
+
+/*//////////////////////////////////////////////////////////////
+        ADDITIONAL LARGE TRANSACTION GUARD HOOK TESTS
+//////////////////////////////////////////////////////////////*/
+
+contract LargeTransactionGuardHookAdditionalTest is Test {
+    AuraAccountFactory public factory;
+    AuraAccount public account;
+    MockValidator public validator;
+    LargeTransactionExecutorModule public executor;
+    LargeTransactionGuardHook public guardHook;
+    MockTarget public target;
+
+    address public constant ENTRYPOINT = 0x0000000071727De22E5E9d8BAf0edAc6f37da032;
+    address owner = address(0x1234);
+
+    uint256 constant THRESHOLD = 1 ether;
+    uint256 constant TIMELOCK = 1 hours;
+
+    function setUp() public {
+        if (ERC1967FactoryConstants.ADDRESS.code.length == 0) {
+            vm.etch(ERC1967FactoryConstants.ADDRESS, ERC1967FactoryConstants.BYTECODE);
+        }
+
+        validator = new MockValidator();
+        factory = new AuraAccountFactory(address(validator));
+        executor = new LargeTransactionExecutorModule();
+        guardHook = new LargeTransactionGuardHook();
+        target = new MockTarget();
+
+        address accountAddr =
+            factory.createAccount(owner, abi.encode(true), address(guardHook), abi.encode(address(executor)), 0);
+        account = AuraAccount(payable(accountAddr));
+        vm.deal(address(account), 10 ether);
+
+        vm.prank(ENTRYPOINT);
+        account.installModule(MODULE_TYPE_EXECUTOR, address(executor), abi.encode(THRESHOLD, TIMELOCK));
+    }
+
+    function test_IsModuleType() public view {
+        assertTrue(guardHook.isModuleType(MODULE_TYPE_HOOK));
+        assertFalse(guardHook.isModuleType(MODULE_TYPE_VALIDATOR));
+    }
+
+    function test_IsInitialized() public view {
+        assertTrue(guardHook.isInitialized(address(account)));
+    }
+
+    function test_OnUninstall() public {
+        vm.prank(address(account));
+        guardHook.onUninstall("");
+
+        assertFalse(guardHook.isInitialized(address(account)));
+    }
+
+    function test_PostCheck() public view {
+        // postCheck should not revert
+        guardHook.postCheck("");
+    }
+
+    function test_PreCheckWithUninitializedAccount() public {
+        // Create a new guard hook without initializing
+        LargeTransactionGuardHook newGuardHook = new LargeTransactionGuardHook();
+
+        // preCheck should return empty bytes (fail-open)
+        bytes memory result = newGuardHook.preCheck(address(this), 10 ether, "");
+        assertEq(result.length, 0);
+    }
+
+    function test_PreCheckAllowsSmallTransaction() public view {
+        // Small transaction should be allowed
+        bytes memory result = guardHook.preCheck(address(this), 0.5 ether, "");
+        assertEq(result.length, 0);
+    }
+
+    function test_PreCheckAllowsExecutorForLargeTransaction() public view {
+        // Large transaction from executor should be allowed
+        bytes memory result = guardHook.preCheck(address(executor), 2 ether, "");
+        assertEq(result.length, 0);
+    }
+
+    function test_RevertPreCheck_LargeTransactionNotFromExecutor() public {
+        // Large transaction not from executor should revert
+        vm.prank(address(account));
+        vm.expectRevert(LargeTransactionGuardHook.LargeTransactionMustUseExecutor.selector);
+        guardHook.preCheck(address(0x9999), 2 ether, "");
+    }
+}
+
+/*//////////////////////////////////////////////////////////////
+        ADDITIONAL HOOK MANAGER MODULE TESTS
+//////////////////////////////////////////////////////////////*/
+
+contract HookManagerModuleAdditionalTest is Test {
+    AuraAccountFactory public factory;
+    AuraAccount public account;
+    MockValidator public validator;
+    MultiHook public multiHook;
+    HookManagerModule public hookManager;
+    MockHook public hook1;
+
+    address public constant ENTRYPOINT = 0x0000000071727De22E5E9d8BAf0edAc6f37da032;
+    address owner = address(0x1234);
+
+    function setUp() public {
+        if (ERC1967FactoryConstants.ADDRESS.code.length == 0) {
+            vm.etch(ERC1967FactoryConstants.ADDRESS, ERC1967FactoryConstants.BYTECODE);
+        }
+
+        validator = new MockValidator();
+        factory = new AuraAccountFactory(address(validator));
+        multiHook = new MultiHook();
+        hookManager = new HookManagerModule();
+        hook1 = new MockHook();
+
+        address accountAddr =
+            factory.createAccount(owner, abi.encode(true), address(multiHook), abi.encode(address(hookManager)), 0);
+        account = AuraAccount(payable(accountAddr));
+        vm.deal(address(account), 10 ether);
+
+        vm.prank(ENTRYPOINT);
+        account.installModule(MODULE_TYPE_EXECUTOR, address(hookManager), abi.encode(address(multiHook)));
+
+        vm.prank(address(account));
+        multiHook.setManager(address(hookManager));
+    }
+
+    function test_IsModuleType() public view {
+        assertTrue(hookManager.isModuleType(MODULE_TYPE_EXECUTOR));
+        assertFalse(hookManager.isModuleType(MODULE_TYPE_VALIDATOR));
+    }
+
+    function test_IsInitialized() public view {
+        assertTrue(hookManager.isInitialized(address(account)));
+    }
+
+    function test_OnUninstall() public {
+        vm.prank(address(account));
+        hookManager.onUninstall("");
+
+        assertFalse(hookManager.isInitialized(address(account)));
+    }
+
+    function test_RevertExecuteEmergencyUninstall_NoProposal() public {
+        vm.prank(address(account));
+        vm.expectRevert(HookManagerModule.NoEmergencyUninstallProposed.selector);
+        hookManager.executeEmergencyUninstall();
+    }
+
+    function test_RevertInstallHook_InvalidHook() public {
+        vm.prank(address(account));
+        vm.expectRevert(HookManagerModule.InvalidHook.selector);
+        hookManager.installHook(address(0), "");
+    }
+
+    function test_RevertInstallHook_MultiHookNotSet() public {
+        // Create a new account without MultiHook
+        address accountAddr = factory.createAccount(owner, abi.encode(true), address(0), "", 2);
+        AuraAccount newAccount = AuraAccount(payable(accountAddr));
+
+        // Install HookManager without MultiHook
+        vm.prank(ENTRYPOINT);
+        newAccount.installModule(MODULE_TYPE_EXECUTOR, address(hookManager), abi.encode(address(0)));
+
+        vm.prank(address(newAccount));
+        vm.expectRevert(HookManagerModule.MultiHookNotSet.selector);
+        hookManager.installHook(address(hook1), "");
+    }
+
+    function test_RevertUninstallHook_MultiHookNotSet() public {
+        // Create a new account without MultiHook
+        address accountAddr = factory.createAccount(owner, abi.encode(true), address(0), "", 3);
+        AuraAccount newAccount = AuraAccount(payable(accountAddr));
+
+        // Install HookManager without MultiHook
+        vm.prank(ENTRYPOINT);
+        newAccount.installModule(MODULE_TYPE_EXECUTOR, address(hookManager), abi.encode(address(0)));
+
+        vm.prank(address(newAccount));
+        vm.expectRevert(HookManagerModule.MultiHookNotSet.selector);
+        hookManager.uninstallHook(address(hook1));
+    }
+
+    function test_RevertExecuteEmergencyUninstall_TimelockNotPassed() public {
+        vm.startPrank(address(account));
+        hookManager.installHook(address(hook1), "");
+        hookManager.proposeEmergencyUninstall(address(hook1));
+        vm.stopPrank();
+
+        // Try to execute immediately (before timelock)
+        vm.prank(address(account));
+        vm.expectRevert(HookManagerModule.EmergencyTimelockNotPassed.selector);
+        hookManager.executeEmergencyUninstall();
     }
 }
 

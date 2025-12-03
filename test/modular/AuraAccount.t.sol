@@ -14,7 +14,21 @@ import {
     MODULE_TYPE_FALLBACK,
     MODULE_TYPE_HOOK
 } from "@erc7579/interfaces/IERC7579Module.sol";
-import {ModeLib, ModeCode} from "@erc7579/lib/ModeLib.sol";
+import {
+    ModeLib,
+    ModeCode,
+    CallType,
+    ExecType,
+    ModeSelector,
+    ModePayload,
+    CALLTYPE_SINGLE,
+    CALLTYPE_BATCH,
+    CALLTYPE_STATIC,
+    CALLTYPE_DELEGATECALL,
+    EXECTYPE_DEFAULT,
+    EXECTYPE_TRY,
+    MODE_DEFAULT
+} from "@erc7579/lib/ModeLib.sol";
 import {ExecutionLib} from "@erc7579/lib/ExecutionLib.sol";
 
 import {MockValidator} from "./mocks/MockValidator.sol";
@@ -335,6 +349,448 @@ contract AuraAccountTest is Test {
         assertTrue(success);
 
         assertEq(address(account).balance, balanceBefore + 1 ether);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                          STATIC CALL TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    function test_ExecuteStatic() public {
+        // First set a value
+        target.setValue(42);
+
+        // Prepare static call to read the value
+        bytes memory callData = abi.encodeCall(MockTarget.getValue, ());
+        bytes memory executionData = ExecutionLib.encodeSingle(address(target), 0, callData);
+
+        // Create static mode
+        ModeCode staticMode = ModeLib.encode(CALLTYPE_STATIC, EXECTYPE_DEFAULT, MODE_DEFAULT, ModePayload.wrap(0x00));
+
+        // Execute from EntryPoint - static call should work
+        vm.prank(ENTRYPOINT);
+        account.execute(staticMode, executionData);
+
+        // Value should still be 42 (static call doesn't change state)
+        assertEq(target.value(), 42);
+    }
+
+    function test_RevertExecuteStatic_StateChange() public {
+        // Prepare static call that tries to change state
+        bytes memory callData = abi.encodeCall(MockTarget.setValue, (100));
+        bytes memory executionData = ExecutionLib.encodeSingle(address(target), 0, callData);
+
+        // Create static mode
+        ModeCode staticMode = ModeLib.encode(CALLTYPE_STATIC, EXECTYPE_DEFAULT, MODE_DEFAULT, ModePayload.wrap(0x00));
+
+        vm.prank(ENTRYPOINT);
+        vm.expectRevert(AuraAccount.ExecutionFailed.selector);
+        account.execute(staticMode, executionData);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                          DELEGATECALL DISABLED TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    function test_RevertExecuteDelegatecall() public {
+        bytes memory callData = abi.encodeCall(MockTarget.setValue, (42));
+        bytes memory executionData = ExecutionLib.encodeSingle(address(target), 0, callData);
+
+        // Create delegatecall mode
+        ModeCode delegatecallMode =
+            ModeLib.encode(CALLTYPE_DELEGATECALL, EXECTYPE_DEFAULT, MODE_DEFAULT, ModePayload.wrap(0x00));
+
+        vm.prank(ENTRYPOINT);
+        vm.expectRevert(abi.encodeWithSelector(AuraAccount.UnsupportedExecutionMode.selector, delegatecallMode));
+        account.execute(delegatecallMode, executionData);
+    }
+
+    function test_SupportsExecutionMode_NoDelegatecall() public view {
+        // Create delegatecall mode
+        ModeCode delegatecallMode =
+            ModeLib.encode(CALLTYPE_DELEGATECALL, EXECTYPE_DEFAULT, MODE_DEFAULT, ModePayload.wrap(0x00));
+
+        assertFalse(account.supportsExecutionMode(delegatecallMode));
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                          TRY EXECUTION TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    function test_ExecuteTry_SuccessfulCall() public {
+        bytes memory callData = abi.encodeCall(MockTarget.setValue, (42));
+        bytes memory executionData = ExecutionLib.encodeSingle(address(target), 0, callData);
+
+        // Create try mode
+        ModeCode tryMode = ModeLib.encode(CALLTYPE_SINGLE, EXECTYPE_TRY, MODE_DEFAULT, ModePayload.wrap(0x00));
+
+        vm.prank(ENTRYPOINT);
+        account.execute(tryMode, executionData);
+
+        assertEq(target.value(), 42);
+    }
+
+    function test_ExecuteTry_FailedCallDoesNotRevert() public {
+        // Set target to revert
+        target.setShouldRevert(true);
+
+        bytes memory callData = abi.encodeCall(MockTarget.setValue, (42));
+        bytes memory executionData = ExecutionLib.encodeSingle(address(target), 0, callData);
+
+        // Create try mode
+        ModeCode tryMode = ModeLib.encode(CALLTYPE_SINGLE, EXECTYPE_TRY, MODE_DEFAULT, ModePayload.wrap(0x00));
+
+        // Should not revert even though target reverts
+        vm.prank(ENTRYPOINT);
+        account.execute(tryMode, executionData);
+
+        // Value should not have changed
+        assertEq(target.value(), 0);
+    }
+
+    function test_ExecuteTryBatch_PartialFailure() public {
+        // Prepare batch with one failing call
+        Execution[] memory executions = new Execution[](3);
+        executions[0] =
+            Execution({target: address(target), value: 0, callData: abi.encodeCall(MockTarget.setValue, (10))});
+        executions[1] =
+            Execution({target: address(target), value: 0, callData: abi.encodeCall(MockTarget.increment, ())});
+        executions[2] =
+            Execution({target: address(target), value: 0, callData: abi.encodeCall(MockTarget.increment, ())});
+
+        bytes memory executionData = ExecutionLib.encodeBatch(executions);
+
+        // Create try batch mode
+        ModeCode tryBatchMode = ModeLib.encode(CALLTYPE_BATCH, EXECTYPE_TRY, MODE_DEFAULT, ModePayload.wrap(0x00));
+
+        vm.prank(ENTRYPOINT);
+        account.execute(tryBatchMode, executionData);
+
+        // All calls should have succeeded
+        assertEq(target.value(), 12); // 10 + 1 + 1
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                          UNSUPPORTED MODE TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    function test_RevertUnsupportedCallType() public {
+        bytes memory executionData = ExecutionLib.encodeSingle(address(target), 0, "");
+
+        // Create mode with unsupported call type
+        ModeCode unsupportedMode =
+            ModeLib.encode(CallType.wrap(0xAA), EXECTYPE_DEFAULT, MODE_DEFAULT, ModePayload.wrap(0x00));
+
+        vm.prank(ENTRYPOINT);
+        vm.expectRevert(abi.encodeWithSelector(AuraAccount.UnsupportedExecutionMode.selector, unsupportedMode));
+        account.execute(unsupportedMode, executionData);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                          BATCH WITH VALUE TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    function test_ExecuteBatchWithValue() public {
+        Execution[] memory executions = new Execution[](2);
+        executions[0] =
+            Execution({target: address(target), value: 1 ether, callData: abi.encodeCall(MockTarget.setValue, (100))});
+        executions[1] = Execution({
+            target: address(target),
+            value: 0.5 ether,
+            callData: abi.encodeCall(MockTarget.setValue, (101)) // Use setValue which is payable
+        });
+
+        bytes memory executionData = ExecutionLib.encodeBatch(executions);
+
+        vm.prank(ENTRYPOINT);
+        account.execute(ModeLib.encodeSimpleBatch(), executionData);
+
+        assertEq(target.value(), 101);
+        assertEq(address(target).balance, 1.5 ether);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                          ACCOUNT ID TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    function test_AccountId() public view {
+        assertEq(account.accountId(), "ethaura.aura.0.1.0");
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                          ENTRYPOINT TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    function test_EntryPoint() public view {
+        assertEq(address(account.ENTRYPOINT()), ENTRYPOINT);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                          VIEW FUNCTIONS TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    function test_GetValidator() public view {
+        assertEq(account.getValidator(), address(validator));
+    }
+
+    function test_GetGlobalHook() public view {
+        // No hook installed initially
+        assertEq(account.getGlobalHook(), address(0));
+    }
+
+    function test_GetGlobalHook_WithHook() public {
+        vm.prank(ENTRYPOINT);
+        account.installModule(MODULE_TYPE_HOOK, address(hook), "");
+
+        assertEq(account.getGlobalHook(), address(hook));
+    }
+
+    function test_GetFallbackHandler() public view {
+        // No fallback handler installed initially
+        assertEq(account.getFallbackHandler(bytes4(0x12345678)), address(0));
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                          FALLBACK HANDLER TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    function test_InstallFallbackHandler() public {
+        // Create a mock fallback handler
+        MockFallbackHandler fallbackHandler = new MockFallbackHandler();
+        bytes4 selector = MockFallbackHandler.handleCall.selector;
+
+        // Install fallback handler with selector
+        bytes memory initData = abi.encodePacked(selector);
+
+        vm.prank(ENTRYPOINT);
+        account.installModule(MODULE_TYPE_FALLBACK, address(fallbackHandler), initData);
+
+        // Verify installation
+        assertTrue(
+            account.isModuleInstalled(MODULE_TYPE_FALLBACK, address(fallbackHandler), abi.encodePacked(selector))
+        );
+        assertEq(account.getFallbackHandler(selector), address(fallbackHandler));
+    }
+
+    function test_UninstallFallbackHandler() public {
+        // Create and install a mock fallback handler
+        MockFallbackHandler fallbackHandler = new MockFallbackHandler();
+        bytes4 selector = MockFallbackHandler.handleCall.selector;
+        bytes memory initData = abi.encodePacked(selector);
+
+        vm.prank(ENTRYPOINT);
+        account.installModule(MODULE_TYPE_FALLBACK, address(fallbackHandler), initData);
+
+        // Uninstall
+        vm.prank(ENTRYPOINT);
+        account.uninstallModule(MODULE_TYPE_FALLBACK, address(fallbackHandler), initData);
+
+        // Verify uninstallation
+        assertFalse(
+            account.isModuleInstalled(MODULE_TYPE_FALLBACK, address(fallbackHandler), abi.encodePacked(selector))
+        );
+        assertEq(account.getFallbackHandler(selector), address(0));
+    }
+
+    function test_FallbackHandlerExecution() public {
+        // Create and install a mock fallback handler
+        MockFallbackHandler fallbackHandler = new MockFallbackHandler();
+        bytes4 selector = MockFallbackHandler.handleCall.selector;
+        bytes memory initData = abi.encodePacked(selector);
+
+        vm.prank(ENTRYPOINT);
+        account.installModule(MODULE_TYPE_FALLBACK, address(fallbackHandler), initData);
+
+        // Call the fallback handler through the account
+        (bool success, bytes memory result) =
+            address(account).call(abi.encodeCall(MockFallbackHandler.handleCall, (42)));
+        assertTrue(success);
+        assertEq(abi.decode(result, (uint256)), 42);
+    }
+
+    function test_RevertFallbackHandler_NoHandler() public {
+        // Call with unknown selector
+        (bool success,) = address(account).call(abi.encodeWithSelector(bytes4(0x12345678)));
+        assertFalse(success);
+    }
+
+    function test_RevertInstallFallbackHandler_AlreadyInstalled() public {
+        MockFallbackHandler fallbackHandler = new MockFallbackHandler();
+        bytes4 selector = MockFallbackHandler.handleCall.selector;
+        bytes memory initData = abi.encodePacked(selector);
+
+        vm.prank(ENTRYPOINT);
+        account.installModule(MODULE_TYPE_FALLBACK, address(fallbackHandler), initData);
+
+        // Try to install again with same selector
+        MockFallbackHandler fallbackHandler2 = new MockFallbackHandler();
+        vm.prank(ENTRYPOINT);
+        vm.expectRevert(abi.encodeWithSelector(AuraAccount.ModuleAlreadyInstalled.selector, address(fallbackHandler2)));
+        account.installModule(MODULE_TYPE_FALLBACK, address(fallbackHandler2), initData);
+    }
+
+    function test_RevertUninstallFallbackHandler_NotInstalled() public {
+        MockFallbackHandler fallbackHandler = new MockFallbackHandler();
+        bytes4 selector = MockFallbackHandler.handleCall.selector;
+        bytes memory initData = abi.encodePacked(selector);
+
+        vm.prank(ENTRYPOINT);
+        vm.expectRevert(abi.encodeWithSelector(AuraAccount.ModuleNotInstalled.selector, address(fallbackHandler)));
+        account.uninstallModule(MODULE_TYPE_FALLBACK, address(fallbackHandler), initData);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                          HOOK UNINSTALL TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    function test_UninstallHook() public {
+        // Install hook first
+        vm.prank(ENTRYPOINT);
+        account.installModule(MODULE_TYPE_HOOK, address(hook), "");
+        assertTrue(account.isModuleInstalled(MODULE_TYPE_HOOK, address(hook), ""));
+
+        // Uninstall hook
+        vm.prank(ENTRYPOINT);
+        account.uninstallModule(MODULE_TYPE_HOOK, address(hook), "");
+        assertFalse(account.isModuleInstalled(MODULE_TYPE_HOOK, address(hook), ""));
+    }
+
+    function test_RevertUninstallHook_NotInstalled() public {
+        vm.prank(ENTRYPOINT);
+        vm.expectRevert(abi.encodeWithSelector(AuraAccount.ModuleNotInstalled.selector, address(hook)));
+        account.uninstallModule(MODULE_TYPE_HOOK, address(hook), "");
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                          IS MODULE INSTALLED TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    function test_IsModuleInstalled_Validator() public view {
+        assertTrue(account.isModuleInstalled(MODULE_TYPE_VALIDATOR, address(validator), ""));
+        assertFalse(account.isModuleInstalled(MODULE_TYPE_VALIDATOR, address(0x1234), ""));
+    }
+
+    function test_IsModuleInstalled_Executor() public {
+        assertFalse(account.isModuleInstalled(MODULE_TYPE_EXECUTOR, address(executor), ""));
+
+        vm.prank(ENTRYPOINT);
+        account.installModule(MODULE_TYPE_EXECUTOR, address(executor), "");
+
+        assertTrue(account.isModuleInstalled(MODULE_TYPE_EXECUTOR, address(executor), ""));
+    }
+
+    function test_IsModuleInstalled_Hook() public {
+        assertFalse(account.isModuleInstalled(MODULE_TYPE_HOOK, address(hook), ""));
+
+        vm.prank(ENTRYPOINT);
+        account.installModule(MODULE_TYPE_HOOK, address(hook), "");
+
+        assertTrue(account.isModuleInstalled(MODULE_TYPE_HOOK, address(hook), ""));
+    }
+
+    function test_IsModuleInstalled_FallbackWithContext() public {
+        MockFallbackHandler fallbackHandler = new MockFallbackHandler();
+        bytes4 selector = MockFallbackHandler.handleCall.selector;
+        bytes memory initData = abi.encodePacked(selector);
+
+        vm.prank(ENTRYPOINT);
+        account.installModule(MODULE_TYPE_FALLBACK, address(fallbackHandler), initData);
+
+        // Check with selector context
+        assertTrue(
+            account.isModuleInstalled(MODULE_TYPE_FALLBACK, address(fallbackHandler), abi.encodePacked(selector))
+        );
+        // Check with wrong selector
+        assertFalse(
+            account.isModuleInstalled(
+                MODULE_TYPE_FALLBACK, address(fallbackHandler), abi.encodePacked(bytes4(0x12345678))
+            )
+        );
+    }
+
+    function test_IsModuleInstalled_FallbackWithoutContext() public {
+        MockFallbackHandler fallbackHandler = new MockFallbackHandler();
+        bytes4 selector = MockFallbackHandler.handleCall.selector;
+        bytes memory initData = abi.encodePacked(selector);
+
+        vm.prank(ENTRYPOINT);
+        account.installModule(MODULE_TYPE_FALLBACK, address(fallbackHandler), initData);
+
+        // Check without context - should return false (can't verify without selector)
+        assertFalse(account.isModuleInstalled(MODULE_TYPE_FALLBACK, address(fallbackHandler), ""));
+    }
+
+    function test_IsModuleInstalled_UnsupportedType() public view {
+        // Module type 5 is not supported
+        assertFalse(account.isModuleInstalled(5, address(validator), ""));
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                          UNSUPPORTED MODULE TYPE TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    function test_RevertInstallModule_UnsupportedType() public {
+        vm.prank(ENTRYPOINT);
+        vm.expectRevert(abi.encodeWithSelector(AuraAccount.UnsupportedModuleType.selector, 5));
+        account.installModule(5, address(validator), "");
+    }
+
+    function test_RevertUninstallModule_UnsupportedType() public {
+        vm.prank(ENTRYPOINT);
+        vm.expectRevert(abi.encodeWithSelector(AuraAccount.UnsupportedModuleType.selector, 5));
+        account.uninstallModule(5, address(validator), "");
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                          ADDITIONAL FALLBACK TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    function test_FallbackHandler_Success() public {
+        MockFallbackHandler fallbackHandler = new MockFallbackHandler();
+        bytes4 selector = MockFallbackHandler.handleCall.selector;
+        bytes memory initData = abi.encodePacked(selector);
+
+        vm.prank(ENTRYPOINT);
+        account.installModule(MODULE_TYPE_FALLBACK, address(fallbackHandler), initData);
+
+        // Call the fallback handler through the account
+        (bool success, bytes memory result) = address(account).call(abi.encodeWithSelector(selector, uint256(42)));
+        assertTrue(success);
+        assertEq(abi.decode(result, (uint256)), 42);
+    }
+
+    function test_FallbackHandler_NoHandler() public {
+        // Call with unknown selector should revert
+        bytes4 unknownSelector = bytes4(keccak256("unknownFunction()"));
+        (bool success,) = address(account).call(abi.encodeWithSelector(unknownSelector));
+        assertFalse(success);
+    }
+}
+
+/*//////////////////////////////////////////////////////////////
+                      MOCK FALLBACK HANDLER
+//////////////////////////////////////////////////////////////*/
+
+contract MockFallbackHandler {
+    bool public installed;
+
+    function onInstall(bytes calldata) external {
+        installed = true;
+    }
+
+    function onUninstall(bytes calldata) external {
+        installed = false;
+    }
+
+    function isModuleType(uint256 moduleTypeId) external pure returns (bool) {
+        return moduleTypeId == MODULE_TYPE_FALLBACK;
+    }
+
+    function isInitialized(address) external view returns (bool) {
+        return installed;
+    }
+
+    function handleCall(uint256 value) external pure returns (uint256) {
+        return value;
     }
 }
 

@@ -230,5 +230,328 @@ contract SocialRecoveryModuleTest is Test {
         vm.expectRevert(SocialRecoveryModule.RecoveryAlreadyApproved.selector);
         recovery.approveRecovery(address(account), 0);
     }
+
+    /*//////////////////////////////////////////////////////////////
+                          ERROR CASES TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    function test_RevertAddGuardian_AlreadyGuardian() public {
+        vm.prank(address(account));
+        vm.expectRevert(SocialRecoveryModule.AlreadyGuardian.selector);
+        recovery.addGuardian(guardian1);
+    }
+
+    function test_RevertRemoveGuardian_NotFound() public {
+        vm.prank(address(account));
+        vm.expectRevert(SocialRecoveryModule.GuardianNotFound.selector);
+        recovery.removeGuardian(guardian3);
+    }
+
+    function test_RevertSetRecoveryConfig_InvalidThreshold() public {
+        vm.prank(address(account));
+        vm.expectRevert(SocialRecoveryModule.InvalidThreshold.selector);
+        recovery.setRecoveryConfig(5, 24 hours); // threshold > guardian count
+    }
+
+    function test_RevertApproveRecovery_NotGuardian() public {
+        bytes32 newQx = bytes32(uint256(1));
+        bytes32 newQy = bytes32(uint256(2));
+        address newOwner = address(0x9999);
+
+        vm.prank(guardian1);
+        recovery.initiateRecovery(address(account), newQx, newQy, newOwner);
+
+        vm.prank(address(0xdead));
+        vm.expectRevert(SocialRecoveryModule.NotGuardian.selector);
+        recovery.approveRecovery(address(account), 0);
+    }
+
+    function test_RevertApproveRecovery_NotFound() public {
+        vm.prank(guardian1);
+        vm.expectRevert(SocialRecoveryModule.RecoveryNotFound.selector);
+        recovery.approveRecovery(address(account), 999);
+    }
+
+    function test_RevertApproveRecovery_AlreadyExecuted() public {
+        bytes32 newQx = bytes32(uint256(1));
+        bytes32 newQy = bytes32(uint256(2));
+        address newOwner = address(0x9999);
+
+        // Initiate and approve
+        vm.prank(guardian1);
+        recovery.initiateRecovery(address(account), newQx, newQy, newOwner);
+
+        vm.prank(guardian2);
+        recovery.approveRecovery(address(account), 0);
+
+        // Wait for timelock
+        vm.warp(block.timestamp + 25 hours);
+
+        // Execute
+        recovery.executeRecovery(address(account), 0, address(validator));
+
+        // Try to approve again
+        vm.prank(guardian1);
+        vm.expectRevert(SocialRecoveryModule.RecoveryAlreadyExecuted.selector);
+        recovery.approveRecovery(address(account), 0);
+    }
+
+    function test_RevertApproveRecovery_Cancelled() public {
+        bytes32 newQx = bytes32(uint256(1));
+        bytes32 newQy = bytes32(uint256(2));
+        address newOwner = address(0x9999);
+
+        vm.prank(guardian1);
+        recovery.initiateRecovery(address(account), newQx, newQy, newOwner);
+
+        vm.prank(address(account));
+        recovery.cancelRecovery(0);
+
+        vm.prank(guardian2);
+        vm.expectRevert(SocialRecoveryModule.RecoveryAlreadyCancelled.selector);
+        recovery.approveRecovery(address(account), 0);
+    }
+
+    function test_RevertExecuteRecovery_NotFound() public {
+        vm.expectRevert(SocialRecoveryModule.RecoveryNotFound.selector);
+        recovery.executeRecovery(address(account), 999, address(validator));
+    }
+
+    function test_RevertExecuteRecovery_ThresholdNotMet() public {
+        bytes32 newQx = bytes32(uint256(1));
+        bytes32 newQy = bytes32(uint256(2));
+        address newOwner = address(0x9999);
+
+        vm.prank(guardian1);
+        recovery.initiateRecovery(address(account), newQx, newQy, newOwner);
+
+        // Only 1 approval, threshold is 2
+        vm.expectRevert(SocialRecoveryModule.ThresholdNotMet.selector);
+        recovery.executeRecovery(address(account), 0, address(validator));
+    }
+
+    function test_RevertExecuteRecovery_AlreadyExecuted() public {
+        bytes32 newQx = bytes32(uint256(1));
+        bytes32 newQy = bytes32(uint256(2));
+        address newOwner = address(0x9999);
+
+        vm.prank(guardian1);
+        recovery.initiateRecovery(address(account), newQx, newQy, newOwner);
+
+        vm.prank(guardian2);
+        recovery.approveRecovery(address(account), 0);
+
+        vm.warp(block.timestamp + 25 hours);
+
+        recovery.executeRecovery(address(account), 0, address(validator));
+
+        vm.expectRevert(SocialRecoveryModule.RecoveryAlreadyExecuted.selector);
+        recovery.executeRecovery(address(account), 0, address(validator));
+    }
+
+    function test_RevertExecuteRecovery_Cancelled() public {
+        bytes32 newQx = bytes32(uint256(1));
+        bytes32 newQy = bytes32(uint256(2));
+        address newOwner = address(0x9999);
+
+        vm.prank(guardian1);
+        recovery.initiateRecovery(address(account), newQx, newQy, newOwner);
+
+        vm.prank(guardian2);
+        recovery.approveRecovery(address(account), 0);
+
+        vm.prank(address(account));
+        recovery.cancelRecovery(0);
+
+        vm.warp(block.timestamp + 25 hours);
+
+        vm.expectRevert(SocialRecoveryModule.RecoveryAlreadyCancelled.selector);
+        recovery.executeRecovery(address(account), 0, address(validator));
+    }
+
+    function test_RevertCancelRecovery_NotFound() public {
+        vm.prank(address(account));
+        vm.expectRevert(SocialRecoveryModule.RecoveryNotFound.selector);
+        recovery.cancelRecovery(999);
+    }
+
+    function test_RevertCancelRecovery_AlreadyExecuted() public {
+        bytes32 newQx = bytes32(uint256(1));
+        bytes32 newQy = bytes32(uint256(2));
+        address newOwner = address(0x9999);
+
+        vm.prank(guardian1);
+        recovery.initiateRecovery(address(account), newQx, newQy, newOwner);
+
+        vm.prank(guardian2);
+        recovery.approveRecovery(address(account), 0);
+
+        vm.warp(block.timestamp + 25 hours);
+
+        recovery.executeRecovery(address(account), 0, address(validator));
+
+        vm.prank(address(account));
+        vm.expectRevert(SocialRecoveryModule.RecoveryAlreadyExecuted.selector);
+        recovery.cancelRecovery(0);
+    }
+
+    function test_RevertCancelRecovery_AlreadyCancelled() public {
+        bytes32 newQx = bytes32(uint256(1));
+        bytes32 newQy = bytes32(uint256(2));
+        address newOwner = address(0x9999);
+
+        vm.prank(guardian1);
+        recovery.initiateRecovery(address(account), newQx, newQy, newOwner);
+
+        vm.prank(address(account));
+        recovery.cancelRecovery(0);
+
+        vm.prank(address(account));
+        vm.expectRevert(SocialRecoveryModule.RecoveryAlreadyCancelled.selector);
+        recovery.cancelRecovery(0);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                          EXECUTE RECOVERY TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    function test_ExecuteRecovery() public {
+        bytes32 newQx = bytes32(uint256(1));
+        bytes32 newQy = bytes32(uint256(2));
+        address newOwner = address(0x9999);
+
+        vm.prank(guardian1);
+        recovery.initiateRecovery(address(account), newQx, newQy, newOwner);
+
+        vm.prank(guardian2);
+        recovery.approveRecovery(address(account), 0);
+
+        vm.warp(block.timestamp + 25 hours);
+
+        recovery.executeRecovery(address(account), 0, address(validator));
+
+        (,,,,,,, bool executed,) = recovery.getRecoveryRequest(address(account), 0);
+        assertTrue(executed);
+
+        // Verify new owner is set
+        assertEq(validator.getOwner(address(account)), newOwner);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                          MODULE TYPE TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    function test_IsModuleType() public view {
+        assertTrue(recovery.isModuleType(MODULE_TYPE_EXECUTOR));
+        assertFalse(recovery.isModuleType(MODULE_TYPE_VALIDATOR));
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                          VIEW FUNCTIONS TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    function test_GetGuardians() public view {
+        address[] memory guardians = recovery.getGuardians(address(account));
+        assertEq(guardians.length, 2);
+        assertEq(guardians[0], guardian1);
+        assertEq(guardians[1], guardian2);
+    }
+
+    function test_GetRecoveryNonce() public {
+        assertEq(recovery.getRecoveryNonce(address(account)), 0);
+
+        bytes32 newQx = bytes32(uint256(1));
+        bytes32 newQy = bytes32(uint256(2));
+        address newOwner = address(0x9999);
+
+        vm.prank(guardian1);
+        recovery.initiateRecovery(address(account), newQx, newQy, newOwner);
+
+        assertEq(recovery.getRecoveryNonce(address(account)), 1);
+    }
+
+    function test_HasApproved() public {
+        bytes32 newQx = bytes32(uint256(1));
+        bytes32 newQy = bytes32(uint256(2));
+        address newOwner = address(0x9999);
+
+        vm.prank(guardian1);
+        recovery.initiateRecovery(address(account), newQx, newQy, newOwner);
+
+        assertTrue(recovery.hasApproved(address(account), 0, guardian1));
+        assertFalse(recovery.hasApproved(address(account), 0, guardian2));
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                          UNINSTALL TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    function test_OnUninstall() public {
+        assertTrue(recovery.isInitialized(address(account)));
+
+        vm.prank(address(account));
+        recovery.onUninstall("");
+
+        assertFalse(recovery.isInitialized(address(account)));
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                          INSTALL TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    function test_OnInstall_WithZeroThreshold() public {
+        SocialRecoveryModule newRecovery = new SocialRecoveryModule();
+
+        address[] memory guardians = new address[](1);
+        guardians[0] = guardian1;
+
+        bytes memory recoveryData = abi.encode(
+            uint256(0), // zero threshold - should default to 1
+            uint256(24 hours),
+            guardians
+        );
+
+        vm.prank(address(0x9999));
+        newRecovery.onInstall(recoveryData);
+
+        (uint256 threshold,) = newRecovery.getRecoveryConfig(address(0x9999));
+        assertEq(threshold, 1);
+    }
+
+    function test_OnInstall_WithZeroTimelock() public {
+        SocialRecoveryModule newRecovery = new SocialRecoveryModule();
+
+        address[] memory guardians = new address[](1);
+        guardians[0] = guardian1;
+
+        bytes memory recoveryData = abi.encode(
+            uint256(1),
+            uint256(0), // zero timelock - should default to 24 hours
+            guardians
+        );
+
+        vm.prank(address(0x9999));
+        newRecovery.onInstall(recoveryData);
+
+        (, uint256 timelockPeriod) = newRecovery.getRecoveryConfig(address(0x9999));
+        assertEq(timelockPeriod, 24 hours);
+    }
+
+    function test_OnInstall_WithDuplicateGuardians() public {
+        SocialRecoveryModule newRecovery = new SocialRecoveryModule();
+
+        address[] memory guardians = new address[](3);
+        guardians[0] = guardian1;
+        guardians[1] = guardian1; // duplicate
+        guardians[2] = guardian2;
+
+        bytes memory recoveryData = abi.encode(uint256(2), uint256(24 hours), guardians);
+
+        vm.prank(address(0x9999));
+        newRecovery.onInstall(recoveryData);
+
+        // Should only have 2 unique guardians
+        assertEq(newRecovery.getGuardianCount(address(0x9999)), 2);
+    }
 }
 
