@@ -22,6 +22,10 @@ export const AVAILABLE_NETWORKS = [
     bundlerUrl: 'https://api.pimlico.io/v2/1/rpc?apikey=YOUR_API_KEY',
     explorerUrl: 'https://etherscan.io',
     factoryAddress: import.meta.env.VITE_FACTORY_ADDRESS,
+    // ERC-7579 modular account contracts
+    modularFactoryAddress: import.meta.env.VITE_MODULAR_FACTORY_ADDRESS,
+    validatorModuleAddress: import.meta.env.VITE_VALIDATOR_MODULE_ADDRESS,
+    sessionKeyModuleAddress: import.meta.env.VITE_SESSION_KEY_MODULE_ADDRESS,
     supported: false, // Factory not yet deployed on mainnet
   },
   {
@@ -31,6 +35,9 @@ export const AVAILABLE_NETWORKS = [
     bundlerUrl: 'https://api.pimlico.io/v2/optimism/rpc?apikey=YOUR_API_KEY',
     explorerUrl: 'https://optimistic.etherscan.io',
     factoryAddress: import.meta.env.VITE_FACTORY_ADDRESS,
+    modularFactoryAddress: import.meta.env.VITE_MODULAR_FACTORY_ADDRESS,
+    validatorModuleAddress: import.meta.env.VITE_VALIDATOR_MODULE_ADDRESS,
+    sessionKeyModuleAddress: import.meta.env.VITE_SESSION_KEY_MODULE_ADDRESS,
     supported: false, // Factory not yet deployed on Optimism
   },
   {
@@ -40,6 +47,9 @@ export const AVAILABLE_NETWORKS = [
     bundlerUrl: 'https://api.pimlico.io/v2/polygon/rpc?apikey=YOUR_API_KEY',
     explorerUrl: 'https://polygonscan.com',
     factoryAddress: import.meta.env.VITE_FACTORY_ADDRESS,
+    modularFactoryAddress: import.meta.env.VITE_MODULAR_FACTORY_ADDRESS,
+    validatorModuleAddress: import.meta.env.VITE_VALIDATOR_MODULE_ADDRESS,
+    sessionKeyModuleAddress: import.meta.env.VITE_SESSION_KEY_MODULE_ADDRESS,
     supported: false, // Factory not yet deployed on Polygon
   },
   {
@@ -49,6 +59,9 @@ export const AVAILABLE_NETWORKS = [
     bundlerUrl: 'https://api.pimlico.io/v2/arbitrum/rpc?apikey=YOUR_API_KEY',
     explorerUrl: 'https://arbiscan.io',
     factoryAddress: import.meta.env.VITE_FACTORY_ADDRESS,
+    modularFactoryAddress: import.meta.env.VITE_MODULAR_FACTORY_ADDRESS,
+    validatorModuleAddress: import.meta.env.VITE_VALIDATOR_MODULE_ADDRESS,
+    sessionKeyModuleAddress: import.meta.env.VITE_SESSION_KEY_MODULE_ADDRESS,
     supported: false, // Factory not yet deployed on Arbitrum
   },
   {
@@ -58,6 +71,9 @@ export const AVAILABLE_NETWORKS = [
     bundlerUrl: import.meta.env.VITE_BASE_BUNDLER_URL || 'https://api.pimlico.io/v2/base/rpc?apikey=YOUR_API_KEY',
     explorerUrl: 'https://basescan.org',
     factoryAddress: import.meta.env.VITE_FACTORY_ADDRESS,
+    modularFactoryAddress: import.meta.env.VITE_MODULAR_FACTORY_ADDRESS,
+    validatorModuleAddress: import.meta.env.VITE_VALIDATOR_MODULE_ADDRESS,
+    sessionKeyModuleAddress: import.meta.env.VITE_SESSION_KEY_MODULE_ADDRESS,
     supported: false, // Factory will be deployed after Base Sepolia testing
   },
   {
@@ -67,6 +83,10 @@ export const AVAILABLE_NETWORKS = [
     bundlerUrl: import.meta.env.VITE_BASE_SEPOLIA_BUNDLER_URL || 'https://api.pimlico.io/v2/base-sepolia/rpc?apikey=YOUR_API_KEY',
     explorerUrl: 'https://sepolia.basescan.org',
     factoryAddress: import.meta.env.VITE_BASE_SEPOLIA_FACTORY_ADDRESS || '0xF913EF5101Dcb4fDB9A62666D18593aea5509262',
+    // ERC-7579 modular account contracts (to be deployed)
+    modularFactoryAddress: import.meta.env.VITE_BASE_SEPOLIA_MODULAR_FACTORY_ADDRESS,
+    validatorModuleAddress: import.meta.env.VITE_BASE_SEPOLIA_VALIDATOR_MODULE_ADDRESS,
+    sessionKeyModuleAddress: import.meta.env.VITE_BASE_SEPOLIA_SESSION_KEY_MODULE_ADDRESS,
     supported: true, // ✅ Deployed on 2025-11-22
   },
   {
@@ -76,6 +96,10 @@ export const AVAILABLE_NETWORKS = [
     bundlerUrl: import.meta.env.VITE_BUNDLER_URL || 'https://api.pimlico.io/v2/sepolia/rpc?apikey=YOUR_API_KEY',
     explorerUrl: 'https://sepolia.etherscan.io',
     factoryAddress: import.meta.env.VITE_FACTORY_ADDRESS,
+    // ERC-7579 modular account contracts (to be deployed)
+    modularFactoryAddress: import.meta.env.VITE_MODULAR_FACTORY_ADDRESS,
+    validatorModuleAddress: import.meta.env.VITE_VALIDATOR_MODULE_ADDRESS,
+    sessionKeyModuleAddress: import.meta.env.VITE_SESSION_KEY_MODULE_ADDRESS,
     supported: true, // Factory is deployed on Sepolia
   },
 ];

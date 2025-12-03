@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
-import { TrendingUp, TrendingDown, AlertTriangle, Lightbulb, ArrowLeftRight, ArrowUp, ArrowDown, MoreVertical, Plus, Pencil, Trash2, Wallet } from 'lucide-react'
+import { TrendingUp, TrendingDown, AlertTriangle, Lightbulb, ArrowLeftRight, ArrowUp, ArrowDown, MoreVertical, Plus, Pencil, Trash2, Wallet, Layers } from 'lucide-react'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
 import { useNetwork } from '../contexts/NetworkContext'
 import { useP256SDK } from '../hooks/useP256SDK'
+import { useModularAccountManager } from '../hooks/useModularAccount'
 import { ethers } from 'ethers'
 import Header from '../components/Header'
 import { Identicon } from '../utils/identicon.jsx'
@@ -19,6 +20,7 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onSwap
   const { userInfo, address: ownerAddress } = useWeb3Auth()
   const { networkInfo } = useNetwork()
   const sdk = useP256SDK()
+  const modularManager = useModularAccountManager()
   const [wallets, setWallets] = useState([])
   const [loading, setLoading] = useState(false)
   const [showAddModal, setShowAddModal] = useState(false)
@@ -28,6 +30,7 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onSwap
   const [walletIndex, setWalletIndex] = useState('0')
   const [addError, setAddError] = useState('')
   const [isAdding, setIsAdding] = useState(false)
+  const [accountType, setAccountType] = useState('modular') // 'legacy' or 'modular'
 
   // Menu and modal states
   const [openMenuId, setOpenMenuId] = useState(null)
@@ -365,8 +368,13 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onSwap
       return
     }
 
-    // Check if SDK is ready
-    if (!sdk) {
+    // Check if SDK is ready (for legacy) or modular manager (for modular)
+    const isModular = accountType === 'modular'
+    if (isModular && !modularManager) {
+      setAddError('Modular accounts not available on this network. Please use legacy account type.')
+      return
+    }
+    if (!isModular && !sdk) {
       setAddError('SDK not initialized. Please try again.')
       return
     }
@@ -374,90 +382,64 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onSwap
     // Get existing wallets to check for duplicate index
     const walletsList = JSON.parse(localStorage.getItem('ethaura_wallets_list') || '[]')
 
-    // Check if this index has already been used by this owner
-    const existingWallet = walletsList.find(w => w.index === indexNum && w.owner === ownerAddress)
+    // Check if this index has already been used by this owner (for same account type)
+    const existingWallet = walletsList.find(w =>
+      w.index === indexNum &&
+      w.owner === ownerAddress &&
+      (w.isModular || false) === isModular
+    )
     if (existingWallet) {
       setAddError(`Index ${indexNum} is already used for this owner. The wallet already exists at ${existingWallet.address}. Please use a different index (e.g., ${indexNum + 1}).`)
       return
-    }
-
-    // Note: Same index with different owner is OK (will produce different address)
-    const sameIndexDifferentOwner = walletsList.find(w => w.index === indexNum && w.owner && w.owner !== ownerAddress)
-    if (sameIndexDifferentOwner) {
-      console.log('ℹ️ Same index with different owner - this is OK, will produce different address:', {
-        existingOwner: sameIndexDifferentOwner.owner,
-        currentOwner: ownerAddress,
-        index: indexNum,
-      })
     }
 
     setIsAdding(true)
     setAddError('') // Clear any previous errors
 
     try {
-      console.log('🔧 Creating new wallet with index:', {
+      const saltBigInt = BigInt(indexNum)
+      let accountAddress
+      let isDeployed = false
+
+      console.log('🔧 Creating new wallet:', {
         owner: ownerAddress,
         index: indexNum,
         name: walletName.trim(),
+        type: isModular ? 'modular (ERC-7579)' : 'legacy (P256Account)',
       })
 
-      // Create account with owner-only mode (no passkey)
-      // User can add passkey later via Settings > Device Management
-      const saltBigInt = BigInt(indexNum)
+      if (isModular) {
+        // Create modular account (ERC-7579 AuraAccount)
+        console.log('🏗️ Creating modular account via AuraAccountFactory...')
+        accountAddress = await modularManager.getAccountAddress(ownerAddress, saltBigInt)
+        isDeployed = await modularManager.isDeployed(accountAddress)
+        console.log('📍 Modular account address:', accountAddress, 'deployed:', isDeployed)
+      } else {
+        // Create legacy account (P256Account)
+        console.log('🏗️ Creating legacy account via P256AccountFactory...')
+        const createAccountPromise = sdk.createAccount(
+          null, // no passkey - owner-only mode
+          ownerAddress,
+          saltBigInt,
+          false // 2FA disabled
+        )
 
-      console.log('🧂 Salt calculation:', {
-        indexNum,
-        saltBigInt: saltBigInt.toString(),
-        owner: ownerAddress,
-        expectedSalt: `keccak256(${ownerAddress}, ${saltBigInt.toString()})`,
-      })
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Account creation timed out after 45 seconds.')), 45000)
+        )
 
-      console.log('Calling sdk.createAccount...')
-
-      // Add timeout to prevent indefinite hanging
-      const createAccountPromise = sdk.createAccount(
-        null, // no passkey - owner-only mode
-        ownerAddress,
-        saltBigInt,
-        false // 2FA disabled
-      )
-
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Account creation timed out after 45 seconds. Please check your network connection and try again.')), 45000)
-      )
-
-      const accountData = await Promise.race([createAccountPromise, timeoutPromise])
-      console.log('sdk.createAccount completed')
-
-      console.log('📍 New wallet created:', {
-        address: accountData.address,
-        isDeployed: accountData.isDeployed,
-        owner: ownerAddress,
-        salt: saltBigInt.toString(),
-        index: indexNum,
-      })
-
-      // Verify: same salt should give same address
-      console.log('Address determinism check:', {
-        message: 'Same owner + same salt should ALWAYS give this address',
-        address: accountData.address,
-        formula: `CREATE2(factory, keccak256(owner=${ownerAddress}, salt=${indexNum}), initCodeHash)`,
-      })
+        const accountData = await Promise.race([createAccountPromise, timeoutPromise])
+        accountAddress = accountData.address
+        isDeployed = accountData.isDeployed
+        console.log('📍 Legacy account address:', accountAddress, 'deployed:', isDeployed)
+      }
 
       // Double-check if wallet already exists (by address)
-      const exists = walletsList.some(w => w.address.toLowerCase() === accountData.address.toLowerCase())
+      const exists = walletsList.some(w => w.address.toLowerCase() === accountAddress.toLowerCase())
       if (exists) {
         setAddError('This wallet already exists in your list')
         setIsAdding(false)
         return
-      }
-
-      // If account is already deployed on-chain, show a note
-      if (accountData.isDeployed) {
-        console.log('ℹ️ Account already deployed on-chain:', {
-          address: accountData.address,
-          message: 'This account was previously deployed (possibly from another device or session)',
-        })
       }
 
       // Fetch balance for the new wallet
@@ -469,20 +451,13 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onSwap
       let totalBalanceUSD = 0
 
       try {
-        // Fetch all token balances (ETH + ERC20 tokens) with real prices
-        const tokenBalances = await tokenService.getAllTokenBalances(accountData.address, false, true)
-
-        // Calculate total portfolio value in USD
+        const tokenBalances = await tokenService.getAllTokenBalances(accountAddress, false, true)
         totalBalanceUSD = tokenBalances.reduce((sum, token) => sum + (token.valueUSD || 0), 0)
-
-        // Get ETH balance for display
         const ethToken = tokenBalances.find(t => t.symbol === 'ETH')
         balanceEth = ethToken ? ethToken.amount.toString() : '0'
-
         console.log('Balance fetched:', balanceEth, 'ETH, Total USD:', totalBalanceUSD)
       } catch (balanceError) {
         console.warn('Failed to fetch balance, using 0.0:', balanceError.message)
-        // Continue with 0 balance instead of failing the whole operation
       }
 
       const percentChange = (Math.random() * 4 - 2).toFixed(2)
@@ -491,13 +466,14 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onSwap
       const newWallet = {
         id: Date.now().toString(),
         name: walletName.trim(),
-        address: accountData.address,
+        address: accountAddress,
         balance: balanceEth,
         balanceUSD: totalBalanceUSD.toFixed(2),
         percentChange,
-        index: indexNum, // Store the index for reference
-        owner: ownerAddress, // Store the owner address used to create this wallet
+        index: indexNum,
+        owner: ownerAddress,
         createdAt: new Date().toISOString(),
+        isModular, // Track account type
       }
 
       walletsList.push(newWallet)
@@ -513,6 +489,7 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onSwap
       setWalletIndex('0')
       setAddError('')
       setModalMode('import')
+      setAccountType('modular')
     } catch (err) {
       console.error('Error creating wallet:', err)
       setAddError(err.message || 'Failed to create wallet. Please try again.')
@@ -802,6 +779,7 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onSwap
           setWalletName('')
           setWalletIndex('0')
           setAddError('')
+          setAccountType('modular')
         }}>
           <div className="modal-content add-wallet-modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
@@ -813,6 +791,7 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onSwap
                 setWalletName('')
                 setWalletIndex('0')
                 setAddError('')
+                setAccountType('modular')
               }}>×</button>
             </div>
             <div className="modal-body">
@@ -890,6 +869,48 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onSwap
                     />
                   </div>
 
+                  {/* Account Type Selector */}
+                  <div className="form-group">
+                    <label className="form-label-with-info">
+                      <span>Account Type</span>
+                      <div className="info-icon-wrapper">
+                        <span className="info-icon-btn"></span>
+                        <div className="info-tooltip">
+                          <div className="tooltip-section">
+                            <strong>Modular (ERC-7579):</strong>
+                            <p>Next-gen modular smart account with pluggable modules for session keys, spending limits, and more.</p>
+                          </div>
+                          <div className="tooltip-section">
+                            <strong>Legacy (P256Account):</strong>
+                            <p>Original smart account with built-in passkey support and guardian recovery.</p>
+                          </div>
+                        </div>
+                      </div>
+                    </label>
+                    <div className="account-type-selector">
+                      <button
+                        type="button"
+                        className={`account-type-btn ${accountType === 'modular' ? 'active' : ''}`}
+                        onClick={() => setAccountType('modular')}
+                        disabled={!modularManager}
+                      >
+                        <Layers size={16} />
+                        <span>Modular (ERC-7579)</span>
+                      </button>
+                      <button
+                        type="button"
+                        className={`account-type-btn ${accountType === 'legacy' ? 'active' : ''}`}
+                        onClick={() => setAccountType('legacy')}
+                      >
+                        <Wallet size={16} />
+                        <span>Legacy</span>
+                      </button>
+                    </div>
+                    {!modularManager && (
+                      <p className="form-hint warning">Modular accounts not available on this network</p>
+                    )}
+                  </div>
+
                   <div className="form-group">
                     <label className="form-label-with-info">
                       <span>Index (Salt)</span>
@@ -963,6 +984,7 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onSwap
                     setWalletName('')
                     setWalletIndex('0')
                     setAddError('')
+                    setAccountType('modular')
                   }}
                   disabled={isAdding}
                 >

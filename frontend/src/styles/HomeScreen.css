@@ -1180,3 +1180,49 @@
   background: #1f1f1f;
   border-color: #1f1f1f;
 }
+
+/* Account Type Selector */
+.account-type-selector {
+  display: flex;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.account-type-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 16px;
+  background: #f9fafb;
+  border: 2px solid #e5e7eb;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #6b7280;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.account-type-btn:hover:not(:disabled) {
+  background: #f3f4f6;
+  border-color: #d1d5db;
+}
+
+.account-type-btn.active {
+  background: #f0f9ff;
+  border-color: #3b82f6;
+  color: #1d4ed8;
+}
+
+.account-type-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.form-hint.warning {
+  color: #f59e0b;
+  font-size: 12px;
+  margin-top: 4px;
+}
