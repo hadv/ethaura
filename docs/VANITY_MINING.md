@@ -21,7 +21,7 @@ cargo install create2crunch
 ### Step 1: Get Validator Init Code Hash
 
 ```bash
-forge script script/GetInitCodeHash.s.sol
+forge script script/GetValidatorInitCodeHash.s.sol
 ```
 
 Output:

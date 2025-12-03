@@ -5,9 +5,9 @@ import {Script, console2} from "forge-std/Script.sol";
 import {P256MFAValidatorModule} from "../src/modular/modules/validators/P256MFAValidatorModule.sol";
 
 /**
- * @title GetInitCodeHashScript
+ * @title GetValidatorInitCodeHashScript
  * @notice Computes init code hash for P256MFAValidatorModule (CREATE2 vanity mining)
- * @dev Usage: forge script script/GetInitCodeHash.s.sol
+ * @dev Usage: forge script script/GetValidatorInitCodeHash.s.sol
  *
  * Workflow:
  *   1. Run this script to get validator init code hash
@@ -17,7 +17,7 @@ import {P256MFAValidatorModule} from "../src/modular/modules/validators/P256MFAV
  *   5. Mine factory vanity salt
  *   6. Update Deploy.s.sol with both salts
  */
-contract GetInitCodeHashScript is Script {
+contract GetValidatorInitCodeHashScript is Script {
     address constant SOLADY_CREATE2_FACTORY = 0x0000000000FFe8B47B3e2130213B802212439497;
 
     function run() external view {

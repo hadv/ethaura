@@ -25,10 +25,8 @@ contract GetFactoryInitCodeHashScript is Script {
     function run(address validatorAddress) external view {
         require(validatorAddress != address(0), "Validator address required");
 
-        bytes memory creationCode = abi.encodePacked(
-            type(AuraAccountFactory).creationCode,
-            abi.encode(validatorAddress)
-        );
+        bytes memory creationCode =
+            abi.encodePacked(type(AuraAccountFactory).creationCode, abi.encode(validatorAddress));
         bytes32 initCodeHash = keccak256(creationCode);
 
         console2.log("=== AuraAccountFactory Init Code Hash ===");

@@ -55,10 +55,8 @@ contract DeployScript is Script {
         console2.log("");
 
         // Step 2: Compute factory creation code (depends on validator address)
-        bytes memory factoryCreationCode = abi.encodePacked(
-            type(AuraAccountFactory).creationCode,
-            abi.encode(expectedValidator)
-        );
+        bytes memory factoryCreationCode =
+            abi.encodePacked(type(AuraAccountFactory).creationCode, abi.encode(expectedValidator));
         bytes32 factoryInitCodeHash = keccak256(factoryCreationCode);
         address expectedFactory = computeCreate2Address(SOLADY_CREATE2_FACTORY, FACTORY_SALT, factoryInitCodeHash);
 
@@ -107,9 +105,8 @@ contract DeployScript is Script {
     }
 
     function _deployViaCreate2(bytes32 salt, bytes memory creationCode) internal returns (address) {
-        (bool success, bytes memory returnData) = SOLADY_CREATE2_FACTORY.call(
-            abi.encodeWithSignature("safeCreate2(bytes32,bytes)", salt, creationCode)
-        );
+        (bool success, bytes memory returnData) =
+            SOLADY_CREATE2_FACTORY.call(abi.encodeWithSignature("safeCreate2(bytes32,bytes)", salt, creationCode));
         require(success, "CREATE2 deployment failed");
         return abi.decode(returnData, (address));
     }
