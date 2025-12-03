@@ -2,109 +2,124 @@
 pragma solidity ^0.8.23;
 
 import {Script, console2} from "forge-std/Script.sol";
-import {P256AccountFactory} from "../src/P256AccountFactory.sol";
-import {P256Account} from "../src/P256Account.sol";
-import {IEntryPoint} from "@account-abstraction/interfaces/IEntryPoint.sol";
+import {AuraAccountFactory} from "../src/modular/AuraAccountFactory.sol";
+import {AuraAccount} from "../src/modular/AuraAccount.sol";
+import {P256MFAValidatorModule} from "../src/modular/modules/validators/P256MFAValidatorModule.sol";
 
 /**
  * @title DeployScript
- * @notice Deployment script for P256AccountFactory using CREATE2 for deterministic addresses
- * @dev Deploys factory to the SAME address on ALL networks
+ * @notice Deployment script for ERC-7579 Modular Smart Account using CREATE2
+ * @dev Deploys to deterministic addresses on ALL networks:
+ *      1. P256MFAValidatorModule - The default validator with passkey MFA support
+ *      2. AuraAccountFactory - Factory that creates modular accounts
  *
  * How it works:
- * 1. Uses CREATE2 for deterministic deployment
- * 2. Same salt + same bytecode = same factory address on all chains
+ * 1. Uses Solady's CREATE2 factory for deterministic deployment
+ * 2. Same salt + same bytecode = same addresses on all chains
  * 3. Users get same account addresses across all networks
  *
  * Usage:
  *   forge script script/Deploy.s.sol:DeployScript --rpc-url <network> --broadcast --verify
  */
 contract DeployScript is Script {
-    // EntryPoint v0.7 address (same on all networks)
-    address constant ENTRYPOINT_V07 = 0x0000000071727De22E5E9d8BAf0edAc6f37da032;
-
     // Solady's canonical CREATE2 factory (deployed on all major chains)
     address constant SOLADY_CREATE2_FACTORY = 0x0000000000FFe8B47B3e2130213B802212439497;
 
-    // Salt for CREATE2 deployment (vanity salt for 0x0000000000 prefix - 5 zero bytes!)
-    // IMPORTANT: Use the SAME salt on ALL networks to get the same factory address
-    // First 20 bytes must match deployer address (0x18Ee4C040568238643C07e7aFd6c53efc196D26b) for Solady factory
-    // Predicted factory address: 0x0000000000569C25b117231B791C9ACaD7A930c7
-    bytes32 constant SALT = 0x18ee4c040568238643c07e7afd6c53efc196d26b000000000000000dc8cf832f;
+    // Salt for P256MFAValidatorModule CREATE2 deployment
+    // First 20 bytes must match deployer address for Solady factory
+    // TODO: Update with your deployer address and vanity salt
+    bytes32 constant VALIDATOR_SALT = 0x18ee4c040568238643c07e7afd6c53efc196d26b0000000000000000000000a1;
+
+    // Salt for AuraAccountFactory CREATE2 deployment
+    // TODO: Update with your deployer address and vanity salt
+    bytes32 constant FACTORY_SALT = 0x18ee4c040568238643c07e7afd6c53efc196d26b0000000000000000000000a2;
 
     function run() external {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         address deployer = vm.addr(deployerPrivateKey);
 
-        // Prepare creation code (bytecode + constructor args)
-        bytes memory creationCode = abi.encodePacked(type(P256AccountFactory).creationCode, abi.encode(ENTRYPOINT_V07));
-
-        // Calculate init code hash dynamically
-        bytes32 initCodeHash = keccak256(creationCode);
-
-        // Calculate expected address using CREATE2 formula with Solady factory
-        address expectedAddress = computeCreate2Address(SOLADY_CREATE2_FACTORY, SALT, initCodeHash);
-
-        console2.log("=== CREATE2 Deployment ===");
+        console2.log("=== ERC-7579 Modular Account CREATE2 Deployment ===");
         console2.log("Deployer:", deployer);
-        console2.log("Salt:", vm.toString(SALT));
-        console2.log("Init Code Hash:", vm.toString(initCodeHash));
-        console2.log("Init Code Length:", creationCode.length, "bytes");
-        console2.log("Expected Factory Address:", expectedAddress);
+        console2.log("CREATE2 Factory:", SOLADY_CREATE2_FACTORY);
+        console2.log("");
+
+        // Step 1: Compute validator creation code and expected address
+        bytes memory validatorCreationCode = type(P256MFAValidatorModule).creationCode;
+        bytes32 validatorInitCodeHash = keccak256(validatorCreationCode);
+        address expectedValidator = computeCreate2Address(SOLADY_CREATE2_FACTORY, VALIDATOR_SALT, validatorInitCodeHash);
+
+        console2.log("=== Step 1: P256MFAValidatorModule ===");
+        console2.log("Salt:", vm.toString(VALIDATOR_SALT));
+        console2.log("Init Code Hash:", vm.toString(validatorInitCodeHash));
+        console2.log("Expected Address:", expectedValidator);
+        console2.log("");
+
+        // Step 2: Compute factory creation code (depends on validator address)
+        bytes memory factoryCreationCode = abi.encodePacked(
+            type(AuraAccountFactory).creationCode,
+            abi.encode(expectedValidator)
+        );
+        bytes32 factoryInitCodeHash = keccak256(factoryCreationCode);
+        address expectedFactory = computeCreate2Address(SOLADY_CREATE2_FACTORY, FACTORY_SALT, factoryInitCodeHash);
+
+        console2.log("=== Step 2: AuraAccountFactory ===");
+        console2.log("Salt:", vm.toString(FACTORY_SALT));
+        console2.log("Init Code Hash:", vm.toString(factoryInitCodeHash));
+        console2.log("Expected Address:", expectedFactory);
         console2.log("");
 
         vm.startBroadcast(deployerPrivateKey);
 
-        // Deploy using Solady's CREATE2 factory
-        // Call safeCreate2(bytes32 salt, bytes memory initializationCode)
-        (bool success, bytes memory returnData) = SOLADY_CREATE2_FACTORY.call{value: 0}(
-            abi.encodeWithSignature("safeCreate2(bytes32,bytes)", SALT, creationCode)
-        );
+        // Deploy P256MFAValidatorModule via CREATE2
+        address validatorAddress = _deployViaCreate2(VALIDATOR_SALT, validatorCreationCode);
+        require(validatorAddress == expectedValidator, "Validator address mismatch");
+        console2.log("P256MFAValidatorModule deployed at:", validatorAddress);
 
-        require(success, "Solady CREATE2 factory deployment failed");
-
-        address factoryAddress = abi.decode(returnData, (address));
-
-        require(factoryAddress == expectedAddress, "Deployed address mismatch");
-
-        // Try to get implementation address (may fail in simulation if using expected address)
-        P256AccountFactory factory = P256AccountFactory(factoryAddress);
-        address implementationAddress;
-        address proxyFactoryAddress;
-
-        try factory.IMPLEMENTATION() returns (P256Account impl) {
-            implementationAddress = address(impl);
-            proxyFactoryAddress = address(factory.PROXY_FACTORY());
-        } catch {
-            console2.log("Note: Cannot read factory state in simulation (expected for collision case)");
-            console2.log("Factory will be deployed on-chain at:", expectedAddress);
-        }
+        // Deploy AuraAccountFactory via CREATE2
+        address factoryAddress = _deployViaCreate2(FACTORY_SALT, factoryCreationCode);
+        require(factoryAddress == expectedFactory, "Factory address mismatch");
+        console2.log("AuraAccountFactory deployed at:", factoryAddress);
 
         vm.stopBroadcast();
 
+        // Get additional info from factory
+        AuraAccountFactory factory = AuraAccountFactory(factoryAddress);
+        address implementationAddress = factory.accountImplementation();
+        address proxyFactoryAddress = address(factory.PROXY_FACTORY());
+
+        console2.log("");
         console2.log("=== Deployment Complete ===");
-        console2.log("EntryPoint:", ENTRYPOINT_V07);
-        console2.log("P256AccountFactory:", factoryAddress);
-        if (implementationAddress != address(0)) {
-            console2.log("P256Account Implementation:", implementationAddress);
-            console2.log("Solady ERC1967Factory:", proxyFactoryAddress);
-        }
-        console2.log("========================");
+        console2.log("P256MFAValidatorModule:", validatorAddress);
+        console2.log("AuraAccountFactory:", factoryAddress);
+        console2.log("AuraAccount Implementation:", implementationAddress);
+        console2.log("Solady ERC1967Factory:", proxyFactoryAddress);
+        console2.log("===========================");
         console2.log("");
-        console2.log("This factory address is DETERMINISTIC across all networks!");
-        console2.log("Deploy with the same salt on other networks to get the same address.");
+        console2.log("These addresses are DETERMINISTIC across all networks!");
+        console2.log("Deploy with the same salts on other networks to get the same addresses.");
         console2.log("");
-        console2.log("Note: Factory uses Solady's canonical ERC-1967 proxy pattern.");
-        console2.log("Each account is a minimal proxy (~121 bytes) pointing to the implementation.");
-        console2.log("This saves ~60-70% gas on account deployment.");
+        console2.log("To create an account, call factory.createAccount() with:");
+        console2.log("  - owner: Web3Auth address");
+        console2.log("  - validatorData: abi.encode(owner, qx, qy, deviceId, enableMFA)");
+        console2.log("  - hook: Optional hook address (address(0) for none)");
+        console2.log("  - hookData: Hook initialization data");
+        console2.log("  - salt: Unique salt for deterministic address");
     }
 
-    function computeCreate2Address(address deployer, bytes32 salt, bytes32 initCodeHash)
+    function _deployViaCreate2(bytes32 salt, bytes memory creationCode) internal returns (address) {
+        (bool success, bytes memory returnData) = SOLADY_CREATE2_FACTORY.call(
+            abi.encodeWithSignature("safeCreate2(bytes32,bytes)", salt, creationCode)
+        );
+        require(success, "CREATE2 deployment failed");
+        return abi.decode(returnData, (address));
+    }
+
+    function computeCreate2Address(address factory, bytes32 salt, bytes32 initCodeHash)
         internal
         pure
         returns (address)
     {
-        bytes32 hash = keccak256(abi.encodePacked(bytes1(0xff), deployer, salt, initCodeHash));
+        bytes32 hash = keccak256(abi.encodePacked(bytes1(0xff), factory, salt, initCodeHash));
         return address(uint160(uint256(hash)));
     }
 }
