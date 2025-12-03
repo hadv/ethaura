@@ -1,4 +1,6 @@
 @openzeppelin/=lib/openzeppelin-contracts/
 @account-abstraction/=lib/account-abstraction/contracts/
 forge-std/=lib/forge-std/src/
+@erc7579/=lib/erc7579-implementation/src/
+solady/=lib/solady/src/
 

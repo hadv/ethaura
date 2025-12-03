@@ -13,9 +13,9 @@ P256ModularAccount (Core Account)
 │   └── PQMFAValidatorModule - Dilithium + MFA (future: post-quantum)
 │
 ├── Executors (Type 2)
-│   ├── PasskeyManagerModule - Add/remove passkeys
 │   ├── SocialRecoveryModule - Guardian management + recovery with threshold + timelock
 │   ├── HookManagerModule - Install/uninstall user hooks
+│   ├── SessionKeyExecutorModule - Session keys with time bounds, target restrictions, spending limits
 │   └── LargeTransactionExecutorModule - Timelock for high-value txs (built-in, disabled by default)
 │
 ├── Fallback (Type 3)
@@ -27,6 +27,12 @@ P256ModularAccount (Core Account)
         ├── LargeTransactionGuardHook - Built-in (disabled by default, threshold = type(uint256).max)
         └── User-installed hooks (WhitelistHook, SpendingLimitHook, etc.)
 ```
+
+**Why SessionKeyExecutorModule is an Executor (not Validator):**
+- Session keys have temporal validity (expire after `validUntil`)
+- If SessionKey was a Validator and user removed P256MFAValidator, the account would be permanently locked after session keys expire
+- As an Executor, P256MFAValidator remains the only validator, ensuring the "last validator" protection works correctly
+- Cleaner architecture: session keys are "delegated execution" not "alternative authentication"
 
 **Key Design Decisions:**
 - No separate ECDSAValidatorModule - recovery handled by SocialRecoveryModule (Executor)
@@ -67,7 +73,7 @@ Long-term: FullPQValidatorModule (Dilithium only, when ECDSA deprecated)
 - May require off-chain verification with on-chain proof
 - EIP-7212 equivalent for Dilithium precompile would help
 
-## Core Account: P256ModularAccount
+## Core Account: AuraAccount
 
 ### Responsibilities
 - ERC-4337 validateUserOp delegation to validators
@@ -75,9 +81,42 @@ Long-term: FullPQValidatorModule (Dilithium only, when ECDSA deprecated)
 - Module installation/uninstallation
 - ERC-1271 signature validation forwarding
 
+### Signature-Based Validator Selection
+
+AuraAccount uses **signature-based validator selection** instead of nonce-based selection. The validator address is encoded in the first 20 bytes of the signature:
+
+```
+┌──────────────────────┬─────────────────────────┐
+│ Validator Addr (20B) │ Actual Signature (var)  │
+└──────────────────────┴─────────────────────────┘
+```
+
+**Security Benefits:**
+- Validator is cryptographically bound to the signature
+- No frontend nonce encoding complexity
+- Prevents validator injection attacks (must be installed)
+- Prevents downgrade attacks (validator must verify its own signature format)
+
+**Validation Flow:**
+```
+1. Extract validator address from signature[0:20]
+2. Verify validator is installed (CRITICAL security check)
+3. Pass full userOp to validator's validateUserOp()
+4. Validator extracts its own signature format from signature[20:]
+5. Return validation result
+```
+
+**Example Signatures:**
+
+| Validator | Signature Format |
+|-----------|------------------|
+| P256MFAValidatorModule | `[validator(20B)][ownerSig(65B)][passkeySig(~70B)]` |
+
+Note: SessionKeyExecutorModule is an Executor (not Validator), so it doesn't use the signature-based validator selection. Instead, it validates session key signatures internally when `executeWithSessionKey()` is called.
+
 ### Key Interfaces
 ```solidity
-interface IP256ModularAccount is IERC7579Account {
+interface IAuraAccount is IERC7579Account {
     // Account initialization
     function initialize(
         address defaultValidator,
@@ -85,9 +124,6 @@ interface IP256ModularAccount is IERC7579Account {
         address hook,
         bytes calldata hookData
     ) external;
-    
-    // Validator selection (encoded in userOp.nonce)
-    function getActiveValidator() external view returns (address);
 }
 ```
 
@@ -120,17 +156,17 @@ mapping(address account => bool) mfaEnabled;       // MFA toggle
 **Interface:**
 ```solidity
 interface IP256MFAValidatorModule is IValidator {
-    // Passkey management (called by PasskeyManagerModule)
-    function addPasskey(address account, bytes32 qx, bytes32 qy, bytes32 deviceId) external;
-    function removePasskey(address account, bytes32 passkeyId) external;
+    // Passkey management (called by account)
+    function addPasskey(bytes32 qx, bytes32 qy, bytes32 deviceId) external;
+    function removePasskey(bytes32 passkeyId) external;
 
     // MFA management
-    function enableMFA(address account) external;
-    function disableMFA(address account) external;
+    function enableMFA() external;
+    function disableMFA() external;
     function isMFAEnabled(address account) external view returns (bool);
 
-    // Owner management
-    function setOwner(address account, address newOwner) external;
+    // Owner management (called by SocialRecoveryModule during recovery)
+    function setOwner(address newOwner) external;
     function getOwner(address account) external view returns (address);
 
     // View functions
@@ -142,16 +178,97 @@ interface IP256MFAValidatorModule is IValidator {
 
 ## Executor Modules
 
-### 2. PasskeyManagerModule (Type 2)
+### 2. SessionKeyExecutorModule (Type 2)
 
-**Purpose:** Manage passkeys on P256ValidatorModule
+**Purpose:** Execute transactions on behalf of the account using session keys with granular permissions for gasless/automated transactions
+
+**Why Executor (not Validator):**
+- Session keys have temporal validity (expire after `validUntil`)
+- If SessionKey was a Validator and user removed P256MFAValidator, the account would be permanently locked after session keys expire
+- As an Executor, P256MFAValidator remains the only validator, ensuring the "last validator" protection works correctly
+- Cleaner architecture: session keys are "delegated execution" not "alternative authentication"
+
+**Storage (per account):**
+```solidity
+struct SessionKeyPermission {
+    address sessionKey;        // EOA that can sign
+    uint48 validAfter;         // Start timestamp
+    uint48 validUntil;         // Expiry timestamp
+    address[] allowedTargets;  // Contracts it can call (empty = any)
+    bytes4[] allowedSelectors; // Functions it can call (empty = any)
+    uint256 spendLimitPerTx;   // Max ETH per transaction (0 = unlimited)
+    uint256 spendLimitTotal;   // Max ETH total (0 = unlimited)
+}
+
+struct SessionKeyData {
+    bool active;
+    uint48 validAfter;
+    uint48 validUntil;
+    uint256 spendLimitPerTx;
+    uint256 spendLimitTotal;
+    uint256 spentTotal;
+}
+
+mapping(address account => mapping(address sessionKey => SessionKeyData)) sessionKeys;
+mapping(address account => address[]) sessionKeyList;
+mapping(address account => mapping(address sessionKey => mapping(address target => bool))) allowedTargets;
+mapping(address account => mapping(address sessionKey => mapping(bytes4 selector => bool))) allowedSelectors;
+mapping(address account => mapping(address sessionKey => uint256)) nonces;  // Replay protection
+```
 
 **Interface:**
 ```solidity
-interface IPasskeyManagerModule is IExecutor {
-    function addPasskey(bytes32 qx, bytes32 qy, bytes32 deviceId) external;
-    function removePasskey(bytes32 passkeyId) external;
+interface ISessionKeyExecutorModule is IExecutor {
+    // Session key management (called by account)
+    function createSessionKey(SessionKeyPermission calldata permission) external;
+    function revokeSessionKey(address sessionKey) external;
+
+    // Execution (called by anyone with valid session key signature)
+    function executeWithSessionKey(
+        address account,
+        address sessionKey,
+        address target,
+        uint256 value,
+        bytes calldata data,
+        uint256 nonce,
+        bytes calldata signature
+    ) external returns (bytes memory);
+
+    // View functions
+    function getSessionKey(address account, address sessionKey)
+        external view returns (bool active, uint48 validAfter, uint48 validUntil,
+            uint256 limitPerTx, uint256 limitTotal, uint256 spentTotal);
+    function getSessionKeys(address account) external view returns (address[] memory);
+    function getSessionKeyCount(address account) external view returns (uint256);
+    function isSessionKeyValid(address account, address sessionKey) external view returns (bool);
+    function isTargetAllowed(address account, address sessionKey, address target) external view returns (bool);
+    function isSelectorAllowed(address account, address sessionKey, bytes4 selector) external view returns (bool);
+    function getNonce(address account, address sessionKey) external view returns (uint256);
 }
+```
+
+**Use Cases:**
+- **Gaming:** Allow game backend to submit moves without user signing each one
+- **Trading bots:** Automated trading within spending limits
+- **Subscriptions:** Recurring payments to specific addresses
+- **Batch operations:** DeFi automation with selector restrictions
+
+**Signature Format:**
+```
+Message: keccak256(account, target, value, keccak256(data), nonce, chainId)
+Signature: ECDSA signature from session key (65 bytes)
+```
+
+**Execution Flow:**
+```
+1. Anyone calls executeWithSessionKey() with session key signature
+2. Verify session key is active and within time bounds
+3. Verify nonce matches expected value (replay protection)
+4. Verify ECDSA signature from session key over (account, target, value, data, nonce, chainId)
+5. Check target and selector permissions
+6. Check and update spending limits
+7. Increment nonce
+8. Call account.executeFromExecutor() to execute the transaction
 ```
 
 ### 3. SocialRecoveryModule (Type 2)

@@ -7,6 +7,13 @@ evm_version = "cancun"
 optimizer = true
 optimizer_runs = 1000000
 via_ir = true
+remappings = [
+    "@openzeppelin/=lib/openzeppelin-contracts/",
+    "@account-abstraction/=lib/account-abstraction/contracts/",
+    "forge-std/=lib/forge-std/src/",
+    "@erc7579/=lib/erc7579-implementation/src/",
+    "solady/=lib/solady/src/"
+]
 
 [rpc_endpoints]
 sepolia = "${SEPOLIA_RPC_URL}"
@@ -20,3 +27,12 @@ base-sepolia = { key = "${ETHERSCAN_API_KEY}", url = "https://api-sepolia.basesc
 
 # See more config options https://github.com/foundry-rs/foundry/tree/master/config
 
+[fuzz]
+runs = 1000                    # Number of fuzz runs per test
+max_test_rejects = 65536       # Max inputs rejected before stopping
+dictionary_weight = 40         # Weight for dictionary-based fuzzing
+
+[invariant]
+runs = 256                     # Invariant test runs
+depth = 15                     # Maximum call depth per run
+fail_on_revert = false         # Don't fail on reverts

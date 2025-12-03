@@ -129,6 +129,81 @@ export const WETH_ABI = [
   'function transfer(address to, uint256 amount) returns (bool)',
 ]
 
+// ERC-7579 Module Type IDs
+export const MODULE_TYPE = {
+  VALIDATOR: 1,
+  EXECUTOR: 2,
+  FALLBACK: 3,
+  HOOK: 4,
+}
+
+// AuraAccountFactory ABI (ERC-7579 modular account factory)
+export const AURA_ACCOUNT_FACTORY_ABI = [
+  'function createAccount(address owner, bytes validatorData, address hook, bytes hookData, uint256 salt) returns (address)',
+  'function getAddress(address owner, uint256 salt) view returns (address)',
+  'function accountImplementation() view returns (address)',
+  'function validator() view returns (address)',
+]
+
+// AuraAccount ABI (ERC-7579 modular account)
+export const AURA_ACCOUNT_ABI = [
+  // ERC-7579 execution
+  'function execute(bytes32 mode, bytes executionCalldata) payable',
+  'function executeFromExecutor(bytes32 mode, bytes executionCalldata) payable returns (bytes[])',
+  // Module management
+  'function installModule(uint256 moduleTypeId, address module, bytes initData) payable',
+  'function uninstallModule(uint256 moduleTypeId, address module, bytes deInitData) payable',
+  'function isModuleInstalled(uint256 moduleTypeId, address module, bytes additionalContext) view returns (bool)',
+  // Account info
+  'function getValidator() view returns (address)',
+  'function getGlobalHook() view returns (address)',
+  'function accountId() view returns (string)',
+  'function supportsModule(uint256 moduleTypeId) view returns (bool)',
+  // ERC-1271
+  'function isValidSignature(bytes32 hash, bytes signature) view returns (bytes4)',
+]
+
+// P256MFAValidatorModule ABI
+export const P256_MFA_VALIDATOR_ABI = [
+  'function getOwner(address account) view returns (address)',
+  'function isMFAEnabled(address account) view returns (bool)',
+  'function getPasskeyCount(address account) view returns (uint256)',
+  'function getPasskey(address account, bytes32 passkeyId) view returns ((bytes32 qx, bytes32 qy, uint256 addedAt, bool active, bytes32 deviceId))',
+  'function isPasskeyActive(address account, bytes32 passkeyId) view returns (bool)',
+  'function getPasskeyIds(address account) view returns (bytes32[])',
+  // Management functions (called via account.execute)
+  'function addPasskey(bytes32 qx, bytes32 qy, bytes32 deviceId) external',
+  'function removePasskey(bytes32 passkeyId) external',
+  'function enableMFA() external',
+  'function disableMFA() external',
+  'function setOwner(address newOwner) external',
+]
+
+// SessionKeyExecutorModule ABI
+export const SESSION_KEY_EXECUTOR_ABI = [
+  'function getSessionKey(address account, address sessionKey) view returns (bool active, uint48 validAfter, uint48 validUntil, uint256 spendLimitPerTx, uint256 spendLimitTotal, uint256 spentTotal, uint256 nonce)',
+  'function getSessionKeyCount(address account) view returns (uint256)',
+  'function getSessionKeys(address account) view returns (address[])',
+  'function getAllowedTargets(address account, address sessionKey) view returns (address[])',
+  'function getAllowedSelectors(address account, address sessionKey) view returns (bytes4[])',
+  'function isSessionKeyValid(address account, address sessionKey) view returns (bool)',
+  // Management functions (called via account.execute)
+  'function createSessionKey((address sessionKey, uint48 validAfter, uint48 validUntil, address[] allowedTargets, bytes4[] allowedSelectors, uint256 spendLimitPerTx, uint256 spendLimitTotal)) external',
+  'function revokeSessionKey(address sessionKey) external',
+  // Execution
+  'function executeWithSessionKey(address account, address sessionKey, address target, uint256 value, bytes data, uint256 nonce, bytes signature) returns (bytes)',
+]
+
+// LargeTransactionExecutorModule ABI
+export const LARGE_TX_EXECUTOR_ABI = [
+  'function getThreshold(address account) view returns (uint256)',
+  'function setThreshold(uint256 threshold) external',
+  'function proposeTransaction(address target, uint256 value, bytes data) external returns (bytes32)',
+  'function executeProposedTransaction(bytes32 proposalId) external returns (bytes)',
+  'function cancelProposal(bytes32 proposalId) external',
+  'function getProposal(address account, bytes32 proposalId) view returns ((address target, uint256 value, bytes data, uint256 executeAfter, bool executed, bool cancelled))',
+]
+
 // Import token icons
 import ethIcon from '../assets/tokens/eth.svg'
 import wethIcon from '../assets/tokens/weth.svg'
