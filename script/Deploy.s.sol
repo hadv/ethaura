@@ -27,12 +27,12 @@ contract DeployScript is Script {
 
     // Salt for P256MFAValidatorModule CREATE2 deployment
     // First 20 bytes must match deployer address for Solady factory
-    // TODO: Update with your deployer address and vanity salt
-    bytes32 constant VALIDATOR_SALT = 0x18ee4c040568238643c07e7afd6c53efc196d26b0000000000000000000000a1;
+    // Expected address: 0x000000b07799b322d076669ef32b247d02279c7e
+    bytes32 constant VALIDATOR_SALT = 0x18ee4c040568238643c07e7afd6c53efc196d26b00000000000000000028c56f;
 
     // Salt for AuraAccountFactory CREATE2 deployment
-    // TODO: Update with your deployer address and vanity salt
-    bytes32 constant FACTORY_SALT = 0x18ee4c040568238643c07e7afd6c53efc196d26b0000000000000000000000a2;
+    // Expected address: 0x0000004b2941659deb7472b46f7b84caf27dce44
+    bytes32 constant FACTORY_SALT = 0x18ee4c040568238643c07e7afd6c53efc196d26b000000000000000001b2f724;
 
     function run() external {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
