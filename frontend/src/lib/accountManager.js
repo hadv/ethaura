@@ -4,7 +4,6 @@
 
 import { ethers } from 'ethers'
 import { P256_ACCOUNT_FACTORY_ABI, P256_ACCOUNT_ABI, ENTRYPOINT_ADDRESS } from './constants.js'
-import P256AccountArtifact from '@contracts/P256Account.sol/P256Account.json'
 
 /**
  * P256AccountManager class for managing P256 accounts
