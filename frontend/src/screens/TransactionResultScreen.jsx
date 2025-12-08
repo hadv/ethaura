@@ -66,7 +66,7 @@ function TransactionResultScreen({
                 gasUsed: txReceipt.gasUsed?.toString(),
                 gasPrice: txReceipt.gasPrice?.toString(),
               }
-              walletDataCache.addTransactionToCache(wallet.address, networkInfo.name, confirmedTransaction)
+              await walletDataCache.addTransactionToCache(wallet.address, networkInfo.name, confirmedTransaction)
               setCacheUpdated(true)
               console.log('✅ Transaction added to cache')
             }

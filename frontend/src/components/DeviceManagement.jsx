@@ -5,6 +5,7 @@ import { useNetwork } from '../contexts/NetworkContext'
 import { useP256SDK } from '../hooks/useP256SDK'
 import { getDevices, removeDevice } from '../lib/deviceManager'
 import { signWithPasskey } from '../utils/webauthn'
+import { passkeyStorage } from '../lib/passkeyStorage'
 import { ethers } from 'ethers'
 import '../styles/DeviceManagement.css'
 
@@ -179,13 +180,11 @@ function DeviceManagement({ accountAddress, onAddDevice }) {
         setRemoving(device.deviceId)
         setError('')
 
-        // Load passkey credential from localStorage
-        const storedCredential = localStorage.getItem(`passkey_${accountAddress}`)
-        if (!storedCredential) {
+        // Load passkey credential from SQLite cache
+        const passkeyCredential = await passkeyStorage.getCredential(accountAddress)
+        if (!passkeyCredential) {
           throw new Error('Passkey credential not found. Please ensure you have a passkey for this account.')
         }
-
-        const passkeyCredential = JSON.parse(storedCredential)
         console.log('🔑 Loaded passkey credential for removal:', passkeyCredential.id)
 
         console.log('🗑️ Removing passkey from blockchain:', {

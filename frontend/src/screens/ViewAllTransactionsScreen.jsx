@@ -5,6 +5,7 @@ import { useNetwork } from '../contexts/NetworkContext'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
 import { createTransactionHistoryService } from '../lib/transactionService'
 import { walletDataCache } from '../lib/walletDataCache'
+import * as walletsStore from '../lib/walletsStore'
 import Header from '../components/Header'
 import SubHeader from '../components/SubHeader'
 import '../styles/ViewAllTransactionsScreen.css'
@@ -31,13 +32,13 @@ function ViewAllTransactionsScreen({ wallet, onBack, onHome, onLogout, onSetting
   const hasFetched100Ref = useRef(false) // Track if we've fetched 100 transactions from on-chain
   const isFetching100Ref = useRef(false) // Track if we're currently fetching 100 transactions
 
-  // Load all wallets from localStorage
+  // Load all wallets from SQLite
   useEffect(() => {
-    const storedWallets = localStorage.getItem('ethaura_wallets_list')
-    if (storedWallets) {
-      const walletsList = JSON.parse(storedWallets)
+    const loadWallets = async () => {
+      const walletsList = await walletsStore.getWallets()
       setWallets(walletsList)
     }
+    loadWallets()
   }, [])
 
   // Update selected wallet when prop changes
@@ -133,7 +134,7 @@ function ViewAllTransactionsScreen({ wallet, onBack, onHome, onLogout, onSetting
         }
       } else {
         // First load - try to use cached data from walletDataCache (preloaded 30 transactions)
-        const cachedData = walletDataCache.getCachedData(selectedWallet.address, networkInfo.name)
+        const cachedData = await walletDataCache.getCachedData(selectedWallet.address, networkInfo.name)
         if (cachedData && cachedData.transactions && cachedData.transactions.length > 0) {
           console.log(`📦 Using cached transactions from walletDataCache (${cachedData.transactions.length} cached)`)
 

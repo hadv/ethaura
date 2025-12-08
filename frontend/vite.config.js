@@ -1,6 +1,8 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { NodeGlobalsPolyfillPlugin } from '@esbuild-plugins/node-globals-polyfill'
+import wasm from 'vite-plugin-wasm'
+import topLevelAwait from 'vite-plugin-top-level-await'
 import path from 'path'
 
 // Plugin to set COOP headers for Web3Auth popup support
@@ -17,7 +19,7 @@ const coopPlugin = () => ({
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  plugins: [react(), coopPlugin()],
+  plugins: [react(), wasm(), topLevelAwait(), coopPlugin()],
   server: {
     port: 3000,
     host: '0.0.0.0', // Listen on all network interfaces for mobile testing
@@ -55,6 +57,7 @@ export default defineConfig({
     global: 'globalThis',
   },
   optimizeDeps: {
+    exclude: ['wa-sqlite'],
     esbuildOptions: {
       define: {
         global: 'globalThis',
@@ -68,6 +71,7 @@ export default defineConfig({
     },
   },
   build: {
+    target: 'esnext',
     rollupOptions: {},
   },
 });

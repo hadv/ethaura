@@ -15,6 +15,8 @@ import { SessionRequestModal } from '../components/SessionRequestModal'
 import { createTokenBalanceService } from '../lib/tokenService'
 import { createTransactionHistoryService } from '../lib/transactionService'
 import { walletDataCache } from '../lib/walletDataCache'
+import * as walletsStore from '../lib/walletsStore'
+import { passkeyStorage } from '../lib/passkeyStorage'
 import '../styles/WalletDetailScreen.css'
 import logo from '../assets/logo.svg'
 
@@ -39,29 +41,21 @@ function WalletDetailScreen({ wallet, onBack, onHome, onSettings, onSend, onLogo
   })
 
   // Get passkey credential and owner signer for WalletConnect
-  const [passkeyCredential, setPasskeyCredential] = useState(() => {
-    const stored = localStorage.getItem('ethaura_passkey_credential')
-    if (!stored) return null
-    try {
-      const parsed = JSON.parse(stored)
-      return {
-        id: parsed.id,
-        rawId: parsed.rawId ? Uint8Array.from(atob(parsed.rawId), c => c.charCodeAt(0)).buffer : null,
-        publicKey: parsed.publicKey,
-        response: parsed.response ? {
-          attestationObject: parsed.response.attestationObject
-            ? Uint8Array.from(atob(parsed.response.attestationObject), c => c.charCodeAt(0)).buffer
-            : null,
-          clientDataJSON: parsed.response.clientDataJSON
-            ? Uint8Array.from(atob(parsed.response.clientDataJSON), c => c.charCodeAt(0)).buffer
-            : null,
-        } : null,
+  const [passkeyCredential, setPasskeyCredential] = useState(null)
+
+  // Load passkey credential from SQLite
+  useEffect(() => {
+    const loadPasskey = async () => {
+      if (!selectedWallet?.address) return
+      try {
+        const credential = await passkeyStorage.getCredential(selectedWallet.address)
+        setPasskeyCredential(credential)
+      } catch (e) {
+        console.error('Failed to load passkey credential:', e)
       }
-    } catch (e) {
-      console.error('Failed to deserialize credential:', e)
-      return null
     }
-  })
+    loadPasskey()
+  }, [selectedWallet?.address])
 
   const [ownerSigner, setOwnerSigner] = useState(null)
   const walletConnectButtonRef = useRef(null)
@@ -82,13 +76,13 @@ function WalletDetailScreen({ wallet, onBack, onHome, onSettings, onSend, onLogo
     createSigner()
   }, [web3authProvider])
 
-  // Load all wallets from localStorage
+  // Load all wallets from SQLite
   useEffect(() => {
-    const storedWallets = localStorage.getItem('ethaura_wallets_list')
-    if (storedWallets) {
-      const walletsList = JSON.parse(storedWallets)
+    const loadWallets = async () => {
+      const walletsList = await walletsStore.getWallets()
       setWallets(walletsList)
     }
+    loadWallets()
   }, [])
 
   // Update selected wallet when prop changes
@@ -136,7 +130,7 @@ function WalletDetailScreen({ wallet, onBack, onHome, onSettings, onSend, onLogo
 
       // Try to get cached data first
       let tokenBalances, txHistory
-      const cachedData = walletDataCache.getCachedData(selectedWallet.address, networkInfo.name)
+      const cachedData = await walletDataCache.getCachedData(selectedWallet.address, networkInfo.name)
 
       if (cachedData) {
         console.log('📦 Using cached wallet data')
@@ -153,7 +147,7 @@ function WalletDetailScreen({ wallet, onBack, onHome, onSettings, onSend, onLogo
         tokenBalances = assets
         txHistory = transactions
         // Cache the data for future use
-        walletDataCache.setCachedData(selectedWallet.address, networkInfo.name, tokenBalances, txHistory)
+        await walletDataCache.setCachedData(selectedWallet.address, networkInfo.name, tokenBalances, txHistory)
       }
 
       // Set assets (tokens with balances)
@@ -435,10 +429,10 @@ function WalletDetailScreen({ wallet, onBack, onHome, onSettings, onSend, onLogo
                   >
                     <div className="asset-info">
                       <div className="asset-icon">
-                        {typeof asset.icon === 'string' && asset.icon.startsWith('/') ? (
+                        {typeof asset.icon === 'string' ? (
                           <img src={asset.icon} alt={asset.symbol} />
                         ) : (
-                          asset.icon
+                          <span className="asset-icon-fallback">{asset.symbol?.charAt(0) || '?'}</span>
                         )}
                       </div>
                       <div className="asset-details">

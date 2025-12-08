@@ -1,7 +1,10 @@
 /**
  * Passkey Storage Client
  * Handles communication with backend server for persistent passkey storage
+ * Uses SQLite (wa-sqlite) as local cache for improved performance
  */
+
+import { clientDb } from './clientDatabase.js'
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001'
 
@@ -130,6 +133,16 @@ export async function storePasskeyCredential(signMessageFn, ownerAddress, accoun
 
       const result = await response.json()
       console.log('✅ Passkey credential stored on server:', result)
+
+      // Cache locally in SQLite for faster retrieval
+      try {
+        await clientDb.setPasskeyCredential(accountAddress, credential, deviceName)
+        console.log('💾 Passkey credential cached locally')
+      } catch (cacheError) {
+        console.warn('⚠️ Failed to cache passkey locally:', cacheError)
+        // Non-fatal - server is source of truth
+      }
+
       return result
     } catch (parseError) {
       console.error('Failed to parse success response:', parseError)
@@ -142,14 +155,29 @@ export async function storePasskeyCredential(signMessageFn, ownerAddress, accoun
 }
 
 /**
- * Retrieve passkey credential from server
+ * Retrieve passkey credential from server (with local cache)
  * @param {Function} signMessageFn - Sign message function from Web3Auth context
  * @param {string} ownerAddress - Owner address (Web3Auth social login address)
  * @param {string} accountAddress - Smart account address
+ * @param {boolean} useCache - Whether to check local cache first (default: true)
  * @returns {Promise<Object|null>} Credential or null if not found
  */
-export async function retrievePasskeyCredential(signMessageFn, ownerAddress, accountAddress) {
+export async function retrievePasskeyCredential(signMessageFn, ownerAddress, accountAddress, useCache = true) {
   try {
+    // Check local cache first for faster retrieval
+    if (useCache) {
+      try {
+        const cached = await clientDb.getPasskeyCredential(accountAddress)
+        if (cached && cached.credential) {
+          console.log('💾 Passkey credential found in local cache')
+          return cached.credential
+        }
+      } catch (cacheError) {
+        console.warn('⚠️ Failed to check local cache:', cacheError)
+        // Continue to fetch from server
+      }
+    }
+
     console.log('🔍 Retrieving passkey credential from server for account:', accountAddress)
 
     // Create authentication signature
@@ -207,6 +235,15 @@ export async function retrievePasskeyCredential(signMessageFn, ownerAddress, acc
 
       const result = await response.json()
       console.log('✅ Passkey credential retrieved from server')
+
+      // Cache locally for future use
+      try {
+        await clientDb.setPasskeyCredential(accountAddress, result.credential)
+        console.log('💾 Passkey credential cached locally')
+      } catch (cacheError) {
+        console.warn('⚠️ Failed to cache passkey locally:', cacheError)
+      }
+
       return result.credential
     } catch (parseError) {
       console.error('Failed to parse success response:', parseError)
@@ -278,6 +315,15 @@ export async function deletePasskeyCredential(signMessageFn, ownerAddress, accou
 
       const result = await response.json()
       console.log('✅ Passkey credential deleted from server:', result)
+
+      // Clear local cache
+      try {
+        await clientDb.deletePasskeyCredential(accountAddress)
+        console.log('💾 Passkey credential removed from local cache')
+      } catch (cacheError) {
+        console.warn('⚠️ Failed to clear local cache:', cacheError)
+      }
+
       return result
     } catch (parseError) {
       console.error('Failed to parse success response:', parseError)
@@ -311,10 +357,53 @@ export async function checkBackendHealth() {
   }
 }
 
-export default {
+/**
+ * Get passkey credential from local SQLite cache only (no server call)
+ * Use this for quick local checks without authentication
+ * @param {string} accountAddress - Smart account address
+ * @returns {Promise<Object|null>} Credential or null if not found
+ */
+export async function getCredential(accountAddress) {
+  try {
+    const cached = await clientDb.getPasskeyCredential(accountAddress)
+    if (cached && cached.credential) {
+      return cached.credential
+    }
+    return null
+  } catch (error) {
+    console.error('Failed to get credential from cache:', error)
+    return null
+  }
+}
+
+/**
+ * Save passkey credential to local SQLite cache only (no server call)
+ * Use this for temporary storage before server sync
+ * @param {string} accountAddress - Smart account address
+ * @param {Object} credential - Passkey credential to cache
+ * @param {string} deviceName - Device name (optional)
+ * @returns {Promise<void>}
+ */
+export async function cacheCredential(accountAddress, credential, deviceName = null) {
+  try {
+    await clientDb.setPasskeyCredential(accountAddress, credential, deviceName)
+    console.log('💾 Passkey credential cached locally')
+  } catch (error) {
+    console.error('Failed to cache credential:', error)
+    throw error
+  }
+}
+
+export const passkeyStorage = {
   storePasskeyCredential,
   retrievePasskeyCredential,
   deletePasskeyCredential,
   checkBackendHealth,
+  getCredential,
+  cacheCredential,
+  serializeCredential,
+  deserializeCredential,
 }
+
+export default passkeyStorage
 

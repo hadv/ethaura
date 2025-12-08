@@ -17,8 +17,10 @@ import SwapConfirmationScreen from './screens/SwapConfirmationScreen'
 import ToastContainer from './components/Toast'
 import { GuardianRecoveryPortal } from './screens/GuardianRecoveryPortal'
 import RegisterDevicePage from './pages/RegisterDevicePage'
-import { storePasskeyCredential, serializeCredential } from './lib/passkeyStorage'
+import { storePasskeyCredential, serializeCredential, passkeyStorage } from './lib/passkeyStorage'
 import { getDevices } from './lib/deviceManager'
+import { clientDb } from './lib/clientDatabase'
+import { walletsStore } from './lib/walletsStore'
 
 // Inner component that uses Web3Auth context
 function AppContent() {
@@ -99,29 +101,33 @@ function AppContent() {
 
   // State for passkey credential and account config
   const [passkeyCredential, setPasskeyCredential] = useState(null)
-  const [accountConfig, setAccountConfig] = useState(() => {
-    const stored = localStorage.getItem('ethaura_account_config')
-    return stored ? JSON.parse(stored) : null
-  })
+  const [accountConfig, setAccountConfig] = useState(null)
+  const [accountConfigLoaded, setAccountConfigLoaded] = useState(false)
   const [credentialLoading, setCredentialLoading] = useState(false)
+
+  // Load account config from SQLite on mount
+  useEffect(() => {
+    const loadAccountConfig = async () => {
+      try {
+        // Use a default address key for the global account config
+        const config = await clientDb.getAccountConfig('global')
+        if (config) {
+          setAccountConfig(config)
+          console.log('💾 Loaded account config from SQLite')
+        }
+      } catch (error) {
+        console.error('Failed to load account config from SQLite:', error)
+      } finally {
+        setAccountConfigLoaded(true)
+      }
+    }
+    loadAccountConfig()
+  }, [])
 
   // Note: Credential loading is now handled per-account in individual components
   // (PasskeySettings, RecoveryManager) since each smart account has its own passkey.
   // For wallet creation flow (PasskeyManager), credentials are created fresh.
-  useEffect(() => {
-    // Try to load legacy credential from localStorage for backward compatibility
-    if (isConnected) {
-      const stored = localStorage.getItem('ethaura_passkey_credential')
-      if (stored) {
-        try {
-          setPasskeyCredential(deserializeCredential(stored))
-          console.log('ℹ️  Loaded legacy passkey credential from localStorage')
-        } catch (error) {
-          console.error('Failed to deserialize legacy credential:', error)
-        }
-      }
-    }
-  }, [isConnected])
+  // Legacy localStorage loading has been removed - credentials are now stored in SQLite
 
   // Load account-specific credential when wallet is selected
   useEffect(() => {
@@ -141,28 +147,25 @@ function AppContent() {
         console.log(`🔍 Loading passkey credential for account: ${accountAddress}`)
         setCredentialLoading(true)
 
-        // First, try to load from localStorage
-        const storageKey = `ethaura_passkey_credential_${accountAddress.toLowerCase()}`
-        console.log(`💾 Checking localStorage with key: ${storageKey}`)
-        let stored = localStorage.getItem(storageKey)
+        // First, try to load from SQLite cache
+        console.log(`💾 Checking SQLite cache for credential...`)
+        const cachedCredential = await passkeyStorage.getCredential(accountAddress)
 
-        if (stored) {
-          console.log(`📦 Found stored credential in localStorage (${stored.length} chars)`)
-          const credential = deserializeCredential(stored)
-          console.log(`✅ Loaded passkey credential from localStorage for account: ${accountAddress}`)
+        if (cachedCredential) {
+          console.log(`📦 Found credential in SQLite cache`)
           console.log(`🔑 Credential details:`, {
-            id: credential.id,
-            hasPublicKey: !!credential.publicKey,
-            publicKeyX: credential.publicKey?.x?.slice(0, 20) + '...',
-            publicKeyY: credential.publicKey?.y?.slice(0, 20) + '...',
+            id: cachedCredential.id,
+            hasPublicKey: !!cachedCredential.publicKey,
+            publicKeyX: cachedCredential.publicKey?.x?.slice(0, 20) + '...',
+            publicKeyY: cachedCredential.publicKey?.y?.slice(0, 20) + '...',
           })
-          setPasskeyCredential(credential)
+          setPasskeyCredential(cachedCredential)
           setCredentialLoading(false)
           return
         }
 
         // Fallback: Try to recover credential from backend (devices API)
-        console.log(`🔄 localStorage empty, attempting to recover from backend...`)
+        console.log(`🔄 SQLite cache empty, attempting to recover from backend...`)
         try {
           const devices = await getDevices(signMessage, address, accountAddress)
           console.log(`📱 Retrieved ${devices.length} devices from backend`)
@@ -187,10 +190,9 @@ function AppContent() {
               publicKeyY: recoveredCredential.publicKey?.y?.slice(0, 20) + '...',
             })
 
-            // Save to localStorage for future use
-            const serialized = serializeCredential(recoveredCredential)
-            localStorage.setItem(storageKey, serialized)
-            console.log(`💾 Saved recovered credential to localStorage`)
+            // Save to SQLite cache for future use
+            await passkeyStorage.cacheCredential(accountAddress, recoveredCredential, activeDevice.deviceName)
+            console.log(`💾 Saved recovered credential to SQLite cache`)
 
             setPasskeyCredential(recoveredCredential)
             setCredentialLoading(false)
@@ -203,7 +205,6 @@ function AppContent() {
         }
 
         console.log(`❌ No passkey credential found for account: ${accountAddress}`)
-        console.log(`🔍 All localStorage keys:`, Object.keys(localStorage).filter(k => k.includes('passkey')))
         setPasskeyCredential(null)
         setCredentialLoading(false)
       } catch (error) {
@@ -217,15 +218,25 @@ function AppContent() {
     loadAccountCredential()
   }, [selectedWallet, isConnected, address, signMessage])
 
-  // Save account config to localStorage when it changes
+  // Save account config to SQLite when it changes
   useEffect(() => {
-    if (accountConfig) {
-      localStorage.setItem('ethaura_account_config', JSON.stringify(accountConfig))
-      console.log('💾 Saved account config to localStorage')
-    } else {
-      localStorage.removeItem('ethaura_account_config')
+    const saveAccountConfig = async () => {
+      // Don't save until initial load is complete
+      if (!accountConfigLoaded) return
+
+      try {
+        if (accountConfig) {
+          await clientDb.setAccountConfig('global', accountConfig)
+          console.log('💾 Saved account config to SQLite')
+        } else {
+          await clientDb.deleteAccountConfig('global')
+        }
+      } catch (error) {
+        console.error('Failed to save account config to SQLite:', error)
+      }
     }
-  }, [accountConfig])
+    saveAccountConfig()
+  }, [accountConfig, accountConfigLoaded])
 
   // Handler to save passkey credential (both to server and state)
   // accountAddress: the smart account address this credential belongs to
@@ -246,22 +257,19 @@ function AppContent() {
         await storePasskeyCredential(signMessage, address, accountAddress, serialized)
         console.log(`✅ Passkey credential saved to server for account: ${accountAddress}`)
 
-        // Also save to localStorage as backup (with account-specific key)
-        localStorage.setItem(`ethaura_passkey_credential_${accountAddress.toLowerCase()}`, JSON.stringify(serialized))
+        // Also save to SQLite cache for faster local access
+        await passkeyStorage.cacheCredential(accountAddress, serialized)
       } catch (error) {
         console.error('❌ Failed to save credential to server:', error)
-        // Still save to localStorage as fallback
+        // Still save to SQLite cache
         const serialized = serializeCredential(credential)
-        localStorage.setItem(`ethaura_passkey_credential_${accountAddress.toLowerCase()}`, JSON.stringify(serialized))
-        console.log('⚠️  Saved to localStorage as fallback')
+        await passkeyStorage.cacheCredential(accountAddress, serialized)
+        console.log('⚠️  Saved to SQLite cache as fallback')
       }
-    } else {
-      // If not connected or no account address, save to legacy localStorage key
+    } else if (accountAddress) {
+      // If not connected but have account address, save to SQLite cache
       const serialized = serializeCredential(credential)
-      const key = accountAddress
-        ? `ethaura_passkey_credential_${accountAddress.toLowerCase()}`
-        : 'ethaura_passkey_credential'
-      localStorage.setItem(key, JSON.stringify(serialized))
+      await passkeyStorage.cacheCredential(accountAddress, serialized)
     }
   }
 
@@ -524,7 +532,7 @@ function AppContent() {
           onSettings={handleSettings}
           onLogout={handleLogout}
           onWalletChange={handleWalletChange}
-          wallets={JSON.parse(localStorage.getItem('ethaura_wallets_list') || '[]')}
+          wallets={walletsStore.getWalletsSync()}
         />
       )}
 

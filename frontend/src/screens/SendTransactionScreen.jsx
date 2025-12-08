@@ -6,6 +6,7 @@ import SubHeader from '../components/SubHeader'
 import { WalletConnectModal } from '../components/WalletConnectModal'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
 import { useNetwork } from '../contexts/NetworkContext'
+import * as walletsStore from '../lib/walletsStore'
 import '../styles/SendTransactionScreen.css'
 
 function SendTransactionScreen({ wallet, selectedToken, onBack, onHome, onSettings, credential, accountConfig, onLogout, onSignatureRequest, onTransactionBroadcast }) {
@@ -26,13 +27,13 @@ function SendTransactionScreen({ wallet, selectedToken, onBack, onHome, onSettin
     twoFactorEnabled: selectedWallet.twoFactorEnabled || false,
   } : accountConfig
 
-  // Load all wallets from localStorage
+  // Load all wallets from SQLite
   useEffect(() => {
-    const storedWallets = localStorage.getItem('ethaura_wallets_list')
-    if (storedWallets) {
-      const walletsList = JSON.parse(storedWallets)
+    const loadWallets = async () => {
+      const walletsList = await walletsStore.getWallets()
       setWallets(walletsList)
     }
+    loadWallets()
   }, [])
 
   // Update selected wallet when prop changes

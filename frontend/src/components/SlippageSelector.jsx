@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { SlidersHorizontal, AlertTriangle } from 'lucide-react'
+import { clientDb } from '../lib/clientDatabase'
 import '../styles/SlippageSelector.css'
 
 const PRESET_SLIPPAGE = [
@@ -10,42 +11,53 @@ const PRESET_SLIPPAGE = [
   { value: 5, label: '5%', description: 'Extreme' },
 ]
 
-const STORAGE_KEY = 'ethaura_slippage_preference'
+const STORAGE_KEY = 'slippage_preference'
 
 function SlippageSelector({ value, onChange, className = '' }) {
   const [isOpen, setIsOpen] = useState(false)
   const [customValue, setCustomValue] = useState('')
   const [isCustom, setIsCustom] = useState(false)
+  const isInitialMount = useRef(true)
 
   // Load saved preference on mount
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY)
-      if (saved) {
-        const savedValue = parseFloat(saved)
-        if (!isNaN(savedValue) && savedValue > 0) {
-          // Check if it's a preset value
-          const isPreset = PRESET_SLIPPAGE.some(preset => preset.value === savedValue)
-          if (!isPreset) {
-            setIsCustom(true)
-            setCustomValue(savedValue.toString())
+    const loadPreference = async () => {
+      try {
+        const saved = await clientDb.getSetting(STORAGE_KEY)
+        if (saved) {
+          const savedValue = parseFloat(saved)
+          if (!isNaN(savedValue) && savedValue > 0) {
+            // Check if it's a preset value
+            const isPreset = PRESET_SLIPPAGE.some(preset => preset.value === savedValue)
+            if (!isPreset) {
+              setIsCustom(true)
+              setCustomValue(savedValue.toString())
+            }
+            onChange(savedValue)
           }
-          onChange(savedValue)
         }
+      } catch (error) {
+        console.error('Failed to load slippage preference:', error)
       }
-    } catch (error) {
-      console.error('Failed to load slippage preference:', error)
     }
+    loadPreference()
   }, [])
 
-  // Save preference when value changes
+  // Save preference when value changes (skip initial mount)
   useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false
+      return
+    }
     if (value > 0) {
-      try {
-        localStorage.setItem(STORAGE_KEY, value.toString())
-      } catch (error) {
-        console.error('Failed to save slippage preference:', error)
+      const savePreference = async () => {
+        try {
+          await clientDb.setSetting(STORAGE_KEY, value.toString())
+        } catch (error) {
+          console.error('Failed to save slippage preference:', error)
+        }
       }
+      savePreference()
     }
   }, [value])
 

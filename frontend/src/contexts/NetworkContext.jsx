@@ -1,5 +1,6 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { getNetworkName, getNetworkIcon, getNetworkColor } from '../utils/network';
+import { clientDb } from '../lib/clientDatabase';
 
 const NetworkContext = createContext(null);
 
@@ -107,44 +108,73 @@ export const AVAILABLE_NETWORKS = [
 export const NetworkProvider = ({ children }) => {
   // Get default network from env or use Sepolia
   const defaultChainId = parseInt(import.meta.env.VITE_CHAIN_ID || '11155111');
+  const defaultNetwork = AVAILABLE_NETWORKS.find(n => n.chainId === defaultChainId) || AVAILABLE_NETWORKS[0];
 
-  // Load selected network from localStorage or use default
-  const [selectedNetwork, setSelectedNetwork] = useState(() => {
-    const stored = localStorage.getItem('ethaura_selected_network');
-    if (stored) {
+  // Start with default, load from SQLite after mount
+  const [selectedNetwork, setSelectedNetwork] = useState(defaultNetwork);
+  const [customRpcs, setCustomRpcs] = useState({});
+  const [isLoaded, setIsLoaded] = useState(false);
+  const isInitialMount = useRef(true);
+
+  // Load settings from SQLite on mount
+  useEffect(() => {
+    const loadSettings = async () => {
       try {
-        const parsed = JSON.parse(stored);
-        // Validate that the stored network exists in AVAILABLE_NETWORKS
-        const network = AVAILABLE_NETWORKS.find(n => n.chainId === parsed.chainId);
-        if (network) {
-          return network;
+        // Load selected network (getSetting already parses JSON)
+        const storedNetwork = await clientDb.getSetting('selected_network');
+        if (storedNetwork) {
+          const network = AVAILABLE_NETWORKS.find(n => n.chainId === storedNetwork.chainId);
+          if (network) {
+            setSelectedNetwork(network);
+          }
+        }
+
+        // Load custom RPCs (getSetting already parses JSON)
+        const storedRpcs = await clientDb.getSetting('custom_rpcs');
+        if (storedRpcs) {
+          setCustomRpcs(storedRpcs);
         }
       } catch (e) {
-        console.error('Failed to parse stored network:', e);
+        console.error('Failed to load network settings from SQLite:', e);
+      } finally {
+        setIsLoaded(true);
       }
-    }
-    // Default to the network from env or Sepolia
-    return AVAILABLE_NETWORKS.find(n => n.chainId === defaultChainId) || AVAILABLE_NETWORKS[0];
-  });
+    };
+    loadSettings();
+  }, []);
 
-  // Custom RPC overrides per chainId
-  const [customRpcs, setCustomRpcs] = useState(() => {
-    try {
-      return JSON.parse(localStorage.getItem('ethaura_custom_rpcs') || '{}');
-    } catch (e) {
-      console.warn('Failed to parse custom RPCs from storage, resetting');
-      return {};
-    }
-  });
-
-  // Persist selections
+  // Persist selected network to SQLite (skip initial mount)
   useEffect(() => {
-    localStorage.setItem('ethaura_selected_network', JSON.stringify(selectedNetwork));
-    console.log('🌐 Network changed to:', selectedNetwork.name, `(Chain ID: ${selectedNetwork.chainId})`);
+    if (isInitialMount.current) {
+      return;
+    }
+    const saveNetwork = async () => {
+      try {
+        // setSetting handles JSON.stringify internally
+        await clientDb.setSetting('selected_network', selectedNetwork);
+        console.log('🌐 Network changed to:', selectedNetwork.name, `(Chain ID: ${selectedNetwork.chainId})`);
+      } catch (e) {
+        console.error('Failed to save network to SQLite:', e);
+      }
+    };
+    saveNetwork();
   }, [selectedNetwork]);
 
+  // Persist custom RPCs to SQLite (skip initial mount)
   useEffect(() => {
-    localStorage.setItem('ethaura_custom_rpcs', JSON.stringify(customRpcs));
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
+    const saveRpcs = async () => {
+      try {
+        // setSetting handles JSON.stringify internally
+        await clientDb.setSetting('custom_rpcs', customRpcs);
+      } catch (e) {
+        console.error('Failed to save custom RPCs to SQLite:', e);
+      }
+    };
+    saveRpcs();
   }, [customRpcs]);
 
   const switchNetwork = (chainId) => {

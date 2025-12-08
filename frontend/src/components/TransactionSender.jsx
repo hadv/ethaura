@@ -12,8 +12,31 @@ import { formatPublicKeyForContract } from '../lib/accountManager'
 import { SUPPORTED_TOKENS, ERC20_ABI } from '../lib/constants'
 import { walletDataCache } from '../lib/walletDataCache'
 import { getActiveDeviceCredential } from '../lib/deviceManager'
+import { passkeyStorage } from '../lib/passkeyStorage'
 import TokenSelector from './TokenSelector'
 import '../styles/TransactionSender.css'
+
+/**
+ * Helper function to load passkey credential from SQLite cache
+ * @param {string} accountAddress - The account address
+ * @returns {Promise<Object|null>} The credential or null
+ */
+async function loadPasskeyCredential(accountAddress) {
+  try {
+    const credential = await passkeyStorage.getCredential(accountAddress)
+    if (credential?.publicKey) {
+      console.log('✅ Loaded passkey from SQLite cache:', {
+        hasPublicKey: true,
+        credentialId: credential.id?.slice(0, 20) + '...',
+      })
+      return credential
+    }
+    return null
+  } catch (error) {
+    console.warn('Failed to load passkey from SQLite cache:', error)
+    return null
+  }
+}
 
 function TransactionSender({ accountAddress, credential, accountConfig, onSignatureRequest, preSelectedToken, onTransactionBroadcast, onAccountInfoChange }) {
   const { isConnected, signMessage, signRawHash, address: ownerAddress } = useWeb3Auth()
@@ -134,46 +157,28 @@ function TransactionSender({ accountAddress, credential, accountConfig, onSignat
             } else {
               console.warn('❌ No credential.publicKey found in props!')
 
-              // FALLBACK: Try to load credential from localStorage directly
+              // FALLBACK: Try to load credential from SQLite cache
               // This handles the case where App.jsx didn't load the credential
               // (e.g., navigating directly from Settings to Send)
-              console.log('🔄 Attempting to load credential from localStorage as fallback...')
+              console.log('🔄 Attempting to load credential from SQLite cache as fallback...')
               try {
-                const { deserializeCredential } = await import('../lib/passkeyStorage.js')
+                const fallbackCredential = await loadPasskeyCredential(accountAddress)
 
-                // Try both localStorage key formats
-                // Format 1: Used by AddCurrentDevice - passkey_${address}
-                // Format 2: Used by older code - ethaura_passkey_credential_${address}
-                let stored = localStorage.getItem(`passkey_${accountAddress}`)
-                let keyUsed = `passkey_${accountAddress}`
-
-                if (!stored) {
-                  stored = localStorage.getItem(`ethaura_passkey_credential_${accountAddress.toLowerCase()}`)
-                  keyUsed = `ethaura_passkey_credential_${accountAddress.toLowerCase()}`
-                }
-
-                if (stored) {
-                  console.log(`📦 Found credential in localStorage (key: ${keyUsed})!`)
-                  const fallbackCredential = deserializeCredential(stored)
-
-                  if (fallbackCredential?.publicKey) {
-                    passkeyPublicKey = fallbackCredential.publicKey
-                    // IMPORTANT: Save the loaded credential to state so it can be used for signing
-                    setLoadedCredential(fallbackCredential)
-                    console.log('✅ Successfully loaded passkey from localStorage fallback:', {
-                      x: passkeyPublicKey.x?.slice(0, 20) + '...',
-                      y: passkeyPublicKey.y?.slice(0, 20) + '...',
-                      credentialId: fallbackCredential.id,
-                    })
-                  } else {
-                    console.warn('⚠️  Credential loaded but has no publicKey')
-                  }
+                if (fallbackCredential?.publicKey) {
+                  passkeyPublicKey = fallbackCredential.publicKey
+                  // IMPORTANT: Save the loaded credential to state so it can be used for signing
+                  setLoadedCredential(fallbackCredential)
+                  console.log('✅ Successfully loaded passkey from SQLite cache fallback:', {
+                    x: passkeyPublicKey.x?.slice(0, 20) + '...',
+                    y: passkeyPublicKey.y?.slice(0, 20) + '...',
+                    credentialId: fallbackCredential.id,
+                  })
                 } else {
-                  console.log('❌ No credential found in localStorage (checked both key formats)')
+                  console.log('❌ No credential found in SQLite cache')
                   console.log('Account will deploy in OWNER-ONLY mode')
                 }
               } catch (err) {
-                console.error('❌ Failed to load credential from localStorage:', err)
+                console.error('❌ Failed to load credential from SQLite cache:', err)
               }
 
               if (accountConfig && accountConfig.hasPasskey && !passkeyPublicKey) {
@@ -500,39 +505,10 @@ function TransactionSender({ accountAddress, credential, accountConfig, onSignat
         // If so, we need to regenerate initCode with that passkey so deployment includes it
         let credentialToCheck = credential || loadedCredential
 
-        // CRITICAL: If no credential in props/state, try to load directly from localStorage
-        // AddCurrentDevice stores as `passkey_${accountAddress}`, so we check both formats
+        // CRITICAL: If no credential in props/state, try to load from SQLite cache
         if (!credentialToCheck?.publicKey) {
-          console.log('🔍 No credential in props/state, checking localStorage directly...')
-
-          // Try the format used by AddCurrentDevice
-          const storedPasskey = localStorage.getItem(`passkey_${accountAddress}`)
-          if (storedPasskey) {
-            try {
-              credentialToCheck = JSON.parse(storedPasskey)
-              console.log('✅ Found passkey in localStorage (passkey_${address} format):', {
-                hasPublicKey: !!credentialToCheck?.publicKey,
-                credentialId: credentialToCheck?.id,
-              })
-            } catch (e) {
-              console.warn('Failed to parse stored passkey:', e)
-            }
-          }
-
-          // Also try the other format as fallback
-          if (!credentialToCheck?.publicKey) {
-            const storedCredential = localStorage.getItem(`ethaura_passkey_credential_${accountAddress.toLowerCase()}`)
-            if (storedCredential) {
-              try {
-                credentialToCheck = JSON.parse(storedCredential)
-                console.log('✅ Found passkey in localStorage (ethaura_passkey_credential format):', {
-                  hasPublicKey: !!credentialToCheck?.publicKey,
-                })
-              } catch (e) {
-                console.warn('Failed to parse stored credential:', e)
-              }
-            }
-          }
+          console.log('🔍 No credential in props/state, checking SQLite cache...')
+          credentialToCheck = await loadPasskeyCredential(accountAddress)
         }
 
         if (credentialToCheck?.publicKey) {
@@ -626,47 +602,19 @@ function TransactionSender({ accountAddress, credential, accountConfig, onSignat
             : '1️⃣ Passkey signature only'),
       })
 
-      // Use loadedCredential as fallback, or load directly from localStorage if needed
+      // Use loadedCredential as fallback, or load from SQLite cache if needed
       let credentialToUse = credential || loadedCredential
 
-      // If no credential in state/props, try loading from localStorage directly
+      // If no credential in state/props, try loading from SQLite cache
       // This is needed for deployed accounts on subsequent transactions
       if (!credentialToUse?.publicKey) {
-        console.log('🔍 No credential in props/state for deployed account, checking localStorage...')
-
-        // Try the format used by AddCurrentDevice
-        const storedPasskey = localStorage.getItem(`passkey_${accountAddress}`)
-        if (storedPasskey) {
-          try {
-            credentialToUse = JSON.parse(storedPasskey)
-            console.log('✅ Loaded passkey from localStorage for deployed account:', {
-              hasPublicKey: !!credentialToUse?.publicKey,
-              credentialId: credentialToUse?.id,
-            })
-          } catch (e) {
-            console.warn('Failed to parse stored passkey:', e)
-          }
-        }
-
-        // Also try the other format as fallback
-        if (!credentialToUse?.publicKey) {
-          const storedCredential = localStorage.getItem(`ethaura_passkey_credential_${accountAddress.toLowerCase()}`)
-          if (storedCredential) {
-            try {
-              credentialToUse = JSON.parse(storedCredential)
-              console.log('✅ Loaded passkey from localStorage (alternate format):', {
-                hasPublicKey: !!credentialToUse?.publicKey,
-              })
-            } catch (e) {
-              console.warn('Failed to parse stored credential:', e)
-            }
-          }
-        }
+        console.log('🔍 No credential in props/state for deployed account, checking SQLite cache...')
+        credentialToUse = await loadPasskeyCredential(accountAddress)
 
         // If still no credential, try fetching from backend database
         // Match against on-chain passkeys to find the correct one
         if (!credentialToUse?.publicKey) {
-          console.log('🔍 No credential in localStorage, fetching from backend...')
+          console.log('🔍 No credential in SQLite cache, fetching from backend...')
           setStatus('Syncing passkey from server...')
 
           // Get on-chain passkeys to match against
@@ -694,9 +642,9 @@ function TransactionSender({ accountAddress, credential, accountConfig, onSignat
             const activeDevice = await getActiveDeviceCredential(accountAddress, onChainPasskey.qx)
             if (activeDevice?.credential) {
               credentialToUse = activeDevice.credential
-              // Save to localStorage for future use
-              localStorage.setItem(`passkey_${accountAddress}`, JSON.stringify(credentialToUse))
-              console.log('✅ Synced passkey from backend and saved to localStorage:', {
+              // Save to SQLite cache for future use
+              await passkeyStorage.cacheCredential(accountAddress, credentialToUse, activeDevice.deviceName)
+              console.log('✅ Synced passkey from backend and saved to SQLite cache:', {
                 deviceName: activeDevice.deviceName,
                 deviceType: activeDevice.deviceType,
                 credentialId: credentialToUse?.id?.slice(0, 20) + '...',
@@ -710,7 +658,7 @@ function TransactionSender({ accountAddress, credential, accountConfig, onSignat
             const activeDevice = await getActiveDeviceCredential(accountAddress)
             if (activeDevice?.credential) {
               credentialToUse = activeDevice.credential
-              localStorage.setItem(`passkey_${accountAddress}`, JSON.stringify(credentialToUse))
+              await passkeyStorage.cacheCredential(accountAddress, credentialToUse, activeDevice.deviceName)
               console.log('✅ Synced passkey from backend (no on-chain match):', {
                 deviceName: activeDevice.deviceName,
                 credentialId: credentialToUse?.id?.slice(0, 20) + '...',
@@ -1033,27 +981,10 @@ function TransactionSender({ accountAddress, credential, accountConfig, onSignat
         // Passkey account: Sign with passkey (and optionally owner for 2FA)
         setStatus('🔑 Signing with Passkey (Touch ID/Face ID)...')
 
-        // Load passkey credential - try state/props first, then localStorage
+        // Load passkey credential - try state/props first, then SQLite cache
         let passkeyCredential = credential || loadedCredential
         if (!passkeyCredential?.publicKey) {
-          const storedPasskey = localStorage.getItem(`passkey_${accountAddress}`)
-          if (storedPasskey) {
-            try {
-              passkeyCredential = JSON.parse(storedPasskey)
-            } catch (e) {
-              console.warn('Failed to parse stored passkey:', e)
-            }
-          }
-          if (!passkeyCredential?.publicKey) {
-            const storedCredential = localStorage.getItem(`ethaura_passkey_credential_${accountAddress.toLowerCase()}`)
-            if (storedCredential) {
-              try {
-                passkeyCredential = JSON.parse(storedCredential)
-              } catch (e) {
-                console.warn('Failed to parse stored credential:', e)
-              }
-            }
-          }
+          passkeyCredential = await loadPasskeyCredential(accountAddress)
         }
         if (!passkeyCredential) {
           throw new Error('No passkey credential available for signing. Please ensure the passkey is loaded.')
@@ -1139,19 +1070,10 @@ function TransactionSender({ accountAddress, credential, accountConfig, onSignat
         setStatus(`🔑 ${stepLabel}: Signing with your passkey (biometric)...`)
         console.log(`🔑 Signing with passkey (${stepLabel})...`)
 
-        // Load passkey credential - try state/props first, then localStorage
+        // Load passkey credential - try state/props first, then SQLite cache
         let credentialToUse = credential || loadedCredential
         if (!credentialToUse?.publicKey) {
-          const storedPasskey = localStorage.getItem(`passkey_${accountAddress}`)
-          if (storedPasskey) {
-            try { credentialToUse = JSON.parse(storedPasskey) } catch (e) { /* ignore */ }
-          }
-          if (!credentialToUse?.publicKey) {
-            const storedCredential = localStorage.getItem(`ethaura_passkey_credential_${accountAddress.toLowerCase()}`)
-            if (storedCredential) {
-              try { credentialToUse = JSON.parse(storedCredential) } catch (e) { /* ignore */ }
-            }
-          }
+          credentialToUse = await loadPasskeyCredential(accountAddress)
         }
         if (!credentialToUse) {
           throw new Error('No credential available for signing. Please ensure the passkey is loaded.')
@@ -1271,7 +1193,7 @@ function TransactionSender({ accountAddress, credential, accountConfig, onSignat
         return
       } else {
         // Fallback: Add to cache immediately (old behavior)
-        walletDataCache.addTransactionToCache(accountAddress, networkInfo.name, transactionData)
+        await walletDataCache.addTransactionToCache(accountAddress, networkInfo.name, transactionData)
 
         // Clear cache and refresh account info
         sdk.accountManager.clearCache(accountAddress)

@@ -162,7 +162,7 @@ function AccountManager({ credential, onAccountCreated, accountAddress, accountC
       setAccountInfo(accountData)
       setTwoFactorEnabled(accountData.twoFactorEnabled)
 
-      // Save account config to localStorage
+      // Save account config to SQLite
       onAccountConfigChanged({
         address: accountData.address,
         twoFactorEnabled: accountData.twoFactorEnabled,
@@ -230,7 +230,7 @@ function AccountManager({ credential, onAccountCreated, accountAddress, accountC
       setAccountInfo(accountData)
       setTwoFactorEnabled(false)
 
-      // Save account config to localStorage
+      // Save account config to SQLite
       onAccountConfigChanged({
         address: accountData.address,
         twoFactorEnabled: false,

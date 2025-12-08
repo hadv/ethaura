@@ -5,6 +5,7 @@ import { useNetwork } from '../contexts/NetworkContext'
 import { ethers } from 'ethers'
 import { Wallet, Sparkles } from 'lucide-react'
 import { Identicon } from '../utils/identicon.jsx'
+import { walletsStore } from '../lib/walletsStore'
 import '../styles/Dashboard.css'
 
 function Dashboard({ accountAddress, accountConfig, onSendClick, onReceiveClick, onWalletClick }) {
@@ -48,12 +49,12 @@ function Dashboard({ accountAddress, accountConfig, onSendClick, onReceiveClick,
     }
   }
 
-  // Load wallets from localStorage or create default list
+  // Load wallets from SQLite or create default list
   useEffect(() => {
-    const loadWallets = () => {
-      const storedWallets = localStorage.getItem('ethaura_wallets')
-      if (storedWallets) {
-        setWallets(JSON.parse(storedWallets))
+    const loadWallets = async () => {
+      const storedWallets = await walletsStore.getWallets()
+      if (storedWallets && storedWallets.length > 0) {
+        setWallets(storedWallets)
       } else if (accountAddress) {
         // Create default wallet entry
         const defaultWallets = [
@@ -67,10 +68,10 @@ function Dashboard({ accountAddress, accountConfig, onSendClick, onReceiveClick,
           }
         ]
         setWallets(defaultWallets)
-        localStorage.setItem('ethaura_wallets', JSON.stringify(defaultWallets))
+        await walletsStore.setWallets(defaultWallets)
       }
     }
-    
+
     loadWallets()
   }, [accountAddress, balance, balanceChange])
 

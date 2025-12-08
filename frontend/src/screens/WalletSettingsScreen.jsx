@@ -10,6 +10,7 @@ import SubHeader from '../components/SubHeader'
 import { WalletConnectModal } from '../components/WalletConnectModal'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
 import { useNetwork } from '../contexts/NetworkContext'
+import * as walletsStore from '../lib/walletsStore'
 import { Key, ShieldCheck, LockOpen, Layers, Zap, DollarSign } from 'lucide-react'
 import '../styles/WalletSettingsScreen.css'
 
@@ -22,15 +23,12 @@ function WalletSettingsScreen({ wallet, onBack, onHome, onLogout, credential, on
   const [showWalletConnectModal, setShowWalletConnectModal] = useState(false)
   const walletConnectButtonRef = useRef(null)
 
-  // Load wallets from localStorage
+  // Load wallets from SQLite
   useEffect(() => {
-    const loadWallets = () => {
+    const loadWallets = async () => {
       try {
-        const savedWallets = localStorage.getItem('ethaura_wallets_list')
-        if (savedWallets) {
-          const parsedWallets = JSON.parse(savedWallets)
-          setWallets(parsedWallets)
-        }
+        const walletsList = await walletsStore.getWallets()
+        setWallets(walletsList)
       } catch (error) {
         console.error('Error loading wallets:', error)
       }

@@ -5,6 +5,7 @@ import { useNetwork } from '../contexts/NetworkContext'
 import { useP256SDK } from '../hooks/useP256SDK'
 import { createDeviceSession, pollSessionUntilComplete, addDevice } from '../lib/deviceManager'
 import { signWithPasskey } from '../utils/webauthn'
+import { passkeyStorage } from '../lib/passkeyStorage'
 import { ethers } from 'ethers'
 import '../styles/AddMobileDevice.css'
 
@@ -85,10 +86,10 @@ function AddMobileDeviceV2({ accountAddress, onComplete, onCancel }) {
 
         const attestationMetadata = deviceData.attestationMetadata || null
 
-        // Store in localStorage so TransactionSender can find it for deployment
+        // Store in SQLite cache so TransactionSender can find it for deployment
         // This is critical for 2FA to work on first transaction
-        console.log('💾 Storing mobile passkey in localStorage for deployment...')
-        localStorage.setItem(`passkey_${accountAddress}`, JSON.stringify(credential))
+        console.log('💾 Storing mobile passkey in SQLite cache for deployment...')
+        await passkeyStorage.cacheCredential(accountAddress, credential, deviceData.deviceName)
 
         // Save device to database first
         setStatus('Saving device to database...')
@@ -131,12 +132,10 @@ function AddMobileDeviceV2({ accountAddress, onComplete, onCancel }) {
 
             // Load the passkey credential from CURRENT device (desktop)
             // We need to use the desktop's passkey to sign the UserOperation
-            const currentPasskeyStr = localStorage.getItem(`passkey_${accountAddress}`)
-            if (!currentPasskeyStr) {
+            const currentPasskey = await passkeyStorage.getCredential(accountAddress)
+            if (!currentPasskey) {
               throw new Error('No passkey found on this device. Please add a passkey to this device first before adding mobile passkeys.')
             }
-
-            const currentPasskey = JSON.parse(currentPasskeyStr)
 
             // Add mobile passkey via UserOperation (signed by desktop passkey)
             await sdk.addPasskey({

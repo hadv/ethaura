@@ -4,6 +4,7 @@ import { DollarSign } from 'lucide-react'
 import { useNetwork } from '../contexts/NetworkContext'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
 import { createTokenBalanceService } from '../lib/tokenService'
+import * as walletsStore from '../lib/walletsStore'
 import Header from '../components/Header'
 import SubHeader from '../components/SubHeader'
 import '../styles/ViewAllTokensScreen.css'
@@ -19,13 +20,13 @@ function ViewAllTokensScreen({ wallet, onBack, onHome, onLogout, onSettings, onW
   const [searchQuery, setSearchQuery] = useState('')
   const [hideZeroBalances, setHideZeroBalances] = useState(false)
 
-  // Load all wallets from localStorage
+  // Load all wallets from SQLite
   useEffect(() => {
-    const storedWallets = localStorage.getItem('ethaura_wallets_list')
-    if (storedWallets) {
-      const walletsList = JSON.parse(storedWallets)
+    const loadWallets = async () => {
+      const walletsList = await walletsStore.getWallets()
       setWallets(walletsList)
     }
+    loadWallets()
   }, [])
 
   // Update selected wallet when prop changes
@@ -172,10 +173,10 @@ function ViewAllTokensScreen({ wallet, onBack, onHome, onLogout, onSettings, onW
                     >
                       <div className="td-asset">
                         <div className="token-icon">
-                          {typeof token.icon === 'string' && token.icon.startsWith('/') ? (
+                          {typeof token.icon === 'string' ? (
                             <img src={token.icon} alt={token.symbol} />
                           ) : (
-                            token.icon
+                            <span className="token-icon-fallback">{token.symbol?.charAt(0) || '?'}</span>
                           )}
                         </div>
                         <div className="token-info">

@@ -8,6 +8,7 @@ import { signWithPasskey } from '../utils/webauthn'
 import { UniswapV3Service } from '../lib/uniswapService'
 import { SUPPORTED_TOKENS } from '../lib/constants'
 import { priceOracle } from '../lib/priceOracle'
+import * as walletsStore from '../lib/walletsStore'
 import { ethers } from 'ethers'
 import Header from '../components/Header'
 import SubHeader from '../components/SubHeader'
@@ -68,15 +69,12 @@ function SwapScreen({ wallet, onBack, onHome, onSettings, onLogout, onWalletChan
   // Get available tokens for current network
   const availableTokens = SUPPORTED_TOKENS[networkInfo.name.toLowerCase()] || []
 
-  // Load wallets from localStorage
+  // Load wallets from SQLite
   useEffect(() => {
-    const loadWallets = () => {
+    const loadWallets = async () => {
       try {
-        const savedWallets = localStorage.getItem('ethaura_wallets_list')
-        if (savedWallets) {
-          const parsedWallets = JSON.parse(savedWallets)
-          setWallets(parsedWallets)
-        }
+        const walletsList = await walletsStore.getWallets()
+        setWallets(walletsList)
       } catch (error) {
         console.error('Failed to load wallets:', error)
       }
@@ -286,14 +284,22 @@ function SwapScreen({ wallet, onBack, onHome, onSettings, onLogout, onWalletChan
       ? tokenBalances['ETH']
       : tokenBalances[tokenIn.address]
 
-    if (!balance) return
+    console.log('🔢 MAX button clicked:', { tokenIn, balance, tokenBalances })
+
+    // Check for undefined/null, but allow 0n
+    if (balance === undefined || balance === null) {
+      console.log('⚠️ No balance found for token')
+      return
+    }
 
     const decimals = tokenIn === 'ETH' ? 18 : tokenIn.decimals
     const formattedBalance = ethers.formatUnits(balance, decimals)
 
+    console.log('💰 Formatted balance:', formattedBalance)
+
     // For ETH, leave some for gas
     if (tokenIn === 'ETH') {
-      const maxAmount = parseFloat(formattedBalance) - 0.01 // Reserve 0.01 ETH for gas
+      const maxAmount = parseFloat(formattedBalance) - 0.001 // Reserve 0.001 ETH for gas
       setAmountIn(maxAmount > 0 ? maxAmount.toString() : '0')
     } else {
       setAmountIn(formattedBalance)

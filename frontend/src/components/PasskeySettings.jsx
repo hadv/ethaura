@@ -4,6 +4,7 @@ import { useWeb3Auth } from '../contexts/Web3AuthContext'
 import { useNetwork } from '../contexts/NetworkContext'
 import { useP256SDK } from '../hooks/useP256SDK'
 import { signWithPasskey } from '../utils/webauthn'
+import { passkeyStorage } from '../lib/passkeyStorage'
 import { ethers } from 'ethers'
 import DeviceManagement from './DeviceManagement'
 import AddDeviceFlow from './AddDeviceFlow'
@@ -91,13 +92,11 @@ function PasskeySettingsV2({ accountAddress }) {
     setStatus(enable ? 'Enabling 2FA...' : 'Disabling 2FA...')
 
     try {
-      // Load passkey credential from localStorage
-      const storedCredential = localStorage.getItem(`passkey_${accountAddress}`)
-      if (!storedCredential) {
+      // Load passkey credential from SQLite cache
+      const passkeyCredential = await passkeyStorage.getCredential(accountAddress)
+      if (!passkeyCredential) {
         throw new Error('Passkey credential not found. Please ensure you have a passkey for this account.')
       }
-
-      const passkeyCredential = JSON.parse(storedCredential)
       console.log('🔑 Loaded passkey credential for 2FA toggle:', passkeyCredential.id)
 
       console.log(`${enable ? '🔒 Enabling' : '🔓 Disabling'} 2FA...`)

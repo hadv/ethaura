@@ -5,6 +5,7 @@ import { useNetwork } from '../contexts/NetworkContext'
 import { useP256SDK } from '../hooks/useP256SDK'
 import { parsePublicKey, verifyAttestation, signWithPasskey } from '../utils/webauthn'
 import { addDevice } from '../lib/deviceManager'
+import { passkeyStorage } from '../lib/passkeyStorage'
 import '../styles/AddCurrentDevice.css'
 
 /**
@@ -140,9 +141,9 @@ function AddCurrentDeviceV2({ accountAddress, onComplete, onCancel }) {
         },
       }
 
-      // Store in localStorage
+      // Store in SQLite cache
       setStatus('Saving passkey locally...')
-      localStorage.setItem(`passkey_${accountAddress}`, JSON.stringify(serializedCredential))
+      await passkeyStorage.cacheCredential(accountAddress, serializedCredential, deviceName.trim())
 
       // Save to database (for metadata and multi-device support)
       setStatus('Saving to database...')

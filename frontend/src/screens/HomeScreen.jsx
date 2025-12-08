@@ -13,6 +13,7 @@ import { walletDataCache } from '../lib/walletDataCache'
 import { createTokenBalanceService } from '../lib/tokenService'
 import { priceOracle } from '../lib/priceOracle'
 import { createTransactionHistoryService } from '../lib/transactionService'
+import * as walletsStore from '../lib/walletsStore'
 import '../styles/HomeScreen.css'
 import logo from '../assets/logo.svg'
 
@@ -72,7 +73,7 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onSwap
     return () => window.removeEventListener('resize', updatePieChartSize)
   }, [])
 
-  // Load wallets from localStorage
+  // Load wallets from SQLite
   useEffect(() => {
     loadWallets()
   }, [networkInfo.chainId])
@@ -96,14 +97,14 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onSwap
           networkInfo.name,
           tokenService,
           txService,
-          () => {
+          async () => {
             // Progressive update: re-aggregate portfolio after each wallet loads
-            aggregatePortfolioData()
+            await aggregatePortfolioData()
           }
         )
 
         // Final aggregation after all wallets are loaded
-        aggregatePortfolioData()
+        await aggregatePortfolioData()
       } catch (error) {
         console.error('Failed to start preload:', error)
       }
@@ -131,10 +132,9 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onSwap
   const loadWallets = async () => {
     try {
       setLoading(true)
-      const storedWallets = localStorage.getItem('ethaura_wallets_list')
-      if (storedWallets) {
-        const walletsList = JSON.parse(storedWallets)
+      const walletsList = await walletsStore.getWallets()
 
+      if (walletsList.length > 0) {
         // Fetch balances for each wallet
         const provider = new ethers.JsonRpcProvider(networkInfo.rpcUrl)
         const tokenService = createTokenBalanceService(provider, networkInfo.name)
@@ -212,12 +212,17 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onSwap
   }
 
   // Aggregate portfolio data from all wallets
-  const aggregatePortfolioData = () => {
+  const aggregatePortfolioData = async () => {
     const tokenMap = new Map() // symbol -> { name, symbol, icon, totalAmount, totalValue, addresses }
     let totalPortfolioValue = 0
 
-    wallets.forEach((wallet) => {
-      const cached = walletDataCache.getCachedData(wallet.address, networkInfo.name)
+    // Fetch cached data for all wallets in parallel
+    const cachedDataPromises = wallets.map(wallet =>
+      walletDataCache.getCachedData(wallet.address, networkInfo.name)
+    )
+    const cachedDataArray = await Promise.all(cachedDataPromises)
+
+    cachedDataArray.forEach((cached) => {
       if (!cached || !cached.assets) return
 
       cached.assets.forEach((asset) => {
@@ -285,7 +290,7 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onSwap
 
     try {
       // Get existing wallets
-      const walletsList = JSON.parse(localStorage.getItem('ethaura_wallets_list') || '[]')
+      const walletsList = await walletsStore.getWallets()
 
       // Check if wallet already exists
       const exists = walletsList.some(w => w.address.toLowerCase() === walletAddress.toLowerCase())
@@ -321,8 +326,7 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onSwap
         percentChange,
       }
 
-      walletsList.push(newWallet)
-      localStorage.setItem('ethaura_wallets_list', JSON.stringify(walletsList))
+      await walletsStore.addWallet(newWallet)
 
       // Update wallets state
       setWallets([...wallets, newWallet])
@@ -380,7 +384,7 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onSwap
     }
 
     // Get existing wallets to check for duplicate index
-    const walletsList = JSON.parse(localStorage.getItem('ethaura_wallets_list') || '[]')
+    const walletsList = await walletsStore.getWallets()
 
     // Check if this index has already been used by this owner (for same account type)
     const existingWallet = walletsList.find(w =>
@@ -476,8 +480,7 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onSwap
         isModular, // Track account type
       }
 
-      walletsList.push(newWallet)
-      localStorage.setItem('ethaura_wallets_list', JSON.stringify(walletsList))
+      await walletsStore.addWallet(newWallet)
 
       // Update wallets state
       setWallets([...wallets, newWallet])
@@ -517,21 +520,14 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onSwap
     setOpenMenuId(null)
   }
 
-  const handleSaveRename = () => {
+  const handleSaveRename = async () => {
     if (!editName.trim()) {
       return
     }
 
     try {
-      // Get existing wallets
-      const walletsList = JSON.parse(localStorage.getItem('ethaura_wallets_list') || '[]')
-
-      // Update wallet name
-      const updatedWallets = walletsList.map(w =>
-        w.id === selectedWallet.id ? { ...w, name: editName.trim() } : w
-      )
-
-      localStorage.setItem('ethaura_wallets_list', JSON.stringify(updatedWallets))
+      // Update wallet name in SQLite
+      await walletsStore.updateWallet(selectedWallet.id, { name: editName.trim() })
 
       // Update state
       setWallets(wallets.map(w =>
@@ -547,15 +543,10 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onSwap
     }
   }
 
-  const handleConfirmDelete = () => {
+  const handleConfirmDelete = async () => {
     try {
-      // Get existing wallets
-      const walletsList = JSON.parse(localStorage.getItem('ethaura_wallets_list') || '[]')
-
-      // Remove wallet
-      const updatedWallets = walletsList.filter(w => w.id !== selectedWallet.id)
-
-      localStorage.setItem('ethaura_wallets_list', JSON.stringify(updatedWallets))
+      // Delete wallet from SQLite
+      await walletsStore.deleteWallet(selectedWallet.id)
 
       // Update state
       setWallets(wallets.filter(w => w.id !== selectedWallet.id))
@@ -931,7 +922,8 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onSwap
                           </div>
 
                           {(() => {
-                            const walletsList = JSON.parse(localStorage.getItem('ethaura_wallets_list') || '[]')
+                            // Use sync version since wallets are already loaded
+                            const walletsList = walletsStore.getWalletsSync()
                             const currentOwnerIndices = walletsList
                               .filter(w => w.index !== undefined && w.owner === ownerAddress)
                               .map(w => w.index)
