@@ -1,30 +1,30 @@
 /**
  * Database module for passkey credential storage
- * Uses sqlite3 for reliable, cross-platform SQLite support
+ * Uses better-sqlite3 for reliable, high-performance synchronous SQLite support
  *
  * Production optimizations:
  * - WAL mode for better concurrency
- * - Connection pooling with busy timeout
+ * - Busy timeout for connection management
  * - Automatic backups
  * - Performance monitoring
+ * - Native transaction support
  */
 
-import sqlite3 from 'sqlite3'
-import { mkdir, copyFile } from 'fs/promises'
-import { dirname, join } from 'path'
+import Database from 'better-sqlite3'
+import { mkdirSync, copyFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
 
 const DB_PATH = process.env.DATABASE_PATH || './data/passkeys.db'
 const BACKUP_DIR = process.env.BACKUP_DIR || './data/backups'
 const BACKUP_INTERVAL_HOURS = parseInt(process.env.BACKUP_INTERVAL_HOURS || '24', 10)
 const BUSY_TIMEOUT_MS = 5000 // 5 seconds
 
-// Ensure data directory exists
-await mkdir(dirname(DB_PATH), { recursive: true })
-await mkdir(BACKUP_DIR, { recursive: true })
+// Ensure data directory exists (synchronous for module initialization)
+mkdirSync(dirname(DB_PATH), { recursive: true })
+mkdirSync(BACKUP_DIR, { recursive: true })
 
-// Initialize database with verbose mode for debugging
-const sqlite = sqlite3.verbose()
-const db = new sqlite.Database(DB_PATH)
+// Initialize database with better-sqlite3
+const db = new Database(DB_PATH)
 
 // Performance metrics
 let queryCount = 0
@@ -33,94 +33,55 @@ let lastBackupTime = null
 
 // Configure SQLite for production
 // Set busy timeout to prevent immediate failures on lock
-db.configure('busyTimeout', BUSY_TIMEOUT_MS)
+db.pragma(`busy_timeout = ${BUSY_TIMEOUT_MS}`)
 
 // Enable WAL mode for better concurrency (allows concurrent reads during writes)
-await new Promise((resolve, reject) => {
-  db.run('PRAGMA journal_mode = WAL', (err) => {
-    if (err) reject(err)
-    else resolve()
-  })
-})
+db.pragma('journal_mode = WAL')
 
 // Enable foreign keys
-await new Promise((resolve, reject) => {
-  db.run('PRAGMA foreign_keys = ON', (err) => {
-    if (err) reject(err)
-    else resolve()
-  })
-})
+db.pragma('foreign_keys = ON')
 
 // Optimize for performance
-await new Promise((resolve, reject) => {
-  db.run('PRAGMA synchronous = NORMAL', (err) => { // NORMAL is safe with WAL mode
-    if (err) reject(err)
-    else resolve()
-  })
-})
-
-await new Promise((resolve, reject) => {
-  db.run('PRAGMA cache_size = -64000', (err) => { // 64MB cache
-    if (err) reject(err)
-    else resolve()
-  })
-})
-
-await new Promise((resolve, reject) => {
-  db.run('PRAGMA temp_store = MEMORY', (err) => {
-    if (err) reject(err)
-    else resolve()
-  })
-})
+db.pragma('synchronous = NORMAL') // NORMAL is safe with WAL mode
+db.pragma('cache_size = -64000') // 64MB cache
+db.pragma('temp_store = MEMORY')
 
 console.log('✅ SQLite optimizations applied (WAL mode, busy timeout, cache)')
 
-// Promisify database operations with metrics
-function runAsync(sql, params = []) {
+// Synchronous database operations with metrics
+function run(sql, params = []) {
   queryCount++
-  return new Promise((resolve, reject) => {
-    db.run(sql, params, function(err) {
-      if (err) {
-        errorCount++
-        reject(err)
-      } else {
-        resolve(this)
-      }
-    })
-  })
+  try {
+    return db.prepare(sql).run(...params)
+  } catch (err) {
+    errorCount++
+    throw err
+  }
 }
 
-function getAsync(sql, params = []) {
+function get(sql, params = []) {
   queryCount++
-  return new Promise((resolve, reject) => {
-    db.get(sql, params, (err, row) => {
-      if (err) {
-        errorCount++
-        reject(err)
-      } else {
-        resolve(row)
-      }
-    })
-  })
+  try {
+    return db.prepare(sql).get(...params)
+  } catch (err) {
+    errorCount++
+    throw err
+  }
 }
 
-function allAsync(sql, params = []) {
+function all(sql, params = []) {
   queryCount++
-  return new Promise((resolve, reject) => {
-    db.all(sql, params, (err, rows) => {
-      if (err) {
-        errorCount++
-        reject(err)
-      } else {
-        resolve(rows)
-      }
-    })
-  })
+  try {
+    return db.prepare(sql).all(...params)
+  } catch (err) {
+    errorCount++
+    throw err
+  }
 }
 
 // Create tables
 // Multi-device table with Phase 1 attestation support
-await runAsync(`
+run(`
   CREATE TABLE IF NOT EXISTS passkey_devices (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     account_address TEXT NOT NULL,
@@ -147,14 +108,14 @@ await runAsync(`
   )
 `)
 
-await runAsync(`CREATE INDEX IF NOT EXISTS idx_account_address ON passkey_devices(account_address)`)
-await runAsync(`CREATE INDEX IF NOT EXISTS idx_device_id ON passkey_devices(device_id)`)
-await runAsync(`CREATE INDEX IF NOT EXISTS idx_credential_id_devices ON passkey_devices(credential_id)`)
-await runAsync(`CREATE INDEX IF NOT EXISTS idx_active_devices ON passkey_devices(account_address, is_active)`)
-await runAsync(`CREATE INDEX IF NOT EXISTS idx_proposal_hash ON passkey_devices(proposal_hash)`)
+run(`CREATE INDEX IF NOT EXISTS idx_account_address ON passkey_devices(account_address)`)
+run(`CREATE INDEX IF NOT EXISTS idx_device_id ON passkey_devices(device_id)`)
+run(`CREATE INDEX IF NOT EXISTS idx_credential_id_devices ON passkey_devices(credential_id)`)
+run(`CREATE INDEX IF NOT EXISTS idx_active_devices ON passkey_devices(account_address, is_active)`)
+run(`CREATE INDEX IF NOT EXISTS idx_proposal_hash ON passkey_devices(proposal_hash)`)
 
 // Session table for cross-device registration
-await runAsync(`
+run(`
   CREATE TABLE IF NOT EXISTS device_sessions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     session_id TEXT NOT NULL UNIQUE,
@@ -169,12 +130,12 @@ await runAsync(`
   )
 `)
 
-await runAsync(`CREATE INDEX IF NOT EXISTS idx_session_id ON device_sessions(session_id)`)
-await runAsync(`CREATE INDEX IF NOT EXISTS idx_session_status ON device_sessions(status)`)
-await runAsync(`CREATE INDEX IF NOT EXISTS idx_session_expires ON device_sessions(expires_at)`)
+run(`CREATE INDEX IF NOT EXISTS idx_session_id ON device_sessions(session_id)`)
+run(`CREATE INDEX IF NOT EXISTS idx_session_status ON device_sessions(status)`)
+run(`CREATE INDEX IF NOT EXISTS idx_session_expires ON device_sessions(expires_at)`)
 
 // Phase 2: FIDO MDS cache table
-await runAsync(`
+run(`
   CREATE TABLE IF NOT EXISTS fido_mds_cache (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     blob_data TEXT NOT NULL,
@@ -189,14 +150,14 @@ console.log('✅ Database initialized:', DB_PATH)
 
 // Phase 2: Add MDS metadata columns to passkey_devices if they don't exist
 // These columns store FIDO MDS metadata for each device
-const addColumnIfNotExists = async (tableName, columnName, columnDef) => {
+const addColumnIfNotExists = (tableName, columnName, columnDef) => {
   try {
     // Check if column exists
-    const tableInfo = await allAsync(`PRAGMA table_info(${tableName})`)
+    const tableInfo = all(`PRAGMA table_info(${tableName})`)
     const columnExists = tableInfo.some(col => col.name === columnName)
 
     if (!columnExists) {
-      await runAsync(`ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${columnDef}`)
+      run(`ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${columnDef}`)
       console.log(`✅ Added column ${columnName} to ${tableName}`)
     }
   } catch (error) {
@@ -206,10 +167,10 @@ const addColumnIfNotExists = async (tableName, columnName, columnDef) => {
 }
 
 // Add Phase 2 MDS metadata columns
-await addColumnIfNotExists('passkey_devices', 'authenticator_description', 'TEXT')
-await addColumnIfNotExists('passkey_devices', 'is_fido2_certified', 'BOOLEAN DEFAULT 0')
-await addColumnIfNotExists('passkey_devices', 'certification_level', 'TEXT')
-await addColumnIfNotExists('passkey_devices', 'mds_last_updated', 'INTEGER')
+addColumnIfNotExists('passkey_devices', 'authenticator_description', 'TEXT')
+addColumnIfNotExists('passkey_devices', 'is_fido2_certified', 'BOOLEAN DEFAULT 0')
+addColumnIfNotExists('passkey_devices', 'certification_level', 'TEXT')
+addColumnIfNotExists('passkey_devices', 'mds_last_updated', 'INTEGER')
 
 // Legacy functions removed - use multi-device functions instead:
 // - addDevice() instead of storeCredential()
@@ -239,7 +200,7 @@ await addColumnIfNotExists('passkey_devices', 'mds_last_updated', 'INTEGER')
  * @param {string} proposalHash - Optional proposal hash from on-chain proposal
  * @returns {Object} Stored device info
  */
-export async function addDevice(accountAddress, deviceInfo, isActive = true, proposalHash = null) {
+export function addDevice(accountAddress, deviceInfo, isActive = true, proposalHash = null) {
   const now = Date.now()
   const {
     deviceId,
@@ -250,7 +211,7 @@ export async function addDevice(accountAddress, deviceInfo, isActive = true, pro
   } = deviceInfo
 
   // Check if there's already an active device
-  const existingActive = await getAsync(`
+  const existingActive = get(`
     SELECT id FROM passkey_devices
     WHERE account_address = ? AND is_active = 1
   `, [accountAddress.toLowerCase()])
@@ -272,7 +233,7 @@ export async function addDevice(accountAddress, deviceInfo, isActive = true, pro
     : 1 // Default to true if unknown
 
   // Insert the new device
-  await runAsync(`
+  run(`
     INSERT INTO passkey_devices (
       account_address, device_id, device_name, device_type,
       credential_id, raw_id, public_key_x, public_key_y,
@@ -332,10 +293,10 @@ export async function addDevice(accountAddress, deviceInfo, isActive = true, pro
  * @param {string} proposalTxHash - The transaction hash that created the proposal (optional)
  * @returns {Object} Result
  */
-export async function updateDeviceProposalHash(accountAddress, deviceId, proposalHash, proposalTxHash = null) {
+export function updateDeviceProposalHash(accountAddress, deviceId, proposalHash, proposalTxHash = null) {
   const now = Date.now()
 
-  const result = await runAsync(`
+  const result = run(`
     UPDATE passkey_devices
     SET proposal_hash = ?, proposal_tx_hash = ?, updated_at = ?
     WHERE account_address = ? AND device_id = ?
@@ -363,27 +324,34 @@ export async function updateDeviceProposalHash(accountAddress, deviceId, proposa
  * @param {string} newPublicKeyX - The new public key X coordinate (to identify which device to activate)
  * @returns {Object} Result
  */
-export async function activateDevice(accountAddress, newPublicKeyX) {
+export function activateDevice(accountAddress, newPublicKeyX) {
   const now = Date.now()
 
-  // Deactivate all currently active devices for this account
-  // (should only be one, but use UPDATE to be safe)
-  await runAsync(`
-    UPDATE passkey_devices
-    SET is_active = 0, updated_at = ?
-    WHERE account_address = ? AND is_active = 1
-  `, [now, accountAddress.toLowerCase()])
+  // Use transaction for atomic operation
+  const activateTransaction = db.transaction(() => {
+    // Deactivate all currently active devices for this account
+    // (should only be one, but use UPDATE to be safe)
+    run(`
+      UPDATE passkey_devices
+      SET is_active = 0, updated_at = ?
+      WHERE account_address = ? AND is_active = 1
+    `, [now, accountAddress.toLowerCase()])
 
-  // Activate the device with the matching public key
-  const result = await runAsync(`
-    UPDATE passkey_devices
-    SET is_active = 1, updated_at = ?
-    WHERE account_address = ? AND public_key_x = ?
-  `, [now, accountAddress.toLowerCase(), newPublicKeyX])
+    // Activate the device with the matching public key
+    const result = run(`
+      UPDATE passkey_devices
+      SET is_active = 1, updated_at = ?
+      WHERE account_address = ? AND public_key_x = ?
+    `, [now, accountAddress.toLowerCase(), newPublicKeyX])
 
-  if (result.changes === 0) {
-    throw new Error('Device not found with the specified public key')
-  }
+    if (result.changes === 0) {
+      throw new Error('Device not found with the specified public key')
+    }
+
+    return result
+  })
+
+  activateTransaction()
 
   console.log(`✅ Device activated for account ${accountAddress}`)
 
@@ -398,8 +366,8 @@ export async function activateDevice(accountAddress, newPublicKeyX) {
  * @param {string} accountAddress - Smart account address
  * @returns {Array} List of devices
  */
-export async function getDevices(accountAddress) {
-  const rows = await allAsync(`
+export function getDevices(accountAddress) {
+  const rows = all(`
     SELECT
       device_id, device_name, device_type, credential_id, raw_id,
       public_key_x, public_key_y, is_active,
@@ -447,8 +415,8 @@ export async function getDevices(accountAddress) {
  * @param {string} credentialId - Credential ID
  * @returns {Object|null} Device info or null
  */
-export async function getDeviceByCredentialId(accountAddress, credentialId) {
-  const row = await getAsync(`
+export function getDeviceByCredentialId(accountAddress, credentialId) {
+  const row = get(`
     SELECT * FROM passkey_devices
     WHERE account_address = ? AND credential_id = ?
   `, [accountAddress.toLowerCase(), credentialId])
@@ -481,9 +449,9 @@ export async function getDeviceByCredentialId(accountAddress, credentialId) {
  * @param {string} accountAddress - Smart account address
  * @param {string} deviceId - Device ID
  */
-export async function updateDeviceLastUsed(accountAddress, deviceId) {
+export function updateDeviceLastUsed(accountAddress, deviceId) {
   const now = Date.now()
-  await runAsync(`
+  run(`
     UPDATE passkey_devices
     SET last_used_at = ?, updated_at = ?
     WHERE account_address = ? AND device_id = ?
@@ -496,8 +464,8 @@ export async function updateDeviceLastUsed(accountAddress, deviceId) {
  * @param {string} deviceId - Device ID
  * @returns {boolean} True if deleted
  */
-export async function removeDevice(accountAddress, deviceId) {
-  const result = await runAsync(`
+export function removeDevice(accountAddress, deviceId) {
+  const result = run(`
     DELETE FROM passkey_devices
     WHERE account_address = ? AND device_id = ?
   `, [accountAddress.toLowerCase(), deviceId])
@@ -515,7 +483,7 @@ export async function removeDevice(accountAddress, deviceId) {
  * @param {Object} sessionData - Session data
  * @returns {Object} Session info
  */
-export async function createSession(sessionData) {
+export function createSession(sessionData) {
   const now = Date.now()
   const expiresAt = now + (10 * 60 * 1000) // 10 minutes
 
@@ -526,7 +494,7 @@ export async function createSession(sessionData) {
     signature,
   } = sessionData
 
-  await runAsync(`
+  run(`
     INSERT INTO device_sessions (
       session_id, account_address, owner_address, signature,
       status, created_at, expires_at
@@ -556,8 +524,8 @@ export async function createSession(sessionData) {
  * @param {string} sessionId - Session ID
  * @returns {Object|null} Session data or null
  */
-export async function getSession(sessionId) {
-  const row = await getAsync(`
+export function getSession(sessionId) {
+  const row = get(`
     SELECT * FROM device_sessions WHERE session_id = ?
   `, [sessionId])
 
@@ -590,10 +558,10 @@ export async function getSession(sessionId) {
  * @param {Object} deviceData - Device data (qx, qy, deviceName, deviceType)
  * @returns {boolean} True if updated
  */
-export async function completeSession(sessionId, deviceData) {
+export function completeSession(sessionId, deviceData) {
   const now = Date.now()
 
-  const result = await runAsync(`
+  const result = run(`
     UPDATE device_sessions
     SET status = ?, device_data = ?, completed_at = ?
     WHERE session_id = ? AND status = 'pending'
@@ -615,9 +583,9 @@ export async function completeSession(sessionId, deviceData) {
 /**
  * Clean up expired sessions (run periodically)
  */
-export async function cleanupExpiredSessions() {
+export function cleanupExpiredSessions() {
   const now = Date.now()
-  const result = await runAsync(`
+  const result = run(`
     DELETE FROM device_sessions
     WHERE expires_at < ? OR (status = 'completed' AND completed_at < ?)
   `, [now, now - (24 * 60 * 60 * 1000)]) // Delete completed sessions older than 24h
@@ -629,23 +597,22 @@ export async function cleanupExpiredSessions() {
 
 /**
  * Create a backup of the database
- * @returns {Promise<string>} Path to backup file
+ * @returns {string} Path to backup file
  */
-export async function createBackup() {
+export function createBackup() {
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
   const backupPath = join(BACKUP_DIR, `passkeys-${timestamp}.db`)
 
   try {
-    // Use VACUUM INTO for atomic backup (SQLite 3.27.0+)
-    // This creates a clean copy without WAL files
-    await runAsync(`VACUUM INTO ?`, [backupPath])
+    // Use better-sqlite3's backup API for atomic backup
+    db.backup(backupPath)
     lastBackupTime = Date.now()
     console.log(`✅ Database backup created: ${backupPath}`)
     return backupPath
   } catch (error) {
-    // Fallback to file copy if VACUUM INTO not supported
-    console.warn('⚠️  VACUUM INTO not supported, using file copy')
-    await copyFile(DB_PATH, backupPath)
+    // Fallback to file copy if backup fails
+    console.warn('⚠️  Database backup API failed, using file copy')
+    copyFileSync(DB_PATH, backupPath)
     lastBackupTime = Date.now()
     console.log(`✅ Database backup created (file copy): ${backupPath}`)
     return backupPath
@@ -656,8 +623,8 @@ export async function createBackup() {
  * Get database statistics
  * @returns {Object} Database stats
  */
-export async function getDatabaseStats() {
-  const stats = await getAsync(`
+export function getDatabaseStats() {
+  const stats = get(`
     SELECT
       COUNT(*) as total_credentials,
       MIN(created_at) as oldest_credential,
@@ -678,58 +645,42 @@ export async function getDatabaseStats() {
  * Optimize database (run VACUUM and ANALYZE)
  * Should be run periodically (e.g., weekly)
  */
-export async function optimizeDatabase() {
+export function optimizeDatabase() {
   console.log('🔧 Optimizing database...')
 
   // ANALYZE updates query planner statistics
-  await runAsync('ANALYZE')
+  db.exec('ANALYZE')
 
   // Note: VACUUM cannot be run in WAL mode while transactions are active
   // It's better to run this during maintenance windows
-  // await runAsync('VACUUM')
+  // db.exec('VACUUM')
 
   console.log('✅ Database optimized')
 }
 
 /**
  * Close database connection gracefully
+ * better-sqlite3 uses synchronous close
  */
-let isClosing = false
 let isClosed = false
 
 export function closeDatabase() {
-  return new Promise((resolve, reject) => {
-    // Prevent double-closing
-    if (isClosing || isClosed) {
-      console.log('ℹ️  Database already closed or closing')
-      resolve()
-      return
-    }
+  // Prevent double-closing
+  if (isClosed) {
+    console.log('ℹ️  Database already closed')
+    return
+  }
 
-    isClosing = true
-    console.log('🔒 Closing database connection...')
+  console.log('🔒 Closing database connection...')
 
-    db.close((err) => {
-      if (err) {
-        // Ignore SQLITE_MISUSE error if database is already closed
-        if (err.code === 'SQLITE_MISUSE') {
-          console.log('ℹ️  Database already closed')
-          isClosed = true
-          isClosing = false
-          resolve()
-        } else {
-          console.error('❌ Error closing database:', err)
-          isClosing = false
-          reject(err)
-        }
-      } else {
-        console.log('✅ Database connection closed')
-        isClosed = true
-        isClosing = false
-        resolve()
-      }
-    })
-  })
+  try {
+    db.close()
+    console.log('✅ Database connection closed')
+    isClosed = true
+  } catch (err) {
+    console.error('❌ Error closing database:', err)
+    throw err
+  }
 }
 
 // Automatic backup scheduler
@@ -746,9 +697,9 @@ export function startBackupScheduler() {
 
   const intervalMs = BACKUP_INTERVAL_HOURS * 60 * 60 * 1000
 
-  backupInterval = setInterval(async () => {
+  backupInterval = setInterval(() => {
     try {
-      await createBackup()
+      createBackup()
     } catch (error) {
       console.error('❌ Automatic backup failed:', error)
     }
@@ -771,7 +722,7 @@ export function stopBackupScheduler() {
 // Graceful shutdown handler
 let isShuttingDown = false
 
-async function gracefulShutdown(signal) {
+function gracefulShutdown(signal) {
   if (isShuttingDown) {
     console.log('⚠️  Shutdown already in progress...')
     return
@@ -782,7 +733,7 @@ async function gracefulShutdown(signal) {
 
   try {
     stopBackupScheduler()
-    await closeDatabase()
+    closeDatabase()
     console.log('✅ Graceful shutdown complete')
     process.exit(0)
   } catch (error) {
@@ -803,10 +754,10 @@ process.on('SIGTERM', () => gracefulShutdown('SIGTERM'))
  * @param {Object} payload - MDS blob payload (already verified)
  * @returns {Object} Result
  */
-export async function storeMDSCache(payload) {
+export function storeMDSCache(payload) {
   const now = Math.floor(Date.now() / 1000)
 
-  await runAsync(`
+  run(`
     INSERT INTO fido_mds_cache (blob_data, last_updated, next_update, blob_number)
     VALUES (?, ?, ?, ?)
   `, [
@@ -830,8 +781,8 @@ export async function storeMDSCache(payload) {
  * Load FIDO MDS blob from database
  * @returns {Object|null} MDS payload or null if not found
  */
-export async function loadMDSCache() {
-  const row = await getAsync(`
+export function loadMDSCache() {
+  const row = get(`
     SELECT blob_data, last_updated, next_update, blob_number
     FROM fido_mds_cache
     ORDER BY id DESC
@@ -852,8 +803,8 @@ export async function loadMDSCache() {
  * Get age of MDS cache in seconds
  * @returns {number|null} Age in seconds or null if no cache
  */
-export async function getMDSCacheAge() {
-  const row = await getAsync(`
+export function getMDSCacheAge() {
+  const row = get(`
     SELECT last_updated FROM fido_mds_cache
     ORDER BY id DESC
     LIMIT 1
@@ -872,10 +823,10 @@ export async function getMDSCacheAge() {
  * @param {Object} metadata - MDS metadata
  * @returns {Object} Result
  */
-export async function updateDeviceMetadata(accountAddress, deviceId, metadata) {
+export function updateDeviceMetadata(accountAddress, deviceId, metadata) {
   const now = Math.floor(Date.now() / 1000)
 
-  await runAsync(`
+  run(`
     UPDATE passkey_devices
     SET
       authenticator_name = ?,
