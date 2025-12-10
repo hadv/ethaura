@@ -208,7 +208,7 @@ Test Files  1 passed (1)
 ## Next Steps
 
 1. **Integration Testing** (Phase 2)
-   - Test with P256AccountSDK
+   - Test with ModularAccountSDK
    - Test passkey signing flow
    - Test actual swap execution on Sepolia
 

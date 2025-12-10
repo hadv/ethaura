@@ -1,20 +1,24 @@
 import React, { useState, useEffect } from 'react'
 import { useWalletConnect } from '../contexts/WalletConnectContext'
-import { useP256SDK } from '../hooks/useP256SDK'
+import { useModularAccountSDK } from '../hooks/useModularAccountSDK'
 import { getSdkError } from '@walletconnect/utils'
 import { ethers } from 'ethers'
 import '../styles/WalletConnectModal.css'
 
-export const SessionRequestModal = ({ 
-  request, 
-  accountAddress, 
+/**
+ * SessionRequestModal for ERC-7579 modular accounts
+ * Handles WalletConnect session requests using ModularAccountSDK
+ */
+export const SessionRequestModal = ({
+  request,
+  accountAddress,
   passkeyCredential,
   ownerSigner,
   twoFactorEnabled,
-  onComplete 
+  onComplete
 }) => {
   const { respondSessionRequest } = useWalletConnect()
-  const sdk = useP256SDK()
+  const modularSDK = useModularAccountSDK()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [decodedData, setDecodedData] = useState(null)
@@ -176,32 +180,21 @@ export const SessionRequestModal = ({
   }
 
   const handleSendTransaction = async (tx) => {
-    console.log('📤 Sending transaction:', tx)
+    console.log('📤 Sending transaction via modular account:', tx)
 
-    // Build UserOperation
-    const userOp = await sdk.buildUserOperation(
+    // Use ModularAccountSDK to execute the call
+    // The SDK handles UserOperation building, signing, and sending
+    const result = await modularSDK.executeCall(
       accountAddress,
       tx.to,
       tx.value || '0',
-      tx.data || '0x'
+      tx.data || '0x',
+      ownerSigner,
+      twoFactorEnabled ? passkeyCredential : null
     )
 
-    // Sign with passkey and owner (if 2FA enabled)
-    const signedUserOp = await sdk.signUserOperation(
-      userOp,
-      passkeyCredential,
-      twoFactorEnabled ? ownerSigner : null
-    )
-
-    // Send to bundler
-    const userOpHash = await sdk.sendUserOperation(signedUserOp)
-    console.log('✅ UserOperation sent:', userOpHash)
-
-    // Wait for receipt
-    const receipt = await sdk.waitForUserOperationReceipt(userOpHash)
-    console.log('✅ Transaction confirmed:', receipt.transactionHash)
-
-    return receipt.transactionHash
+    console.log('✅ Transaction confirmed:', result.transactionHash)
+    return result.transactionHash
   }
 
   const handleSignTransaction = async (tx) => {

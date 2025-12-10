@@ -282,7 +282,7 @@ export async function signWithPasskey(credential, message, useNativePicker = fal
     } else if (Array.isArray(credentialId)) {
       credentialIdBytes = new Uint8Array(credentialId)
     } else if (typeof credentialId === 'string') {
-      // Handle base64-encoded string (from server/localStorage)
+      // Handle base64-encoded string (from server/SQLite cache)
       try {
         const binaryString = atob(credentialId)
         credentialIdBytes = new Uint8Array(binaryString.length)

@@ -128,7 +128,7 @@ export async function getDevices(signMessageFn, ownerAddress, accountAddress) {
 
 /**
  * Get active device credential from backend (public endpoint, no auth required)
- * Used to sync localStorage when credential is missing
+ * Used to sync SQLite cache when credential is missing
  * @param {string} accountAddress - Smart account address
  * @param {string} publicKeyX - Optional public key X to filter by (for matching on-chain passkey)
  * @returns {Promise<Object|null>} Active device credential or null

@@ -1,13 +1,19 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
-import { CheckCircle, Clock, RefreshCw } from 'lucide-react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
+import { CheckCircle, Clock, RefreshCw, AlertTriangle } from 'lucide-react'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
 import { useNetwork } from '../contexts/NetworkContext'
-import { useP256SDK } from '../hooks/useP256SDK'
-import { formatPublicKeyForContract } from '../lib/accountManager'
+import { useModularAccountSDK } from '../hooks/useModularAccountSDK'
+import { ethers } from 'ethers'
 
+/**
+ * AccountManager for ERC-7579 modular accounts
+ * Uses ModularAccountSDK for account management
+ */
 function AccountManager({ credential, onAccountCreated, accountAddress, accountConfig, onAccountConfigChanged }) {
   const { isConnected, address: ownerAddress } = useWeb3Auth()
   const { networkInfo } = useNetwork()
+  const modularSDK = useModularAccountSDK()
+  const provider = useMemo(() => new ethers.JsonRpcProvider(networkInfo.rpcUrl), [networkInfo.rpcUrl])
   const [status, setStatus] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -21,12 +27,9 @@ function AccountManager({ credential, onAccountCreated, accountAddress, accountC
   // Use ref to track if we've already loaded account info for this address
   const loadedAddressRef = useRef(null)
 
-  // Use SDK from hook (will use network from context)
-  const sdk = useP256SDK()
-
   // Function to refresh account info with debouncing to prevent rate limiting
   const refreshAccountInfo = useCallback(async () => {
-    if (accountAddress && sdk) {
+    if (accountAddress && modularSDK) {
       // Check if already refreshing using a ref-like pattern
       setIsRefreshing(prev => {
         if (prev) {
@@ -40,12 +43,9 @@ function AccountManager({ credential, onAccountCreated, accountAddress, accountC
         setRefreshing(true)
         console.log('🔄 Refreshing account info...')
 
-        // IMPORTANT: Clear cache to get fresh data
-        sdk.accountManager.clearCache(accountAddress)
-
         // First, quickly check if account is deployed by checking contract code
         // This is much cheaper than calling getAccountInfo()
-        const code = await sdk.provider.getCode(accountAddress)
+        const code = await provider.getCode(accountAddress)
         const isDeployed = code !== '0x'
 
         console.log('📊 Quick deployment check:', {
@@ -55,23 +55,21 @@ function AccountManager({ credential, onAccountCreated, accountAddress, accountC
         })
 
         // Always fetch full account info to get latest state
-        const expectedTwoFactorEnabled = accountConfig?.twoFactorEnabled
-        const info = await sdk.getAccountInfo(accountAddress, expectedTwoFactorEnabled)
+        const info = await modularSDK.getAccountInfo(accountAddress)
 
         console.log('📊 Full account info refreshed:', {
           address: accountAddress,
           deployed: info.deployed,
-          twoFactorEnabled: info.twoFactorEnabled,
-          nonce: info.nonce?.toString(),
+          mfaEnabled: info.mfaEnabled,
         })
 
         setAccountInfo(info)
-        setTwoFactorEnabled(info.twoFactorEnabled)
+        setTwoFactorEnabled(info.mfaEnabled)
 
-        // Fetch guardian info if account is deployed
+        // Guardian info is via SocialRecoveryModule - not yet implemented
         if (info.deployed) {
-          const guardians = await sdk.getGuardians(accountAddress)
-          setGuardianInfo(guardians)
+          // TODO: Fetch guardians from SocialRecoveryModule
+          setGuardianInfo({ guardians: [], threshold: 0 })
         }
       } catch (err) {
         console.error('Error fetching account info:', err)
@@ -85,7 +83,7 @@ function AccountManager({ credential, onAccountCreated, accountAddress, accountC
         setIsRefreshing(false)
       }
     }
-  }, [accountAddress, sdk, accountConfig])
+  }, [accountAddress, modularSDK, provider])
 
   // Load account info on mount or when dependencies change
   useEffect(() => {
@@ -106,169 +104,34 @@ function AccountManager({ credential, onAccountCreated, accountAddress, accountC
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accountAddress])
 
+  // Account creation is now handled via HomeScreen with ModularAccountManager
+  // These functions are kept for backward compatibility but show deprecation notice
   const createAccountWithPasskey = async (enable2FA = false) => {
-    if (!credential) {
-      setError('Please create a passkey first')
-      return
-    }
-
-    if (!isConnected || !ownerAddress) {
-      setError('Please login with Web3Auth first')
-      return
-    }
-
-    if (!networkInfo.factoryAddress) {
-      setError('Factory address not configured for this network')
-      return
-    }
-
-    setLoading(true)
-    setError('')
-    setStatus('Creating account with passkey...')
-
-    try {
-      setStatus('Calculating account address...')
-
-      console.log('🔑 Creating account with passkey:', {
-        x: credential.publicKey.x,
-        y: credential.publicKey.y,
-        owner: ownerAddress,
-        salt,
-        enable2FA,
-      })
-
-      // Address depends ONLY on owner and salt, NOT on passkey
-      // This allows users to add/change passkey later without changing address
-      const saltBigInt = BigInt(salt)
-      const accountData = await sdk.createAccount(
-        credential.publicKey,
-        ownerAddress,
-        saltBigInt,
-        enable2FA
-      )
-
-      console.log('📍 Account created:', {
-        address: accountData.address,
-        isDeployed: accountData.isDeployed,
-        twoFactorEnabled: accountData.twoFactorEnabled,
-      })
-
-      // Guard: ensure we are not accidentally using the factory address as the account
-      if (accountData.address && sdk.factoryAddress && accountData.address.toLowerCase() === sdk.factoryAddress.toLowerCase()) {
-        throw new Error('Derived account address equals the factory address. Please verify VITE_FACTORY_ADDRESS and contract ABI.')
-      }
-
-      setStatus('Account created successfully!')
-      setAccountInfo(accountData)
-      setTwoFactorEnabled(accountData.twoFactorEnabled)
-
-      // Save account config to localStorage
-      onAccountConfigChanged({
-        address: accountData.address,
-        twoFactorEnabled: accountData.twoFactorEnabled,
-        hasPasskey: true,
-        salt: salt, // Save the salt used
-      })
-
-      onAccountCreated(accountData.address)
-
-      setStatus(`✅ Account ready! ${accountData.isDeployed ? 'Already deployed' : 'Will deploy on first transaction'}`)
-
-    } catch (err) {
-      console.error('Error creating account:', err)
-      setError(err.message)
-      setStatus('')
-    } finally {
-      setLoading(false)
-    }
+    setError('Account creation has moved to the Home screen. Please use the "Add Wallet" button there.')
+    return
   }
 
   const createAccountOwnerOnly = async () => {
-    if (!isConnected || !ownerAddress) {
-      setError('Please login with Web3Auth first')
-      return
-    }
-
-    if (!networkInfo.factoryAddress) {
-      setError('Factory address not configured for this network')
-      return
-    }
-
-    setLoading(true)
-    setError('')
-    setStatus('Creating owner-only account...')
-
-    try {
-      setStatus('Calculating account address...')
-
-      console.log('🔑 Creating owner-only account:', {
-        owner: ownerAddress,
-        salt,
-      })
-
-      // Address depends ONLY on owner and salt, NOT on passkey
-      // This allows users to add/change passkey later without changing address
-      const saltBigInt = BigInt(salt)
-      const accountData = await sdk.createAccount(
-        null, // no passkey
-        ownerAddress,
-        saltBigInt,
-        false // 2FA disabled
-      )
-
-      console.log('📍 Account created:', {
-        address: accountData.address,
-        isDeployed: accountData.isDeployed,
-      })
-
-      // Guard: ensure we are not accidentally using the factory address as the account
-      if (accountData.address && sdk.factoryAddress && accountData.address.toLowerCase() === sdk.factoryAddress.toLowerCase()) {
-        throw new Error('Derived account address equals the factory address. Please verify VITE_FACTORY_ADDRESS and contract ABI.')
-      }
-
-      setStatus('Account created successfully!')
-      setAccountInfo(accountData)
-      setTwoFactorEnabled(false)
-
-      // Save account config to localStorage
-      onAccountConfigChanged({
-        address: accountData.address,
-        twoFactorEnabled: false,
-        hasPasskey: false,
-        salt: salt, // Save the salt used
-      })
-
-      onAccountCreated(accountData.address)
-
-      setStatus(`✅ Owner-only account ready! ${accountData.isDeployed ? 'Already deployed' : 'Will deploy on first transaction'}`)
-
-    } catch (err) {
-      console.error('Error creating account:', err)
-      setError(err.message)
-      setStatus('')
-    } finally {
-      setLoading(false)
-    }
+    setError('Account creation has moved to the Home screen. Please use the "Add Wallet" button there.')
+    return
   }
 
   return (
     <div className="card">
-      <h2>3️⃣ Create Your Smart Account</h2>
-      <p className="text-sm mb-4">
-        Deploy your P256Account smart contract wallet. Choose the security level that fits your needs:
-      </p>
+      <h2>Smart Account Management</h2>
 
-      {/* IMPORTANT INFO */}
-      <div className="mb-4 p-4" style={{ backgroundColor: '#d1fae5', borderRadius: '8px', border: '2px solid #10b981' }}>
-        <p className="text-sm font-semibold" style={{ color: '#065f46', marginBottom: '8px' }}>
-          ✅ Good News: Your Address Stays the Same!
-        </p>
-        <ul className="text-xs" style={{ marginLeft: '20px', lineHeight: '1.6', color: '#047857' }}>
-          <li><strong>Same owner = Same address</strong> (regardless of passkey choice)</li>
-          <li>You can add or change passkey later without changing your address</li>
-          <li>Receive funds first, then decide on security level later</li>
-          <li><strong>Recommendation:</strong> Choose "With Passkey" to enable 2FA later</li>
-        </ul>
+      {/* Modular Account Notice */}
+      <div className="mb-4 p-4" style={{ backgroundColor: '#fef3c7', borderRadius: '8px', border: '2px solid #f59e0b', display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+        <AlertTriangle size={24} style={{ color: '#d97706', flexShrink: 0 }} />
+        <div>
+          <p className="text-sm font-semibold" style={{ color: '#92400e', marginBottom: '8px' }}>
+            Account Creation Moved
+          </p>
+          <p className="text-xs" style={{ color: '#78350f', lineHeight: '1.6' }}>
+            Account creation is now handled from the Home screen using the "Add Wallet" button.
+            This page shows account information for existing accounts.
+          </p>
+        </div>
       </div>
 
       {!accountAddress ? (

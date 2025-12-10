@@ -1,67 +1,68 @@
 /**
  * Wallet Data Cache Service
  * Preloads and caches wallet data (assets and transactions) with 30-minute expiry
- * Persists to localStorage to survive page refreshes
+ * Persists to SQLite (wa-sqlite) for better performance and querying capabilities
  */
+
+import { clientDb } from './clientDatabase.js'
 
 class WalletDataCache {
   constructor() {
     this.cache = new Map() // key: `${address}-${networkName}` -> { assets, transactions, timestamp }
     this.cacheExpiry = 30 * 60 * 1000 // 30 minutes in milliseconds
     this.preloadingPromises = new Map() // Track ongoing preload requests to avoid duplicates
-    this.storageKey = 'ethaura_wallet_data_cache'
-
-    // Load cache from localStorage on initialization
-    this.loadFromStorage()
+    this.dbInitialized = false
+    this.initPromise = null
   }
 
   /**
-   * Load cache from localStorage
+   * Initialize the database and load cache
    */
-  loadFromStorage() {
-    try {
-      const stored = localStorage.getItem(this.storageKey)
-      if (stored) {
-        const data = JSON.parse(stored)
-        // Restore Map from stored object with validation
-        Object.entries(data).forEach(([key, value]) => {
-          // Validate that the cache entry has the required fields
-          if (value && value.networkName && value.address) {
-            this.cache.set(key, value)
-          } else {
-            console.warn(`⚠️ Skipping invalid cache entry: ${key}`)
-          }
-        })
-        console.log(`📦 Loaded ${this.cache.size} cached wallets from localStorage`)
-      }
-    } catch (error) {
-      console.error('Failed to load cache from localStorage:', error)
+  async initialize() {
+    if (this.initPromise) {
+      return this.initPromise
+    }
+    this.initPromise = this._doInitialize()
+    return this.initPromise
+  }
+
+  async _doInitialize() {
+    await clientDb.initialize()
+    this.dbInitialized = true
+    console.log('📦 WalletDataCache initialized with SQLite backend')
+  }
+
+  async _ensureDbReady() {
+    if (!this.dbInitialized) {
+      await this.initialize()
     }
   }
 
   /**
-   * Save cache to localStorage
+   * Load cache from SQLite for a specific wallet
    */
-  saveToStorage() {
-    try {
-      // Convert Map to object for JSON serialization
-      const data = {}
-      this.cache.forEach((value, key) => {
-        data[key] = value
+  async loadFromStorage(address, networkName) {
+    await this._ensureDbReady()
+    const cached = await clientDb.getWalletCache(address, networkName)
+    if (cached) {
+      const key = this.getCacheKey(address, networkName)
+      this.cache.set(key, {
+        assets: cached.assets,
+        transactions: cached.transactions,
+        timestamp: cached.timestamp,
+        networkName: networkName.toLowerCase(),
+        address: address.toLowerCase()
       })
-
-      // Custom JSON serializer to handle BigInt and other non-serializable types
-      const jsonString = JSON.stringify(data, (key, value) => {
-        if (typeof value === 'bigint') {
-          return value.toString() // Convert BigInt to string
-        }
-        return value
-      })
-
-      localStorage.setItem(this.storageKey, jsonString)
-    } catch (error) {
-      console.error('Failed to save cache to localStorage:', error)
     }
+    return cached
+  }
+
+  /**
+   * Save cache to SQLite
+   */
+  async saveToStorage(address, networkName, assets, transactions) {
+    await this._ensureDbReady()
+    await clientDb.setWalletCache(address, networkName, assets, transactions)
   }
 
   /**
@@ -81,11 +82,26 @@ class WalletDataCache {
   }
 
   /**
-   * Get cached data for a wallet
+   * Get cached data for a wallet (async - loads from SQLite if not in memory)
    */
-  getCachedData(address, networkName) {
+  async getCachedData(address, networkName) {
     const key = this.getCacheKey(address, networkName)
-    const cacheEntry = this.cache.get(key)
+    let cacheEntry = this.cache.get(key)
+
+    // If not in memory, try to load from SQLite
+    if (!cacheEntry) {
+      const dbCache = await this.loadFromStorage(address, networkName)
+      if (dbCache) {
+        cacheEntry = {
+          assets: dbCache.assets,
+          transactions: dbCache.transactions,
+          timestamp: dbCache.timestamp,
+          networkName: networkName.toLowerCase(),
+          address: address.toLowerCase()
+        }
+        this.cache.set(key, cacheEntry)
+      }
+    }
 
     if (this.isCacheValid(cacheEntry)) {
       // Validate that the cached data is for the correct network
@@ -106,6 +122,8 @@ class WalletDataCache {
     if (cacheEntry) {
       console.log(`⏰ Cache expired for ${address} on ${networkName}`)
       this.cache.delete(key)
+      // Also clear from SQLite
+      await clientDb.clearWalletCache(address, networkName)
     }
     return null
   }
@@ -114,7 +132,7 @@ class WalletDataCache {
    * Set cached data for a wallet
    * Only cache if we have meaningful data (at least some transactions or assets)
    */
-  setCachedData(address, networkName, assets, transactions) {
+  async setCachedData(address, networkName, assets, transactions) {
     const key = this.getCacheKey(address, networkName)
 
     // Warn if caching empty data
@@ -131,8 +149,8 @@ class WalletDataCache {
     })
     console.log(`💾 Cached data for ${address} on ${networkName} (${transactions?.length || 0} txs, ${assets?.length || 0} assets)`)
 
-    // Persist to localStorage
-    this.saveToStorage()
+    // Persist to SQLite
+    await this.saveToStorage(address, networkName, assets, transactions)
   }
 
   /**
@@ -142,8 +160,8 @@ class WalletDataCache {
   async preloadWalletData(address, networkName, tokenService, txService) {
     const key = this.getCacheKey(address, networkName)
 
-    // Check if already cached and valid
-    const cached = this.getCachedData(address, networkName)
+    // Check if already cached and valid (async now)
+    const cached = await this.getCachedData(address, networkName)
     if (cached) {
       return cached
     }
@@ -175,8 +193,8 @@ class WalletDataCache {
 
         console.log(`✅ Preload completed for ${address}: ${transactions?.length || 0} txs, ${assets?.length || 0} assets`)
 
-        // Cache the data
-        this.setCachedData(address, networkName, assets, transactions)
+        // Cache the data (async now)
+        await this.setCachedData(address, networkName, assets, transactions)
 
         return { assets, transactions }
       } catch (error) {
@@ -231,7 +249,7 @@ class WalletDataCache {
    * Add a new transaction to the top of cached transactions
    * Used when user sends a transaction to immediately show it in the UI
    */
-  addTransactionToCache(address, networkName, transaction) {
+  async addTransactionToCache(address, networkName, transaction) {
     const key = this.getCacheKey(address, networkName)
     const cacheEntry = this.cache.get(key)
 
@@ -242,8 +260,8 @@ class WalletDataCache {
       cacheEntry.timestamp = Date.now()
       console.log(`✨ Added new transaction to cache for ${address}`)
 
-      // Persist to localStorage
-      this.saveToStorage()
+      // Persist to SQLite
+      await this.saveToStorage(address, networkName, cacheEntry.assets, cacheEntry.transactions)
     } else {
       console.log(`⚠️ No cache entry found for ${address}, skipping transaction prepend`)
     }
@@ -252,17 +270,19 @@ class WalletDataCache {
   /**
    * Clear cache for a specific wallet
    */
-  clearWalletCache(address, networkName) {
+  async clearWalletCache(address, networkName) {
     const key = this.getCacheKey(address, networkName)
     this.cache.delete(key)
     console.log(`🗑️ Cleared cache for ${address} on ${networkName}`)
 
-    // Persist to localStorage
-    this.saveToStorage()
+    // Clear from SQLite
+    await this._ensureDbReady()
+    await clientDb.clearWalletCache(address, networkName)
   }
 
   /**
    * Clear all cache for a specific network
+   * Note: This clears memory cache only. SQLite entries will expire naturally.
    */
   clearNetworkCache(networkName) {
     const normalizedNetwork = networkName.toLowerCase()
@@ -276,21 +296,19 @@ class WalletDataCache {
     }
 
     console.log(`🗑️ Cleared ${clearedCount} cache entries for network ${networkName}`)
-
-    // Persist to localStorage
-    this.saveToStorage()
   }
 
   /**
    * Clear all cache
    */
-  clearAllCache() {
+  async clearAllCache() {
     this.cache.clear()
     this.preloadingPromises.clear()
     console.log(`🗑️ Cleared all cache`)
 
-    // Persist to localStorage
-    localStorage.removeItem(this.storageKey)
+    // Clear from SQLite
+    await this._ensureDbReady()
+    await clientDb.clearAll()
   }
 
   /**
@@ -300,7 +318,8 @@ class WalletDataCache {
     return {
       cacheSize: this.cache.size,
       preloadingCount: this.preloadingPromises.size,
-      cacheExpiry: `${this.cacheExpiry / 1000 / 60} minutes`
+      cacheExpiry: `${this.cacheExpiry / 1000 / 60} minutes`,
+      storageBackend: 'wa-sqlite (IndexedDB)'
     }
   }
 }

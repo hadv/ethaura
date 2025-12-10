@@ -10,7 +10,7 @@ import { MODULE_TYPE } from '../lib/constants'
 import { Layers, Check, X, AlertCircle, Loader2, Settings, Zap, Shield } from 'lucide-react'
 import '../styles/ModuleManager.css'
 
-function ModuleManager({ accountAddress, isModular = false }) {
+function ModuleManager({ accountAddress }) {
   const { networkInfo } = useNetwork()
   const manager = useModularAccountManager()
   const [loading, setLoading] = useState(true)
@@ -25,7 +25,7 @@ function ModuleManager({ accountAddress, isModular = false }) {
 
   // Load installed modules
   const loadModules = useCallback(async () => {
-    if (!manager || !accountAddress || !isModular) {
+    if (!manager || !accountAddress) {
       setLoading(false)
       return
     }
@@ -78,27 +78,11 @@ function ModuleManager({ accountAddress, isModular = false }) {
     } finally {
       setLoading(false)
     }
-  }, [manager, accountAddress, isModular, networkInfo])
+  }, [manager, accountAddress, networkInfo])
 
   useEffect(() => {
     loadModules()
   }, [loadModules])
-
-  // If not a modular account, show info message
-  if (!isModular) {
-    return (
-      <div className="module-manager">
-        <div className="module-header">
-          <Layers className="header-icon" size={24} />
-          <h2>Module Management</h2>
-        </div>
-        <div className="module-info-message">
-          <AlertCircle size={20} />
-          <p>This is a legacy P256Account. Module management is only available for ERC-7579 modular accounts.</p>
-        </div>
-      </div>
-    )
-  }
 
   if (loading) {
     return (

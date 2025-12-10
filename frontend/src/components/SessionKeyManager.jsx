@@ -9,7 +9,7 @@ import { useSessionKeyManager } from '../hooks/useModularAccount'
 import { Key, Plus, Trash2, Clock, AlertCircle, Loader2, Check, X, DollarSign } from 'lucide-react'
 import '../styles/SessionKeyManager.css'
 
-function SessionKeyManager({ accountAddress, isModular = false }) {
+function SessionKeyManager({ accountAddress }) {
   const { networkInfo } = useNetwork()
   const sessionKeyManager = useSessionKeyManager()
   const [loading, setLoading] = useState(true)
@@ -19,7 +19,7 @@ function SessionKeyManager({ accountAddress, isModular = false }) {
 
   // Load session keys
   const loadSessionKeys = useCallback(async () => {
-    if (!sessionKeyManager || !accountAddress || !isModular) {
+    if (!sessionKeyManager || !accountAddress) {
       setLoading(false)
       return
     }
@@ -36,27 +36,11 @@ function SessionKeyManager({ accountAddress, isModular = false }) {
     } finally {
       setLoading(false)
     }
-  }, [sessionKeyManager, accountAddress, isModular])
+  }, [sessionKeyManager, accountAddress])
 
   useEffect(() => {
     loadSessionKeys()
   }, [loadSessionKeys])
-
-  // If not a modular account, show info message
-  if (!isModular) {
-    return (
-      <div className="session-key-manager">
-        <div className="session-header">
-          <Key className="header-icon" size={24} />
-          <h2>Session Keys</h2>
-        </div>
-        <div className="session-info-message">
-          <AlertCircle size={20} />
-          <p>Session keys are only available for ERC-7579 modular accounts.</p>
-        </div>
-      </div>
-    )
-  }
 
   if (!sessionKeyManager) {
     return (

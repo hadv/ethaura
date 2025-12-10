@@ -38,6 +38,9 @@
     "stream-browserify": "^3.0.0",
     "util": "^0.12.5",
     "viem": "^2.21.54",
+    "vite-plugin-top-level-await": "^1.6.0",
+    "vite-plugin-wasm": "^3.5.0",
+    "wa-sqlite": "^1.0.0",
     "wagmi": "^2.12.29"
   },
   "devDependencies": {

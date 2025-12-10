@@ -1,16 +1,16 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
-import { useP256SDK } from '../hooks/useP256SDK'
 import { useNetwork } from '../contexts/NetworkContext'
 import { ethers } from 'ethers'
 import { Wallet, Sparkles } from 'lucide-react'
 import { Identicon } from '../utils/identicon.jsx'
+import { walletsStore } from '../lib/walletsStore'
 import '../styles/Dashboard.css'
 
 function Dashboard({ accountAddress, accountConfig, onSendClick, onReceiveClick, onWalletClick }) {
   const { isConnected } = useWeb3Auth()
-  const { sdk } = useP256SDK()
   const { networkInfo } = useNetwork()
+  const provider = useMemo(() => new ethers.JsonRpcProvider(networkInfo.rpcUrl), [networkInfo.rpcUrl])
   const [balance, setBalance] = useState('0')
   const [balanceChange, setBalanceChange] = useState('+0.00%')
   const [wallets, setWallets] = useState([])
@@ -24,10 +24,10 @@ function Dashboard({ accountAddress, accountConfig, onSendClick, onReceiveClick,
 
   // Fetch balance when account address changes
   useEffect(() => {
-    if (accountAddress && sdk) {
+    if (accountAddress && provider) {
       fetchBalance()
     }
-  }, [accountAddress, sdk])
+  }, [accountAddress, provider])
 
   const fetchBalance = async () => {
     try {
@@ -48,12 +48,12 @@ function Dashboard({ accountAddress, accountConfig, onSendClick, onReceiveClick,
     }
   }
 
-  // Load wallets from localStorage or create default list
+  // Load wallets from SQLite or create default list
   useEffect(() => {
-    const loadWallets = () => {
-      const storedWallets = localStorage.getItem('ethaura_wallets')
-      if (storedWallets) {
-        setWallets(JSON.parse(storedWallets))
+    const loadWallets = async () => {
+      const storedWallets = await walletsStore.getWallets()
+      if (storedWallets && storedWallets.length > 0) {
+        setWallets(storedWallets)
       } else if (accountAddress) {
         // Create default wallet entry
         const defaultWallets = [
@@ -67,10 +67,10 @@ function Dashboard({ accountAddress, accountConfig, onSendClick, onReceiveClick,
           }
         ]
         setWallets(defaultWallets)
-        localStorage.setItem('ethaura_wallets', JSON.stringify(defaultWallets))
+        await walletsStore.setWallets(defaultWallets)
       }
     }
-    
+
     loadWallets()
   }, [accountAddress, balance, balanceChange])
 

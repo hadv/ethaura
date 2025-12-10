@@ -2,8 +2,10 @@ import { useState, useEffect } from 'react'
 import { Lock, Key, AlertCircle } from 'lucide-react'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
 import { useNetwork } from '../contexts/NetworkContext'
-import { useP256SDK } from '../hooks/useP256SDK'
+import { useModularAccountManager } from '../hooks/useModularAccount'
+import { useModularAccountSDK } from '../hooks/useModularAccountSDK'
 import { signWithPasskey } from '../utils/webauthn'
+import { passkeyStorage } from '../lib/passkeyStorage'
 import { ethers } from 'ethers'
 import DeviceManagement from './DeviceManagement'
 import AddDeviceFlow from './AddDeviceFlow'
@@ -14,9 +16,10 @@ import '../styles/PasskeySettings.css'
  * This replaces the old PasskeySettings.jsx which used the timelock pattern
  */
 function PasskeySettingsV2({ accountAddress }) {
-  const { address: ownerAddress, signRawHash, provider: web3AuthProvider } = useWeb3Auth()
+  const { address: ownerAddress, signRawHash, getSigner, provider: web3AuthProvider } = useWeb3Auth()
   const { networkInfo } = useNetwork()
-  const sdk = useP256SDK()
+  const modularManager = useModularAccountManager()
+  const modularSDK = useModularAccountSDK()
   const [status, setStatus] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -26,10 +29,10 @@ function PasskeySettingsV2({ accountAddress }) {
   // Load account info when address, provider, or network changes
   useEffect(() => {
     loadAccountInfo()
-  }, [accountAddress, sdk, networkInfo.chainId])
+  }, [accountAddress, modularManager, networkInfo.chainId])
 
   const loadAccountInfo = async () => {
-    if (!accountAddress || !sdk) {
+    if (!accountAddress || !modularManager) {
       return
     }
 
@@ -37,16 +40,14 @@ function PasskeySettingsV2({ accountAddress }) {
       setLoading(true)
       setError('')
 
-      // Check if account is deployed
-      const provider = new ethers.JsonRpcProvider(networkInfo.rpcUrl)
-      const code = await provider.getCode(accountAddress)
-      const isDeployed = code !== '0x'
+      // Check if account is deployed using modular manager
+      const isDeployed = await modularManager.isDeployed(accountAddress)
 
       if (!isDeployed) {
         // For undeployed accounts, we can't read on-chain state
         setAccountInfo({
           deployed: false,
-          twoFactorEnabled: false,
+          mfaEnabled: false,
           hasPasskey: false,
           passkeyCount: 0,
         })
@@ -54,17 +55,14 @@ function PasskeySettingsV2({ accountAddress }) {
         return
       }
 
-      // Get account info from SDK
-      const info = await sdk.accountManager.getAccountInfo(accountAddress)
-      const passkeyCount = await sdk.getActivePasskeyCount(accountAddress)
+      // Get account info from modular manager
+      const info = await modularManager.getAccountInfo(accountAddress)
 
       setAccountInfo({
         deployed: info.deployed,
-        twoFactorEnabled: info.twoFactorEnabled,
-        hasPasskey: passkeyCount > 0,
-        passkeyCount,
-        qx: info.qx,
-        qy: info.qy,
+        mfaEnabled: info.mfaEnabled,
+        hasPasskey: info.hasPasskey,
+        passkeyCount: info.passkeyCount || 0,
       })
     } catch (err) {
       console.error('Failed to load account info:', err)
@@ -74,7 +72,7 @@ function PasskeySettingsV2({ accountAddress }) {
     }
   }
 
-  const toggle2FA = async (enable) => {
+  const toggleMFA = async (enable) => {
     if (!web3AuthProvider || !ownerAddress) {
       setError('Please connect your wallet')
       return
@@ -82,73 +80,40 @@ function PasskeySettingsV2({ accountAddress }) {
 
     // Check if passkey exists on-chain
     if (enable && (!accountInfo?.hasPasskey || accountInfo?.passkeyCount === 0)) {
-      setError('You must add a passkey before enabling 2FA')
+      setError('You must add a passkey before enabling MFA')
       return
     }
 
-    setLoading(true)
-    setError('')
-    setStatus(enable ? 'Enabling 2FA...' : 'Disabling 2FA...')
+    if (!modularSDK) {
+      setError('Modular account SDK not available')
+      return
+    }
 
     try {
-      // Load passkey credential from localStorage
-      const storedCredential = localStorage.getItem(`passkey_${accountAddress}`)
-      if (!storedCredential) {
-        throw new Error('Passkey credential not found. Please ensure you have a passkey for this account.')
+      setLoading(true)
+      setError('')
+      setStatus(`${enable ? 'Enabling' : 'Disabling'} MFA...`)
+
+      console.log(`🔐 ${enable ? 'Enabling' : 'Disabling'} MFA for account:`, accountAddress)
+
+      let receipt
+      if (enable) {
+        receipt = await modularSDK.enableMFA({ accountAddress, getSigner })
+      } else {
+        receipt = await modularSDK.disableMFA({ accountAddress, getSigner })
       }
 
-      const passkeyCredential = JSON.parse(storedCredential)
-      console.log('🔑 Loaded passkey credential for 2FA toggle:', passkeyCredential.id)
-
-      console.log(`${enable ? '🔒 Enabling' : '🔓 Disabling'} 2FA...`)
-
-      // Determine if we need owner signature
-      // - Enabling 2FA: No owner signature needed (passkey only)
-      // - Disabling 2FA when enabled: Owner signature required (Step 1/2)
-      const needsOwnerSignature = !enable && accountInfo.twoFactorEnabled
-
-      // Toggle 2FA via UserOperation
-      const receipt = enable
-        ? await sdk.enableTwoFactor({
-            accountAddress,
-            passkeyCredential,
-            signWithPasskey,
-          })
-        : await sdk.disableTwoFactor({
-            accountAddress,
-            passkeyCredential,
-            signWithPasskey,
-            getOwnerSignature: needsOwnerSignature
-              ? async (userOpHash, userOp) => {
-                  console.log('🔐 2FA enabled - requesting owner signature to disable (Step 1/2)...')
-                  console.log('🔐 UserOpHash:', userOpHash)
-
-                  setStatus('🔐 Step 1/2: Requesting signature from your social login account...')
-
-                  // Sign with owner (Web3Auth)
-                  const ownerSig = await signRawHash(userOpHash)
-                  console.log('🔐 Owner signature received (Step 1/2):', ownerSig)
-
-                  setStatus('🔑 Step 2/2: Signing with your passkey (biometric)...')
-
-                  return ownerSig
-                }
-              : null,
-          })
-
-      console.log(`✅ 2FA ${enable ? 'enabled' : 'disabled'} successfully:`, receipt)
-
-      setStatus(`✅ 2FA ${enable ? 'enabled' : 'disabled'} successfully!`)
+      console.log('✅ MFA toggle complete:', receipt)
+      setStatus(`MFA ${enable ? 'enabled' : 'disabled'} successfully!`)
 
       // Reload account info
       await loadAccountInfo()
-
     } catch (err) {
-      console.error('Failed to toggle 2FA:', err)
-      setError(err.message || 'Failed to toggle 2FA')
+      console.error('Failed to toggle MFA:', err)
+      setError(err.message || `Failed to ${enable ? 'enable' : 'disable'} MFA`)
+      setStatus('')
     } finally {
       setLoading(false)
-      setTimeout(() => setStatus(''), 3000)
     }
   }
 
@@ -182,21 +147,21 @@ function PasskeySettingsV2({ accountAddress }) {
       <div className="passkey-layout">
         {/* Main Content */}
         <div className="passkey-main">
-          {/* 2FA Section - Only show for deployed accounts with passkeys */}
+          {/* MFA Section - Only show for deployed accounts with passkeys */}
           {accountInfo?.deployed && accountInfo?.hasPasskey && (
             <div className="settings-section">
-              <h3>Two-Factor Authentication</h3>
+              <h3>Multi-Factor Authentication</h3>
               <p className="section-description">
-                {accountInfo.twoFactorEnabled
+                {accountInfo.mfaEnabled
                   ? 'All transactions require both passkey and social login signatures. This provides maximum security for your account.'
-                  : 'Enable 2FA to require both passkey and social login for all transactions. This adds an extra layer of security.'}
+                  : 'Enable MFA to require both passkey and social login for all transactions. This adds an extra layer of security.'}
               </p>
               <button
-                className={`btn ${accountInfo.twoFactorEnabled ? 'btn-danger' : 'btn-success'}`}
-                onClick={() => toggle2FA(!accountInfo.twoFactorEnabled)}
+                className={`btn ${accountInfo.mfaEnabled ? 'btn-danger' : 'btn-success'}`}
+                onClick={() => toggleMFA(!accountInfo.mfaEnabled)}
                 disabled={loading}
               >
-                {accountInfo.twoFactorEnabled ? 'Disable 2FA' : 'Enable 2FA'}
+                {accountInfo.mfaEnabled ? 'Disable MFA' : 'Enable MFA'}
               </button>
             </div>
           )}

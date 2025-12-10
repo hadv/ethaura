@@ -72,6 +72,86 @@ export const MODULE_TYPE = {
   HOOK: 4,
 }
 
+// ERC-7579 Mode constants
+// Mode = callType (1 byte) + execType (1 byte) + unused (4 bytes) + modeSelector (4 bytes) + modePayload (22 bytes)
+export const CALLTYPE_SINGLE = '0x00'
+export const CALLTYPE_BATCH = '0x01'
+export const EXECTYPE_DEFAULT = '0x00'
+export const EXECTYPE_TRY = '0x01'
+
+/**
+ * Encode simple single execution mode (CALLTYPE_SINGLE, EXECTYPE_DEFAULT)
+ * @returns {string} Mode as bytes32
+ */
+export function encodeSimpleSingleMode() {
+  // 0x00 (calltype) + 0x00 (exectype) + 0x00000000 (unused) + 0x00000000 (selector) + 22 zero bytes (payload)
+  return ethers.zeroPadValue('0x', 32)
+}
+
+/**
+ * Encode simple batch execution mode (CALLTYPE_BATCH, EXECTYPE_DEFAULT)
+ * @returns {string} Mode as bytes32
+ */
+export function encodeSimpleBatchMode() {
+  // 0x01 (calltype) + 0x00 (exectype) + rest zeros
+  return ethers.zeroPadValue('0x01', 32)
+}
+
+/**
+ * Encode single execution calldata (ERC-7579 ExecutionLib.encodeSingle)
+ * @param {string} target - Target address
+ * @param {bigint} value - ETH value
+ * @param {string} data - Call data
+ * @returns {string} Encoded execution calldata
+ */
+export function encodeSingleExecution(target, value, data) {
+  // abi.encodePacked(target, value, data) = 20 bytes + 32 bytes + variable
+  return ethers.concat([
+    target,
+    ethers.zeroPadValue(ethers.toBeHex(value), 32),
+    data
+  ])
+}
+
+/**
+ * Encode batch execution calldata (ERC-7579 ExecutionLib.encodeBatch)
+ * @param {Array<{target: string, value: bigint, data: string}>} executions
+ * @returns {string} Encoded execution calldata
+ */
+export function encodeBatchExecution(executions) {
+  // abi.encode(executions) where Execution is struct { address; uint256; bytes; }
+  return ethers.AbiCoder.defaultAbiCoder().encode(
+    ['tuple(address target, uint256 value, bytes callData)[]'],
+    [executions.map(e => ({ target: e.target, value: e.value, callData: e.data }))]
+  )
+}
+
+/**
+ * Encode execute call for AuraAccount (ERC-7579)
+ * @param {string} target - Target address
+ * @param {bigint} value - ETH value
+ * @param {string} data - Call data
+ * @returns {string} Encoded execute calldata for account
+ */
+export function encodeModularExecute(target, value, data) {
+  const accountInterface = new ethers.Interface(AURA_ACCOUNT_ABI)
+  const mode = encodeSimpleSingleMode()
+  const executionCalldata = encodeSingleExecution(target, value, data)
+  return accountInterface.encodeFunctionData('execute', [mode, executionCalldata])
+}
+
+/**
+ * Encode batch execute call for AuraAccount (ERC-7579)
+ * @param {Array<{target: string, value: bigint, data: string}>} executions
+ * @returns {string} Encoded execute calldata for account
+ */
+export function encodeModularBatchExecute(executions) {
+  const accountInterface = new ethers.Interface(AURA_ACCOUNT_ABI)
+  const mode = encodeSimpleBatchMode()
+  const executionCalldata = encodeBatchExecution(executions)
+  return accountInterface.encodeFunctionData('execute', [mode, executionCalldata])
+}
+
 /**
  * ModularAccountManager class for managing ERC-7579 modular accounts
  */
@@ -111,14 +191,18 @@ export class ModularAccountManager {
         throw new Error('Modular factory address not configured for this network')
       }
 
-      const factoryCode = await this.provider.getCode(this.factoryAddress)
-      if (factoryCode === '0x') {
-        throw new Error(`Modular factory not deployed on this network at ${this.factoryAddress}`)
-      }
+      // We use a raw call here because ethers.js Contract.getAddress() was 
+      // sometimes weirdly returning the factory address instead of the result
+      const callData = this.factory.interface.encodeFunctionData('getAddress', [owner, salt])
 
-      console.log('🏭 Calling modular factory.getAddress:', { owner, salt: salt.toString() })
-      const address = await this.factory.getAddress(owner, salt)
-      console.log('🏭 Modular factory returned:', address)
+      const rawResult = await this.provider.call({
+        to: this.factoryAddress,
+        data: callData
+      })
+
+      const decodedResult = this.factory.interface.decodeFunctionResult('getAddress', rawResult)
+      const address = decodedResult[0]
+
       return address
     } catch (error) {
       console.error('❌ ModularFactory.getAddress() failed:', error)
@@ -155,11 +239,14 @@ export class ModularAccountManager {
   async isDeployed(accountAddress) {
     const cached = this.cache.deployedStatus.get(accountAddress)
     if (cached && Date.now() - cached.timestamp < this.cacheExpiry) {
+      console.log('📦 isDeployed (cached):', accountAddress, cached.deployed)
       return cached.deployed
     }
 
     const code = await this.provider.getCode(accountAddress)
     const deployed = code !== '0x'
+
+    console.log('🔍 isDeployed (fresh):', accountAddress, deployed, 'code length:', code.length)
 
     this.cache.deployedStatus.set(accountAddress, { deployed, timestamp: Date.now() })
     return deployed
@@ -191,7 +278,10 @@ export class ModularAccountManager {
     try {
       const isDeployed = await this.isDeployed(accountAddress)
 
+      console.log('📊 getAccountInfo:', { accountAddress, isDeployed })
+
       if (!isDeployed) {
+        console.log('⏭️ Account not deployed, returning counterfactual info')
         return {
           address: accountAddress,
           deployed: false,
@@ -205,17 +295,36 @@ export class ModularAccountManager {
       }
 
       const account = this.getAccountContract(accountAddress)
-      const [validator, nonce] = await Promise.all([
-        account.getValidator(),
-        this.getNonce(accountAddress),
-      ])
 
-      // Get MFA and passkey info from validator module
+      // Try to get validator - this will fail for legacy P256Accounts
+      let validator = null
+      let nonce = 0n
+      let isModularAccount = true
+
+      try {
+        [validator, nonce] = await Promise.all([
+          account.getValidator(),
+          this.getNonce(accountAddress),
+        ])
+      } catch (validatorError) {
+        // This account is likely a legacy P256Account, not a modular AuraAccount
+        console.warn('Account may be a legacy P256Account (no getValidator):', validatorError.message)
+        isModularAccount = false
+
+        // Still try to get nonce from EntryPoint
+        try {
+          nonce = await this.getNonce(accountAddress)
+        } catch (nonceError) {
+          console.warn('Failed to get nonce:', nonceError.message)
+        }
+      }
+
+      // Get MFA and passkey info from validator module (only for modular accounts)
       let mfaEnabled = false
       let passkeyCount = 0
       let hasPasskey = false
 
-      if (this.validator) {
+      if (this.validator && isModularAccount) {
         try {
           [mfaEnabled, passkeyCount] = await Promise.all([
             this.validator.isMFAEnabled(accountAddress),
@@ -223,14 +332,14 @@ export class ModularAccountManager {
           ])
           hasPasskey = passkeyCount > 0
         } catch (e) {
-          console.warn('Failed to read validator module state:', e)
+          console.warn('Failed to read validator module state:', e.message)
         }
       }
 
       return {
         address: accountAddress,
         deployed: true,
-        isModular: true,
+        isModular: isModularAccount,
         mfaEnabled,
         deposit: 0n, // TODO: Get from EntryPoint
         nonce,
@@ -240,7 +349,18 @@ export class ModularAccountManager {
       }
     } catch (e) {
       console.error('Error getting modular account info:', e)
-      throw e
+      // Return a safe default instead of throwing
+      return {
+        address: accountAddress,
+        deployed: true, // We know it's deployed if we got here
+        isModular: false, // Assume legacy if we can't determine
+        mfaEnabled: false,
+        deposit: 0n,
+        nonce: 0n,
+        validator: null,
+        hasPasskey: false,
+        passkeyCount: 0,
+      }
     }
   }
 
@@ -304,6 +424,50 @@ export class ModularAccountManager {
     } catch (e) {
       return null
     }
+  }
+
+  /**
+   * Encode addPasskey call for the validator module
+   * @param {string} qx - Passkey public key X coordinate (bytes32)
+   * @param {string} qy - Passkey public key Y coordinate (bytes32)
+   * @param {string} deviceId - Device identifier (bytes32)
+   * @returns {string} Encoded calldata for account.execute
+   */
+  encodeAddPasskey(qx, qy, deviceId) {
+    if (!this.validator) throw new Error('Validator not configured')
+    const data = this.validator.interface.encodeFunctionData('addPasskey', [qx, qy, deviceId])
+    return encodeModularExecute(this.validatorAddress, 0n, data)
+  }
+
+  /**
+   * Encode removePasskey call for the validator module
+   * @param {string} passkeyId - Passkey ID (bytes32, keccak256(qx, qy))
+   * @returns {string} Encoded calldata for account.execute
+   */
+  encodeRemovePasskey(passkeyId) {
+    if (!this.validator) throw new Error('Validator not configured')
+    const data = this.validator.interface.encodeFunctionData('removePasskey', [passkeyId])
+    return encodeModularExecute(this.validatorAddress, 0n, data)
+  }
+
+  /**
+   * Encode enableMFA call for the validator module
+   * @returns {string} Encoded calldata for account.execute
+   */
+  encodeEnableMFA() {
+    if (!this.validator) throw new Error('Validator not configured')
+    const data = this.validator.interface.encodeFunctionData('enableMFA', [])
+    return encodeModularExecute(this.validatorAddress, 0n, data)
+  }
+
+  /**
+   * Encode disableMFA call for the validator module
+   * @returns {string} Encoded calldata for account.execute
+   */
+  encodeDisableMFA() {
+    if (!this.validator) throw new Error('Validator not configured')
+    const data = this.validator.interface.encodeFunctionData('disableMFA', [])
+    return encodeModularExecute(this.validatorAddress, 0n, data)
   }
 }
 

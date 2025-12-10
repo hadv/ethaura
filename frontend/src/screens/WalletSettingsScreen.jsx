@@ -10,6 +10,7 @@ import SubHeader from '../components/SubHeader'
 import { WalletConnectModal } from '../components/WalletConnectModal'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
 import { useNetwork } from '../contexts/NetworkContext'
+import * as walletsStore from '../lib/walletsStore'
 import { Key, ShieldCheck, LockOpen, Layers, Zap, DollarSign } from 'lucide-react'
 import '../styles/WalletSettingsScreen.css'
 
@@ -22,15 +23,12 @@ function WalletSettingsScreen({ wallet, onBack, onHome, onLogout, credential, on
   const [showWalletConnectModal, setShowWalletConnectModal] = useState(false)
   const walletConnectButtonRef = useRef(null)
 
-  // Load wallets from localStorage
+  // Load wallets from SQLite
   useEffect(() => {
-    const loadWallets = () => {
+    const loadWallets = async () => {
       try {
-        const savedWallets = localStorage.getItem('ethaura_wallets_list')
-        if (savedWallets) {
-          const parsedWallets = JSON.parse(savedWallets)
-          setWallets(parsedWallets)
-        }
+        const walletsList = await walletsStore.getWallets()
+        setWallets(walletsList)
       } catch (error) {
         console.error('Error loading wallets:', error)
       }
@@ -84,7 +82,7 @@ function WalletSettingsScreen({ wallet, onBack, onHome, onLogout, credential, on
         onWalletConnectClick={() => setShowWalletConnectModal(true)}
         walletConnectButtonRef={walletConnectButtonRef}
         hideActions={false}
-        onSettings={() => {}}
+        onSettings={() => { }}
       />
 
       {/* Main Content */}
@@ -113,31 +111,27 @@ function WalletSettingsScreen({ wallet, onBack, onHome, onLogout, credential, on
               <LockOpen className="tab-icon" size={20} />
               <span className="tab-label">Recovery</span>
             </button>
-            {selectedWallet?.isModular && (
-              <>
-                <button
-                  className={`tab-btn ${activeTab === 'modules' ? 'active' : ''}`}
-                  onClick={() => setActiveTab('modules')}
-                >
-                  <Layers className="tab-icon" size={20} />
-                  <span className="tab-label">Modules</span>
-                </button>
-                <button
-                  className={`tab-btn ${activeTab === 'sessionkeys' ? 'active' : ''}`}
-                  onClick={() => setActiveTab('sessionkeys')}
-                >
-                  <Zap className="tab-icon" size={20} />
-                  <span className="tab-label">Session Keys</span>
-                </button>
-                <button
-                  className={`tab-btn ${activeTab === 'spending' ? 'active' : ''}`}
-                  onClick={() => setActiveTab('spending')}
-                >
-                  <DollarSign className="tab-icon" size={20} />
-                  <span className="tab-label">Spending Limits</span>
-                </button>
-              </>
-            )}
+            <button
+              className={`tab-btn ${activeTab === 'modules' ? 'active' : ''}`}
+              onClick={() => setActiveTab('modules')}
+            >
+              <Layers className="tab-icon" size={20} />
+              <span className="tab-label">Modules</span>
+            </button>
+            <button
+              className={`tab-btn ${activeTab === 'sessionkeys' ? 'active' : ''}`}
+              onClick={() => setActiveTab('sessionkeys')}
+            >
+              <Zap className="tab-icon" size={20} />
+              <span className="tab-label">Session Keys</span>
+            </button>
+            <button
+              className={`tab-btn ${activeTab === 'spending' ? 'active' : ''}`}
+              onClick={() => setActiveTab('spending')}
+            >
+              <DollarSign className="tab-icon" size={20} />
+              <span className="tab-label">Spending Limits</span>
+            </button>
           </div>
         </div>
 
@@ -173,7 +167,6 @@ function WalletSettingsScreen({ wallet, onBack, onHome, onLogout, credential, on
               <div className="tab-panel">
                 <ModuleManager
                   accountAddress={selectedWallet.address}
-                  isModular={selectedWallet?.isModular}
                 />
               </div>
             )}
@@ -182,7 +175,6 @@ function WalletSettingsScreen({ wallet, onBack, onHome, onLogout, credential, on
               <div className="tab-panel">
                 <SessionKeyManager
                   accountAddress={selectedWallet.address}
-                  isModular={selectedWallet?.isModular}
                 />
               </div>
             )}
@@ -191,7 +183,6 @@ function WalletSettingsScreen({ wallet, onBack, onHome, onLogout, credential, on
               <div className="tab-panel">
                 <SpendingLimitConfig
                   accountAddress={selectedWallet.address}
-                  isModular={selectedWallet?.isModular}
                 />
               </div>
             )}

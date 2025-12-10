@@ -9,7 +9,7 @@ import { useModularAccountManager } from '../hooks/useModularAccount'
 import { DollarSign, AlertCircle, Loader2, Shield, Clock, Settings } from 'lucide-react'
 import '../styles/SpendingLimitConfig.css'
 
-function SpendingLimitConfig({ accountAddress, isModular = false }) {
+function SpendingLimitConfig({ accountAddress }) {
   const { networkInfo } = useNetwork()
   const manager = useModularAccountManager()
   const [loading, setLoading] = useState(true)
@@ -23,7 +23,7 @@ function SpendingLimitConfig({ accountAddress, isModular = false }) {
 
   // Load current configuration
   const loadConfig = useCallback(async () => {
-    if (!manager || !accountAddress || !isModular) {
+    if (!manager || !accountAddress) {
       setLoading(false)
       return
     }
@@ -47,27 +47,11 @@ function SpendingLimitConfig({ accountAddress, isModular = false }) {
     } finally {
       setLoading(false)
     }
-  }, [manager, accountAddress, isModular])
+  }, [manager, accountAddress])
 
   useEffect(() => {
     loadConfig()
   }, [loadConfig])
-
-  // If not a modular account, show info message
-  if (!isModular) {
-    return (
-      <div className="spending-limit-config">
-        <div className="spending-header">
-          <DollarSign className="header-icon" size={24} />
-          <h2>Spending Limits</h2>
-        </div>
-        <div className="spending-info-message">
-          <AlertCircle size={20} />
-          <p>Spending limits are only available for ERC-7579 modular accounts.</p>
-        </div>
-      </div>
-    )
-  }
 
   if (loading) {
     return (

@@ -1,18 +1,33 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Lightbulb } from 'lucide-react'
 import { parsePublicKey } from '../utils/webauthn'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
-import { deletePasskeyCredential } from '../lib/passkeyStorage'
+import { deletePasskeyCredential, passkeyStorage } from '../lib/passkeyStorage'
+import { clientDb } from '../lib/clientDatabase'
 
 function PasskeyManager({ onCredentialCreated, credential }) {
   const { address: ownerAddress, signMessage } = useWeb3Auth()
   const [status, setStatus] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [existingAccountAddress, setExistingAccountAddress] = useState(null)
+  const [existingAccountConfig, setExistingAccountConfig] = useState(null)
 
-  // Check if user already has an account
-  const existingAccountAddress = localStorage.getItem('ethaura_account_address')
-  const existingAccountConfig = localStorage.getItem('ethaura_account_config')
+  // Load existing account info from SQLite on mount
+  useEffect(() => {
+    const loadExistingAccount = async () => {
+      try {
+        const address = await clientDb.getSetting('account_address')
+        const config = await clientDb.getSetting('account_config')
+        setExistingAccountAddress(address)
+        setExistingAccountConfig(config)
+      } catch (error) {
+        console.error('Failed to load existing account:', error)
+      }
+    }
+    loadExistingAccount()
+  }, [])
+
   const hasExistingAccount = existingAccountAddress && existingAccountConfig
 
   const discoverPasskey = async () => {
@@ -97,8 +112,8 @@ function PasskeyManager({ onCredentialCreated, credential }) {
 
       // NOTE: We do NOT use excludeCredentials because:
       // 1. It causes the browser to reject credential creation
-      // 2. We already check if credential exists in localStorage above
-      // 3. User should clear localStorage before creating a new passkey
+      // 2. We already check if credential exists in SQLite cache above
+      // 3. User should clear existing passkey before creating a new one
 
       // Create credential options
       const createCredentialOptions = {
@@ -180,19 +195,25 @@ function PasskeyManager({ onCredentialCreated, credential }) {
       }
     } catch (error) {
       console.error('⚠️  Failed to delete from server:', error)
-      // Continue anyway to clear local storage
+      // Continue anyway to clear local cache
     }
 
-    // Clear local storage (both legacy and account-specific keys)
-    localStorage.removeItem('ethaura_passkey_credential')
-    if (existingAccountAddress) {
-      localStorage.removeItem(`ethaura_passkey_credential_${existingAccountAddress.toLowerCase()}`)
+    // Clear SQLite cache
+    try {
+      if (existingAccountAddress) {
+        await clientDb.deletePasskeyCredential(existingAccountAddress)
+      }
+      await clientDb.deleteSetting('account_address')
+      await clientDb.deleteSetting('account_config')
+    } catch (error) {
+      console.error('⚠️  Failed to clear SQLite cache:', error)
     }
-    localStorage.removeItem('ethaura_account_address')
-    localStorage.removeItem('ethaura_account_config')
+
+    setExistingAccountAddress(null)
+    setExistingAccountConfig(null)
     onCredentialCreated(null)
     setStatus('Passkey cleared. You can create a new one.')
-    console.log('🗑️ Cleared passkey and account from localStorage')
+    console.log('🗑️ Cleared passkey and account from SQLite cache')
   }
 
   return (

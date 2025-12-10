@@ -148,10 +148,10 @@ function DonutChart({ data, size = 200 }) {
               <div className="legend-label">
                 {item.icon && (
                   <span className="legend-icon">
-                    {typeof item.icon === 'string' && item.icon.startsWith('/') ? (
+                    {typeof item.icon === 'string' ? (
                       <img src={item.icon} alt={item.label} />
                     ) : (
-                      item.icon
+                      <span className="legend-icon-fallback">{item.label?.charAt(0) || '?'}</span>
                     )}
                   </span>
                 )}

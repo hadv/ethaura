@@ -2,20 +2,23 @@ import { useState, useEffect } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
 import { useNetwork } from '../contexts/NetworkContext'
-import { useP256SDK } from '../hooks/useP256SDK'
+import { useModularAccountManager } from '../hooks/useModularAccount'
+import { useModularAccountSDK } from '../hooks/useModularAccountSDK'
 import { createDeviceSession, pollSessionUntilComplete, addDevice } from '../lib/deviceManager'
 import { signWithPasskey } from '../utils/webauthn'
+import { passkeyStorage } from '../lib/passkeyStorage'
 import { ethers } from 'ethers'
 import '../styles/AddMobileDevice.css'
 
 /**
  * AddMobileDevice V2 - Clean implementation for adding passkeys from mobile devices
- * Uses immediate passkey addition (no timelock) via UserOperation
+ * Uses modular account P256MFAValidatorModule for passkey management
  */
 function AddMobileDeviceV2({ accountAddress, onComplete, onCancel }) {
-  const { address: ownerAddress, signMessage, signRawHash } = useWeb3Auth()
+  const { address: ownerAddress, signMessage, signRawHash, getSigner } = useWeb3Auth()
   const { networkInfo } = useNetwork()
-  const sdk = useP256SDK()
+  const modularManager = useModularAccountManager()
+  const modularSDK = useModularAccountSDK()
   const [sessionId, setSessionId] = useState(null)
   const [qrUrl, setQrUrl] = useState('')
   const [loading, setLoading] = useState(false)
@@ -85,10 +88,10 @@ function AddMobileDeviceV2({ accountAddress, onComplete, onCancel }) {
 
         const attestationMetadata = deviceData.attestationMetadata || null
 
-        // Store in localStorage so TransactionSender can find it for deployment
+        // Store in SQLite cache so TransactionSender can find it for deployment
         // This is critical for 2FA to work on first transaction
-        console.log('💾 Storing mobile passkey in localStorage for deployment...')
-        localStorage.setItem(`passkey_${accountAddress}`, JSON.stringify(credential))
+        console.log('💾 Storing mobile passkey in SQLite cache for deployment...')
+        await passkeyStorage.cacheCredential(accountAddress, credential, deviceData.deviceName)
 
         // Save device to database first
         setStatus('Saving device to database...')
@@ -102,74 +105,35 @@ function AddMobileDeviceV2({ accountAddress, onComplete, onCancel }) {
           attestationMetadata
         )
 
-        // Check if account is deployed
+        // Check if account is deployed using modular manager
         setStatus('Checking account deployment...')
-        const publicProvider = new ethers.JsonRpcProvider(networkInfo.rpcUrl)
-        const code = await publicProvider.getCode(accountAddress)
-        const isDeployed = code !== '0x'
+        const isDeployed = modularManager ? await modularManager.isDeployed(accountAddress) : false
 
         console.log('🔍 Account deployment status:', { accountAddress, isDeployed })
 
-        if (isDeployed && sdk) {
-          // Account is deployed - add passkey to blockchain immediately
+        if (isDeployed && modularSDK) {
+          // Account is deployed - add passkey on-chain via UserOperation
           setStatus('Adding passkey to blockchain...')
 
-          try {
-            // Get account info to check if 2FA is enabled
-            const accountInfo = await sdk.getAccountInfo(accountAddress)
-            const needsOwnerSignature = accountInfo.twoFactorEnabled
+          const qx = deviceData.qx
+          const qy = deviceData.qy
+          const deviceId = ethers.id(deviceData.deviceName)
 
-            console.log('📝 Adding mobile passkey to blockchain:', {
-              qx: deviceData.qx,
-              qy: deviceData.qy,
-              deviceId: ethers.id(deviceData.deviceName),
-              twoFactorEnabled: accountInfo.twoFactorEnabled,
-            })
+          console.log('📝 Adding mobile passkey on-chain:', { qx, qy, deviceId })
 
-            // Convert device name to bytes32 deviceId
-            const deviceId = ethers.id(deviceData.deviceName)
+          const receipt = await modularSDK.addPasskey({
+            accountAddress,
+            qx,
+            qy,
+            deviceId,
+            getSigner,
+          })
 
-            // Load the passkey credential from CURRENT device (desktop)
-            // We need to use the desktop's passkey to sign the UserOperation
-            const currentPasskeyStr = localStorage.getItem(`passkey_${accountAddress}`)
-            if (!currentPasskeyStr) {
-              throw new Error('No passkey found on this device. Please add a passkey to this device first before adding mobile passkeys.')
-            }
-
-            const currentPasskey = JSON.parse(currentPasskeyStr)
-
-            // Add mobile passkey via UserOperation (signed by desktop passkey)
-            await sdk.addPasskey({
-              accountAddress,
-              qx: deviceData.qx,
-              qy: deviceData.qy,
-              deviceId,
-              passkeyCredential: currentPasskey, // Use desktop's passkey to sign
-              signWithPasskey,
-              getOwnerSignature: needsOwnerSignature
-                ? async (userOpHash, userOp) => {
-                    console.log('🔐 2FA enabled - requesting owner signature (Step 1/2)...')
-                    setStatus('🔐 Step 1/2: Requesting signature from your social login account...')
-
-                    const ownerSig = await signRawHash(userOpHash)
-                    console.log('🔐 Owner signature received (Step 1/2):', ownerSig)
-
-                    setStatus('🔑 Step 2/2: Signing with your passkey (biometric)...')
-
-                    return ownerSig
-                  }
-                : null,
-            })
-
-            setStatus('✅ Mobile passkey added to blockchain successfully!')
-          } catch (err) {
-            console.error('Failed to add passkey to blockchain:', err)
-            // Don't fail the whole operation - passkey is saved in database
-            setStatus('⚠️ Passkey saved but failed to add to blockchain. It will be added on your next transaction.')
-          }
+          console.log('✅ Mobile passkey added on-chain:', receipt)
+          setStatus('Mobile passkey registered on blockchain!')
         } else {
-          // Account not deployed yet - passkey will be added on first transaction
-          setStatus('✅ Device saved! It will be added to the blockchain when you deploy this account.')
+          // Account not deployed yet - passkey will be used during account deployment
+          setStatus('Device saved! It will be added to the blockchain when you deploy this account.')
         }
 
         setTimeout(() => {

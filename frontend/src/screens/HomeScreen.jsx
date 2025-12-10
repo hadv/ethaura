@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from 'react'
 import { TrendingUp, TrendingDown, AlertTriangle, Lightbulb, ArrowLeftRight, ArrowUp, ArrowDown, MoreVertical, Plus, Pencil, Trash2, Wallet, Layers } from 'lucide-react'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
 import { useNetwork } from '../contexts/NetworkContext'
-import { useP256SDK } from '../hooks/useP256SDK'
 import { useModularAccountManager } from '../hooks/useModularAccount'
 import { ethers } from 'ethers'
 import Header from '../components/Header'
@@ -13,13 +12,13 @@ import { walletDataCache } from '../lib/walletDataCache'
 import { createTokenBalanceService } from '../lib/tokenService'
 import { priceOracle } from '../lib/priceOracle'
 import { createTransactionHistoryService } from '../lib/transactionService'
+import * as walletsStore from '../lib/walletsStore'
 import '../styles/HomeScreen.css'
 import logo from '../assets/logo.svg'
 
 function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onSwap, onLogout }) {
   const { userInfo, address: ownerAddress } = useWeb3Auth()
   const { networkInfo } = useNetwork()
-  const sdk = useP256SDK()
   const modularManager = useModularAccountManager()
   const [wallets, setWallets] = useState([])
   const [loading, setLoading] = useState(false)
@@ -30,7 +29,6 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onSwap
   const [walletIndex, setWalletIndex] = useState('0')
   const [addError, setAddError] = useState('')
   const [isAdding, setIsAdding] = useState(false)
-  const [accountType, setAccountType] = useState('modular') // 'legacy' or 'modular'
 
   // Menu and modal states
   const [openMenuId, setOpenMenuId] = useState(null)
@@ -72,7 +70,7 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onSwap
     return () => window.removeEventListener('resize', updatePieChartSize)
   }, [])
 
-  // Load wallets from localStorage
+  // Load wallets from SQLite
   useEffect(() => {
     loadWallets()
   }, [networkInfo.chainId])
@@ -96,14 +94,14 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onSwap
           networkInfo.name,
           tokenService,
           txService,
-          () => {
+          async () => {
             // Progressive update: re-aggregate portfolio after each wallet loads
-            aggregatePortfolioData()
+            await aggregatePortfolioData()
           }
         )
 
         // Final aggregation after all wallets are loaded
-        aggregatePortfolioData()
+        await aggregatePortfolioData()
       } catch (error) {
         console.error('Failed to start preload:', error)
       }
@@ -131,10 +129,9 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onSwap
   const loadWallets = async () => {
     try {
       setLoading(true)
-      const storedWallets = localStorage.getItem('ethaura_wallets_list')
-      if (storedWallets) {
-        const walletsList = JSON.parse(storedWallets)
+      const walletsList = await walletsStore.getWallets()
 
+      if (walletsList.length > 0) {
         // Fetch balances for each wallet
         const provider = new ethers.JsonRpcProvider(networkInfo.rpcUrl)
         const tokenService = createTokenBalanceService(provider, networkInfo.name)
@@ -212,12 +209,17 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onSwap
   }
 
   // Aggregate portfolio data from all wallets
-  const aggregatePortfolioData = () => {
+  const aggregatePortfolioData = async () => {
     const tokenMap = new Map() // symbol -> { name, symbol, icon, totalAmount, totalValue, addresses }
     let totalPortfolioValue = 0
 
-    wallets.forEach((wallet) => {
-      const cached = walletDataCache.getCachedData(wallet.address, networkInfo.name)
+    // Fetch cached data for all wallets in parallel
+    const cachedDataPromises = wallets.map(wallet =>
+      walletDataCache.getCachedData(wallet.address, networkInfo.name)
+    )
+    const cachedDataArray = await Promise.all(cachedDataPromises)
+
+    cachedDataArray.forEach((cached) => {
       if (!cached || !cached.assets) return
 
       cached.assets.forEach((asset) => {
@@ -285,7 +287,7 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onSwap
 
     try {
       // Get existing wallets
-      const walletsList = JSON.parse(localStorage.getItem('ethaura_wallets_list') || '[]')
+      const walletsList = await walletsStore.getWallets()
 
       // Check if wallet already exists
       const exists = walletsList.some(w => w.address.toLowerCase() === walletAddress.toLowerCase())
@@ -321,8 +323,7 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onSwap
         percentChange,
       }
 
-      walletsList.push(newWallet)
-      localStorage.setItem('ethaura_wallets_list', JSON.stringify(walletsList))
+      await walletsStore.addWallet(newWallet)
 
       // Update wallets state
       setWallets([...wallets, newWallet])
@@ -368,25 +369,19 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onSwap
       return
     }
 
-    // Check if SDK is ready (for legacy) or modular manager (for modular)
-    const isModular = accountType === 'modular'
-    if (isModular && !modularManager) {
-      setAddError('Modular accounts not available on this network. Please use legacy account type.')
-      return
-    }
-    if (!isModular && !sdk) {
-      setAddError('SDK not initialized. Please try again.')
+    // Check if modular manager is ready
+    if (!modularManager) {
+      setAddError('Modular accounts not available on this network.')
       return
     }
 
     // Get existing wallets to check for duplicate index
-    const walletsList = JSON.parse(localStorage.getItem('ethaura_wallets_list') || '[]')
+    const walletsList = await walletsStore.getWallets()
 
-    // Check if this index has already been used by this owner (for same account type)
+    // Check if this index has already been used by this owner
     const existingWallet = walletsList.find(w =>
       w.index === indexNum &&
-      w.owner === ownerAddress &&
-      (w.isModular || false) === isModular
+      w.owner === ownerAddress
     )
     if (existingWallet) {
       setAddError(`Index ${indexNum} is already used for this owner. The wallet already exists at ${existingWallet.address}. Please use a different index (e.g., ${indexNum + 1}).`)
@@ -398,40 +393,26 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onSwap
 
     try {
       const saltBigInt = BigInt(indexNum)
-      let accountAddress
-      let isDeployed = false
 
       console.log('🔧 Creating new wallet:', {
         owner: ownerAddress,
         index: indexNum,
         name: walletName.trim(),
-        type: isModular ? 'modular (ERC-7579)' : 'legacy (P256Account)',
+        type: 'modular (ERC-7579)',
       })
 
-      if (isModular) {
-        // Create modular account (ERC-7579 AuraAccount)
-        console.log('🏗️ Creating modular account via AuraAccountFactory...')
-        accountAddress = await modularManager.getAccountAddress(ownerAddress, saltBigInt)
-        isDeployed = await modularManager.isDeployed(accountAddress)
-        console.log('📍 Modular account address:', accountAddress, 'deployed:', isDeployed)
-      } else {
-        // Create legacy account (P256Account)
-        console.log('🏗️ Creating legacy account via P256AccountFactory...')
-        const createAccountPromise = sdk.createAccount(
-          null, // no passkey - owner-only mode
-          ownerAddress,
-          saltBigInt,
-          false // 2FA disabled
-        )
+      // Create modular account (ERC-7579 AuraAccount)
+      console.log('🏗️ Creating modular account via AuraAccountFactory...')
+      const accountAddress = await modularManager.getAccountAddress(ownerAddress, saltBigInt)
+      const isDeployed = await modularManager.isDeployed(accountAddress)
+      console.log('📍 Modular account address:', accountAddress, 'deployed:', isDeployed)
 
-        const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Account creation timed out after 45 seconds.')), 45000)
-        )
-
-        const accountData = await Promise.race([createAccountPromise, timeoutPromise])
-        accountAddress = accountData.address
-        isDeployed = accountData.isDeployed
-        console.log('📍 Legacy account address:', accountAddress, 'deployed:', isDeployed)
+      // Validate: ensure account address is not the factory address (sanity check)
+      if (accountAddress.toLowerCase() === networkInfo.modularFactoryAddress?.toLowerCase()) {
+        console.error('❌ Account address matches factory address - this is a bug!')
+        setAddError('Error: Generated account address matches factory address. Please try again.')
+        setIsAdding(false)
+        return
       }
 
       // Double-check if wallet already exists (by address)
@@ -473,11 +454,10 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onSwap
         index: indexNum,
         owner: ownerAddress,
         createdAt: new Date().toISOString(),
-        isModular, // Track account type
+        isModular: true, // Track account type
       }
 
-      walletsList.push(newWallet)
-      localStorage.setItem('ethaura_wallets_list', JSON.stringify(walletsList))
+      await walletsStore.addWallet(newWallet)
 
       // Update wallets state
       setWallets([...wallets, newWallet])
@@ -517,21 +497,14 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onSwap
     setOpenMenuId(null)
   }
 
-  const handleSaveRename = () => {
+  const handleSaveRename = async () => {
     if (!editName.trim()) {
       return
     }
 
     try {
-      // Get existing wallets
-      const walletsList = JSON.parse(localStorage.getItem('ethaura_wallets_list') || '[]')
-
-      // Update wallet name
-      const updatedWallets = walletsList.map(w =>
-        w.id === selectedWallet.id ? { ...w, name: editName.trim() } : w
-      )
-
-      localStorage.setItem('ethaura_wallets_list', JSON.stringify(updatedWallets))
+      // Update wallet name in SQLite
+      await walletsStore.updateWallet(selectedWallet.id, { name: editName.trim() })
 
       // Update state
       setWallets(wallets.map(w =>
@@ -547,15 +520,10 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onSwap
     }
   }
 
-  const handleConfirmDelete = () => {
+  const handleConfirmDelete = async () => {
     try {
-      // Get existing wallets
-      const walletsList = JSON.parse(localStorage.getItem('ethaura_wallets_list') || '[]')
-
-      // Remove wallet
-      const updatedWallets = walletsList.filter(w => w.id !== selectedWallet.id)
-
-      localStorage.setItem('ethaura_wallets_list', JSON.stringify(updatedWallets))
+      // Delete wallet from SQLite
+      await walletsStore.deleteWallet(selectedWallet.id)
 
       // Update state
       setWallets(wallets.filter(w => w.id !== selectedWallet.id))
@@ -611,7 +579,7 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onSwap
       <Header
         userInfo={userInfo}
         onLogout={onLogout}
-        onHome={() => {}} // On home screen, clicking logo does nothing (already home)
+        onHome={() => { }} // On home screen, clicking logo does nothing (already home)
       />
 
       {/* Main Content */}
@@ -869,48 +837,6 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onSwap
                     />
                   </div>
 
-                  {/* Account Type Selector */}
-                  <div className="form-group">
-                    <label className="form-label-with-info">
-                      <span>Account Type</span>
-                      <div className="info-icon-wrapper">
-                        <span className="info-icon-btn"></span>
-                        <div className="info-tooltip">
-                          <div className="tooltip-section">
-                            <strong>Modular (ERC-7579):</strong>
-                            <p>Next-gen modular smart account with pluggable modules for session keys, spending limits, and more.</p>
-                          </div>
-                          <div className="tooltip-section">
-                            <strong>Legacy (P256Account):</strong>
-                            <p>Original smart account with built-in passkey support and guardian recovery.</p>
-                          </div>
-                        </div>
-                      </div>
-                    </label>
-                    <div className="account-type-selector">
-                      <button
-                        type="button"
-                        className={`account-type-btn ${accountType === 'modular' ? 'active' : ''}`}
-                        onClick={() => setAccountType('modular')}
-                        disabled={!modularManager}
-                      >
-                        <Layers size={16} />
-                        <span>Modular (ERC-7579)</span>
-                      </button>
-                      <button
-                        type="button"
-                        className={`account-type-btn ${accountType === 'legacy' ? 'active' : ''}`}
-                        onClick={() => setAccountType('legacy')}
-                      >
-                        <Wallet size={16} />
-                        <span>Legacy</span>
-                      </button>
-                    </div>
-                    {!modularManager && (
-                      <p className="form-hint warning">Modular accounts not available on this network</p>
-                    )}
-                  </div>
-
                   <div className="form-group">
                     <label className="form-label-with-info">
                       <span>Index (Salt)</span>
@@ -931,7 +857,8 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onSwap
                           </div>
 
                           {(() => {
-                            const walletsList = JSON.parse(localStorage.getItem('ethaura_wallets_list') || '[]')
+                            // Use sync version since wallets are already loaded
+                            const walletsList = walletsStore.getWalletsSync()
                             const currentOwnerIndices = walletsList
                               .filter(w => w.index !== undefined && w.owner === ownerAddress)
                               .map(w => w.index)

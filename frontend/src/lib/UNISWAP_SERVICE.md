@@ -2,7 +2,7 @@
 
 ## Overview
 
-The `UniswapV3Service` provides a simple interface for interacting with Uniswap V3 protocol for token swaps. It handles quote fetching, swap calldata building, and integrates seamlessly with P256Account's `execute()` and `executeBatch()` functions.
+The `UniswapV3Service` provides a simple interface for interacting with Uniswap V3 protocol for token swaps. It handles quote fetching, swap calldata building, and integrates seamlessly with ModularAccountSDK's `executeBatch()` function.
 
 ## Features
 
@@ -61,10 +61,10 @@ const batch = uniswapService.buildApproveAndSwap(
   USDT,
   amountIn,
   amountOutMinimum,
-  accountAddress // P256Account address
+  accountAddress // ModularAccount address
 )
 
-// Execute via P256Account
+// Execute via ModularAccountSDK
 await sdk.executeBatch(batch.targets, batch.values, batch.datas)
 ```
 
@@ -122,7 +122,7 @@ Build calldata for a swap transaction.
 - `tokenOut` (string): Output token address
 - `amountIn` (bigint): Input amount in wei
 - `amountOutMinimum` (bigint): Minimum output amount (with slippage)
-- `recipient` (string): Recipient address (P256Account)
+- `recipient` (string): Recipient address (ModularAccount)
 - `fee` (number): Pool fee tier (default: 3000 = 0.3%)
 
 **Returns:** string (encoded calldata)
@@ -202,7 +202,7 @@ See `uniswapService.example.js` for complete working examples.
 
 ## Next Steps (Future Phases)
 
-- **Phase 2**: Integrate with P256AccountSDK
+- **Phase 2**: Integrate with ModularAccountSDK
 - **Phase 3**: Build swap UI components
 - **Phase 4**: Implement real price impact calculation
 - **Phase 5**: Add comprehensive tests

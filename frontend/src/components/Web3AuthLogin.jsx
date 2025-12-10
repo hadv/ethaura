@@ -82,8 +82,8 @@ function Web3AuthLogin() {
           </div>
         </div>
 
-        <button 
-          className="button button-secondary" 
+        <button
+          className="button button-secondary"
           onClick={handleLogout}
           style={{ marginTop: '1rem' }}
         >
@@ -133,7 +133,7 @@ function Web3AuthLogin() {
       )}
 
       <div className="status status-info" style={{ marginTop: '1rem' }}>
-        ℹ️ Your wallet will be used as the master key (owner) for your P256Account
+        ℹ️ Your wallet will be used as the master key (owner) for your smart account
       </div>
     </div>
   );

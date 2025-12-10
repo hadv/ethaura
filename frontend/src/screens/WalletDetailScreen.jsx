@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { TrendingUp, TrendingDown, ArrowLeftRight, ArrowUp, ArrowDown, FileText } from 'lucide-react'
 import { ethers } from 'ethers'
-import { P256_ACCOUNT_ABI } from '../lib/constants'
+import { useModularAccountManager } from '../hooks/useModularAccount'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
 import { useNetwork } from '../contexts/NetworkContext'
 import { useWalletConnect } from '../contexts/WalletConnectContext'
@@ -15,6 +15,8 @@ import { SessionRequestModal } from '../components/SessionRequestModal'
 import { createTokenBalanceService } from '../lib/tokenService'
 import { createTransactionHistoryService } from '../lib/transactionService'
 import { walletDataCache } from '../lib/walletDataCache'
+import * as walletsStore from '../lib/walletsStore'
+import { passkeyStorage } from '../lib/passkeyStorage'
 import '../styles/WalletDetailScreen.css'
 import logo from '../assets/logo.svg'
 
@@ -39,29 +41,21 @@ function WalletDetailScreen({ wallet, onBack, onHome, onSettings, onSend, onLogo
   })
 
   // Get passkey credential and owner signer for WalletConnect
-  const [passkeyCredential, setPasskeyCredential] = useState(() => {
-    const stored = localStorage.getItem('ethaura_passkey_credential')
-    if (!stored) return null
-    try {
-      const parsed = JSON.parse(stored)
-      return {
-        id: parsed.id,
-        rawId: parsed.rawId ? Uint8Array.from(atob(parsed.rawId), c => c.charCodeAt(0)).buffer : null,
-        publicKey: parsed.publicKey,
-        response: parsed.response ? {
-          attestationObject: parsed.response.attestationObject
-            ? Uint8Array.from(atob(parsed.response.attestationObject), c => c.charCodeAt(0)).buffer
-            : null,
-          clientDataJSON: parsed.response.clientDataJSON
-            ? Uint8Array.from(atob(parsed.response.clientDataJSON), c => c.charCodeAt(0)).buffer
-            : null,
-        } : null,
+  const [passkeyCredential, setPasskeyCredential] = useState(null)
+
+  // Load passkey credential from SQLite
+  useEffect(() => {
+    const loadPasskey = async () => {
+      if (!selectedWallet?.address) return
+      try {
+        const credential = await passkeyStorage.getCredential(selectedWallet.address)
+        setPasskeyCredential(credential)
+      } catch (e) {
+        console.error('Failed to load passkey credential:', e)
       }
-    } catch (e) {
-      console.error('Failed to deserialize credential:', e)
-      return null
     }
-  })
+    loadPasskey()
+  }, [selectedWallet?.address])
 
   const [ownerSigner, setOwnerSigner] = useState(null)
   const walletConnectButtonRef = useRef(null)
@@ -82,13 +76,13 @@ function WalletDetailScreen({ wallet, onBack, onHome, onSettings, onSend, onLogo
     createSigner()
   }, [web3authProvider])
 
-  // Load all wallets from localStorage
+  // Load all wallets from SQLite
   useEffect(() => {
-    const storedWallets = localStorage.getItem('ethaura_wallets_list')
-    if (storedWallets) {
-      const walletsList = JSON.parse(storedWallets)
+    const loadWallets = async () => {
+      const walletsList = await walletsStore.getWallets()
       setWallets(walletsList)
     }
+    loadWallets()
   }, [])
 
   // Update selected wallet when prop changes
@@ -116,6 +110,9 @@ function WalletDetailScreen({ wallet, onBack, onHome, onSettings, onSend, onLogo
     }
   }
 
+  // Use ModularAccountManager
+  const modularManager = useModularAccountManager()
+
   const fetchWalletData = useCallback(async () => {
     if (!selectedWallet?.address) return
 
@@ -136,7 +133,7 @@ function WalletDetailScreen({ wallet, onBack, onHome, onSettings, onSend, onLogo
 
       // Try to get cached data first
       let tokenBalances, txHistory
-      const cachedData = walletDataCache.getCachedData(selectedWallet.address, networkInfo.name)
+      const cachedData = await walletDataCache.getCachedData(selectedWallet.address, networkInfo.name)
 
       if (cachedData) {
         console.log('📦 Using cached wallet data')
@@ -153,7 +150,7 @@ function WalletDetailScreen({ wallet, onBack, onHome, onSettings, onSend, onLogo
         tokenBalances = assets
         txHistory = transactions
         // Cache the data for future use
-        walletDataCache.setCachedData(selectedWallet.address, networkInfo.name, tokenBalances, txHistory)
+        await walletDataCache.setCachedData(selectedWallet.address, networkInfo.name, tokenBalances, txHistory)
       }
 
       // Set assets (tokens with balances)
@@ -169,72 +166,61 @@ function WalletDetailScreen({ wallet, onBack, onHome, onSettings, onSend, onLogo
         setBalance(ethToken.amount.toString())
       }
 
-      // Set transactions - display only latest 10 even if cache has 30
+      // Set transactions - display only latest 10 even if transactions has 30
       setTransactions(txHistory.slice(0, 10))
 
-      // Check if account is deployed
-      const code = await provider.getCode(selectedWallet.address)
-      const isDeployed = code !== '0x'
-
-      if (isDeployed) {
-        // Fetch security status from contract
-        const accountContract = new ethers.Contract(
-          selectedWallet.address,
-          P256_ACCOUNT_ABI,
-          provider
-        )
-
+      // Check if account is deployed and get info using ModularAccountManager
+      if (modularManager) {
         try {
-          const [twoFactorEnabled, guardians] = await Promise.all([
-            accountContract.twoFactorEnabled(),
-            accountContract.getGuardians()
-          ])
+          // Use modular manager to get account info (deployed status, MFA status)
+          const accountInfo = await modularManager.getAccountInfo(selectedWallet.address)
 
           setSecurityStatus({
-            has2FA: twoFactorEnabled,
-            guardianCount: guardians.length,
-            isDeployed: true
+            has2FA: accountInfo.mfaEnabled,
+            guardianCount: 0, // Guardians via SocialRecoveryModule (pending)
+            isDeployed: accountInfo.deployed
           })
 
           console.log('✅ Security status loaded:', {
             address: selectedWallet.address,
-            twoFactorEnabled,
-            guardianCount: guardians.length
+            twoFactorEnabled: accountInfo.mfaEnabled,
+            deployed: accountInfo.deployed
           })
-        } catch (error) {
-          console.error('Failed to fetch security status:', error)
+        } catch (infoError) {
+          console.error('Failed to fetch modular account info:', infoError)
+          // Determine if deployed by checking code directly as fallback
+          const code = await provider.getCode(selectedWallet.address)
+          const isDeployed = code !== '0x'
+
           setSecurityStatus({
             has2FA: false,
             guardianCount: 0,
-            isDeployed: true
+            isDeployed
           })
         }
       } else {
-        console.log('⚠️ Account not deployed yet:', selectedWallet.address)
+        // Fallback if modular manager is not available (shouldn't happen on supported networks)
+        const code = await provider.getCode(selectedWallet.address)
+        const isDeployed = code !== '0x'
         setSecurityStatus({
           has2FA: false,
           guardianCount: 0,
-          isDeployed: false
+          isDeployed
         })
       }
+
     } catch (error) {
       console.error('Failed to fetch wallet data:', error)
-
-      // Check if it's a network compatibility error
-      if (error.message && (error.message.includes('Factory contract not deployed') ||
-                            error.message.includes('Factory address not configured'))) {
-        // Set error state for unsupported network
-        setSecurityStatus({
-          has2FA: false,
-          guardianCount: 0,
-          isDeployed: false,
-          error: 'Network not supported - Factory contract not deployed'
-        })
-      }
+      setSecurityStatus({
+        has2FA: false,
+        guardianCount: 0,
+        isDeployed: false,
+        error: error.message
+      })
     } finally {
       setLoading(false)
     }
-  }, [selectedWallet, networkInfo.rpcUrl, networkInfo.chainId])
+  }, [selectedWallet, networkInfo.rpcUrl, networkInfo.chainId, modularManager])
 
   useEffect(() => {
     fetchWalletData()
@@ -435,10 +421,10 @@ function WalletDetailScreen({ wallet, onBack, onHome, onSettings, onSend, onLogo
                   >
                     <div className="asset-info">
                       <div className="asset-icon">
-                        {typeof asset.icon === 'string' && asset.icon.startsWith('/') ? (
+                        {typeof asset.icon === 'string' ? (
                           <img src={asset.icon} alt={asset.symbol} />
                         ) : (
-                          asset.icon
+                          <span className="asset-icon-fallback">{asset.symbol?.charAt(0) || '?'}</span>
                         )}
                       </div>
                       <div className="asset-details">
@@ -484,8 +470,8 @@ function WalletDetailScreen({ wallet, onBack, onHome, onSettings, onSend, onLogo
           proposal={pendingProposal}
           accountAddress={selectedWallet?.address}
           chainId={networkInfo.chainId}
-          onApprove={() => {}}
-          onReject={() => {}}
+          onApprove={() => { }}
+          onReject={() => { }}
         />
       )}
 
@@ -497,7 +483,7 @@ function WalletDetailScreen({ wallet, onBack, onHome, onSettings, onSend, onLogo
           passkeyCredential={passkeyCredential}
           ownerSigner={ownerSigner}
           twoFactorEnabled={securityStatus.has2FA}
-          onComplete={() => {}}
+          onComplete={() => { }}
         />
       )}
     </div>

@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Clock, AlertTriangle } from 'lucide-react'
+import { clientDb } from '../lib/clientDatabase'
 import '../styles/DeadlineSelector.css'
 
 const PRESET_DEADLINES = [
@@ -9,42 +10,53 @@ const PRESET_DEADLINES = [
   { value: 30, label: '30 min', description: 'Long' },
 ]
 
-const STORAGE_KEY = 'ethaura_deadline_preference'
+const STORAGE_KEY = 'deadline_preference'
 
 function DeadlineSelector({ value, onChange, className = '' }) {
   const [isOpen, setIsOpen] = useState(false)
   const [customValue, setCustomValue] = useState('')
   const [isCustom, setIsCustom] = useState(false)
+  const isInitialMount = useRef(true)
 
   // Load saved preference on mount
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY)
-      if (saved) {
-        const savedValue = parseInt(saved, 10)
-        if (!isNaN(savedValue) && savedValue > 0) {
-          // Check if it's a preset value
-          const isPreset = PRESET_DEADLINES.some(preset => preset.value === savedValue)
-          if (!isPreset) {
-            setIsCustom(true)
-            setCustomValue(savedValue.toString())
+    const loadPreference = async () => {
+      try {
+        const saved = await clientDb.getSetting(STORAGE_KEY)
+        if (saved) {
+          const savedValue = parseInt(saved, 10)
+          if (!isNaN(savedValue) && savedValue > 0) {
+            // Check if it's a preset value
+            const isPreset = PRESET_DEADLINES.some(preset => preset.value === savedValue)
+            if (!isPreset) {
+              setIsCustom(true)
+              setCustomValue(savedValue.toString())
+            }
+            onChange(savedValue)
           }
-          onChange(savedValue)
         }
+      } catch (error) {
+        console.error('Failed to load deadline preference:', error)
       }
-    } catch (error) {
-      console.error('Failed to load deadline preference:', error)
     }
+    loadPreference()
   }, [])
 
-  // Save preference when value changes
+  // Save preference when value changes (skip initial mount)
   useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false
+      return
+    }
     if (value > 0) {
-      try {
-        localStorage.setItem(STORAGE_KEY, value.toString())
-      } catch (error) {
-        console.error('Failed to save deadline preference:', error)
+      const savePreference = async () => {
+        try {
+          await clientDb.setSetting(STORAGE_KEY, value.toString())
+        } catch (error) {
+          console.error('Failed to save deadline preference:', error)
+        }
       }
+      savePreference()
     }
   }, [value])
 

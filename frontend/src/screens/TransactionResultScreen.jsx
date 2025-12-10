@@ -1,8 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Clock, CheckCircle, XCircle } from 'lucide-react'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
 import { useNetwork } from '../contexts/NetworkContext'
-import { useP256SDK } from '../hooks/useP256SDK'
 import { walletDataCache } from '../lib/walletDataCache'
 import Header from '../components/Header'
 import SubHeader from '../components/SubHeader'
@@ -21,7 +20,7 @@ function TransactionResultScreen({
 }) {
   const { userInfo } = useWeb3Auth()
   const { networkInfo } = useNetwork()
-  const sdk = useP256SDK()
+  const provider = useMemo(() => new ethers.JsonRpcProvider(networkInfo.rpcUrl), [networkInfo.rpcUrl])
   const [status, setStatus] = useState('pending') // 'pending', 'confirmed', 'failed'
   const [receipt, setReceipt] = useState(null)
   const [error, setError] = useState('')
@@ -30,7 +29,7 @@ function TransactionResultScreen({
 
   // Poll for transaction confirmation
   useEffect(() => {
-    if (!transactionData?.hash || !sdk?.provider) return
+    if (!transactionData?.hash || !provider) return
 
     let isCancelled = false
     let pollInterval = null
@@ -38,22 +37,22 @@ function TransactionResultScreen({
     const checkTransactionStatus = async () => {
       try {
         console.log('🔍 Checking transaction status:', transactionData.hash)
-        
+
         // Get transaction receipt
-        const txReceipt = await sdk.provider.getTransactionReceipt(transactionData.hash)
-        
+        const txReceipt = await provider.getTransactionReceipt(transactionData.hash)
+
         if (isCancelled) return
 
         if (txReceipt) {
           console.log('✅ Transaction confirmed:', txReceipt)
-          
+
           // Check if transaction was successful
           if (txReceipt.status === 1) {
             setStatus('confirmed')
             setReceipt(txReceipt)
 
             // Get current block to calculate confirmations
-            const currentBlock = await sdk.provider.getBlockNumber()
+            const currentBlock = await provider.getBlockNumber()
             const confs = currentBlock - txReceipt.blockNumber + 1
             setConfirmations(confs)
 
@@ -66,7 +65,7 @@ function TransactionResultScreen({
                 gasUsed: txReceipt.gasUsed?.toString(),
                 gasPrice: txReceipt.gasPrice?.toString(),
               }
-              walletDataCache.addTransactionToCache(wallet.address, networkInfo.name, confirmedTransaction)
+              await walletDataCache.addTransactionToCache(wallet.address, networkInfo.name, confirmedTransaction)
               setCacheUpdated(true)
               console.log('✅ Transaction added to cache')
             }
@@ -106,16 +105,16 @@ function TransactionResultScreen({
         clearInterval(pollInterval)
       }
     }
-  }, [transactionData?.hash, sdk?.provider, wallet?.address, networkInfo.name, cacheUpdated, transactionData])
+  }, [transactionData?.hash, provider, wallet?.address, networkInfo.name, cacheUpdated, transactionData])
 
   // Update confirmations count periodically
   useEffect(() => {
-    if (status !== 'confirmed' || !receipt || !sdk?.provider) return
+    if (status !== 'confirmed' || !receipt || !provider) return
 
     let isCancelled = false
     const interval = setInterval(async () => {
       try {
-        const currentBlock = await sdk.provider.getBlockNumber()
+        const currentBlock = await provider.getBlockNumber()
         const confs = currentBlock - receipt.blockNumber + 1
         if (!isCancelled) {
           setConfirmations(confs)
@@ -129,7 +128,7 @@ function TransactionResultScreen({
       isCancelled = true
       clearInterval(interval)
     }
-  }, [status, receipt, sdk?.provider])
+  }, [status, receipt, provider])
 
   const getStatusIcon = () => {
     switch (status) {
