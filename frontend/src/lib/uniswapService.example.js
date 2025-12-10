@@ -67,7 +67,7 @@ export async function exampleBuildSwapCalldata() {
     const amountOutMinimum = uniswapService.calculateMinimumOutput(quote.amountOut, 0.5)
 
     // Build swap calldata
-    const recipient = '0x1234567890123456789012345678901234567890' // P256Account address
+    const recipient = '0x1234567890123456789012345678901234567890' // ModularAccount address
     const calldata = uniswapService.buildSwapCalldata(
       USDC,
       USDT,
@@ -123,7 +123,7 @@ export async function exampleBuildApproveAndSwap() {
     console.log('  Targets:', batch.targets)
     console.log('  Values:', batch.values.map(v => v.toString()))
     console.log('  Number of calls:', batch.targets.length)
-    console.log('\nThis batch can be executed via P256Account.executeBatch()')
+    console.log('\nThis batch can be executed via ModularAccountSDK.executeBatch()')
 
     return batch
   } catch (error) {
@@ -160,7 +160,7 @@ export function exampleCalculateSlippage() {
  */
 export async function runAllExamples() {
   console.log('🧪 Running UniswapV3Service examples...\n')
-  console.log('=' .repeat(60))
+  console.log('='.repeat(60))
 
   try {
     await exampleGetQuote()
