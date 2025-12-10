@@ -2,7 +2,6 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { NodeGlobalsPolyfillPlugin } from '@esbuild-plugins/node-globals-polyfill'
 import wasm from 'vite-plugin-wasm'
-import topLevelAwait from 'vite-plugin-top-level-await'
 import path from 'path'
 
 // Plugin to set COOP headers for Web3Auth popup support
@@ -10,7 +9,9 @@ const coopPlugin = () => ({
   name: 'configure-response-headers',
   configureServer: (server) => {
     server.middlewares.use((_req, res, next) => {
+      // same-origin-allow-popups allows Web3Auth OAuth popups
       res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
+      // unsafe-none allows cross-origin resources without CORP headers
       res.setHeader('Cross-Origin-Embedder-Policy', 'unsafe-none');
       next();
     });
@@ -19,7 +20,7 @@ const coopPlugin = () => ({
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  plugins: [react(), wasm(), topLevelAwait(), coopPlugin()],
+  plugins: [react(), wasm(), coopPlugin()],
   server: {
     port: 3000,
     host: '0.0.0.0', // Listen on all network interfaces for mobile testing

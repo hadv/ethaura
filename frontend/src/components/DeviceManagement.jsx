@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { Smartphone, Tablet, Monitor, Key, Trash2, Calendar, Clock, Fingerprint, Cpu } from 'lucide-react'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
 import { useNetwork } from '../contexts/NetworkContext'
-import { useP256SDK } from '../hooks/useP256SDK'
+import { useModularAccountManager } from '../hooks/useModularAccount'
 import { getDevices, removeDevice } from '../lib/deviceManager'
 import { signWithPasskey } from '../utils/webauthn'
 import { passkeyStorage } from '../lib/passkeyStorage'
@@ -12,20 +12,20 @@ import '../styles/DeviceManagement.css'
 function DeviceManagement({ accountAddress, onAddDevice }) {
   const { address: ownerAddress, signMessage, signRawHash, provider: web3AuthProvider } = useWeb3Auth()
   const { networkInfo } = useNetwork()
-  const sdk = useP256SDK()
+  const modularManager = useModularAccountManager()
   const [devices, setDevices] = useState([]) // Merged devices (local + on-chain)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [removing, setRemoving] = useState(null)
   const [isAccountDeployed, setIsAccountDeployed] = useState(true)
-  const [twoFactorEnabled, setTwoFactorEnabled] = useState(false)
+  const [mfaEnabled, setMfaEnabled] = useState(false)
 
   useEffect(() => {
     loadDevices()
-  }, [accountAddress, sdk, signMessage])
+  }, [accountAddress, modularManager, signMessage])
 
   const loadDevices = async () => {
-    if (!accountAddress || !sdk || !signMessage) {
+    if (!accountAddress || !modularManager || !signMessage) {
       setLoading(false)
       return
     }
@@ -35,9 +35,7 @@ function DeviceManagement({ accountAddress, onAddDevice }) {
       setError('')
 
       // Check if account is deployed
-      const provider = new ethers.JsonRpcProvider(networkInfo.rpcUrl)
-      const code = await provider.getCode(accountAddress)
-      const isDeployed = code !== '0x'
+      const isDeployed = await modularManager.isDeployed(accountAddress)
 
       console.log('🔍 Account deployment status:', { accountAddress, isDeployed })
       setIsAccountDeployed(isDeployed)
@@ -61,13 +59,13 @@ function DeviceManagement({ accountAddress, onAddDevice }) {
         return
       }
 
-      // 2. Fetch on-chain passkeys (source of truth for active passkeys)
-      const passkeyData = await sdk.getPasskeys(accountAddress, 0, 50)
+      // 2. Fetch on-chain passkeys from modular account (source of truth)
+      const passkeyData = await modularManager.getPasskeys(accountAddress)
       console.log('🔗 Loaded on-chain passkeys:', passkeyData)
 
-      // Get account info for 2FA status
-      const accountInfo = await sdk.accountManager.getAccountInfo(accountAddress)
-      setTwoFactorEnabled(accountInfo.twoFactorEnabled)
+      // Get account info for MFA status
+      const accountInfo = await modularManager.getAccountInfo(accountAddress)
+      setMfaEnabled(accountInfo.mfaEnabled)
 
       // 3. Merge local devices with on-chain passkeys
       const mergedDevices = mergeDevicesWithPasskeys(localDevices, passkeyData)
@@ -88,22 +86,25 @@ function DeviceManagement({ accountAddress, onAddDevice }) {
    * - On-chain passkeys are the source of truth for active status
    * - Local devices provide metadata (device name, type, attestation)
    * - Devices not on-chain yet are marked as "pending"
+   *
+   * passkeyData format from modular account:
+   * { passkeyIds: bytes32[], passkeys: Array<{ passkeyId, qx, qy, addedAt, active, deviceId }>, total: number }
    */
   const mergeDevicesWithPasskeys = (localDevices, passkeyData) => {
     const merged = []
 
     // Create a map of on-chain passkeys by passkeyId
     const onChainPasskeys = new Map()
-    passkeyData.passkeyIds.forEach((passkeyId, index) => {
-      onChainPasskeys.set(passkeyId, {
-        passkeyId,
-        qx: passkeyData.qxList[index],
-        qy: passkeyData.qyList[index],
-        addedAt: Number(passkeyData.addedAtList[index]) * 1000, // Convert to milliseconds
-        active: passkeyData.activeList[index],
-        deviceId: passkeyData.deviceIdList[index],
+    for (const passkey of passkeyData.passkeys || []) {
+      onChainPasskeys.set(passkey.passkeyId, {
+        passkeyId: passkey.passkeyId,
+        qx: passkey.qx,
+        qy: passkey.qy,
+        addedAt: Number(passkey.addedAt) * 1000, // Convert to milliseconds
+        active: passkey.active,
+        deviceId: passkey.deviceId,
       })
-    })
+    }
 
     // Match local devices with on-chain passkeys
     for (const localDevice of localDevices) {
@@ -141,9 +142,19 @@ function DeviceManagement({ accountAddress, onAddDevice }) {
 
     // Add any on-chain passkeys that don't have local metadata
     for (const [passkeyId, onChainPasskey] of onChainPasskeys) {
+      // Try to decode deviceId as a readable name
+      let deviceName = 'Unknown Device'
+      try {
+        const decoded = ethers.decodeBytes32String(onChainPasskey.deviceId)
+        if (decoded) deviceName = decoded
+      } catch (e) {
+        // deviceId is not a valid bytes32 string, use truncated passkeyId
+        deviceName = `Device ${passkeyId.slice(0, 10)}...`
+      }
+
       merged.push({
         deviceId: passkeyId, // Use passkeyId as deviceId
-        deviceName: ethers.decodeBytes32String(onChainPasskey.deviceId) || 'Unknown Device',
+        deviceName,
         deviceType: 'unknown',
         publicKey: {
           x: onChainPasskey.qx,
@@ -163,76 +174,19 @@ function DeviceManagement({ accountAddress, onAddDevice }) {
   const handleRemoveDevice = async (device) => {
     const displayName = device.deviceName || `${device.publicKey.x.slice(0, 10)}...${device.publicKey.x.slice(-8)}`
 
-    // If device is on-chain (active), need to remove via UserOperation
+    // If device is on-chain (active), removal via UserOperation is not yet implemented for modular accounts
     if (device.isActive) {
-      // Check if this is the last passkey and 2FA is enabled
+      // Check if this is the last passkey and MFA is enabled
       const activeCount = devices.filter(d => d.isActive).length
-      if (activeCount <= 1 && twoFactorEnabled) {
-        setError('Cannot remove the last passkey when 2FA is enabled. Disable 2FA first.')
+      if (activeCount <= 1 && mfaEnabled) {
+        setError('Cannot remove the last passkey when MFA is enabled. Disable MFA first.')
         return
       }
 
-      if (!confirm(`Remove passkey "${displayName}" from the blockchain? This requires a transaction.`)) {
-        return
-      }
-
-      try {
-        setRemoving(device.deviceId)
-        setError('')
-
-        // Load passkey credential from SQLite cache
-        const passkeyCredential = await passkeyStorage.getCredential(accountAddress)
-        if (!passkeyCredential) {
-          throw new Error('Passkey credential not found. Please ensure you have a passkey for this account.')
-        }
-        console.log('🔑 Loaded passkey credential for removal:', passkeyCredential.id)
-
-        console.log('🗑️ Removing passkey from blockchain:', {
-          qx: device.publicKey.x,
-          qy: device.publicKey.y,
-          twoFactorEnabled,
-        })
-
-        // Remove passkey via UserOperation
-        // If 2FA is enabled, the SDK will call getOwnerSignature callback
-        const receipt = await sdk.removePasskey({
-          accountAddress,
-          qx: device.publicKey.x,
-          qy: device.publicKey.y,
-          passkeyCredential,
-          signWithPasskey,
-          getOwnerSignature: twoFactorEnabled
-            ? async (userOpHash, userOp) => {
-                console.log('🔐 2FA enabled - requesting owner signature (Step 1/2)...')
-                console.log('🔐 UserOpHash:', userOpHash)
-
-                // Show confirmation to user
-                if (!confirm(`⚠️ 2FA Confirmation Required\n\nYou are about to remove passkey "${displayName}" from the blockchain.\n\nThis requires TWO signatures:\n1. Owner signature (social login) - Step 1/2\n2. Passkey signature (biometric) - Step 2/2\n\nClick OK to proceed with owner signature.`)) {
-                  throw new Error('User cancelled the operation')
-                }
-
-                // Sign with owner (Web3Auth)
-                const ownerSig = await signRawHash(userOpHash)
-                console.log('🔐 Owner signature received (Step 1/2):', ownerSig)
-                return ownerSig
-              }
-            : null,
-        })
-
-        console.log('✅ Passkey removed successfully:', receipt)
-
-        // Also remove from local storage if it matches
-        await removeDevice(signMessage, ownerAddress, accountAddress, device.deviceId)
-
-        // Reload devices
-        await loadDevices()
-
-      } catch (err) {
-        console.error('Failed to remove passkey:', err)
-        setError(err.message || 'Failed to remove passkey')
-      } finally {
-        setRemoving(null)
-      }
+      // TODO: Implement on-chain passkey removal via modular account UserOperation
+      // For now, show a message that this feature is coming soon
+      setError('On-chain passkey removal is not yet implemented for modular accounts. Coming soon!')
+      return
     } else {
       // Device is local-only (not on-chain yet) - just remove from local storage
       if (!confirm(`Remove local device "${displayName}"? This action cannot be undone.`)) {
