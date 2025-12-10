@@ -1,6 +1,5 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
-import { useP256SDK } from '../hooks/useP256SDK'
 import { useNetwork } from '../contexts/NetworkContext'
 import { ethers } from 'ethers'
 import { Wallet, Sparkles } from 'lucide-react'
@@ -10,8 +9,8 @@ import '../styles/Dashboard.css'
 
 function Dashboard({ accountAddress, accountConfig, onSendClick, onReceiveClick, onWalletClick }) {
   const { isConnected } = useWeb3Auth()
-  const { sdk } = useP256SDK()
   const { networkInfo } = useNetwork()
+  const provider = useMemo(() => new ethers.JsonRpcProvider(networkInfo.rpcUrl), [networkInfo.rpcUrl])
   const [balance, setBalance] = useState('0')
   const [balanceChange, setBalanceChange] = useState('+0.00%')
   const [wallets, setWallets] = useState([])
@@ -25,10 +24,10 @@ function Dashboard({ accountAddress, accountConfig, onSendClick, onReceiveClick,
 
   // Fetch balance when account address changes
   useEffect(() => {
-    if (accountAddress && sdk) {
+    if (accountAddress && provider) {
       fetchBalance()
     }
-  }, [accountAddress, sdk])
+  }, [accountAddress, provider])
 
   const fetchBalance = async () => {
     try {

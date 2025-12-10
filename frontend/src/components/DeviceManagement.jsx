@@ -3,6 +3,7 @@ import { Smartphone, Tablet, Monitor, Key, Trash2, Calendar, Clock, Fingerprint,
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
 import { useNetwork } from '../contexts/NetworkContext'
 import { useModularAccountManager } from '../hooks/useModularAccount'
+import { useModularAccountSDK } from '../hooks/useModularAccountSDK'
 import { getDevices, removeDevice } from '../lib/deviceManager'
 import { signWithPasskey } from '../utils/webauthn'
 import { passkeyStorage } from '../lib/passkeyStorage'
@@ -10,9 +11,10 @@ import { ethers } from 'ethers'
 import '../styles/DeviceManagement.css'
 
 function DeviceManagement({ accountAddress, onAddDevice }) {
-  const { address: ownerAddress, signMessage, signRawHash, provider: web3AuthProvider } = useWeb3Auth()
+  const { address: ownerAddress, signMessage, signRawHash, getSigner, provider: web3AuthProvider } = useWeb3Auth()
   const { networkInfo } = useNetwork()
   const modularManager = useModularAccountManager()
+  const modularSDK = useModularAccountSDK()
   const [devices, setDevices] = useState([]) // Merged devices (local + on-chain)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -174,7 +176,7 @@ function DeviceManagement({ accountAddress, onAddDevice }) {
   const handleRemoveDevice = async (device) => {
     const displayName = device.deviceName || `${device.publicKey.x.slice(0, 10)}...${device.publicKey.x.slice(-8)}`
 
-    // If device is on-chain (active), removal via UserOperation is not yet implemented for modular accounts
+    // If device is on-chain (active), remove via UserOperation
     if (device.isActive) {
       // Check if this is the last passkey and MFA is enabled
       const activeCount = devices.filter(d => d.isActive).length
@@ -183,10 +185,43 @@ function DeviceManagement({ accountAddress, onAddDevice }) {
         return
       }
 
-      // TODO: Implement on-chain passkey removal via modular account UserOperation
-      // For now, show a message that this feature is coming soon
-      setError('On-chain passkey removal is not yet implemented for modular accounts. Coming soon!')
-      return
+      if (!confirm(`Remove on-chain passkey "${displayName}"? This will send a transaction.`)) {
+        return
+      }
+
+      if (!modularSDK) {
+        setError('Modular account SDK not available')
+        return
+      }
+
+      try {
+        setRemoving(device.deviceId)
+        setError('')
+
+        // passkeyId = keccak256(qx, qy)
+        const passkeyId = device.passkeyId || ethers.keccak256(
+          ethers.solidityPacked(['bytes32', 'bytes32'], [device.publicKey.x, device.publicKey.y])
+        )
+
+        console.log('🗑️ Removing passkey on-chain:', { passkeyId, displayName })
+
+        const receipt = await modularSDK.removePasskey({
+          accountAddress,
+          passkeyId,
+          getSigner,
+        })
+
+        console.log('✅ Passkey removed on-chain:', receipt)
+
+        // Also remove from local storage
+        await removeDevice(signMessage, ownerAddress, accountAddress, device.deviceId)
+        await loadDevices()
+      } catch (err) {
+        console.error('Failed to remove passkey:', err)
+        setError(err.message || 'Failed to remove passkey from blockchain')
+      } finally {
+        setRemoving(null)
+      }
     } else {
       // Device is local-only (not on-chain yet) - just remove from local storage
       if (!confirm(`Remove local device "${displayName}"? This action cannot be undone.`)) {

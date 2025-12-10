@@ -3,6 +3,7 @@ import { Lock, Key, AlertCircle } from 'lucide-react'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
 import { useNetwork } from '../contexts/NetworkContext'
 import { useModularAccountManager } from '../hooks/useModularAccount'
+import { useModularAccountSDK } from '../hooks/useModularAccountSDK'
 import { signWithPasskey } from '../utils/webauthn'
 import { passkeyStorage } from '../lib/passkeyStorage'
 import { ethers } from 'ethers'
@@ -15,9 +16,10 @@ import '../styles/PasskeySettings.css'
  * This replaces the old PasskeySettings.jsx which used the timelock pattern
  */
 function PasskeySettingsV2({ accountAddress }) {
-  const { address: ownerAddress, signRawHash, provider: web3AuthProvider } = useWeb3Auth()
+  const { address: ownerAddress, signRawHash, getSigner, provider: web3AuthProvider } = useWeb3Auth()
   const { networkInfo } = useNetwork()
   const modularManager = useModularAccountManager()
+  const modularSDK = useModularAccountSDK()
   const [status, setStatus] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -82,11 +84,37 @@ function PasskeySettingsV2({ accountAddress }) {
       return
     }
 
-    // TODO: Implement MFA toggle via modular account UserOperation
-    // The P256MFAValidatorModule has enableMFA() and disableMFA() methods
-    // that need to be called via the account's execute function
-    setError(`MFA ${enable ? 'enable' : 'disable'} via modular accounts is coming soon!`)
-    return
+    if (!modularSDK) {
+      setError('Modular account SDK not available')
+      return
+    }
+
+    try {
+      setLoading(true)
+      setError('')
+      setStatus(`${enable ? 'Enabling' : 'Disabling'} MFA...`)
+
+      console.log(`🔐 ${enable ? 'Enabling' : 'Disabling'} MFA for account:`, accountAddress)
+
+      let receipt
+      if (enable) {
+        receipt = await modularSDK.enableMFA({ accountAddress, getSigner })
+      } else {
+        receipt = await modularSDK.disableMFA({ accountAddress, getSigner })
+      }
+
+      console.log('✅ MFA toggle complete:', receipt)
+      setStatus(`MFA ${enable ? 'enabled' : 'disabled'} successfully!`)
+
+      // Reload account info
+      await loadAccountInfo()
+    } catch (err) {
+      console.error('Failed to toggle MFA:', err)
+      setError(err.message || `Failed to ${enable ? 'enable' : 'disable'} MFA`)
+      setStatus('')
+    } finally {
+      setLoading(false)
+    }
   }
 
   if (loading && !accountInfo) {

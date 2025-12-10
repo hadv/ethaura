@@ -1,20 +1,20 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { XCircle, CheckCircle } from 'lucide-react'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
 import { useNetwork } from '../contexts/NetworkContext'
-import { signWithPasskey } from '../utils/webauthn'
+import { signWithPasskey, derToRS } from '../utils/webauthn'
 import { formatSignatureForDisplay } from '../utils/signatureUtils'
-import { useP256SDK } from '../hooks/useP256SDK'
+import { useModularAccountSDK } from '../hooks/useModularAccountSDK'
 import { ethers } from 'ethers'
 import { buildSendEthUserOp, getUserOpHash, signUserOperation, signUserOperationOwnerOnly, packAccountGasLimits, packGasFees, encodeExecute } from '../lib/userOperation'
 import { getUserFriendlyMessage, getSuggestedAction, isRetryableError } from '../lib/errors'
-import { formatPublicKeyForContract } from '../lib/accountManager'
 import { SUPPORTED_TOKENS, ERC20_ABI } from '../lib/constants'
 import { walletDataCache } from '../lib/walletDataCache'
 import { getActiveDeviceCredential } from '../lib/deviceManager'
 import { passkeyStorage } from '../lib/passkeyStorage'
 import TokenSelector from './TokenSelector'
 import '../styles/TransactionSender.css'
+import { BundlerClient } from '../lib/bundlerClient'
 
 /**
  * Helper function to load passkey credential from SQLite cache
@@ -41,7 +41,14 @@ async function loadPasskeyCredential(accountAddress) {
 function TransactionSender({ accountAddress, credential, accountConfig, onSignatureRequest, preSelectedToken, onTransactionBroadcast, onAccountInfoChange }) {
   const { isConnected, signMessage, signRawHash, address: ownerAddress } = useWeb3Auth()
   const { networkInfo } = useNetwork()
-  const sdk = useP256SDK()
+  const modularSDK = useModularAccountSDK()
+
+  // Create provider and bundler from network config
+  const provider = useMemo(() => new ethers.JsonRpcProvider(networkInfo.rpcUrl), [networkInfo.rpcUrl])
+  const bundler = useMemo(() => new BundlerClient(networkInfo.bundlerUrl), [networkInfo.bundlerUrl])
+  const entryPointAddress = networkInfo.entryPointAddress
+  const chainId = networkInfo.chainId
+
   const [status, setStatus] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -96,16 +103,16 @@ function TransactionSender({ accountAddress, credential, accountConfig, onSignat
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accountInfo])
 
-  // Load account info (derive from SDK using passkey + owner OR owner-only)
+  // Load account info (derive from modularSDK using passkey + owner OR owner-only)
   useEffect(() => {
     const loadAccountInfo = async () => {
-      if (accountAddress && sdk && ownerAddress) {
+      if (accountAddress && modularSDK && ownerAddress) {
         // Immediately reset state when network changes
         setAccountInfo(null)
 
         try {
           // First, check if account is deployed
-          const isDeployed = await sdk.accountManager.isDeployed(accountAddress)
+          const isDeployed = await modularSDK.isDeployed(accountAddress)
 
           console.log('📋 Loading account info:', {
             accountAddress,
@@ -119,21 +126,21 @@ function TransactionSender({ accountAddress, credential, accountConfig, onSignat
           if (isDeployed) {
             // For deployed accounts, fetch actual on-chain state
             // This is critical after recovery which may have changed the passkey to zero
-            const info = await sdk.getAccountInfo(accountAddress)
+            const info = await modularSDK.getAccountInfo(accountAddress)
 
             console.log('📋 Fetched deployed account info:', {
               address: info.address,
               deployed: info.deployed,
-              twoFactorEnabled: info.twoFactorEnabled,
-              hasPasskey: info.hasPasskey,
-              qx: info.qx,
-              qy: info.qy,
+              mfaEnabled: info.mfaEnabled,
+              hasPasskey: info.passkeys?.length > 0,
             })
 
             setAccountInfo({
               ...info,
               deployed: info.deployed,
               isDeployed: info.deployed,
+              twoFactorEnabled: info.mfaEnabled,
+              hasPasskey: info.passkeys?.length > 0,
             })
           } else {
             // For undeployed accounts, derive from credentials
@@ -215,23 +222,26 @@ function TransactionSender({ accountAddress, credential, accountConfig, onSignat
               passkeyY: passkeyPublicKey?.y?.slice(0, 20) + '...',
             })
 
-            const derived = await sdk.createAccount(passkeyPublicKey, ownerAddress, salt, enable2FA)
-            if (derived.address.toLowerCase() !== accountAddress.toLowerCase()) {
-              console.warn('⚠️  Provided accountAddress differs from derived address from credentials/owner', {
+            // For undeployed modular accounts, we need to compute the address
+            // The modularSDK.computeAddress method handles this
+            const computedAddress = await modularSDK.computeAddress(ownerAddress, salt)
+
+            if (computedAddress.toLowerCase() !== accountAddress.toLowerCase()) {
+              console.warn('⚠️  Provided accountAddress differs from computed address', {
                 provided: accountAddress,
-                derived: derived.address,
+                computed: computedAddress,
                 ownerAddress,
                 salt: salt.toString(),
-                passkeyPublicKey,
-                enable2FA,
               })
-              console.warn('⚠️  This means the account was created with different parameters!')
-              console.warn('⚠️  Address only depends on: owner + salt (NOT passkey)')
             }
+
             // Normalize to shape expected by this component
             setAccountInfo({
-              ...derived,
-              deployed: derived.isDeployed,
+              address: accountAddress,
+              deployed: false,
+              isDeployed: false,
+              twoFactorEnabled: false,
+              mfaEnabled: false,
               hasPasskey: !!passkeyPublicKey,
             })
           }
@@ -267,9 +277,9 @@ function TransactionSender({ accountAddress, credential, accountConfig, onSignat
     loadAccountInfo()
     // NOTE: Removed accountConfig from dependencies to prevent infinite loop
     // accountConfig is an object that gets recreated on every render in parent component
-    // We only need to re-run when accountAddress, sdk, credential, ownerAddress, or chainId changes
+    // We only need to re-run when accountAddress, modularSDK, credential, ownerAddress, or chainId changes
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [accountAddress, sdk, credential, ownerAddress, networkInfo.chainId])
+  }, [accountAddress, modularSDK, credential, ownerAddress, networkInfo.chainId])
 
   // Load available tokens based on network
   useEffect(() => {
@@ -298,17 +308,17 @@ function TransactionSender({ accountAddress, credential, accountConfig, onSignat
 
   // Load balance and deposit info
   const loadBalanceInfo = async (address) => {
-    if (!sdk || !address) return
+    if (!provider || !address) return
 
     try {
       const [accountBalance, entryPointDeposit] = await Promise.all([
-        sdk.provider.getBalance(address),
-        sdk.provider.getBalance(address).then(() => {
+        provider.getBalance(address),
+        provider.getBalance(address).then(() => {
           // Get EntryPoint deposit
           const entryPointContract = new ethers.Contract(
-            sdk.entryPointAddress,
+            entryPointAddress,
             ['function balanceOf(address) view returns (uint256)'],
-            sdk.provider
+            provider
           )
           return entryPointContract.balanceOf(address)
         })
@@ -327,7 +337,7 @@ function TransactionSender({ accountAddress, credential, accountConfig, onSignat
 
   // Load token balances and decimals
   const loadTokenBalances = async (address) => {
-    if (!sdk || !address || availableTokens.length === 0) return
+    if (!provider || !address || availableTokens.length === 0) return
 
     try {
       const balances = {}
@@ -336,7 +346,7 @@ function TransactionSender({ accountAddress, credential, accountConfig, onSignat
       await Promise.all(
         availableTokens.map(async (token) => {
           try {
-            const tokenContract = new ethers.Contract(token.address, ERC20_ABI, sdk.provider)
+            const tokenContract = new ethers.Contract(token.address, ERC20_ABI, provider)
 
             // Fetch decimals from contract if not already cached
             if (!token.decimalsFromChain) {
@@ -362,7 +372,7 @@ function TransactionSender({ accountAddress, credential, accountConfig, onSignat
 
   // Deposit to EntryPoint from EOA
   const depositToEntryPoint = async () => {
-    if (!sdk || !accountAddress || !isConnected) return
+    if (!provider || !accountAddress || !isConnected) return
 
     setDepositLoading(true)
     setError('')
@@ -374,7 +384,7 @@ function TransactionSender({ accountAddress, credential, accountConfig, onSignat
       const signer = await web3authProvider.getSigner()
 
       const entryPointContract = new ethers.Contract(
-        sdk.entryPointAddress,
+        entryPointAddress,
         ['function depositTo(address) payable'],
         signer
       )
@@ -430,7 +440,7 @@ function TransactionSender({ accountAddress, credential, accountConfig, onSignat
       setStatus('Reading on-chain account state...')
 
       // Check if account is deployed by reading code directly
-      const accountCode = await sdk.provider.getCode(accountAddress)
+      const accountCode = await provider.getCode(accountAddress)
       const isActuallyDeployed = accountCode !== '0x'
 
       console.log('📝 Deployment check:', {
@@ -448,14 +458,15 @@ function TransactionSender({ accountAddress, credential, accountConfig, onSignat
       if (isActuallyDeployed) {
         console.log('🔄 Reading on-chain state DIRECTLY from contract...')
 
-        // Read directly from contract - bypass all caching
+        // For modular accounts, read from P256MFAValidatorModule
+        // First check if this is a modular account by checking for the validator module
         const accountContract = new ethers.Contract(
           accountAddress,
           [
             'function getPasskeyByIndex(uint256 index) view returns (bytes32 passkeyId, bytes32 qx, bytes32 qy, uint256 addedAt, bool active)',
-            'function twoFactorEnabled() view returns (bool)',
+            'function mfaEnabled() view returns (bool)',
           ],
-          sdk.provider
+          provider
         )
 
         let qx = '0x0000000000000000000000000000000000000000000000000000000000000000'
@@ -473,18 +484,24 @@ function TransactionSender({ accountAddress, credential, accountConfig, onSignat
           // No passkeys configured
         }
 
-        const twoFactorEnabled = await accountContract.twoFactorEnabled()
+        // For modular accounts, mfaEnabled is the equivalent of twoFactorEnabled
+        let mfaEnabled = false
+        try {
+          mfaEnabled = await accountContract.mfaEnabled()
+        } catch {
+          // mfaEnabled might not exist on older contracts
+        }
 
         onChainQx = qx
         onChainQy = qy
-        onChainTwoFactorEnabled = twoFactorEnabled
+        onChainTwoFactorEnabled = mfaEnabled
 
         console.log('✅ On-chain state (direct from contract):', {
           accountAddress,
           qx: onChainQx,
           qy: onChainQy,
           passkeyId,
-          twoFactorEnabled: onChainTwoFactorEnabled,
+          mfaEnabled: onChainTwoFactorEnabled,
         })
 
         // Update currentAccountInfo with on-chain values
@@ -494,6 +511,7 @@ function TransactionSender({ accountAddress, credential, accountConfig, onSignat
           qy: onChainQy,
           passkeyId,
           twoFactorEnabled: onChainTwoFactorEnabled,
+          mfaEnabled: onChainTwoFactorEnabled,
           hasPasskey: onChainQx !== '0x0000000000000000000000000000000000000000000000000000000000000000',
           isDeployed: true,
           deployed: true,
@@ -512,39 +530,23 @@ function TransactionSender({ accountAddress, credential, accountConfig, onSignat
         }
 
         if (credentialToCheck?.publicKey) {
-          console.log('🔑 Found local passkey - will deploy with passkey and 2FA enabled!')
-          const { qx: passkeyQx, qy: passkeyQy } = formatPublicKeyForContract(credentialToCheck.publicKey)
-          onChainQx = passkeyQx
-          onChainQy = passkeyQy
-          // IMPORTANT: Enable 2FA so passkey is required for all transactions
-          // This matches EthAura security model: passkey required, owner cannot bypass
+          console.log('🔑 Found local passkey - will deploy with passkey and MFA enabled!')
+          // For modular accounts, we use the modularSDK to get initCode
           onChainTwoFactorEnabled = true
 
-          // CRITICAL: Regenerate initCode with the passkey AND 2FA enabled
-          console.log('🔄 Regenerating initCode with passkey and 2FA...')
-          const newInitCode = await sdk.accountManager.getInitCode(
-            passkeyQx,
-            passkeyQy,
-            accountInfo.owner,
-            accountInfo.salt || 0n,
-            true, // Enable 2FA so passkey is required for all transactions
-            ethers.ZeroHash // deviceId
-          )
+          // Get initCode from modularSDK
+          const initCode = await modularSDK.getInitCode(ownerAddress, accountInfo?.salt || 0n)
 
           // Update currentAccountInfo with new initCode
           currentAccountInfo = {
             ...accountInfo,
-            qx: passkeyQx,
-            qy: passkeyQy,
             twoFactorEnabled: true,
-            initCode: newInitCode,
+            initCode,
           }
 
-          console.log('✅ InitCode regenerated with passkey + 2FA:', {
-            qx: passkeyQx,
-            qy: passkeyQy,
-            twoFactorEnabled: true,
-            initCodeLength: newInitCode.length,
+          console.log('✅ InitCode generated for modular account:', {
+            mfaEnabled: true,
+            initCodeLength: initCode.length,
           })
         } else {
           console.log('📋 No local passkey found - deploying in owner-only mode')
@@ -619,12 +621,12 @@ function TransactionSender({ accountAddress, credential, accountConfig, onSignat
 
           // Get on-chain passkeys to match against
           let onChainPasskeys = []
-          if (currentAccountInfo.isDeployed && sdk) {
+          if (currentAccountInfo.isDeployed && provider) {
             try {
               const accountContract = new ethers.Contract(
                 accountAddress,
                 ['function getPasskeys() view returns (tuple(bytes32 passkeyId, bytes32 qx, bytes32 qy, uint256 addedAt, bool active)[] memory)'],
-                sdk.provider
+                provider
               )
               const passkeys = await accountContract.getPasskeys()
               onChainPasskeys = passkeys.filter(p => p.active).map(p => ({
@@ -706,7 +708,7 @@ function TransactionSender({ accountAddress, credential, accountConfig, onSignat
             const accountContract = new ethers.Contract(
               accountAddress,
               ['function getPasskeys() view returns (tuple(bytes32 passkeyId, bytes32 qx, bytes32 qy, uint256 addedAt, bool active)[] memory)'],
-              sdk.provider
+              provider
             )
 
             // Get all passkeys and find a match
@@ -746,7 +748,7 @@ function TransactionSender({ accountAddress, credential, accountConfig, onSignat
       setStatus('Fetching gas prices from Pimlico...')
       let gasPrices = null
       try {
-        const pimlicoGasPrice = await sdk.bundler.getUserOperationGasPrice()
+        const pimlicoGasPrice = await bundler.getUserOperationGasPrice()
         if (pimlicoGasPrice && pimlicoGasPrice.fast) {
           gasPrices = {
             maxFeePerGas: BigInt(pimlicoGasPrice.fast.maxFeePerGas),
@@ -763,9 +765,10 @@ function TransactionSender({ accountAddress, credential, accountConfig, onSignat
 
       // Batch RPC calls to reduce rate limiting
       // Get balance and factory code in parallel (we already have accountCode from earlier)
+      const factoryAddress = networkInfo.factoryAddress
       const [accountBalance, factoryCode] = await Promise.all([
-        sdk.provider.getBalance(accountAddress),
-        !isActuallyDeployed ? sdk.provider.getCode(sdk.accountManager.factoryAddress) : Promise.resolve('0x'),
+        provider.getBalance(accountAddress),
+        !isActuallyDeployed ? provider.getCode(factoryAddress) : Promise.resolve('0x'),
       ])
 
       console.log('🏗️ Building UserOperation:', {
@@ -788,46 +791,17 @@ function TransactionSender({ accountAddress, credential, accountConfig, onSignat
       // Check if factory is deployed (only if account not deployed yet)
       if (!isActuallyDeployed) {
         console.log('🏭 Factory deployed:', factoryCode !== '0x')
-        console.log('🏭 Factory address:', sdk.accountManager.factoryAddress)
+        console.log('🏭 Factory address:', factoryAddress)
 
         if (factoryCode === '0x') {
-          throw new Error(`Factory not deployed at ${sdk.accountManager.factoryAddress}! Please deploy the factory first.`)
+          throw new Error(`Factory not deployed at ${factoryAddress}! Please deploy the factory first.`)
         }
       }
 
       // Verify public key matches (only for passkey accounts)
+      // For modular accounts, passkey verification is handled by the validator module
       if (!isOwnerOnly && credential?.publicKey) {
-        const { qx: credQx, qy: credQy } = formatPublicKeyForContract(credential.publicKey)
-        const qxMatches = credQx === currentAccountInfo.qx
-        const qyMatches = credQy === currentAccountInfo.qy
-
-        console.log('🔍 Public key verification:', {
-          credentialQx: credQx,
-          credentialQy: credQy,
-          accountQx: currentAccountInfo.qx,
-          accountQy: currentAccountInfo.qy,
-          qxMatches,
-          qyMatches,
-        })
-
-        if (!qxMatches || !qyMatches) {
-          throw new Error(
-            `❌ PUBLIC KEY MISMATCH!\n\n` +
-            `Your passkey's public key does NOT match the account's public key.\n\n` +
-            `This means you're trying to sign with a DIFFERENT passkey than the one that created the account.\n\n` +
-            `Solutions:\n` +
-            `1. Delete the current passkey and create a NEW account with a new passkey\n` +
-            `2. Or use the SAME passkey that created account ${accountAddress}\n\n` +
-            `Credential Public Key:\n` +
-            `  qx: ${credQx}\n` +
-            `  qy: ${credQy}\n\n` +
-            `Account Public Key (on-chain):\n` +
-            `  qx: ${currentAccountInfo.qx}\n` +
-            `  qy: ${currentAccountInfo.qy}`
-          )
-        }
-
-        console.log('✅ Public key matches! Proceeding with signature...')
+        console.log('🔍 Passkey verification will be done by P256MFAValidatorModule on-chain')
       }
 
       // Build UserOp based on whether we're sending ETH or ERC-20 token
@@ -835,7 +809,7 @@ function TransactionSender({ accountAddress, credential, accountConfig, onSignat
       if (selectedToken && selectedToken !== 'ETH') {
         // Fetch decimals from contract if not already cached
         if (!selectedToken.decimalsFromChain) {
-          const tokenContract = new ethers.Contract(selectedToken.address, ERC20_ABI, sdk.provider)
+          const tokenContract = new ethers.Contract(selectedToken.address, ERC20_ABI, provider)
           const decimals = await tokenContract.decimals()
           selectedToken.decimalsFromChain = Number(decimals)
           console.log(`📊 Fetched decimals for ${selectedToken.symbol}:`, selectedToken.decimalsFromChain)
@@ -859,8 +833,8 @@ function TransactionSender({ accountAddress, credential, accountConfig, onSignat
 
         // Build UserOp with execute call to token contract
         const { getNonce, getGasPrices, createUserOperation } = await import('../lib/userOperation.js')
-        const nonce = await getNonce(accountAddress, sdk.provider)
-        const { maxFeePerGas, maxPriorityFeePerGas } = await getGasPrices(sdk.provider)
+        const nonce = await getNonce(accountAddress, provider)
+        const { maxFeePerGas, maxPriorityFeePerGas } = await getGasPrices(provider)
         const callData = encodeExecute(selectedToken.address, 0n, transferData)
 
         userOp = createUserOperation({
@@ -877,7 +851,7 @@ function TransactionSender({ accountAddress, credential, accountConfig, onSignat
           accountAddress,
           targetAddress,
           amount: amountWei,
-          provider: sdk.provider,
+          provider: provider,
           needsDeployment: !isActuallyDeployed,
           initCode: isActuallyDeployed ? '0x' : currentAccountInfo.initCode,
         })
@@ -901,7 +875,7 @@ function TransactionSender({ accountAddress, credential, accountConfig, onSignat
       // Step 1.5: Ask bundler to estimate gas and apply it before hashing/signing
       setStatus('Estimating gas with bundler...')
       try {
-        const est = await sdk.bundler.estimateUserOperationGas(userOp)
+        const est = await bundler.estimateUserOperationGas(userOp)
         const toBig = (v) => (typeof v === 'string' ? BigInt(v) : BigInt(v))
         const callGas = toBig(est.callGasLimit)
         let verifGas = toBig(est.verificationGasLimit)
@@ -935,7 +909,7 @@ function TransactionSender({ accountAddress, credential, accountConfig, onSignat
 
       // Step 2: Get userOpHash
       setStatus('Computing userOpHash...')
-      const userOpHash = await getUserOpHash(userOp, sdk.provider, sdk.chainId)
+      const userOpHash = await getUserOpHash(userOp, provider, chainId)
       const userOpHashBytes = ethers.getBytes(userOpHash)
 
       console.log('🔐 UserOpHash:', {
@@ -1095,7 +1069,7 @@ function TransactionSender({ accountAddress, credential, accountConfig, onSignat
           clientDataJSONHash: await crypto.subtle.digest('SHA-256', new TextEncoder().encode(passkeySignatureRaw.clientDataJSON)),
         })
 
-        const { r, s } = sdk.derToRS(passkeySignatureRaw.signature)
+        const { r, s } = derToRS(passkeySignatureRaw.signature)
         const passkeyR = '0x' + r
         const passkeyS = '0x' + s
 
@@ -1150,7 +1124,7 @@ function TransactionSender({ accountAddress, credential, accountConfig, onSignat
 
       // Step 8: Submit UserOperation to bundler
       setStatus('Submitting to bundler...')
-      const userOpReceipt = await sdk.bundler.sendUserOperationAndWait(signedUserOp)
+      const userOpReceipt = await bundler.sendUserOperationAndWait(signedUserOp)
 
       // Extract transaction hash from the receipt
       // ERC-4337 receipt has a nested 'receipt' field with the actual transaction receipt
@@ -1195,9 +1169,8 @@ function TransactionSender({ accountAddress, credential, accountConfig, onSignat
         // Fallback: Add to cache immediately (old behavior)
         await walletDataCache.addTransactionToCache(accountAddress, networkInfo.name, transactionData)
 
-        // Clear cache and refresh account info
-        sdk.accountManager.clearCache(accountAddress)
-        const updatedInfo = await sdk.getAccountInfo(accountAddress)
+        // Refresh account info
+        const updatedInfo = await modularSDK.getAccountInfo(accountAddress)
         setAccountInfo({ ...updatedInfo, deployed: updatedInfo.deployed })
 
         // Reload balances
@@ -1232,11 +1205,11 @@ function TransactionSender({ accountAddress, credential, accountConfig, onSignat
 
   // Load balance when component mounts or network changes
   useEffect(() => {
-    if (accountAddress && sdk) {
+    if (accountAddress && provider) {
       loadBalanceInfo(accountAddress)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [accountAddress, sdk, networkInfo.chainId])
+  }, [accountAddress, provider, networkInfo.chainId])
 
   // Calculate USD value
   const getUSDValue = () => {

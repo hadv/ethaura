@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from 'react'
 import { TrendingUp, TrendingDown, AlertTriangle, Lightbulb, ArrowLeftRight, ArrowUp, ArrowDown, MoreVertical, Plus, Pencil, Trash2, Wallet, Layers } from 'lucide-react'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
 import { useNetwork } from '../contexts/NetworkContext'
-import { useP256SDK } from '../hooks/useP256SDK'
 import { useModularAccountManager } from '../hooks/useModularAccount'
 import { ethers } from 'ethers'
 import Header from '../components/Header'
@@ -20,7 +19,6 @@ import logo from '../assets/logo.svg'
 function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onSwap, onLogout }) {
   const { userInfo, address: ownerAddress } = useWeb3Auth()
   const { networkInfo } = useNetwork()
-  const sdk = useP256SDK()
   const modularManager = useModularAccountManager()
   const [wallets, setWallets] = useState([])
   const [loading, setLoading] = useState(false)
@@ -31,7 +29,6 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onSwap
   const [walletIndex, setWalletIndex] = useState('0')
   const [addError, setAddError] = useState('')
   const [isAdding, setIsAdding] = useState(false)
-  const [accountType, setAccountType] = useState('modular') // 'legacy' or 'modular'
 
   // Menu and modal states
   const [openMenuId, setOpenMenuId] = useState(null)
@@ -372,25 +369,19 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onSwap
       return
     }
 
-    // Check if SDK is ready (for legacy) or modular manager (for modular)
-    const isModular = accountType === 'modular'
-    if (isModular && !modularManager) {
-      setAddError('Modular accounts not available on this network. Please use legacy account type.')
-      return
-    }
-    if (!isModular && !sdk) {
-      setAddError('SDK not initialized. Please try again.')
+    // Check if modular manager is ready
+    if (!modularManager) {
+      setAddError('Modular accounts not available on this network.')
       return
     }
 
     // Get existing wallets to check for duplicate index
     const walletsList = await walletsStore.getWallets()
 
-    // Check if this index has already been used by this owner (for same account type)
+    // Check if this index has already been used by this owner
     const existingWallet = walletsList.find(w =>
       w.index === indexNum &&
-      w.owner === ownerAddress &&
-      (w.isModular || false) === isModular
+      w.owner === ownerAddress
     )
     if (existingWallet) {
       setAddError(`Index ${indexNum} is already used for this owner. The wallet already exists at ${existingWallet.address}. Please use a different index (e.g., ${indexNum + 1}).`)
@@ -402,41 +393,19 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onSwap
 
     try {
       const saltBigInt = BigInt(indexNum)
-      let accountAddress
-      let isDeployed = false
 
       console.log('🔧 Creating new wallet:', {
         owner: ownerAddress,
         index: indexNum,
         name: walletName.trim(),
-        type: isModular ? 'modular (ERC-7579)' : 'legacy (P256Account)',
+        type: 'modular (ERC-7579)',
       })
 
-      if (isModular) {
-        // Create modular account (ERC-7579 AuraAccount)
-        console.log('🏗️ Creating modular account via AuraAccountFactory...')
-        accountAddress = await modularManager.getAccountAddress(ownerAddress, saltBigInt)
-        isDeployed = await modularManager.isDeployed(accountAddress)
-        console.log('📍 Modular account address:', accountAddress, 'deployed:', isDeployed)
-      } else {
-        // Create legacy account (P256Account)
-        console.log('🏗️ Creating legacy account via P256AccountFactory...')
-        const createAccountPromise = sdk.createAccount(
-          null, // no passkey - owner-only mode
-          ownerAddress,
-          saltBigInt,
-          false // 2FA disabled
-        )
-
-        const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Account creation timed out after 45 seconds.')), 45000)
-        )
-
-        const accountData = await Promise.race([createAccountPromise, timeoutPromise])
-        accountAddress = accountData.address
-        isDeployed = accountData.isDeployed
-        console.log('📍 Legacy account address:', accountAddress, 'deployed:', isDeployed)
-      }
+      // Create modular account (ERC-7579 AuraAccount)
+      console.log('🏗️ Creating modular account via AuraAccountFactory...')
+      const accountAddress = await modularManager.getAccountAddress(ownerAddress, saltBigInt)
+      const isDeployed = await modularManager.isDeployed(accountAddress)
+      console.log('📍 Modular account address:', accountAddress, 'deployed:', isDeployed)
 
       // Double-check if wallet already exists (by address)
       const exists = walletsList.some(w => w.address.toLowerCase() === accountAddress.toLowerCase())
@@ -858,48 +827,6 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onSwap
                       onChange={(e) => setWalletName(e.target.value)}
                       maxLength={30}
                     />
-                  </div>
-
-                  {/* Account Type Selector */}
-                  <div className="form-group">
-                    <label className="form-label-with-info">
-                      <span>Account Type</span>
-                      <div className="info-icon-wrapper">
-                        <span className="info-icon-btn"></span>
-                        <div className="info-tooltip">
-                          <div className="tooltip-section">
-                            <strong>Modular (ERC-7579):</strong>
-                            <p>Next-gen modular smart account with pluggable modules for session keys, spending limits, and more.</p>
-                          </div>
-                          <div className="tooltip-section">
-                            <strong>Legacy (P256Account):</strong>
-                            <p>Original smart account with built-in passkey support and guardian recovery.</p>
-                          </div>
-                        </div>
-                      </div>
-                    </label>
-                    <div className="account-type-selector">
-                      <button
-                        type="button"
-                        className={`account-type-btn ${accountType === 'modular' ? 'active' : ''}`}
-                        onClick={() => setAccountType('modular')}
-                        disabled={!modularManager}
-                      >
-                        <Layers size={16} />
-                        <span>Modular (ERC-7579)</span>
-                      </button>
-                      <button
-                        type="button"
-                        className={`account-type-btn ${accountType === 'legacy' ? 'active' : ''}`}
-                        onClick={() => setAccountType('legacy')}
-                      >
-                        <Wallet size={16} />
-                        <span>Legacy</span>
-                      </button>
-                    </div>
-                    {!modularManager && (
-                      <p className="form-hint warning">Modular accounts not available on this network</p>
-                    )}
                   </div>
 
                   <div className="form-group">

@@ -1,9 +1,9 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { ArrowDownUp, AlertCircle, Loader } from 'lucide-react'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
 import { useNetwork } from '../contexts/NetworkContext'
 import { useToast } from '../contexts/ToastContext'
-import { useP256SDK } from '../hooks/useP256SDK'
+import { useModularAccountSDK } from '../hooks/useModularAccountSDK'
 import { signWithPasskey } from '../utils/webauthn'
 import { UniswapV3Service } from '../lib/uniswapService'
 import { SUPPORTED_TOKENS } from '../lib/constants'
@@ -23,7 +23,8 @@ function SwapScreen({ wallet, onBack, onHome, onSettings, onLogout, onWalletChan
   const { userInfo, address: ownerAddress } = useWeb3Auth()
   const { networkInfo } = useNetwork()
   const { showSwapSuccess, showSwapError } = useToast()
-  const sdk = useP256SDK()
+  const modularSDK = useModularAccountSDK()
+  const provider = useMemo(() => new ethers.JsonRpcProvider(networkInfo.rpcUrl), [networkInfo.rpcUrl])
 
   // Wallet state
   const [wallets, setWallets] = useState([])

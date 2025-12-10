@@ -1,12 +1,18 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { XCircle, Lightbulb } from 'lucide-react'
+import { XCircle, Lightbulb, AlertTriangle } from 'lucide-react'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
-import { useP256SDK } from '../hooks/useP256SDK'
+import { useModularAccountSDK } from '../hooks/useModularAccountSDK'
 import { signWithPasskey } from '../utils/webauthn'
 import '../styles/GuardianManager.css'
 
+/**
+ * GuardianManager for ERC-7579 modular accounts
+ * Uses SocialRecoveryModule for guardian management
+ * TODO: Implement SocialRecoveryModule integration
+ */
 function GuardianManager({ accountAddress, credential, onGuardiansUpdated }) {
   const { isConnected, address: ownerAddress, provider: web3AuthProvider } = useWeb3Auth()
+  const modularSDK = useModularAccountSDK()
   const [status, setStatus] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -14,23 +20,22 @@ function GuardianManager({ accountAddress, credential, onGuardiansUpdated }) {
   const [removeGuardianAddress, setRemoveGuardianAddress] = useState('')
   const [newThreshold, setNewThreshold] = useState('')
   const [guardianInfo, setGuardianInfo] = useState(null)
-
-  // Use SDK from hook (will use network from context)
-  const sdk = useP256SDK()
+  const [isModularAccount, setIsModularAccount] = useState(true) // Assume modular for now
 
   // Use ref to track if we've already loaded guardian info for this address
   const loadedAddressRef = useRef(null)
 
   // Fetch guardian info
+  // TODO: Integrate with SocialRecoveryModule for modular accounts
   const fetchGuardianInfo = useCallback(async () => {
-    if (!accountAddress || !sdk) return
+    if (!accountAddress || !modularSDK) return
 
     // Clear any previous errors
     setError('')
 
     try {
       // Check if account is deployed first
-      const isDeployed = await sdk.accountManager.isDeployed(accountAddress)
+      const isDeployed = await modularSDK.isDeployed(accountAddress)
       if (!isDeployed) {
         console.log('⏭️ Account not deployed yet, skipping guardian fetch')
         setGuardianInfo(null)
@@ -38,11 +43,14 @@ function GuardianManager({ accountAddress, credential, onGuardiansUpdated }) {
         return
       }
 
-      const info = await sdk.getGuardians(accountAddress)
-      setGuardianInfo(info)
-      if (onGuardiansUpdated) {
-        onGuardiansUpdated(info)
-      }
+      // For modular accounts, guardian management is via SocialRecoveryModule
+      // TODO: Read guardians from SocialRecoveryModule
+      console.log('📝 Guardian management for modular accounts not yet implemented')
+      setGuardianInfo({
+        guardians: [],
+        threshold: 0,
+        pendingRecoveries: [],
+      })
 
       // Clear error on success
       setError('')
@@ -50,7 +58,7 @@ function GuardianManager({ accountAddress, credential, onGuardiansUpdated }) {
       console.error('Error fetching guardian info:', err)
       setError(`Failed to load guardian information: ${err.message}`)
     }
-  }, [accountAddress, sdk, onGuardiansUpdated])
+  }, [accountAddress, modularSDK, onGuardiansUpdated])
 
   // Load guardian info on mount or when address changes
   useEffect(() => {
@@ -64,192 +72,29 @@ function GuardianManager({ accountAddress, credential, onGuardiansUpdated }) {
     setLoading(false)
 
     // Fetch when address or SDK changes (SDK changes when network changes)
-    if (accountAddress && sdk) {
+    if (accountAddress && modularSDK) {
       loadedAddressRef.current = accountAddress
       fetchGuardianInfo()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [accountAddress, sdk])
+  }, [accountAddress, modularSDK])
 
   const handleAddGuardian = async () => {
-    if (!guardianAddress) {
-      setError('Please enter a guardian address')
-      return
-    }
-
-    if (!credential) {
-      setError('Please create a passkey first')
-      return
-    }
-
-    if (!isConnected || !ownerAddress) {
-      setError('Please login with Web3Auth first')
-      return
-    }
-
-    setLoading(true)
-    setError('')
-    setStatus('Adding guardian...')
-
-    try {
-      // Get owner signature for 2FA
-      const signer = await web3AuthProvider.getSigner()
-      const message = `Add guardian: ${guardianAddress}`
-      const ownerSignature = await signer.signMessage(message)
-
-      console.log('🔐 Adding guardian:', {
-        accountAddress,
-        guardianAddress,
-        ownerSignature: ownerSignature.slice(0, 20) + '...',
-      })
-
-      // Add guardian via SDK
-      const receipt = await sdk.addGuardian({
-        accountAddress,
-        guardianAddress,
-        passkeyCredential: credential,
-        signWithPasskey,
-        ownerSignature,
-      })
-
-      console.log('✅ Guardian added:', receipt)
-
-      setStatus('✅ Guardian added successfully!')
-      setGuardianAddress('')
-      
-      // Refresh guardian info
-      await fetchGuardianInfo()
-
-    } catch (err) {
-      console.error('Error adding guardian:', err)
-      setError(err.message || 'Failed to add guardian')
-      setStatus('')
-    } finally {
-      setLoading(false)
-    }
+    // TODO: Implement via SocialRecoveryModule for modular accounts
+    setError('Guardian management for modular accounts coming soon. SocialRecoveryModule integration pending.')
+    return
   }
 
   const handleRemoveGuardian = async () => {
-    if (!removeGuardianAddress) {
-      setError('Please enter a guardian address to remove')
-      return
-    }
-
-    if (!credential) {
-      setError('Please create a passkey first')
-      return
-    }
-
-    if (!isConnected || !ownerAddress) {
-      setError('Please login with Web3Auth first')
-      return
-    }
-
-    setLoading(true)
-    setError('')
-    setStatus('Removing guardian...')
-
-    try {
-      // Get owner signature for 2FA
-      const signer = await web3AuthProvider.getSigner()
-      const message = `Remove guardian: ${removeGuardianAddress}`
-      const ownerSignature = await signer.signMessage(message)
-
-      console.log('🔐 Removing guardian:', {
-        accountAddress,
-        guardianAddress: removeGuardianAddress,
-        ownerSignature: ownerSignature.slice(0, 20) + '...',
-      })
-
-      // Remove guardian via SDK
-      const receipt = await sdk.removeGuardian({
-        accountAddress,
-        guardianAddress: removeGuardianAddress,
-        passkeyCredential: credential,
-        signWithPasskey,
-        ownerSignature,
-      })
-
-      console.log('✅ Guardian removed:', receipt)
-
-      setStatus('✅ Guardian removed successfully!')
-      setRemoveGuardianAddress('')
-      
-      // Refresh guardian info
-      await fetchGuardianInfo()
-
-    } catch (err) {
-      console.error('Error removing guardian:', err)
-      setError(err.message || 'Failed to remove guardian')
-      setStatus('')
-    } finally {
-      setLoading(false)
-    }
+    // TODO: Implement via SocialRecoveryModule for modular accounts
+    setError('Guardian management for modular accounts coming soon. SocialRecoveryModule integration pending.')
+    return
   }
 
   const handleSetThreshold = async () => {
-    const threshold = parseInt(newThreshold)
-    
-    if (!threshold || threshold < 1) {
-      setError('Please enter a valid threshold (minimum 1)')
-      return
-    }
-
-    if (guardianInfo && threshold > guardianInfo.guardians.length) {
-      setError(`Threshold cannot exceed number of guardians (${guardianInfo.guardians.length})`)
-      return
-    }
-
-    if (!credential) {
-      setError('Please create a passkey first')
-      return
-    }
-
-    if (!isConnected || !ownerAddress) {
-      setError('Please login with Web3Auth first')
-      return
-    }
-
-    setLoading(true)
-    setError('')
-    setStatus('Setting guardian threshold...')
-
-    try {
-      // Get owner signature for 2FA
-      const signer = await web3AuthProvider.getSigner()
-      const message = `Set guardian threshold: ${threshold}`
-      const ownerSignature = await signer.signMessage(message)
-
-      console.log('🔐 Setting threshold:', {
-        accountAddress,
-        threshold,
-        ownerSignature: ownerSignature.slice(0, 20) + '...',
-      })
-
-      // Set threshold via SDK
-      const receipt = await sdk.setGuardianThreshold({
-        accountAddress,
-        threshold,
-        passkeyCredential: credential,
-        signWithPasskey,
-        ownerSignature,
-      })
-
-      console.log('✅ Threshold set:', receipt)
-
-      setStatus('✅ Guardian threshold updated successfully!')
-      setNewThreshold('')
-      
-      // Refresh guardian info
-      await fetchGuardianInfo()
-
-    } catch (err) {
-      console.error('Error setting threshold:', err)
-      setError(err.message || 'Failed to set threshold')
-      setStatus('')
-    } finally {
-      setLoading(false)
-    }
+    // TODO: Implement via SocialRecoveryModule for modular accounts
+    setError('Guardian management for modular accounts coming soon. SocialRecoveryModule integration pending.')
+    return
   }
 
   if (!accountAddress) {
@@ -264,6 +109,12 @@ function GuardianManager({ accountAddress, credential, onGuardiansUpdated }) {
 
   return (
     <div className="guardian-manager">
+      {/* Modular Account Notice */}
+      <div className="info-box info-box-warning" style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+        <AlertTriangle size={18} />
+        <p style={{ margin: 0 }}>Guardian management for modular accounts is coming soon. SocialRecoveryModule integration pending.</p>
+      </div>
+
       <div className="guardian-layout">
         {/* Main Content - Left Column */}
         <div className="guardian-main">

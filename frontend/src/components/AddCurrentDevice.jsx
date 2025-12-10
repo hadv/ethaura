@@ -3,6 +3,7 @@ import { ethers } from 'ethers'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
 import { useNetwork } from '../contexts/NetworkContext'
 import { useModularAccountManager } from '../hooks/useModularAccount'
+import { useModularAccountSDK } from '../hooks/useModularAccountSDK'
 import { parsePublicKey, verifyAttestation, signWithPasskey } from '../utils/webauthn'
 import { addDevice } from '../lib/deviceManager'
 import { passkeyStorage } from '../lib/passkeyStorage'
@@ -13,9 +14,10 @@ import '../styles/AddCurrentDevice.css'
  * Uses modular account P256MFAValidatorModule for passkey management
  */
 function AddCurrentDeviceV2({ accountAddress, onComplete, onCancel }) {
-  const { address: ownerAddress, provider, signMessage, signRawHash } = useWeb3Auth()
+  const { address: ownerAddress, provider, signMessage, signRawHash, getSigner } = useWeb3Auth()
   const { networkInfo } = useNetwork()
   const modularManager = useModularAccountManager()
+  const modularSDK = useModularAccountSDK()
   const [deviceName, setDeviceName] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -161,24 +163,31 @@ function AddCurrentDeviceV2({ accountAddress, onComplete, onCancel }) {
       // Check if account is deployed using modular manager
       const isDeployed = modularManager ? await modularManager.isDeployed(accountAddress) : false
 
-      if (isDeployed && modularManager) {
-        // Account is deployed - for modular accounts, on-chain passkey addition
-        // requires a UserOperation. This will be implemented in a future update.
-        // For now, the passkey is saved locally and can be used once on-chain support is added.
-        console.log('📝 Passkey saved locally for modular account:', {
-          qx: publicKey.x,
-          qy: publicKey.y,
-          deviceId: ethers.id(deviceName.trim()),
+      if (isDeployed && modularSDK) {
+        // Account is deployed - add passkey on-chain via UserOperation
+        setStatus('Adding passkey to blockchain...')
+
+        const qx = publicKey.x
+        const qy = publicKey.y
+        const deviceId = ethers.id(deviceName.trim())
+
+        console.log('📝 Adding passkey on-chain for modular account:', { qx, qy, deviceId })
+
+        // Execute addPasskey via ModularAccountSDK
+        const receipt = await modularSDK.addPasskey({
+          accountAddress,
+          qx,
+          qy,
+          deviceId,
+          getSigner,
         })
 
-        // TODO: Implement on-chain passkey addition via modular account UserOperation
-        // The P256MFAValidatorModule has addPasskey(bytes32 qx, bytes32 qy, bytes32 deviceId)
-        // that needs to be called via the account's execute function
-        setStatus('✅ Passkey saved locally! On-chain registration for modular accounts coming soon.')
+        console.log('✅ Passkey added on-chain:', receipt)
+        setStatus('Passkey registered on blockchain!')
       } else {
         // Account not deployed yet - passkey will be used during account deployment
         // The passkey public key will be included in the initCode's validatorData
-        setStatus('✅ Passkey saved! It will be registered on the blockchain when the account is deployed.')
+        setStatus('Passkey saved! It will be registered on the blockchain when the account is deployed.')
       }
 
       // Wait a moment then complete

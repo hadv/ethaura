@@ -3,6 +3,7 @@ import { QRCodeSVG } from 'qrcode.react'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
 import { useNetwork } from '../contexts/NetworkContext'
 import { useModularAccountManager } from '../hooks/useModularAccount'
+import { useModularAccountSDK } from '../hooks/useModularAccountSDK'
 import { createDeviceSession, pollSessionUntilComplete, addDevice } from '../lib/deviceManager'
 import { signWithPasskey } from '../utils/webauthn'
 import { passkeyStorage } from '../lib/passkeyStorage'
@@ -14,9 +15,10 @@ import '../styles/AddMobileDevice.css'
  * Uses modular account P256MFAValidatorModule for passkey management
  */
 function AddMobileDeviceV2({ accountAddress, onComplete, onCancel }) {
-  const { address: ownerAddress, signMessage, signRawHash } = useWeb3Auth()
+  const { address: ownerAddress, signMessage, signRawHash, getSigner } = useWeb3Auth()
   const { networkInfo } = useNetwork()
   const modularManager = useModularAccountManager()
+  const modularSDK = useModularAccountSDK()
   const [sessionId, setSessionId] = useState(null)
   const [qrUrl, setQrUrl] = useState('')
   const [loading, setLoading] = useState(false)
@@ -109,20 +111,29 @@ function AddMobileDeviceV2({ accountAddress, onComplete, onCancel }) {
 
         console.log('🔍 Account deployment status:', { accountAddress, isDeployed })
 
-        if (isDeployed && modularManager) {
-          // Account is deployed - for modular accounts, on-chain passkey addition
-          // requires a UserOperation. This will be implemented in a future update.
-          console.log('📝 Mobile passkey saved locally for modular account:', {
-            qx: deviceData.qx,
-            qy: deviceData.qy,
-            deviceId: ethers.id(deviceData.deviceName),
+        if (isDeployed && modularSDK) {
+          // Account is deployed - add passkey on-chain via UserOperation
+          setStatus('Adding passkey to blockchain...')
+
+          const qx = deviceData.qx
+          const qy = deviceData.qy
+          const deviceId = ethers.id(deviceData.deviceName)
+
+          console.log('📝 Adding mobile passkey on-chain:', { qx, qy, deviceId })
+
+          const receipt = await modularSDK.addPasskey({
+            accountAddress,
+            qx,
+            qy,
+            deviceId,
+            getSigner,
           })
 
-          // TODO: Implement on-chain passkey addition via modular account UserOperation
-          setStatus('✅ Mobile passkey saved! On-chain registration for modular accounts coming soon.')
+          console.log('✅ Mobile passkey added on-chain:', receipt)
+          setStatus('Mobile passkey registered on blockchain!')
         } else {
           // Account not deployed yet - passkey will be used during account deployment
-          setStatus('✅ Device saved! It will be added to the blockchain when you deploy this account.')
+          setStatus('Device saved! It will be added to the blockchain when you deploy this account.')
         }
 
         setTimeout(() => {

@@ -72,6 +72,86 @@ export const MODULE_TYPE = {
   HOOK: 4,
 }
 
+// ERC-7579 Mode constants
+// Mode = callType (1 byte) + execType (1 byte) + unused (4 bytes) + modeSelector (4 bytes) + modePayload (22 bytes)
+export const CALLTYPE_SINGLE = '0x00'
+export const CALLTYPE_BATCH = '0x01'
+export const EXECTYPE_DEFAULT = '0x00'
+export const EXECTYPE_TRY = '0x01'
+
+/**
+ * Encode simple single execution mode (CALLTYPE_SINGLE, EXECTYPE_DEFAULT)
+ * @returns {string} Mode as bytes32
+ */
+export function encodeSimpleSingleMode() {
+  // 0x00 (calltype) + 0x00 (exectype) + 0x00000000 (unused) + 0x00000000 (selector) + 22 zero bytes (payload)
+  return ethers.zeroPadValue('0x', 32)
+}
+
+/**
+ * Encode simple batch execution mode (CALLTYPE_BATCH, EXECTYPE_DEFAULT)
+ * @returns {string} Mode as bytes32
+ */
+export function encodeSimpleBatchMode() {
+  // 0x01 (calltype) + 0x00 (exectype) + rest zeros
+  return ethers.zeroPadValue('0x01', 32)
+}
+
+/**
+ * Encode single execution calldata (ERC-7579 ExecutionLib.encodeSingle)
+ * @param {string} target - Target address
+ * @param {bigint} value - ETH value
+ * @param {string} data - Call data
+ * @returns {string} Encoded execution calldata
+ */
+export function encodeSingleExecution(target, value, data) {
+  // abi.encodePacked(target, value, data) = 20 bytes + 32 bytes + variable
+  return ethers.concat([
+    target,
+    ethers.zeroPadValue(ethers.toBeHex(value), 32),
+    data
+  ])
+}
+
+/**
+ * Encode batch execution calldata (ERC-7579 ExecutionLib.encodeBatch)
+ * @param {Array<{target: string, value: bigint, data: string}>} executions
+ * @returns {string} Encoded execution calldata
+ */
+export function encodeBatchExecution(executions) {
+  // abi.encode(executions) where Execution is struct { address; uint256; bytes; }
+  return ethers.AbiCoder.defaultAbiCoder().encode(
+    ['tuple(address target, uint256 value, bytes callData)[]'],
+    [executions.map(e => ({ target: e.target, value: e.value, callData: e.data }))]
+  )
+}
+
+/**
+ * Encode execute call for AuraAccount (ERC-7579)
+ * @param {string} target - Target address
+ * @param {bigint} value - ETH value
+ * @param {string} data - Call data
+ * @returns {string} Encoded execute calldata for account
+ */
+export function encodeModularExecute(target, value, data) {
+  const accountInterface = new ethers.Interface(AURA_ACCOUNT_ABI)
+  const mode = encodeSimpleSingleMode()
+  const executionCalldata = encodeSingleExecution(target, value, data)
+  return accountInterface.encodeFunctionData('execute', [mode, executionCalldata])
+}
+
+/**
+ * Encode batch execute call for AuraAccount (ERC-7579)
+ * @param {Array<{target: string, value: bigint, data: string}>} executions
+ * @returns {string} Encoded execute calldata for account
+ */
+export function encodeModularBatchExecute(executions) {
+  const accountInterface = new ethers.Interface(AURA_ACCOUNT_ABI)
+  const mode = encodeSimpleBatchMode()
+  const executionCalldata = encodeBatchExecution(executions)
+  return accountInterface.encodeFunctionData('execute', [mode, executionCalldata])
+}
+
 /**
  * ModularAccountManager class for managing ERC-7579 modular accounts
  */
@@ -304,6 +384,50 @@ export class ModularAccountManager {
     } catch (e) {
       return null
     }
+  }
+
+  /**
+   * Encode addPasskey call for the validator module
+   * @param {string} qx - Passkey public key X coordinate (bytes32)
+   * @param {string} qy - Passkey public key Y coordinate (bytes32)
+   * @param {string} deviceId - Device identifier (bytes32)
+   * @returns {string} Encoded calldata for account.execute
+   */
+  encodeAddPasskey(qx, qy, deviceId) {
+    if (!this.validator) throw new Error('Validator not configured')
+    const data = this.validator.interface.encodeFunctionData('addPasskey', [qx, qy, deviceId])
+    return encodeModularExecute(this.validatorAddress, 0n, data)
+  }
+
+  /**
+   * Encode removePasskey call for the validator module
+   * @param {string} passkeyId - Passkey ID (bytes32, keccak256(qx, qy))
+   * @returns {string} Encoded calldata for account.execute
+   */
+  encodeRemovePasskey(passkeyId) {
+    if (!this.validator) throw new Error('Validator not configured')
+    const data = this.validator.interface.encodeFunctionData('removePasskey', [passkeyId])
+    return encodeModularExecute(this.validatorAddress, 0n, data)
+  }
+
+  /**
+   * Encode enableMFA call for the validator module
+   * @returns {string} Encoded calldata for account.execute
+   */
+  encodeEnableMFA() {
+    if (!this.validator) throw new Error('Validator not configured')
+    const data = this.validator.interface.encodeFunctionData('enableMFA', [])
+    return encodeModularExecute(this.validatorAddress, 0n, data)
+  }
+
+  /**
+   * Encode disableMFA call for the validator module
+   * @returns {string} Encoded calldata for account.execute
+   */
+  encodeDisableMFA() {
+    if (!this.validator) throw new Error('Validator not configured')
+    const data = this.validator.interface.encodeFunctionData('disableMFA', [])
+    return encodeModularExecute(this.validatorAddress, 0n, data)
   }
 }
 
