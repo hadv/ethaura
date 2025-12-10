@@ -92,7 +92,6 @@ function RecoveryManager({ accountAddress, credential }) {
     setPendingRecoveries([])
     setIsGuardian(false)
     setAccountInfo(null)
-    setSelectedRecovery(null)
     setNewQx('')
     setNewQy('')
     setNewOwner('')
@@ -118,7 +117,7 @@ function RecoveryManager({ accountAddress, credential }) {
     const remaining = executeAfter - now
 
     if (remaining <= 0) return 'Ready to execute'
-    
+
     const hours = Math.floor(remaining / 3600)
     const minutes = Math.floor((remaining % 3600) / 60)
     return `${hours}h ${minutes}m remaining`
@@ -386,14 +385,6 @@ function RecoveryManager({ accountAddress, credential }) {
           </div>
         </div>
       </div>
-
-      {/* Signature Confirmation Dialog */}
-      <SignatureConfirmationDialog
-        isOpen={showSignatureDialog}
-        onConfirm={handleSignatureConfirm}
-        onCancel={handleSignatureCancel}
-        signatureData={pendingSignatureData}
-      />
     </div>
   )
 }

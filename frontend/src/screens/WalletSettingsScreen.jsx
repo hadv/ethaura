@@ -82,7 +82,7 @@ function WalletSettingsScreen({ wallet, onBack, onHome, onLogout, credential, on
         onWalletConnectClick={() => setShowWalletConnectModal(true)}
         walletConnectButtonRef={walletConnectButtonRef}
         hideActions={false}
-        onSettings={() => {}}
+        onSettings={() => { }}
       />
 
       {/* Main Content */}
@@ -111,31 +111,27 @@ function WalletSettingsScreen({ wallet, onBack, onHome, onLogout, credential, on
               <LockOpen className="tab-icon" size={20} />
               <span className="tab-label">Recovery</span>
             </button>
-            {selectedWallet?.isModular && (
-              <>
-                <button
-                  className={`tab-btn ${activeTab === 'modules' ? 'active' : ''}`}
-                  onClick={() => setActiveTab('modules')}
-                >
-                  <Layers className="tab-icon" size={20} />
-                  <span className="tab-label">Modules</span>
-                </button>
-                <button
-                  className={`tab-btn ${activeTab === 'sessionkeys' ? 'active' : ''}`}
-                  onClick={() => setActiveTab('sessionkeys')}
-                >
-                  <Zap className="tab-icon" size={20} />
-                  <span className="tab-label">Session Keys</span>
-                </button>
-                <button
-                  className={`tab-btn ${activeTab === 'spending' ? 'active' : ''}`}
-                  onClick={() => setActiveTab('spending')}
-                >
-                  <DollarSign className="tab-icon" size={20} />
-                  <span className="tab-label">Spending Limits</span>
-                </button>
-              </>
-            )}
+            <button
+              className={`tab-btn ${activeTab === 'modules' ? 'active' : ''}`}
+              onClick={() => setActiveTab('modules')}
+            >
+              <Layers className="tab-icon" size={20} />
+              <span className="tab-label">Modules</span>
+            </button>
+            <button
+              className={`tab-btn ${activeTab === 'sessionkeys' ? 'active' : ''}`}
+              onClick={() => setActiveTab('sessionkeys')}
+            >
+              <Zap className="tab-icon" size={20} />
+              <span className="tab-label">Session Keys</span>
+            </button>
+            <button
+              className={`tab-btn ${activeTab === 'spending' ? 'active' : ''}`}
+              onClick={() => setActiveTab('spending')}
+            >
+              <DollarSign className="tab-icon" size={20} />
+              <span className="tab-label">Spending Limits</span>
+            </button>
           </div>
         </div>
 
@@ -171,7 +167,6 @@ function WalletSettingsScreen({ wallet, onBack, onHome, onLogout, credential, on
               <div className="tab-panel">
                 <ModuleManager
                   accountAddress={selectedWallet.address}
-                  isModular={selectedWallet?.isModular}
                 />
               </div>
             )}
@@ -180,7 +175,6 @@ function WalletSettingsScreen({ wallet, onBack, onHome, onLogout, credential, on
               <div className="tab-panel">
                 <SessionKeyManager
                   accountAddress={selectedWallet.address}
-                  isModular={selectedWallet?.isModular}
                 />
               </div>
             )}
@@ -189,7 +183,6 @@ function WalletSettingsScreen({ wallet, onBack, onHome, onLogout, credential, on
               <div className="tab-panel">
                 <SpendingLimitConfig
                   accountAddress={selectedWallet.address}
-                  isModular={selectedWallet?.isModular}
                 />
               </div>
             )}

@@ -407,6 +407,14 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onSwap
       const isDeployed = await modularManager.isDeployed(accountAddress)
       console.log('📍 Modular account address:', accountAddress, 'deployed:', isDeployed)
 
+      // Validate: ensure account address is not the factory address (sanity check)
+      if (accountAddress.toLowerCase() === networkInfo.modularFactoryAddress?.toLowerCase()) {
+        console.error('❌ Account address matches factory address - this is a bug!')
+        setAddError('Error: Generated account address matches factory address. Please try again.')
+        setIsAdding(false)
+        return
+      }
+
       // Double-check if wallet already exists (by address)
       const exists = walletsList.some(w => w.address.toLowerCase() === accountAddress.toLowerCase())
       if (exists) {
@@ -446,7 +454,7 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onSwap
         index: indexNum,
         owner: ownerAddress,
         createdAt: new Date().toISOString(),
-        isModular, // Track account type
+        isModular: true, // Track account type
       }
 
       await walletsStore.addWallet(newWallet)
@@ -571,7 +579,7 @@ function HomeScreen({ onWalletClick, onAddWallet, onCreateWallet, onSend, onSwap
       <Header
         userInfo={userInfo}
         onLogout={onLogout}
-        onHome={() => {}} // On home screen, clicking logo does nothing (already home)
+        onHome={() => { }} // On home screen, clicking logo does nothing (already home)
       />
 
       {/* Main Content */}

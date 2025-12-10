@@ -191,14 +191,18 @@ export class ModularAccountManager {
         throw new Error('Modular factory address not configured for this network')
       }
 
-      const factoryCode = await this.provider.getCode(this.factoryAddress)
-      if (factoryCode === '0x') {
-        throw new Error(`Modular factory not deployed on this network at ${this.factoryAddress}`)
-      }
+      // We use a raw call here because ethers.js Contract.getAddress() was 
+      // sometimes weirdly returning the factory address instead of the result
+      const callData = this.factory.interface.encodeFunctionData('getAddress', [owner, salt])
 
-      console.log('🏭 Calling modular factory.getAddress:', { owner, salt: salt.toString() })
-      const address = await this.factory.getAddress(owner, salt)
-      console.log('🏭 Modular factory returned:', address)
+      const rawResult = await this.provider.call({
+        to: this.factoryAddress,
+        data: callData
+      })
+
+      const decodedResult = this.factory.interface.decodeFunctionResult('getAddress', rawResult)
+      const address = decodedResult[0]
+
       return address
     } catch (error) {
       console.error('❌ ModularFactory.getAddress() failed:', error)
@@ -235,11 +239,14 @@ export class ModularAccountManager {
   async isDeployed(accountAddress) {
     const cached = this.cache.deployedStatus.get(accountAddress)
     if (cached && Date.now() - cached.timestamp < this.cacheExpiry) {
+      console.log('📦 isDeployed (cached):', accountAddress, cached.deployed)
       return cached.deployed
     }
 
     const code = await this.provider.getCode(accountAddress)
     const deployed = code !== '0x'
+
+    console.log('🔍 isDeployed (fresh):', accountAddress, deployed, 'code length:', code.length)
 
     this.cache.deployedStatus.set(accountAddress, { deployed, timestamp: Date.now() })
     return deployed
@@ -271,7 +278,10 @@ export class ModularAccountManager {
     try {
       const isDeployed = await this.isDeployed(accountAddress)
 
+      console.log('📊 getAccountInfo:', { accountAddress, isDeployed })
+
       if (!isDeployed) {
+        console.log('⏭️ Account not deployed, returning counterfactual info')
         return {
           address: accountAddress,
           deployed: false,
@@ -285,17 +295,36 @@ export class ModularAccountManager {
       }
 
       const account = this.getAccountContract(accountAddress)
-      const [validator, nonce] = await Promise.all([
-        account.getValidator(),
-        this.getNonce(accountAddress),
-      ])
 
-      // Get MFA and passkey info from validator module
+      // Try to get validator - this will fail for legacy P256Accounts
+      let validator = null
+      let nonce = 0n
+      let isModularAccount = true
+
+      try {
+        [validator, nonce] = await Promise.all([
+          account.getValidator(),
+          this.getNonce(accountAddress),
+        ])
+      } catch (validatorError) {
+        // This account is likely a legacy P256Account, not a modular AuraAccount
+        console.warn('Account may be a legacy P256Account (no getValidator):', validatorError.message)
+        isModularAccount = false
+
+        // Still try to get nonce from EntryPoint
+        try {
+          nonce = await this.getNonce(accountAddress)
+        } catch (nonceError) {
+          console.warn('Failed to get nonce:', nonceError.message)
+        }
+      }
+
+      // Get MFA and passkey info from validator module (only for modular accounts)
       let mfaEnabled = false
       let passkeyCount = 0
       let hasPasskey = false
 
-      if (this.validator) {
+      if (this.validator && isModularAccount) {
         try {
           [mfaEnabled, passkeyCount] = await Promise.all([
             this.validator.isMFAEnabled(accountAddress),
@@ -303,14 +332,14 @@ export class ModularAccountManager {
           ])
           hasPasskey = passkeyCount > 0
         } catch (e) {
-          console.warn('Failed to read validator module state:', e)
+          console.warn('Failed to read validator module state:', e.message)
         }
       }
 
       return {
         address: accountAddress,
         deployed: true,
-        isModular: true,
+        isModular: isModularAccount,
         mfaEnabled,
         deposit: 0n, // TODO: Get from EntryPoint
         nonce,
@@ -320,7 +349,18 @@ export class ModularAccountManager {
       }
     } catch (e) {
       console.error('Error getting modular account info:', e)
-      throw e
+      // Return a safe default instead of throwing
+      return {
+        address: accountAddress,
+        deployed: true, // We know it's deployed if we got here
+        isModular: false, // Assume legacy if we can't determine
+        mfaEnabled: false,
+        deposit: 0n,
+        nonce: 0n,
+        validator: null,
+        hasPasskey: false,
+        passkeyCount: 0,
+      }
     }
   }
 

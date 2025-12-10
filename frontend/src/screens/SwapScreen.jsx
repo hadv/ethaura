@@ -23,7 +23,7 @@ function SwapScreen({ wallet, onBack, onHome, onSettings, onLogout, onWalletChan
   const { userInfo, address: ownerAddress } = useWeb3Auth()
   const { networkInfo } = useNetwork()
   const { showSwapSuccess, showSwapError } = useToast()
-  const modularSDK = useModularAccountSDK()
+  const sdk = useModularAccountSDK()
   const provider = useMemo(() => new ethers.JsonRpcProvider(networkInfo.rpcUrl), [networkInfo.rpcUrl])
 
   // Wallet state
@@ -901,71 +901,71 @@ function SwapScreen({ wallet, onBack, onHome, onSettings, onLogout, onWalletChan
           </div>
         </div>
 
-      {/* Right Panel - Swap Info */}
-      <div className="swap-sidebar">
-        {quote && tokenIn && tokenOut && amountIn && (
-          <div className="sidebar-section">
-            <h3 className="sidebar-title">Swap Details</h3>
-            <div className="sidebar-content">
-              <div className="sidebar-info-item">
-                <span className="sidebar-info-label">You Pay:</span>
-                <span className="sidebar-info-value">
-                  {parseFloat(amountIn).toFixed(6)} {tokenIn === 'ETH' ? 'ETH' : tokenIn.symbol}
-                </span>
-              </div>
-              <div className="sidebar-info-item">
-                <span className="sidebar-info-label">You Receive:</span>
-                <span className="sidebar-info-value">
-                  {parseFloat(ethers.formatUnits(quote.amountOut, tokenOut === 'ETH' ? 18 : tokenOut.decimals)).toFixed(6)} {tokenOut === 'ETH' ? 'ETH' : tokenOut.symbol}
-                </span>
-              </div>
-              <div className="sidebar-info-item">
-                <span className="sidebar-info-label">Exchange Rate:</span>
-                <span className="sidebar-info-value">
-                  1 {tokenIn === 'ETH' ? 'ETH' : tokenIn.symbol} ≈ {(parseFloat(ethers.formatUnits(quote.amountOut, tokenOut === 'ETH' ? 18 : tokenOut.decimals)) / parseFloat(amountIn)).toFixed(6)} {tokenOut === 'ETH' ? 'ETH' : tokenOut.symbol}
-                </span>
-              </div>
-              {quote.priceImpact !== undefined && (
+        {/* Right Panel - Swap Info */}
+        <div className="swap-sidebar">
+          {quote && tokenIn && tokenOut && amountIn && (
+            <div className="sidebar-section">
+              <h3 className="sidebar-title">Swap Details</h3>
+              <div className="sidebar-content">
                 <div className="sidebar-info-item">
-                  <span className="sidebar-info-label">Price Impact:</span>
-                  <span className="sidebar-info-value" style={{ color: quote.priceImpact > 5 ? '#dc2626' : '#10b981' }}>
-                    {quote.priceImpact.toFixed(2)}%
+                  <span className="sidebar-info-label">You Pay:</span>
+                  <span className="sidebar-info-value">
+                    {parseFloat(amountIn).toFixed(6)} {tokenIn === 'ETH' ? 'ETH' : tokenIn.symbol}
                   </span>
                 </div>
-              )}
-              <div className="sidebar-info-item">
-                <span className="sidebar-info-label">Slippage Tolerance:</span>
-                <span className="sidebar-info-value">{slippage}%</span>
-              </div>
-              <div className="sidebar-info-item">
-                <span className="sidebar-info-label">Transaction Deadline:</span>
-                <span className="sidebar-info-value">{deadline} min</span>
-              </div>
-              <div className="sidebar-info-item">
-                <span className="sidebar-info-label">Fee Tier:</span>
-                <span className="sidebar-info-value">0.3%</span>
+                <div className="sidebar-info-item">
+                  <span className="sidebar-info-label">You Receive:</span>
+                  <span className="sidebar-info-value">
+                    {parseFloat(ethers.formatUnits(quote.amountOut, tokenOut === 'ETH' ? 18 : tokenOut.decimals)).toFixed(6)} {tokenOut === 'ETH' ? 'ETH' : tokenOut.symbol}
+                  </span>
+                </div>
+                <div className="sidebar-info-item">
+                  <span className="sidebar-info-label">Exchange Rate:</span>
+                  <span className="sidebar-info-value">
+                    1 {tokenIn === 'ETH' ? 'ETH' : tokenIn.symbol} ≈ {(parseFloat(ethers.formatUnits(quote.amountOut, tokenOut === 'ETH' ? 18 : tokenOut.decimals)) / parseFloat(amountIn)).toFixed(6)} {tokenOut === 'ETH' ? 'ETH' : tokenOut.symbol}
+                  </span>
+                </div>
+                {quote.priceImpact !== undefined && (
+                  <div className="sidebar-info-item">
+                    <span className="sidebar-info-label">Price Impact:</span>
+                    <span className="sidebar-info-value" style={{ color: quote.priceImpact > 5 ? '#dc2626' : '#10b981' }}>
+                      {quote.priceImpact.toFixed(2)}%
+                    </span>
+                  </div>
+                )}
+                <div className="sidebar-info-item">
+                  <span className="sidebar-info-label">Slippage Tolerance:</span>
+                  <span className="sidebar-info-value">{slippage}%</span>
+                </div>
+                <div className="sidebar-info-item">
+                  <span className="sidebar-info-label">Transaction Deadline:</span>
+                  <span className="sidebar-info-value">{deadline} min</span>
+                </div>
+                <div className="sidebar-info-item">
+                  <span className="sidebar-info-label">Fee Tier:</span>
+                  <span className="sidebar-info-value">0.3%</span>
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
-    </div>
 
-    {/* Price Impact Confirmation Modal */}
-    {showPriceImpactModal && quote && tokenIn && tokenOut && (
-      <PriceImpactConfirmModal
-        priceImpact={quote.priceImpact}
-        tokenIn={tokenIn === 'ETH' ? 'ETH' : tokenIn.symbol}
-        tokenOut={tokenOut === 'ETH' ? 'ETH' : tokenOut.symbol}
-        amountIn={amountIn}
-        amountOut={parseFloat(ethers.formatUnits(
-          quote.amountOut,
-          tokenOut === 'ETH' ? 18 : tokenOut.decimals
-        )).toFixed(6)}
-        onConfirm={handleSwap}
-        onCancel={() => setShowPriceImpactModal(false)}
-      />
-    )}
+      {/* Price Impact Confirmation Modal */}
+      {showPriceImpactModal && quote && tokenIn && tokenOut && (
+        <PriceImpactConfirmModal
+          priceImpact={quote.priceImpact}
+          tokenIn={tokenIn === 'ETH' ? 'ETH' : tokenIn.symbol}
+          tokenOut={tokenOut === 'ETH' ? 'ETH' : tokenOut.symbol}
+          amountIn={amountIn}
+          amountOut={parseFloat(ethers.formatUnits(
+            quote.amountOut,
+            tokenOut === 'ETH' ? 18 : tokenOut.decimals
+          )).toFixed(6)}
+          onConfirm={handleSwap}
+          onCancel={() => setShowPriceImpactModal(false)}
+        />
+      )}
     </div>
   )
 }
