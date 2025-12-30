@@ -1,17 +1,13 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { ethers } from 'ethers'
-import {
-  isGuardian,
-  getGuardians,
-  getGuardianThreshold,
-  getCurrentPublicKey,
-  initiateRecovery,
-  generateRecoveryLink,
-} from '../utils/recoveryUtils'
+import { createSocialRecoveryManager } from '../lib/modularAccountManager'
+import { useNetwork } from '../contexts/NetworkContext'
+import { P256_MFA_VALIDATOR_ABI } from '../lib/constants'
 import { isValidAddress, formatAddress } from '../utils/walletUtils'
 import '../styles/GuardianRecovery.css'
 
 export const RecoveryInitiator = ({ accountAddress: initialAccount, provider, signer, guardianAddress }) => {
+  const { networkInfo } = useNetwork()
   const [accountAddress, setAccountAddress] = useState(initialAccount || '')
   const [newQx, setNewQx] = useState('')
   const [newQy, setNewQy] = useState('')
@@ -29,10 +25,15 @@ export const RecoveryInitiator = ({ accountAddress: initialAccount, provider, si
   const [threshold, setThreshold] = useState(0)
   const [currentPublicKey, setCurrentPublicKey] = useState({ qx: '', qy: '' })
 
+  const manager = useMemo(() => {
+    if (!networkInfo.socialRecoveryModuleAddress || !provider) return null
+    return createSocialRecoveryManager(networkInfo.socialRecoveryModuleAddress, provider)
+  }, [networkInfo.socialRecoveryModuleAddress, provider])
+
   // Verify guardian status when account address and guardian address are available
   useEffect(() => {
     const verifyGuardianStatus = async () => {
-      if (!accountAddress || !guardianAddress || !provider) {
+      if (!accountAddress || !guardianAddress || !manager || !networkInfo.validatorModuleAddress) {
         return
       }
 
@@ -46,7 +47,7 @@ export const RecoveryInitiator = ({ accountAddress: initialAccount, provider, si
 
       try {
         // Check if connected address is a guardian
-        const isGuard = await isGuardian(accountAddress, guardianAddress, provider)
+        const isGuard = await manager.isGuardian(accountAddress, guardianAddress)
         setIsVerifiedGuardian(isGuard)
 
         if (!isGuard) {
@@ -55,16 +56,33 @@ export const RecoveryInitiator = ({ accountAddress: initialAccount, provider, si
           return
         }
 
-        // Fetch account info
-        const [guardianList, guardianThreshold, pubKey] = await Promise.all([
-          getGuardians(accountAddress, provider),
-          getGuardianThreshold(accountAddress, provider),
-          getCurrentPublicKey(accountAddress, provider),
+        // Fetch guardian info from Recovery Module
+        const [guardianList, config] = await Promise.all([
+          manager.getGuardians(accountAddress),
+          manager.getRecoveryConfig(accountAddress),
         ])
 
         setGuardians(guardianList)
-        setThreshold(guardianThreshold)
-        setCurrentPublicKey(pubKey)
+        setThreshold(config.threshold)
+
+        // Fetch public key from Validator Module
+        try {
+          const validator = new ethers.Contract(networkInfo.validatorModuleAddress, P256_MFA_VALIDATOR_ABI, provider)
+          // Get all passkey IDs
+          const passkeyIds = await validator.getPasskeyIds(accountAddress)
+
+          if (passkeyIds && passkeyIds.length > 0) {
+            // Get the first passkey
+            const passkey = await validator.getPasskey(accountAddress, passkeyIds[0])
+            if (passkey && passkey.active) {
+              setCurrentPublicKey({ qx: passkey.qx, qy: passkey.qy })
+            }
+          }
+        } catch (e) {
+          console.warn('Failed to fetch public key:', e)
+          // Non-critical, just don't show it
+        }
+
         setVerifying(false)
       } catch (err) {
         console.error('Failed to verify guardian status:', err)
@@ -74,22 +92,28 @@ export const RecoveryInitiator = ({ accountAddress: initialAccount, provider, si
     }
 
     verifyGuardianStatus()
-  }, [accountAddress, guardianAddress, provider])
+  }, [accountAddress, guardianAddress, manager, networkInfo.validatorModuleAddress, provider])
 
   const handleInitiate = async () => {
     // Validation
-    if (!newQx || !newQy || !newOwner) {
-      setError('Please fill in all fields')
+    if ((!newQx || !newQy) && !newOwner) {
+      // Allow updating either passkey OR owner, but at least one
+      setError('Please provide new passkey or new owner')
       return
     }
 
-    if (!isValidAddress(newOwner)) {
+    // Check fields if provided
+    if (newOwner && !isValidAddress(newOwner)) {
       setError('Invalid new owner address')
       return
     }
 
-    // Validate hex format for public key
-    if (!newQx.startsWith('0x') || !newQy.startsWith('0x')) {
+    if ((newQx && !newQy) || (!newQx && newQy)) {
+      setError('Both X and Y coordinates required for passkey')
+      return
+    }
+
+    if (newQx && (!newQx.startsWith('0x') || !newQy.startsWith('0x'))) {
       setError('Public key coordinates must be hex strings starting with 0x')
       return
     }
@@ -98,18 +122,30 @@ export const RecoveryInitiator = ({ accountAddress: initialAccount, provider, si
     setError('')
 
     try {
-      // Initiate recovery
-      const receipt = await initiateRecovery(accountAddress, newQx, newQy, newOwner, signer)
+      if (!manager) throw new Error('Manager not initialized')
+
+      // Encode data
+      const qx = newQx || ethers.ZeroHash
+      const qy = newQy || ethers.ZeroHash
+      const owner = newOwner || ethers.ZeroAddress
+
+      const { to, data } = await manager.initiateRecovery(accountAddress, qx, qy, owner)
+
+      // Send transaction via signer (Guardian EOA)
+      const tx = await signer.sendTransaction({
+        to,
+        data,
+      })
+
+      const receipt = await tx.wait()
 
       // Extract recovery nonce from RecoveryInitiated event
-      // Event signature: RecoveryInitiated(uint256 indexed nonce, address indexed initiator, bytes32 newQx, bytes32 newQy, address newOwner)
+      // Event: RecoveryInitiated(uint256 indexed nonce, address indexed initiator, bytes32 newQx, bytes32 newQy, address newOwner)
       const recoveryInitiatedTopic = ethers.id('RecoveryInitiated(uint256,address,bytes32,bytes32,address)')
-
       const event = receipt.logs.find(log => log.topics[0] === recoveryInitiatedTopic)
 
       let nonce = 0
       if (event && event.topics[1]) {
-        // Nonce is the first indexed parameter (topics[1])
         nonce = parseInt(event.topics[1], 16)
       }
 
@@ -117,8 +153,14 @@ export const RecoveryInitiator = ({ accountAddress: initialAccount, provider, si
       setSuccess(true)
 
       // Generate shareable link
-      const link = generateRecoveryLink(accountAddress, nonce)
+      const baseUrl = window.location.origin
+      const params = new URLSearchParams({
+        account: accountAddress,
+        nonce: nonce.toString()
+      })
+      const link = `${baseUrl}/guardian-recovery?${params.toString()}`
       setRecoveryLink(link)
+
     } catch (err) {
       console.error('Failed to initiate recovery:', err)
       setError(err.message || 'Failed to initiate recovery')
@@ -226,15 +268,15 @@ export const RecoveryInitiator = ({ accountAddress: initialAccount, provider, si
             </div>
           </div>
 
-          {/* New Public Key Input */}
+          {/* inputs */}
           <div className="form-section">
-            <h3>New Public Key (for user's new passkey):</h3>
+            <h3>New Credentials</h3>
             <p className="hint">
-              The user should create a new passkey and provide you with the public key coordinates.
+              Enter new passkey coordinates OR new owner address to recover.
             </p>
-            
+
             <div className="form-group">
-              <label>qx (X coordinate):</label>
+              <label>New Passkey X (qx):</label>
               <input
                 type="text"
                 value={newQx}
@@ -245,7 +287,7 @@ export const RecoveryInitiator = ({ accountAddress: initialAccount, provider, si
             </div>
 
             <div className="form-group">
-              <label>qy (Y coordinate):</label>
+              <label>New Passkey Y (qy):</label>
               <input
                 type="text"
                 value={newQy}
@@ -270,14 +312,14 @@ export const RecoveryInitiator = ({ accountAddress: initialAccount, provider, si
           {/* Initiate Button */}
           <button
             onClick={handleInitiate}
-            disabled={loading || !newQx || !newQy || !newOwner}
+            disabled={loading}
             className="primary-button"
           >
             {loading ? 'Initiating...' : 'Initiate Recovery'}
           </button>
 
           <p className="warning">
-            This will start a 24-hour timelock period.
+            This will start the timelock period once threshold is met.
           </p>
         </>
       )}

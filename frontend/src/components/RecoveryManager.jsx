@@ -2,109 +2,87 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { CheckCircle, Rocket, Clock, Shield, ShieldOff, AlertTriangle } from 'lucide-react'
 import { useWeb3Auth } from '../contexts/Web3AuthContext'
 import { useModularAccountSDK } from '../hooks/useModularAccountSDK'
-import { useNetwork } from '../contexts/NetworkContext'
+import { useSocialRecovery } from '../hooks/useSocialRecovery'
+import { useUserOperation } from '../hooks/useUserOperation'
+import { ethers } from 'ethers'
 import '../styles/RecoveryManager.css'
 
 /**
  * RecoveryManager for ERC-7579 modular accounts
  * Uses SocialRecoveryModule for recovery operations
- * TODO: Implement SocialRecoveryModule integration
  */
 function RecoveryManager({ accountAddress, credential }) {
   const { isConnected, address: ownerAddress } = useWeb3Auth()
-  useNetwork() // Keep for future use
   const modularSDK = useModularAccountSDK()
+  const {
+    isSupported,
+    guardians,
+    threshold,
+    pendingRecoveries,
+    checkIsGuardian,
+    refresh: refreshRecovery,
+    initiateRecovery,
+    approveRecovery,
+    executeRecovery,
+    cancelRecovery
+  } = useSocialRecovery(accountAddress)
+
+  // Transaction Sender for executing account operations
+  const { sendUserOperation, loading: txLoading } = useUserOperation(accountAddress)
+
   const [status, setStatus] = useState('')
   const [error, setError] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [pendingRecoveries, setPendingRecoveries] = useState([])
-  const [guardianInfo, setGuardianInfo] = useState(null)
-  const [isGuardian, setIsGuardian] = useState(false)
   const [newQx, setNewQx] = useState('')
   const [newQy, setNewQy] = useState('')
   const [newOwner, setNewOwner] = useState('')
   const [recoveryType, setRecoveryType] = useState('passkey') // 'passkey' or 'owner'
-  const [accountInfo, setAccountInfo] = useState(null) // Store account info for UI rendering
+  const [isGuardian, setIsGuardian] = useState(false)
+  const [checkingGuardian, setCheckingGuardian] = useState(false)
 
-  // Debug: Log credential status
+  const loading = isSupported === undefined || txLoading || checkingGuardian
+
+  // Check if current user is guardian
   useEffect(() => {
-    console.log('🔍 RecoveryManager credential:', credential ? 'EXISTS' : 'NULL')
-    if (credential) {
-      console.log('🔍 Credential details:', {
-        id: credential.id,
-        hasPublicKey: !!credential.publicKey,
-      })
-    }
-  }, [credential])
-
-  const loadedAddressRef = useRef(null)
-
-  // Fetch guardian info and pending recoveries
-  // TODO: Integrate with SocialRecoveryModule for modular accounts
-  const fetchRecoveryInfo = useCallback(async () => {
-    if (!accountAddress || !modularSDK) return
-
-    // Clear any previous errors
-    setError('')
-
-    try {
-      const isDeployed = await modularSDK.isDeployed(accountAddress)
-      if (!isDeployed) {
-        console.log('⏭️ Account not deployed yet, skipping recovery fetch')
-        setGuardianInfo(null)
-        setPendingRecoveries([])
-        setIsGuardian(false)
-        setAccountInfo(null)
-        setError('') // Clear error since this is expected
-        return
+    const check = async () => {
+      if (accountAddress && ownerAddress && isSupported) {
+        setCheckingGuardian(true)
+        const isG = await checkIsGuardian(ownerAddress)
+        setIsGuardian(isG)
+        setCheckingGuardian(false)
       }
-
-      // For modular accounts, recovery is via SocialRecoveryModule
-      // TODO: Read recovery info from SocialRecoveryModule
-      console.log('📝 Recovery management for modular accounts not yet implemented')
-
-      const accInfo = await modularSDK.getAccountInfo(accountAddress)
-      setAccountInfo(accInfo)
-      setGuardianInfo({
-        guardians: [],
-        threshold: 0,
-      })
-      setPendingRecoveries([])
-      setIsGuardian(false)
-
-      // Clear error on success
-      setError('')
-    } catch (err) {
-      console.error('Error fetching recovery info:', err)
-      // Set default accountInfo when backend is not available
-      setAccountInfo(null)
-      setGuardianInfo(null)
-      setPendingRecoveries([])
-      setIsGuardian(false)
-      setError(`Failed to load recovery information: ${err.message}`)
     }
-  }, [accountAddress, modularSDK, ownerAddress])
+    check()
+  }, [accountAddress, ownerAddress, isSupported, checkIsGuardian])
 
-  // Load recovery info on mount and when account or SDK changes (SDK changes when network changes)
+  // Initial load
   useEffect(() => {
-    // Reset ALL state when network changes to avoid showing stale data
-    setGuardianInfo(null)
-    setPendingRecoveries([])
-    setIsGuardian(false)
-    setAccountInfo(null)
-    setNewQx('')
-    setNewQy('')
-    setNewOwner('')
-    setRecoveryType('passkey')
+    if (accountAddress && isSupported) {
+      refreshRecovery()
+    }
+  }, [accountAddress, isSupported, refreshRecovery])
+
+  const handleTransaction = async (txPromise, successMessage) => {
     setError('')
     setStatus('')
-    setLoading(false)
+    try {
+      const tx = await txPromise
+      await sendUserOperation(tx.to, tx.value, tx.data)
+      setStatus(successMessage)
 
-    if (accountAddress && modularSDK) {
-      loadedAddressRef.current = accountAddress
-      fetchRecoveryInfo()
+      // Refresh data
+      refreshRecovery()
+
+      // Clear inputs (if initiating)
+      if (successMessage.includes('initiated')) {
+        setNewQx('')
+        setNewQy('')
+        setNewOwner('')
+      }
+    } catch (err) {
+      console.error('Transaction failed:', err)
+      setError(err.message || 'Transaction failed')
     }
-  }, [accountAddress, modularSDK, fetchRecoveryInfo])
+  }
 
   // Format timestamp to readable date
   const formatDate = (timestamp) => {
@@ -123,29 +101,60 @@ function RecoveryManager({ accountAddress, credential }) {
     return `${hours}h ${minutes}m remaining`
   }
 
-  // Initiate recovery
-  // TODO: Implement via SocialRecoveryModule for modular accounts
   const handleInitiateRecovery = async () => {
-    setError('Recovery management for modular accounts coming soon. SocialRecoveryModule integration pending.')
-    return
+    // Determine args based on type
+    // UI logic: ensure we are sending valid data based on type
+    if (recoveryType === 'passkey') {
+      if (!newQx || !newQy) {
+        setError('Please enter both coordinates for new passkey')
+        return
+      }
+      // Assuming hex inputs
+    } else {
+      if (!newOwner) {
+        setError('Please enter new owner address')
+        return
+      }
+    }
+
+    // Actually, use state variables directly
+    const qx = recoveryType === 'passkey' ? newQx : ethers.ZeroHash
+    const qy = recoveryType === 'passkey' ? newQy : ethers.ZeroHash
+    const owner = recoveryType === 'owner' ? newOwner : ethers.ZeroAddress
+
+    handleTransaction(
+      initiateRecovery(qx, qy, owner),
+      'Recovery initiated successfully!'
+    )
   }
 
-  // TODO: Implement via SocialRecoveryModule for modular accounts
   const handleApproveRecovery = async (nonce) => {
-    setError('Recovery management for modular accounts coming soon. SocialRecoveryModule integration pending.')
-    return
+    handleTransaction(
+      approveRecovery(nonce),
+      'Recovery approved!'
+    )
   }
 
-  // TODO: Implement via SocialRecoveryModule for modular accounts
   const handleExecuteRecovery = async (nonce) => {
-    setError('Recovery management for modular accounts coming soon. SocialRecoveryModule integration pending.')
-    return
+    try {
+      const info = await modularSDK.getAccountInfo(accountAddress)
+      const validatorAddress = info.validator
+      if (!validatorAddress) throw new Error('Validator address not found')
+
+      handleTransaction(
+        executeRecovery(nonce, validatorAddress),
+        'Recovery executed successfully!'
+      )
+    } catch (e) {
+      setError(e.message)
+    }
   }
 
-  // TODO: Implement via SocialRecoveryModule for modular accounts
   const handleCancelRecovery = async (nonce) => {
-    setError('Recovery management for modular accounts coming soon. SocialRecoveryModule integration pending.')
-    return
+    handleTransaction(
+      cancelRecovery(nonce),
+      'Recovery cancelled.'
+    )
   }
 
   if (!isConnected) {
@@ -163,6 +172,17 @@ function RecoveryManager({ accountAddress, credential }) {
       <div className="recovery-manager">
         <div className="status status-info">
           ℹ️ Please create an account first.
+        </div>
+      </div>
+    )
+  }
+
+  if (!isSupported) {
+    return (
+      <div className="recovery-manager">
+        <div className="info-box info-box-warning" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <AlertTriangle size={18} />
+          <p style={{ margin: 0 }}>Social Recovery Module not configured for this network.</p>
         </div>
       </div>
     )
@@ -218,16 +238,18 @@ function RecoveryManager({ accountAddress, credential }) {
                 </>
               )}
 
-              <div className="form-group">
-                <label>New Owner Address:</label>
-                <input
-                  type="text"
-                  value={newOwner}
-                  onChange={(e) => setNewOwner(e.target.value)}
-                  placeholder="0x..."
-                  disabled={loading}
-                />
-              </div>
+              {recoveryType === 'owner' && (
+                <div className="form-group">
+                  <label>New Owner Address:</label>
+                  <input
+                    type="text"
+                    value={newOwner}
+                    onChange={(e) => setNewOwner(e.target.value)}
+                    placeholder="0x..."
+                    disabled={loading}
+                  />
+                </div>
+              )}
 
               <button
                 onClick={handleInitiateRecovery}
@@ -260,37 +282,35 @@ function RecoveryManager({ accountAddress, credential }) {
         {/* Sidebar - Right Column */}
         <div className="recovery-sidebar">
           {/* Guardian Status */}
-          {guardianInfo && (
-            <div className="guardian-status">
-              <h3>Guardian Status</h3>
-              <div className="status-grid">
-                <div className="status-item">
-                  <span className="status-label">Total Guardians</span>
-                  <span className="status-value">{guardianInfo.guardians.length}</span>
-                </div>
-                <div className="status-item">
-                  <span className="status-label">Threshold</span>
-                  <span className="status-value">{guardianInfo.threshold} of {guardianInfo.guardians.length}</span>
-                </div>
-                <div className="status-item">
-                  <span className="status-label">Your Status</span>
-                  <span className={`status-badge ${isGuardian ? 'badge-success' : 'badge-neutral'}`} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                    {isGuardian ? (
-                      <>
-                        <Shield size={14} />
-                        Guardian
-                      </>
-                    ) : (
-                      <>
-                        <ShieldOff size={14} />
-                        Not a Guardian
-                      </>
-                    )}
-                  </span>
-                </div>
+          <div className="guardian-status">
+            <h3>Guardian Status</h3>
+            <div className="status-grid">
+              <div className="status-item">
+                <span className="status-label">Total Guardians</span>
+                <span className="status-value">{guardians.length}</span>
+              </div>
+              <div className="status-item">
+                <span className="status-label">Threshold</span>
+                <span className="status-value">{threshold} of {guardians.length}</span>
+              </div>
+              <div className="status-item">
+                <span className="status-label">Your Status</span>
+                <span className={`status-badge ${isGuardian ? 'badge-success' : 'badge-neutral'}`} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                  {isGuardian ? (
+                    <>
+                      <Shield size={14} />
+                      Guardian
+                    </>
+                  ) : (
+                    <>
+                      <ShieldOff size={14} />
+                      Not a Guardian
+                    </>
+                  )}
+                </span>
               </div>
             </div>
-          )}
+          </div>
 
           {/* Pending Recoveries */}
           <div className="recovery-section">
@@ -311,14 +331,14 @@ function RecoveryManager({ accountAddress, credential }) {
                     <div className="recovery-header">
                       <h4>Recovery #{recovery.nonce}</h4>
                       <span className="status-badge badge-info">
-                        {recovery.approvalCount}/{guardianInfo?.threshold} Approvals
+                        {recovery.approvalCount}/{threshold} Approvals
                       </span>
                     </div>
 
                     <div className="recovery-details">
                       <p>
                         <strong>New Owner:</strong>{' '}
-                        {recovery.newOwner.slice(0, 6)}...{recovery.newOwner.slice(-4)}
+                        {recovery.newOwner === ethers.ZeroAddress ? 'N/A' : `${recovery.newOwner.slice(0, 6)}...${recovery.newOwner.slice(-4)}`}
                       </p>
                       <p>
                         <strong>Timelock:</strong> {getTimeRemaining(recovery.executeAfter)}
@@ -329,9 +349,8 @@ function RecoveryManager({ accountAddress, credential }) {
                     </div>
 
                     <div className="recovery-actions">
-                      {console.log('🔍 Rendering recovery actions, credential:', credential ? 'EXISTS' : 'NULL')}
 
-                      {isGuardian && recovery.approvalCount < guardianInfo?.threshold && (
+                      {isGuardian && recovery.approvalCount < threshold && (
                         <button
                           onClick={() => handleApproveRecovery(recovery.nonce)}
                           disabled={loading}
@@ -343,7 +362,7 @@ function RecoveryManager({ accountAddress, credential }) {
                         </button>
                       )}
 
-                      {recovery.approvalCount >= guardianInfo?.threshold &&
+                      {recovery.approvalCount >= threshold &&
                         recovery.executeAfter <= Math.floor(Date.now() / 1000) && (
                           <button
                             onClick={() => handleExecuteRecovery(recovery.nonce)}
@@ -364,19 +383,14 @@ function RecoveryManager({ accountAddress, credential }) {
                       )}
 
                       {/* Owner can cancel any pending recovery */}
-                      {credential || !accountInfo?.hasPasskey ? (
-                        <button
-                          onClick={() => handleCancelRecovery(recovery.nonce)}
-                          disabled={loading}
-                          className="btn btn-danger"
-                        >
-                          ❌ Cancel (Owner)
-                        </button>
-                      ) : (
-                        <div style={{ fontSize: '12px', color: '#ff9800', marginTop: '8px', fontWeight: '500' }}>
-                          ⚠️ Passkey required to cancel. Use the device with your passkey.
-                        </div>
-                      )}
+                      {/* TODO: Verify if the user is owner via credential or address match */}
+                      <button
+                        onClick={() => handleCancelRecovery(recovery.nonce)}
+                        disabled={loading}
+                        className="btn btn-danger"
+                      >
+                        ❌ Cancel (Owner)
+                      </button>
                     </div>
                   </div>
                 ))}
@@ -390,4 +404,3 @@ function RecoveryManager({ accountAddress, credential }) {
 }
 
 export default RecoveryManager
-

@@ -27,6 +27,7 @@ export const AVAILABLE_NETWORKS = [
     modularFactoryAddress: import.meta.env.VITE_MODULAR_FACTORY_ADDRESS,
     validatorModuleAddress: import.meta.env.VITE_VALIDATOR_MODULE_ADDRESS,
     sessionKeyModuleAddress: import.meta.env.VITE_SESSION_KEY_MODULE_ADDRESS,
+    socialRecoveryModuleAddress: import.meta.env.VITE_SOCIAL_RECOVERY_MODULE_ADDRESS, // Added
     supported: false, // Factory not yet deployed on mainnet
   },
   {
@@ -101,6 +102,7 @@ export const AVAILABLE_NETWORKS = [
     modularFactoryAddress: import.meta.env.VITE_MODULAR_FACTORY_ADDRESS,
     validatorModuleAddress: import.meta.env.VITE_VALIDATOR_MODULE_ADDRESS,
     sessionKeyModuleAddress: import.meta.env.VITE_SESSION_KEY_MODULE_ADDRESS,
+    socialRecoveryModuleAddress: import.meta.env.VITE_SOCIAL_RECOVERY_MODULE_ADDRESS, // Added
     supported: true, // Factory is deployed on Sepolia
   },
 ];

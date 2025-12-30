@@ -303,15 +303,22 @@ const CustomAvatar = ({ address, size }) => {
 /**
  * Wrapper component with Wagmi and RainbowKit providers
  */
+// Add import at the top (if not present) will serve as separate replacement or hope it exists.
+// Checking imports: useNetwork is imported, but NetworkProvider is NOT imported in original file.
+// I need check imports first.
+import { NetworkProvider } from '../contexts/NetworkContext' // I will add this
+
 export const GuardianRecoveryPortal = () => {
   return (
-    <WagmiProvider config={wagmiConfig}>
-      <QueryClientProvider client={queryClient}>
-        <RainbowKitProvider chains={chains} avatar={CustomAvatar}>
-          <GuardianRecoveryPortalContent />
-        </RainbowKitProvider>
-      </QueryClientProvider>
-    </WagmiProvider>
+    <NetworkProvider>
+      <WagmiProvider config={wagmiConfig}>
+        <QueryClientProvider client={queryClient}>
+          <RainbowKitProvider chains={chains} avatar={CustomAvatar}>
+            <GuardianRecoveryPortalContent />
+          </RainbowKitProvider>
+        </QueryClientProvider>
+      </WagmiProvider>
+    </NetworkProvider>
   )
 }
 

@@ -64,6 +64,26 @@ export const SESSION_KEY_EXECUTOR_ABI = [
   'function executeWithSessionKey(address account, address sessionKey, address target, uint256 value, bytes data, uint256 nonce, bytes signature) returns (bytes)',
 ]
 
+// SocialRecoveryModule ABI
+export const SOCIAL_RECOVERY_ABI = [
+  // Guardian Management
+  'function isGuardian(address account, address guardian) view returns (bool)',
+  'function getGuardians(address account) view returns (address[])',
+  'function getGuardianCount(address account) view returns (uint256)',
+  'function getRecoveryConfig(address account) view returns (uint256 threshold, uint256 timelockPeriod)',
+  'function addGuardian(address guardian) external',
+  'function removeGuardian(address guardian) external',
+  'function setRecoveryConfig(uint256 threshold, uint256 timelockPeriod) external',
+  // Recovery Flow
+  'function initiateRecovery(address account, bytes32 newQx, bytes32 newQy, address newOwner) external',
+  'function approveRecovery(address account, uint256 nonce) external',
+  'function executeRecovery(address account, uint256 nonce, address validatorModule) external',
+  'function cancelRecovery(uint256 nonce) external',
+  'function getRecoveryNonce(address account) view returns (uint256)',
+  'function getRecoveryRequest(address account, uint256 nonce) view returns (bytes32 newPasskeyQx, bytes32 newPasskeyQy, address newOwner, uint256 approvalCount, uint256 initiatedAt, uint256 executeAfter, bool thresholdMet, bool executed, bool cancelled)',
+  'function hasApproved(address account, uint256 nonce, address guardian) view returns (bool)',
+]
+
 // Module type IDs (ERC-7579)
 export const MODULE_TYPE = {
   VALIDATOR: 1,
@@ -551,6 +571,119 @@ export class SessionKeyManager {
 }
 
 /**
+ * SocialRecoveryManager for managing guardians and recovery
+ */
+export class SocialRecoveryManager {
+  constructor(moduleAddress, provider) {
+    this.moduleAddress = moduleAddress
+    this.provider = provider
+    this.module = new ethers.Contract(moduleAddress, SOCIAL_RECOVERY_ABI, provider)
+  }
+
+  async getGuardians(accountAddress) {
+    try {
+      const guardians = await this.module.getGuardians(accountAddress)
+      return guardians
+    } catch (e) {
+      console.warn('Failed to get guardians:', e)
+      return []
+    }
+  }
+
+  async isGuardian(accountAddress, guardianAddress) {
+    try {
+      return await this.module.isGuardian(accountAddress, guardianAddress)
+    } catch (e) {
+      return false
+    }
+  }
+
+  async getRecoveryConfig(accountAddress) {
+    try {
+      const config = await this.module.getRecoveryConfig(accountAddress)
+      return {
+        threshold: Number(config.threshold),
+        timelockPeriod: Number(config.timelockPeriod)
+      }
+    } catch (e) {
+      console.warn('Failed to get recovery config:', e)
+      return { threshold: 0, timelockPeriod: 0 }
+    }
+  }
+
+  async getRecoveryRequest(accountAddress, nonce) {
+    try {
+      const request = await this.module.getRecoveryRequest(accountAddress, nonce)
+      return {
+        newPasskeyQx: request.newPasskeyQx,
+        newPasskeyQy: request.newPasskeyQy,
+        newOwner: request.newOwner,
+        approvalCount: Number(request.approvalCount),
+        initiatedAt: Number(request.initiatedAt),
+        executeAfter: Number(request.executeAfter),
+        thresholdMet: request.thresholdMet,
+        executed: request.executed,
+        cancelled: request.cancelled
+      }
+    } catch (e) {
+      // If request doesn't exist, it likely throws or returns empty.
+      return null
+    }
+  }
+
+  async getRecoveryNonce(accountAddress) {
+    try {
+      return Number(await this.module.getRecoveryNonce(accountAddress))
+    } catch (e) {
+      return 0;
+    }
+  }
+
+  encodeAddGuardian(guardian) {
+    const data = this.module.interface.encodeFunctionData('addGuardian', [guardian])
+    // The executor module calls this, so the account calls the executor module.
+    // BUT WAIT: The SocialRecoveryModule instructions say:
+    // "addGuardian check msg.sender == account".
+    // So if I am the account, I just execute a call to the module with this data.
+    return encodeModularExecute(this.moduleAddress, 0n, data)
+  }
+
+  encodeRemoveGuardian(guardian) {
+    const data = this.module.interface.encodeFunctionData('removeGuardian', [guardian])
+    return encodeModularExecute(this.moduleAddress, 0n, data)
+  }
+
+  encodeSetRecoveryConfig(threshold, timelockPeriod) {
+    const data = this.module.interface.encodeFunctionData('setRecoveryConfig', [threshold, timelockPeriod])
+    return encodeModularExecute(this.moduleAddress, 0n, data)
+  }
+
+  // Recovery Actions
+  // These are called by guardians or anyone (approveRecovery, executeRecovery, etc.)
+  // They are NOT executed via the account. They are direct calls to the module.
+  // HOWEVER, initiateRecovery checks "isGuardian[account][msg.sender]".
+  // So the GUARDIAN'S wallet calls initiateRecovery on the MODULE.
+
+  encodeInitiateRecovery(account, newQx, newQy, newOwner) {
+    return this.module.interface.encodeFunctionData('initiateRecovery', [account, newQx, newQy, newOwner])
+  }
+
+  encodeApproveRecovery(account, nonce) {
+    return this.module.interface.encodeFunctionData('approveRecovery', [account, nonce])
+  }
+
+  encodeExecuteRecovery(account, nonce, validatorModule) {
+    return this.module.interface.encodeFunctionData('executeRecovery', [account, nonce, validatorModule])
+  }
+
+  encodeCancelRecovery(nonce) {
+    // Only account owner can cancel.
+    const data = this.module.interface.encodeFunctionData('cancelRecovery', [nonce])
+    return encodeModularExecute(this.moduleAddress, 0n, data)
+  }
+}
+
+/**
  * Create modular account manager instance
  */
 export function createModularAccountManager(factoryAddress, validatorAddress, provider) {
@@ -564,3 +697,9 @@ export function createSessionKeyManager(moduleAddress, provider) {
   return new SessionKeyManager(moduleAddress, provider)
 }
 
+/**
+ * Create social recovery manager instance
+ */
+export function createSocialRecoveryManager(moduleAddress, provider) {
+  return new SocialRecoveryManager(moduleAddress, provider)
+}
