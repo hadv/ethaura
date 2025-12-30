@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.23;
+pragma solidity ^0.8.33;
 
 import {Script, console2} from "forge-std/Script.sol";
 
@@ -35,7 +35,7 @@ contract DeployModulesScript is Script {
 
         // --- Executors ---
         console2.log("--- Deploying Executors ---");
-
+        
         HookManagerModule hookManager = new HookManagerModule();
         console2.log("HookManagerModule:", address(hookManager));
 
