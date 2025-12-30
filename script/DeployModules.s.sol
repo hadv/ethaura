@@ -35,7 +35,7 @@ contract DeployModulesScript is Script {
 
         // --- Executors ---
         console2.log("--- Deploying Executors ---");
-        
+
         HookManagerModule hookManager = new HookManagerModule();
         console2.log("HookManagerModule:", address(hookManager));
 
