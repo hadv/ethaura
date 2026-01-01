@@ -28,3 +28,8 @@ frontend/coverage/
 .DS_Store
 Thumbs.db
 
+
+# Agent artifacts
+task.md
+implementation_plan.md
+walkthrough.md

@@ -1,17 +1,11 @@
-import { useState, useEffect } from 'react'
-import {
-  isGuardian,
-  getGuardians,
-  getGuardianThreshold,
-  getRecoveryRequest,
-  hasApprovedRecovery,
-  approveRecovery,
-  executeRecovery,
-} from '../utils/recoveryUtils'
+import { useState, useEffect, useMemo } from 'react'
+import { createSocialRecoveryManager } from '../lib/modularAccountManager'
+import { useNetwork } from '../contexts/NetworkContext'
 import { formatAddress } from '../utils/walletUtils'
 import '../styles/GuardianRecovery.css'
 
 export const RecoveryApprover = ({ accountAddress, nonce, provider, signer, guardianAddress }) => {
+  const { networkInfo } = useNetwork()
   const [loading, setLoading] = useState(false)
   const [verifying, setVerifying] = useState(true)
   const [error, setError] = useState('')
@@ -27,10 +21,15 @@ export const RecoveryApprover = ({ accountAddress, nonce, provider, signer, guar
   const [recoveryRequest, setRecoveryRequest] = useState(null)
   const [canExecute, setCanExecute] = useState(false)
 
+  const manager = useMemo(() => {
+    if (!networkInfo.socialRecoveryModuleAddress || !provider) return null
+    return createSocialRecoveryManager(networkInfo.socialRecoveryModuleAddress, provider)
+  }, [networkInfo.socialRecoveryModuleAddress, provider])
+
   // Load recovery request and verify guardian
   useEffect(() => {
     const loadRecoveryData = async () => {
-      if (!accountAddress || !nonce || !guardianAddress || !provider) {
+      if (!accountAddress || nonce === null || !guardianAddress || !manager) {
         return
       }
 
@@ -39,20 +38,26 @@ export const RecoveryApprover = ({ accountAddress, nonce, provider, signer, guar
 
       try {
         // Fetch all data in parallel
-        const [isGuard, request, approved, guardianThreshold] = await Promise.all([
-          isGuardian(accountAddress, guardianAddress, provider),
-          getRecoveryRequest(accountAddress, nonce, provider),
-          hasApprovedRecovery(accountAddress, nonce, guardianAddress, provider),
-          getGuardianThreshold(accountAddress, provider),
+        const [isGuard, request, approved, config] = await Promise.all([
+          manager.isGuardian(accountAddress, guardianAddress),
+          manager.getRecoveryRequest(accountAddress, nonce),
+          manager.hasApprovedRecovery(accountAddress, nonce, guardianAddress),
+          manager.getRecoveryConfig(accountAddress),
         ])
 
         setIsVerifiedGuardian(isGuard)
         setRecoveryRequest(request)
         setHasAlreadyApproved(approved)
-        setThreshold(guardianThreshold)
+        setThreshold(config.threshold)
 
         if (!isGuard) {
           setError('You are not a guardian for this account')
+          setVerifying(false)
+          return
+        }
+
+        if (!request) {
+          setError('Recovery request not found')
           setVerifying(false)
           return
         }
@@ -71,7 +76,7 @@ export const RecoveryApprover = ({ accountAddress, nonce, provider, signer, guar
 
         // Check if can execute
         const now = Math.floor(Date.now() / 1000)
-        const thresholdMet = request.approvalCount >= guardianThreshold
+        const thresholdMet = request.approvalCount >= config.threshold
         const timelockPassed = now >= request.executeAfter
         setCanExecute(thresholdMet && timelockPassed && !request.executed)
 
@@ -84,23 +89,30 @@ export const RecoveryApprover = ({ accountAddress, nonce, provider, signer, guar
     }
 
     loadRecoveryData()
-  }, [accountAddress, nonce, guardianAddress, provider])
+  }, [accountAddress, nonce, guardianAddress, manager])
 
   const handleApprove = async () => {
+    if (!manager) return
     setLoading(true)
     setError('')
     setActionType('approve')
 
     try {
-      await approveRecovery(accountAddress, nonce, signer)
+      // Encode data
+      const { to, data } = await manager.approveRecovery(accountAddress, nonce)
+
+      // Send via signer
+      const tx = await signer.sendTransaction({ to, data })
+      await tx.wait()
+
       setSuccess(true)
       setHasAlreadyApproved(true)
-      
+
       // Reload recovery request to update approval count
-      const request = await getRecoveryRequest(accountAddress, nonce, provider)
+      const request = await manager.getRecoveryRequest(accountAddress, nonce)
       setRecoveryRequest(request)
 
-      // Check if can execute now
+      // config is needed? We have threshold in state.
       const now = Math.floor(Date.now() / 1000)
       const thresholdMet = request.approvalCount >= threshold
       const timelockPassed = now >= request.executeAfter
@@ -114,16 +126,28 @@ export const RecoveryApprover = ({ accountAddress, nonce, provider, signer, guar
   }
 
   const handleExecute = async () => {
+    if (!manager || !networkInfo.validatorModuleAddress) {
+      setError('Validator module address missing')
+      return
+    }
+
     setLoading(true)
     setError('')
     setActionType('execute')
 
     try {
-      await executeRecovery(accountAddress, nonce, signer)
+      // Encode data
+      // For executeRecovery, we need to pass the validator module being used.
+      const validatorModule = networkInfo.validatorModuleAddress
+      const { to, data } = await manager.executeRecovery(accountAddress, nonce, validatorModule)
+
+      const tx = await signer.sendTransaction({ to, data })
+      await tx.wait()
+
       setSuccess(true)
-      
+
       // Reload recovery request
-      const request = await getRecoveryRequest(accountAddress, nonce, provider)
+      const request = await manager.getRecoveryRequest(accountAddress, nonce)
       setRecoveryRequest(request)
     } catch (err) {
       console.error('Failed to execute recovery:', err)
@@ -140,12 +164,12 @@ export const RecoveryApprover = ({ accountAddress, nonce, provider, signer, guar
   const getTimeRemaining = (executeAfter) => {
     const now = Math.floor(Date.now() / 1000)
     const remaining = executeAfter - now
-    
+
     if (remaining <= 0) return 'Ready to execute'
-    
+
     const hours = Math.floor(remaining / 3600)
     const minutes = Math.floor((remaining % 3600) / 60)
-    
+
     return `${hours}h ${minutes}m remaining`
   }
 
@@ -174,7 +198,7 @@ export const RecoveryApprover = ({ accountAddress, nonce, provider, signer, guar
       <div className="recovery-success">
         <h2>Recovery Executed Successfully!</h2>
         <p className="description">
-          The account has been recovered with the new public key and owner.
+          The account has been recovered.
         </p>
         <div className="recovery-details">
           <div className="detail-item">
@@ -196,15 +220,15 @@ export const RecoveryApprover = ({ accountAddress, nonce, provider, signer, guar
       {/* Recovery Details */}
       <div className="recovery-details">
         <h3>Recovery Details:</h3>
-        
+
         <div className="detail-item">
           <strong>Account:</strong> {formatAddress(accountAddress)}
         </div>
-        
+
         <div className="detail-item">
           <strong>New Owner:</strong> {formatAddress(recoveryRequest.newOwner)}
         </div>
-        
+
         <div className="detail-item">
           <strong>New Public Key:</strong>
           <div className="key-display">
@@ -213,17 +237,17 @@ export const RecoveryApprover = ({ accountAddress, nonce, provider, signer, guar
             qy: {recoveryRequest.newQy?.slice(0, 20)}...
           </div>
         </div>
-        
+
         <div className="detail-item">
           <strong>Approvals:</strong> {recoveryRequest.approvalCount} / {threshold} required
         </div>
-        
+
         <div className="detail-item">
           <strong>Timelock:</strong> {getTimeRemaining(recoveryRequest.executeAfter)}
           <br />
           <small>Execute after: {formatTimestamp(recoveryRequest.executeAfter)}</small>
         </div>
-        
+
         <div className="detail-item">
           <strong>Status:</strong>
           {recoveryRequest.executed && ' Executed'}
@@ -272,7 +296,7 @@ export const RecoveryApprover = ({ accountAddress, nonce, provider, signer, guar
 
       {error && <div className="error-message">{error}</div>}
 
-      {!canExecute && hasAlreadyApproved && !recoveryRequest.executed && (
+      {!canExecute && hasAlreadyApproved && !recoveryRequest.executed && !recoveryRequest.cancelled && (
         <div className="info-message">
           Waiting for more approvals or timelock to pass...
         </div>
