@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.23;
+pragma solidity ^0.8.33;
 
 import {IAccount} from "@account-abstraction/interfaces/IAccount.sol";
 import {IEntryPoint} from "@account-abstraction/interfaces/IEntryPoint.sol";
