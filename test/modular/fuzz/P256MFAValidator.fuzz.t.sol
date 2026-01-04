@@ -7,8 +7,6 @@ import {AuraAccountFactory} from "../../../src/modular/AuraAccountFactory.sol";
 import {P256MFAValidatorModule} from "../../../src/modular/modules/validators/P256MFAValidatorModule.sol";
 import {ERC1967FactoryConstants} from "solady/utils/ERC1967FactoryConstants.sol";
 
-import {MODULE_TYPE_VALIDATOR} from "@erc7579/interfaces/IERC7579Module.sol";
-import {PackedUserOperation} from "@account-abstraction/interfaces/PackedUserOperation.sol";
 import {ECDSA} from "solady/utils/ECDSA.sol";
 
 /**
@@ -39,6 +37,7 @@ contract P256MFAValidatorFuzzTest is Test {
         validator = new P256MFAValidatorModule();
         factory = new AuraAccountFactory(address(validator));
 
+        // forge-lint: disable-next-line(unsafe-typecast)
         bytes memory initData = abi.encode(owner, QX, QY, bytes32("Test Device"), true);
 
         address accountAddr = factory.createAccount(owner, initData, address(0), "", 0);
@@ -239,6 +238,7 @@ contract P256MFAValidatorFuzzTest is Test {
         bytes32 newQx = bytes32(uint256(keccak256(abi.encode("qx", salt))));
         bytes32 newQy = bytes32(uint256(keccak256(abi.encode("qy", salt))));
 
+        // forge-lint: disable-next-line(unsafe-typecast)
         bytes memory initData = abi.encode(newOwner, newQx, newQy, bytes32("Device"), true);
 
         address newAccount = factory.createAccount(newOwner, initData, address(0), "", salt);
@@ -259,6 +259,7 @@ contract P256MFAValidatorFuzzTest is Test {
         bytes32 newQy = bytes32(uint256(keccak256(abi.encode("qy", salt))));
 
         // enableMFA = false
+        // forge-lint: disable-next-line(unsafe-typecast)
         bytes memory initData = abi.encode(newOwner, newQx, newQy, bytes32("Device"), false);
 
         address newAccount = factory.createAccount(newOwner, initData, address(0), "", salt);

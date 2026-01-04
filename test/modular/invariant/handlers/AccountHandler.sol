@@ -6,7 +6,7 @@ import {AuraAccount} from "../../../../src/modular/AuraAccount.sol";
 import {SessionKeyExecutorModule} from "../../../../src/modular/modules/executors/SessionKeyExecutorModule.sol";
 import {P256MFAValidatorModule} from "../../../../src/modular/modules/validators/P256MFAValidatorModule.sol";
 
-import {MODULE_TYPE_EXECUTOR} from "@erc7579/interfaces/IERC7579Module.sol";
+
 import {ModeLib} from "@erc7579/lib/ModeLib.sol";
 import {ExecutionLib} from "@erc7579/lib/ExecutionLib.sol";
 
@@ -65,7 +65,9 @@ contract AccountHandler is Test {
 
         SessionKeyExecutorModule.SessionKeyPermission memory permission = SessionKeyExecutorModule.SessionKeyPermission({
             sessionKey: sessionKey,
+            // forge-lint: disable-next-line(unsafe-typecast)
             validAfter: uint48(block.timestamp),
+            // forge-lint: disable-next-line(unsafe-typecast)
             validUntil: uint48(block.timestamp + validDuration),
             allowedTargets: new address[](0),
             allowedSelectors: new bytes4[](0),

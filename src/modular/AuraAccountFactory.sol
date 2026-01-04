@@ -128,6 +128,7 @@ contract AuraAccountFactory {
     function _computeSalt(address owner, uint256 salt) internal view returns (bytes32) {
         // Combine owner, implementation address, and salt to create unique hash
         // Including implementation ensures different contract versions get different addresses
+        // forge-lint: disable-next-line(asm-keccak256)
         bytes32 combinedSalt = keccak256(abi.encodePacked(owner, accountImplementation, salt));
         // Keep only the last 96 bits (12 bytes) of the hash
         // The first 160 bits (20 bytes) will be zero, satisfying Solady's requirement

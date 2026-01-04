@@ -40,6 +40,7 @@ contract P256MFAValidatorModuleTest is Test {
 
         // Create account (factory uses P256MFAValidatorModule as mandatory default)
         // Init data: owner, qx, qy, deviceId, enableMFA
+        // forge-lint: disable-next-line(unsafe-typecast)
         bytes memory initData = abi.encode(owner, QX, QY, bytes32("Test Device"), true);
 
         address accountAddr = factory.createAccount(
@@ -257,6 +258,7 @@ contract P256MFAValidatorModuleTest is Test {
         assertEq(info.qx, QX);
         assertEq(info.qy, QY);
         assertTrue(info.active);
+        // forge-lint: disable-next-line(unsafe-typecast)
         assertEq(info.deviceId, bytes32("Test Device"));
     }
 

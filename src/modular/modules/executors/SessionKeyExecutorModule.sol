@@ -188,7 +188,32 @@ contract SessionKeyExecutorModule is IExecutor {
         if (nonce != keyData.nonce) revert InvalidNonce();
 
         // Verify signature
-        bytes32 messageHash = keccak256(abi.encodePacked(account, target, value, keccak256(data), nonce, block.chainid));
+        bytes32 messageHash;
+        uint256 cId = block.chainid;
+        bytes32 dataHash;
+        assembly {
+            // Hash calldata data
+            // We need to copy calldata to memory to hash it
+            let ptr := mload(0x40) // Get free memory pointer
+
+            // data.offset: offset in calldata where bytes encoding starts (length + data)
+            // data.length: length of the bytes array
+            calldatacopy(ptr, data.offset, data.length)
+            dataHash := keccak256(ptr, data.length)
+
+            // Re-use pointer for message hashing, effectively overwriting or appending
+            // Ideally we should update free memory pointer if we wanted to preserve it,
+            // but we are just hashing and discarding.
+
+            mstore(ptr, shl(96, account)) // Store account (20 bytes)
+            mstore(add(ptr, 20), shl(96, target)) // Store target (20 bytes) at offset 20
+            mstore(add(ptr, 40), value) // Store value (32 bytes) at offset 40
+            mstore(add(ptr, 72), dataHash) // Store dataHash (32 bytes) at offset 72
+            mstore(add(ptr, 104), nonce) // Store nonce (32 bytes) at offset 104
+            mstore(add(ptr, 136), cId) // Store chainId (32 bytes) at offset 136
+            messageHash := keccak256(ptr, 168) // Hash total 168 bytes
+        }
+
         address recovered = messageHash.toEthSignedMessageHash().recover(signature);
         if (recovered != sessionKey) revert InvalidSignature();
 

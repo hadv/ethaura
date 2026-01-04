@@ -8,7 +8,7 @@ import {P256MFAValidatorModule} from "../../../src/modular/modules/validators/P2
 import {SocialRecoveryModule} from "../../../src/modular/modules/executors/SocialRecoveryModule.sol";
 import {ERC1967FactoryConstants} from "solady/utils/ERC1967FactoryConstants.sol";
 
-import {MODULE_TYPE_VALIDATOR, MODULE_TYPE_EXECUTOR} from "@erc7579/interfaces/IERC7579Module.sol";
+import {MODULE_TYPE_EXECUTOR} from "@erc7579/interfaces/IERC7579Module.sol";
 
 /**
  * @title SocialRecoveryModule Fuzz Tests
@@ -38,6 +38,7 @@ contract SocialRecoveryFuzzTest is Test {
 
         factory = new AuraAccountFactory(address(validator));
 
+        // forge-lint: disable-next-line(unsafe-typecast)
         bytes memory validatorData = abi.encode(owner, QX, QY, bytes32("Test Device"), true);
 
         address accountAddr = factory.createAccount(owner, validatorData, address(0), "", 0);
@@ -58,6 +59,7 @@ contract SocialRecoveryFuzzTest is Test {
 
         address[] memory guardians = new address[](numGuardians);
         for (uint256 i = 0; i < numGuardians; i++) {
+            // forge-lint: disable-next-line(unsafe-typecast)
             guardians[i] = address(uint160(0x1000 + i));
         }
 
@@ -85,6 +87,7 @@ contract SocialRecoveryFuzzTest is Test {
 
         address[] memory guardians = new address[](numGuardians);
         for (uint256 i = 0; i < numGuardians; i++) {
+            // forge-lint: disable-next-line(unsafe-typecast)
             guardians[i] = address(uint160(0x1000 + i));
         }
 
@@ -296,6 +299,7 @@ contract SocialRecoveryFuzzTest is Test {
 
         // Add new guardians
         for (uint256 i = 0; i < numToAdd; i++) {
+            // forge-lint: disable-next-line(unsafe-typecast)
             address newGuardian = address(uint160(0x2000 + i));
             vm.prank(address(account));
             recovery.addGuardian(newGuardian);
@@ -307,6 +311,7 @@ contract SocialRecoveryFuzzTest is Test {
         // Randomly remove some guardians
         uint256 toRemove = uint256(keccak256(abi.encode(seed))) % numToAdd;
         for (uint256 i = 0; i < toRemove; i++) {
+            // forge-lint: disable-next-line(unsafe-typecast)
             address guardianToRemove = address(uint160(0x2000 + i));
             vm.prank(address(account));
             recovery.removeGuardian(guardianToRemove);
@@ -321,6 +326,7 @@ contract SocialRecoveryFuzzTest is Test {
         // Start with basic setup
         address[] memory guardians = new address[](5);
         for (uint256 i = 0; i < 5; i++) {
+            // forge-lint: disable-next-line(unsafe-typecast)
             guardians[i] = address(uint160(0x1000 + i));
         }
 

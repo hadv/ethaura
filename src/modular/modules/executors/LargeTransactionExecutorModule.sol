@@ -100,8 +100,8 @@ contract LargeTransactionExecutorModule is IExecutor {
         // Note: pending txs are left for reference, but won't be executable
     }
 
-    function isModuleType(uint256 typeID) external pure override returns (bool) {
-        return typeID == MODULE_TYPE_EXECUTOR;
+    function isModuleType(uint256 typeId) external pure override returns (bool) {
+        return typeId == MODULE_TYPE_EXECUTOR;
     }
 
     function isInitialized(address account) external view override returns (bool) {
@@ -116,7 +116,45 @@ contract LargeTransactionExecutorModule is IExecutor {
     function execute(address target, uint256 value, bytes calldata data) external {
         _onlyAccount();
 
-        bytes32 txHash = keccak256(abi.encode(msg.sender, target, value, data));
+        bytes32 txHash;
+        assembly {
+            let ptr := mload(0x40)
+
+            // ABI Encode: (address, address, uint256, bytes)
+            // Word 0: msg.sender (padded)
+            mstore(ptr, and(caller(), 0xffffffffffffffffffffffffffffffffffffffff))
+
+            // Word 1: target (padded)
+            mstore(add(ptr, 0x20), and(target, 0xffffffffffffffffffffffffffffffffffffffff))
+
+            // Word 2: value
+            mstore(add(ptr, 0x40), value)
+
+            // Word 3: Offset to data (variable)
+            // 4 fixed words (sender, target, value, offset) = 4 * 32 = 128 bytes (0x80)
+            mstore(add(ptr, 0x60), 0x80)
+
+            // Word 4: data.length
+            mstore(add(ptr, 0x80), data.length)
+
+            // Word 5+: data content (padded to 32 bytes)
+            calldatacopy(add(ptr, 0xa0), data.offset, data.length)
+
+            // Align length to 32 bytes for padding
+            // length + 31 / 32 * 32
+            let encodedDataLen := and(add(data.length, 31), not(31))
+
+            // Zero out dirty bytes after data if length is not multiple of 32
+            // Only strictly needed if memory wasn't guaranteed zero, but good practice for ABI compliance
+            if gt(encodedDataLen, data.length) {
+                mstore8(add(add(ptr, 0xa0), data.length), 0)
+            }
+
+            // Total length: 4 fixed words (0x80) + 1 length word (0x20) + encodedDataLen
+            let totalLen := add(0xa0, encodedDataLen)
+
+            txHash := keccak256(ptr, totalLen)
+        }
         ExecutorStorage storage $ = _getStorage();
         PendingTx storage pending = $.pendingTxs[msg.sender][txHash];
 

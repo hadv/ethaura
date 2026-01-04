@@ -106,7 +106,7 @@ contract P256MFAValidatorModule is IValidator {
         P256MFAValidatorStorage storage $ = _getStorage();
 
         // Decode: owner, qx, qy, deviceId, enableMFA
-        (address owner, bytes32 qx, bytes32 qy, bytes32 deviceId, bool shouldEnableMFA) =
+        (address owner, bytes32 qx, bytes32 qy, bytes32 deviceId, bool shouldEnableMfa) =
             abi.decode(data, (address, bytes32, bytes32, bytes32, bool));
 
         if (owner == address(0)) revert InvalidOwner();
@@ -121,7 +121,7 @@ contract P256MFAValidatorModule is IValidator {
         }
 
         // Enable MFA if requested (requires passkey)
-        if (shouldEnableMFA) {
+        if (shouldEnableMfa) {
             if ($.passkeyCount[msg.sender] == 0) revert MFARequiresPasskey();
             $.mfaEnabled[msg.sender] = true;
             emit MFAEnabled(msg.sender);
@@ -327,7 +327,13 @@ contract P256MFAValidatorModule is IValidator {
         if (qx == bytes32(0) || qy == bytes32(0)) revert InvalidPasskey();
 
         P256MFAValidatorStorage storage $ = _getStorage();
-        bytes32 passkeyId = keccak256(abi.encodePacked(qx, qy));
+        bytes32 passkeyId;
+        assembly {
+            let ptr := mload(0x40) // Get free memory pointer
+            mstore(ptr, qx) // Store qx at ptr
+            mstore(add(ptr, 0x20), qy) // Store qy at ptr + 32
+            passkeyId := keccak256(ptr, 0x40) // Hash 64 bytes
+        }
 
         if ($.passkeys[account][passkeyId].active) revert PasskeyAlreadyExists();
 
@@ -347,6 +353,7 @@ contract P256MFAValidatorModule is IValidator {
     /**
      * @notice Enable MFA for the account
      */
+    // forge-lint: disable-next-line(mixed-case-function)
     function enableMFA() external {
         P256MFAValidatorStorage storage $ = _getStorage();
         if ($.passkeyCount[msg.sender] == 0) revert MFARequiresPasskey();
@@ -357,6 +364,7 @@ contract P256MFAValidatorModule is IValidator {
     /**
      * @notice Disable MFA for the account
      */
+    // forge-lint: disable-next-line(mixed-case-function)
     function disableMFA() external {
         P256MFAValidatorStorage storage $ = _getStorage();
         $.mfaEnabled[msg.sender] = false;
@@ -386,6 +394,7 @@ contract P256MFAValidatorModule is IValidator {
         return _getStorage().owners[account];
     }
 
+    // forge-lint: disable-next-line(mixed-case-function)
     function isMFAEnabled(address account) external view returns (bool) {
         return _getStorage().mfaEnabled[account];
     }

@@ -3,7 +3,7 @@ pragma solidity ^0.8.33;
 
 import {Script, console2} from "forge-std/Script.sol";
 import {AuraAccountFactory} from "../src/modular/AuraAccountFactory.sol";
-import {AuraAccount} from "../src/modular/AuraAccount.sol";
+
 import {P256MFAValidatorModule} from "../src/modular/modules/validators/P256MFAValidatorModule.sol";
 
 /**
