@@ -83,7 +83,7 @@ contract MultiHook is IHook {
         return typeID == MODULE_TYPE_HOOK;
     }
 
-    function isInitialized(address account) external view override returns (bool) {
+    function isInitialized(address /* account */) external pure override returns (bool) {
         return true; // MultiHook is always "initialized" - it works with empty hooks
     }
 
@@ -205,8 +205,8 @@ contract MultiHook is IHook {
     }
 
     function _getAccount() internal view returns (address) {
-        MultiHookStorage storage $ = _getStorage();
-        address manager = $.manager[msg.sender];
+        // MultiHookStorage storage $ = _getStorage();
+        // address manager = $.manager[msg.sender];
 
         // If caller has a manager set, caller is the account
         // If caller is the manager, we need to find the account
