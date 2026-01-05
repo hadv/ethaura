@@ -128,8 +128,8 @@ contract LargeTransactionExecutorModule is IExecutor {
             pending.proposedAt = block.timestamp;
             $.pendingTxHashes[msg.sender].push(txHash);
 
-            uint256 executeAfter = block.timestamp + $.timelockPeriod[msg.sender];
-            emit TransactionProposed(msg.sender, txHash, target, value, executeAfter);
+            uint256 proposedExecuteAfter = block.timestamp + $.timelockPeriod[msg.sender];
+            emit TransactionProposed(msg.sender, txHash, target, value, proposedExecuteAfter);
             return; // Don't execute yet
         }
 
