@@ -2,6 +2,7 @@
 pragma solidity ^0.8.23;
 
 import {IExecutor, MODULE_TYPE_EXECUTOR} from "@erc7579/interfaces/IERC7579Module.sol";
+import {EfficientHashLib} from "solady/utils/EfficientHashLib.sol";
 import {IERC7579Account} from "@erc7579/interfaces/IERC7579Account.sol";
 import {
     ModeLib,
@@ -116,7 +117,7 @@ contract LargeTransactionExecutorModule is IExecutor {
     function execute(address target, uint256 value, bytes calldata data) external {
         _onlyAccount();
 
-        bytes32 txHash = keccak256(abi.encode(msg.sender, target, value, data));
+        bytes32 txHash = EfficientHashLib.hash(abi.encode(msg.sender, target, value, data));
         ExecutorStorage storage $ = _getStorage();
         PendingTx storage pending = $.pendingTxs[msg.sender][txHash];
 

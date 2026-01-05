@@ -11,6 +11,7 @@ import {
 } from "@erc7579/interfaces/IERC7579Module.sol";
 import {WebAuthn} from "solady/utils/WebAuthn.sol";
 import {ECDSA} from "solady/utils/ECDSA.sol";
+import {EfficientHashLib} from "solady/utils/EfficientHashLib.sol";
 
 /**
  * @title P256MFAValidatorModule
@@ -327,7 +328,7 @@ contract P256MFAValidatorModule is IValidator {
         if (qx == bytes32(0) || qy == bytes32(0)) revert InvalidPasskey();
 
         P256mfaValidatorStorage storage $ = _getStorage();
-        bytes32 passkeyId = keccak256(abi.encodePacked(qx, qy));
+        bytes32 passkeyId = EfficientHashLib.hash(qx, qy);
 
         if ($.passkeys[account][passkeyId].active) revert PasskeyAlreadyExists();
 

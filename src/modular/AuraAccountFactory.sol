@@ -3,6 +3,7 @@ pragma solidity ^0.8.23;
 
 import {ERC1967Factory} from "solady/utils/ERC1967Factory.sol";
 import {ERC1967FactoryConstants} from "solady/utils/ERC1967FactoryConstants.sol";
+import {EfficientHashLib} from "solady/utils/EfficientHashLib.sol";
 import {AuraAccount} from "./AuraAccount.sol";
 
 /**
@@ -128,7 +129,9 @@ contract AuraAccountFactory {
     function _computeSalt(address owner, uint256 salt) internal view returns (bytes32) {
         // Combine owner, implementation address, and salt to create unique hash
         // Including implementation ensures different contract versions get different addresses
-        bytes32 combinedSalt = keccak256(abi.encodePacked(owner, ACCOUNT_IMPLEMENTATION, salt));
+        bytes32 combinedSalt = EfficientHashLib.hash(
+            bytes32(uint256(uint160(owner))), bytes32(uint256(uint160(ACCOUNT_IMPLEMENTATION))), bytes32(salt)
+        );
         // Keep only the last 96 bits (12 bytes) of the hash
         // The first 160 bits (20 bytes) will be zero, satisfying Solady's requirement
         return bytes32(uint256(combinedSalt) & ((1 << 96) - 1));
