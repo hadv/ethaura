@@ -22,7 +22,7 @@ import {AuraAccountFactory} from "../src/modular/AuraAccountFactory.sol";
 contract GetFactoryInitCodeHashScript is Script {
     address constant SOLADY_CREATE2_FACTORY = 0x0000000000FFe8B47B3e2130213B802212439497;
 
-    function run(address validatorAddress) external view {
+    function run(address validatorAddress) external pure {
         require(validatorAddress != address(0), "Validator address required");
 
         bytes memory creationCode =

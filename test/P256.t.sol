@@ -20,7 +20,7 @@ contract P256Test is Test {
     bytes32 constant TEST_QX = 0x6b17d1f2e12c4247f8bce6e563a440f277037d812deb33a0f4a13945d898c296;
     bytes32 constant TEST_QY = 0x4fe342e2fe1a7f9b8ee7eb4a7c0f9e162bce33576b315ececbb6406837bf51f5;
 
-    function setUp() public {
+    function setUp() public view {
         // Check if precompile is available
         if (!P256.hasPrecompile()) {
             console2.log("WARNING: P256 precompile not available on this network");

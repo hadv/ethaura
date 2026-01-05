@@ -112,7 +112,7 @@ contract AuraAccountFactoryTest is Test {
         assertEq(predicted, deployed);
     }
 
-    function test_GetAddress_DifferentSalts() public {
+    function test_GetAddress_DifferentSalts() public view {
         address addr1 = factory.getAddress(owner, 0);
         address addr2 = factory.getAddress(owner, 1);
         address addr3 = factory.getAddress(owner, 2);
@@ -122,7 +122,7 @@ contract AuraAccountFactoryTest is Test {
         assertTrue(addr1 != addr3);
     }
 
-    function test_GetAddress_DifferentOwners() public {
+    function test_GetAddress_DifferentOwners() public view {
         address addr1 = factory.getAddress(owner, 0);
         address addr2 = factory.getAddress(owner2, 0);
 
