@@ -82,7 +82,14 @@ contract MultiHook is IHook {
         return typeID == MODULE_TYPE_HOOK;
     }
 
-    function isInitialized(address /* account */) external pure override returns (bool) {
+    function isInitialized(
+        address /* account */
+    )
+        external
+        pure
+        override
+        returns (bool)
+    {
         return true; // MultiHook is always "initialized" - it works with empty hooks
     }
 
@@ -191,7 +198,5 @@ contract MultiHook is IHook {
     /*//////////////////////////////////////////////////////////////
                             INTERNAL
     //////////////////////////////////////////////////////////////*/
-
-
 }
 
