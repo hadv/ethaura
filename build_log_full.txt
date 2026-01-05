@@ -1,7 +1,0 @@
-error: unexpected argument '--verbose' found
-
-  tip: a similar argument exists: '--verbosity'
-
-Usage: forge build --force --verbosity... [PATHS]...
-
-For more information, try '--help'.
