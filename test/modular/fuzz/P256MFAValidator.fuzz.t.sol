@@ -7,8 +7,6 @@ import {AuraAccountFactory} from "../../../src/modular/AuraAccountFactory.sol";
 import {P256MFAValidatorModule} from "../../../src/modular/modules/validators/P256MFAValidatorModule.sol";
 import {ERC1967FactoryConstants} from "solady/utils/ERC1967FactoryConstants.sol";
 
-import {MODULE_TYPE_VALIDATOR} from "@erc7579/interfaces/IERC7579Module.sol";
-import {PackedUserOperation} from "@account-abstraction/interfaces/PackedUserOperation.sol";
 import {ECDSA} from "solady/utils/ECDSA.sol";
 
 /**
@@ -39,7 +37,14 @@ contract P256MFAValidatorFuzzTest is Test {
         validator = new P256MFAValidatorModule();
         factory = new AuraAccountFactory(address(validator));
 
-        bytes memory initData = abi.encode(owner, QX, QY, bytes32("Test Device"), true);
+        bytes memory initData = abi.encode(
+            owner,
+            QX,
+            QY,
+            // forge-lint: disable-next-line(unsafe-typecast)
+            bytes32("Test Device"),
+            true
+        );
 
         address accountAddr = factory.createAccount(owner, initData, address(0), "", 0);
         account = AuraAccount(payable(accountAddr));
@@ -69,7 +74,7 @@ contract P256MFAValidatorFuzzTest is Test {
     function testFuzz_ValidOwnerSignature(bytes32 hash) public {
         // Disable MFA first
         vm.prank(address(account));
-        validator.disableMFA();
+        validator.disableMfa();
 
         // Sign with owner private key - validator expects raw hash, not eth signed hash
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(ownerPrivateKey, hash);
@@ -89,7 +94,7 @@ contract P256MFAValidatorFuzzTest is Test {
 
         // Disable MFA
         vm.prank(address(account));
-        validator.disableMFA();
+        validator.disableMfa();
 
         // Sign with wrong private key
         bytes32 ethSignedHash = ECDSA.toEthSignedMessageHash(hash);
@@ -214,15 +219,15 @@ contract P256MFAValidatorFuzzTest is Test {
         for (uint256 i = 0; i < toggleCount; i++) {
             if (expectedState) {
                 vm.prank(address(account));
-                validator.disableMFA();
+                validator.disableMfa();
                 expectedState = false;
             } else {
                 vm.prank(address(account));
-                validator.enableMFA();
+                validator.enableMfa();
                 expectedState = true;
             }
 
-            assertEq(validator.isMFAEnabled(address(account)), expectedState);
+            assertEq(validator.isMfaEnabled(address(account)), expectedState);
         }
     }
 
@@ -239,6 +244,7 @@ contract P256MFAValidatorFuzzTest is Test {
         bytes32 newQx = bytes32(uint256(keccak256(abi.encode("qx", salt))));
         bytes32 newQy = bytes32(uint256(keccak256(abi.encode("qy", salt))));
 
+        // forge-lint: disable-next-line(unsafe-typecast)
         bytes memory initData = abi.encode(newOwner, newQx, newQy, bytes32("Device"), true);
 
         address newAccount = factory.createAccount(newOwner, initData, address(0), "", salt);
@@ -246,7 +252,7 @@ contract P256MFAValidatorFuzzTest is Test {
         assertTrue(newAccount.code.length > 0);
         assertEq(validator.getOwner(newAccount), newOwner);
         assertEq(validator.getPasskeyCount(newAccount), 1);
-        assertTrue(validator.isMFAEnabled(newAccount));
+        assertTrue(validator.isMfaEnabled(newAccount));
     }
 
     /// @notice Fuzz test creating accounts with MFA disabled
@@ -259,11 +265,12 @@ contract P256MFAValidatorFuzzTest is Test {
         bytes32 newQy = bytes32(uint256(keccak256(abi.encode("qy", salt))));
 
         // enableMFA = false
+        // forge-lint: disable-next-line(unsafe-typecast)
         bytes memory initData = abi.encode(newOwner, newQx, newQy, bytes32("Device"), false);
 
         address newAccount = factory.createAccount(newOwner, initData, address(0), "", salt);
 
-        assertFalse(validator.isMFAEnabled(newAccount));
+        assertFalse(validator.isMfaEnabled(newAccount));
     }
 
     /*//////////////////////////////////////////////////////////////

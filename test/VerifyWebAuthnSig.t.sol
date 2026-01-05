@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "forge-std/Test.sol";
+import {Test, console} from "forge-std/Test.sol";
 import {P256} from "solady/utils/P256.sol";
 
 /**
@@ -10,7 +10,7 @@ import {P256} from "solady/utils/P256.sol";
  */
 contract VerifyWebAuthnSigTest is Test {
     // Skipping this test as it uses old test data that may not be valid
-    function skip_test_VerifyRealWebAuthnSignature() public view {
+    function skipTestVerifyRealWebAuthnSignature() public view {
         // Public key from factoryData
         bytes32 qx = 0xcd64d312c53f5d6773debcfe7031bd1074d9082b072cc71ca0fffab2735a5ec1;
         bytes32 qy = 0x8e657ad708338e9021127ae67e90f98875342d4d6c38d5f90ff7cf1841669f13;
@@ -40,11 +40,11 @@ contract VerifyWebAuthnSigTest is Test {
         bytes memory authenticatorData = hex"49960de5880e8c687434170f6476605b8fe4aeb9a28632c7995cf3ba831d97631d00000000";
 
         // ClientDataJSON
-        string memory clientDataJSON =
+        string memory clientDataJson =
             '{"type":"webauthn.get","challenge":"xk3SGdn5s_QE8zuWN3Yn33G81_DI7oLsdqO8RGwthSo","origin":"http://localhost:3000","crossOrigin":false}';
 
         // Compute hashes
-        bytes32 clientDataHash = sha256(bytes(clientDataJSON));
+        bytes32 clientDataHash = sha256(bytes(clientDataJson));
         bytes32 messageHash = sha256(abi.encodePacked(authenticatorData, clientDataHash));
 
         console.log("ClientDataHash:", vm.toString(clientDataHash));

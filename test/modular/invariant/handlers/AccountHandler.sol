@@ -64,7 +64,9 @@ contract AccountHandler is Test {
 
         SessionKeyExecutorModule.SessionKeyPermission memory permission = SessionKeyExecutorModule.SessionKeyPermission({
             sessionKey: sessionKey,
+            // forge-lint: disable-next-line(unsafe-typecast)
             validAfter: uint48(block.timestamp),
+            // forge-lint: disable-next-line(unsafe-typecast)
             validUntil: uint48(block.timestamp + validDuration),
             allowedTargets: new address[](0),
             allowedSelectors: new bytes4[](0),

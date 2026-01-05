@@ -9,7 +9,6 @@ import {Initializable} from "solady/utils/Initializable.sol";
 // ERC-7579 interfaces and libraries from battle-tested reference implementation
 import {IERC7579Account, Execution} from "@erc7579/interfaces/IERC7579Account.sol";
 import {
-    IModule,
     IValidator,
     IExecutor,
     IHook,
@@ -93,20 +92,32 @@ contract AuraAccount is IAccount, IERC7579Account, Initializable {
     //////////////////////////////////////////////////////////////*/
 
     modifier onlyEntryPoint() {
-        if (msg.sender != address(ENTRYPOINT)) revert OnlyEntryPoint();
+        _onlyEntryPoint();
         _;
+    }
+
+    function _onlyEntryPoint() internal view {
+        if (msg.sender != address(ENTRYPOINT)) revert OnlyEntryPoint();
     }
 
     modifier onlyEntryPointOrSelf() {
-        if (msg.sender != address(ENTRYPOINT) && msg.sender != address(this)) {
-            revert OnlyEntryPointOrSelf();
-        }
+        _onlyEntryPointOrSelf();
         _;
     }
 
+    function _onlyEntryPointOrSelf() internal view {
+        if (msg.sender != address(ENTRYPOINT) && msg.sender != address(this)) {
+            revert OnlyEntryPointOrSelf();
+        }
+    }
+
     modifier onlyExecutorModule() {
-        if (!_executors[msg.sender]) revert OnlyExecutorModule();
+        _onlyExecutorModule();
         _;
+    }
+
+    function _onlyExecutorModule() internal view {
+        if (!_executors[msg.sender]) revert OnlyExecutorModule();
     }
 
     /*//////////////////////////////////////////////////////////////

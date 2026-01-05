@@ -5,24 +5,15 @@ import {Test} from "forge-std/Test.sol";
 import {AuraAccount} from "../../../src/modular/AuraAccount.sol";
 import {AuraAccountFactory} from "../../../src/modular/AuraAccountFactory.sol";
 import {ERC1967FactoryConstants} from "solady/utils/ERC1967FactoryConstants.sol";
+import {Execution} from "@erc7579/interfaces/IERC7579Account.sol";
+import {MODULE_TYPE_EXECUTOR} from "@erc7579/interfaces/IERC7579Module.sol";
 
-import {IERC7579Account, Execution} from "@erc7579/interfaces/IERC7579Account.sol";
-import {
-    MODULE_TYPE_VALIDATOR,
-    MODULE_TYPE_EXECUTOR,
-    MODULE_TYPE_FALLBACK,
-    MODULE_TYPE_HOOK
-} from "@erc7579/interfaces/IERC7579Module.sol";
 import {
     ModeLib,
     ModeCode,
     CallType,
-    ExecType,
-    ModeSelector,
     ModePayload,
     CALLTYPE_SINGLE,
-    CALLTYPE_BATCH,
-    CALLTYPE_STATIC,
     CALLTYPE_DELEGATECALL,
     EXECTYPE_DEFAULT,
     EXECTYPE_TRY,

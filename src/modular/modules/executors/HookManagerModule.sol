@@ -86,8 +86,8 @@ contract HookManagerModule is IExecutor {
         delete $.emergencyUninstalls[msg.sender];
     }
 
-    function isModuleType(uint256 typeID) external pure override returns (bool) {
-        return typeID == MODULE_TYPE_EXECUTOR;
+    function isModuleType(uint256 typeId) external pure override returns (bool) {
+        return typeId == MODULE_TYPE_EXECUTOR;
     }
 
     function isInitialized(address account) external view override returns (bool) {

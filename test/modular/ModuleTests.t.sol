@@ -6,14 +6,15 @@ import {AuraAccount} from "../../src/modular/AuraAccount.sol";
 import {AuraAccountFactory} from "../../src/modular/AuraAccountFactory.sol";
 import {ERC1967FactoryConstants} from "solady/utils/ERC1967FactoryConstants.sol";
 
-import {IERC7579Account, Execution} from "@erc7579/interfaces/IERC7579Account.sol";
+import {ModeLib} from "@erc7579/lib/ModeLib.sol";
+
 import {
     MODULE_TYPE_VALIDATOR,
     MODULE_TYPE_EXECUTOR,
     MODULE_TYPE_FALLBACK,
     MODULE_TYPE_HOOK
 } from "@erc7579/interfaces/IERC7579Module.sol";
-import {ModeLib, ModeCode} from "@erc7579/lib/ModeLib.sol";
+
 import {ExecutionLib} from "@erc7579/lib/ExecutionLib.sol";
 
 import {MockValidator} from "./mocks/MockValidator.sol";

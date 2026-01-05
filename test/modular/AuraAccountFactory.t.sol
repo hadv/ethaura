@@ -38,8 +38,8 @@ contract AuraAccountFactoryTest is Test {
     //////////////////////////////////////////////////////////////*/
 
     function test_Constructor() public view {
-        assertEq(factory.validator(), address(validator));
-        assertTrue(factory.accountImplementation() != address(0));
+        assertEq(factory.VALIDATOR(), address(validator));
+        assertTrue(factory.ACCOUNT_IMPLEMENTATION() != address(0));
         assertEq(address(factory.PROXY_FACTORY()), ERC1967FactoryConstants.ADDRESS);
     }
 

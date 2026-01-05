@@ -18,11 +18,11 @@ contract AuraAccountFactory {
     //////////////////////////////////////////////////////////////*/
 
     /// @notice The account implementation address
-    address public immutable accountImplementation;
+    address public immutable ACCOUNT_IMPLEMENTATION;
 
     /// @notice The default validator module address
     /// @dev All accounts use this as the initial validator at creation
-    address public immutable validator;
+    address public immutable VALIDATOR;
 
     /// @notice Solady's canonical ERC1967Factory for deploying proxies
     /// @dev Uses the canonical address: 0x0000000000006396FF2a80c067f99B3d2Ab4Df24
@@ -53,9 +53,9 @@ contract AuraAccountFactory {
         if (_validator == address(0)) revert InvalidValidator();
 
         // Deploy the implementation
-        accountImplementation = address(new AuraAccount());
+        ACCOUNT_IMPLEMENTATION = address(new AuraAccount());
         // Set the default validator
-        validator = _validator;
+        VALIDATOR = _validator;
         // Use Solady's canonical ERC1967Factory (saves deployment gas)
         PROXY_FACTORY = ERC1967Factory(ERC1967FactoryConstants.ADDRESS);
     }
@@ -94,10 +94,10 @@ contract AuraAccountFactory {
         // Deploy proxy using Solady's canonical ERC1967Factory
         // Initialize with the configured default validator
         account = PROXY_FACTORY.deployDeterministicAndCall(
-            accountImplementation,
+            ACCOUNT_IMPLEMENTATION,
             address(0), // No admin - proxies are not upgradeable
             finalSalt,
-            abi.encodeCall(AuraAccount.initialize, (validator, validatorData, hook, hookData))
+            abi.encodeCall(AuraAccount.initialize, (VALIDATOR, validatorData, hook, hookData))
         );
 
         emit AccountCreated(account, owner, salt);
@@ -128,7 +128,7 @@ contract AuraAccountFactory {
     function _computeSalt(address owner, uint256 salt) internal view returns (bytes32) {
         // Combine owner, implementation address, and salt to create unique hash
         // Including implementation ensures different contract versions get different addresses
-        bytes32 combinedSalt = keccak256(abi.encodePacked(owner, accountImplementation, salt));
+        bytes32 combinedSalt = keccak256(abi.encodePacked(owner, ACCOUNT_IMPLEMENTATION, salt));
         // Keep only the last 96 bits (12 bytes) of the hash
         // The first 160 bits (20 bytes) will be zero, satisfying Solady's requirement
         return bytes32(uint256(combinedSalt) & ((1 << 96) - 1));

@@ -40,6 +40,7 @@ contract P256MFAValidatorModuleTest is Test {
 
         // Create account (factory uses P256MFAValidatorModule as mandatory default)
         // Init data: owner, qx, qy, deviceId, enableMFA
+        // forge-lint: disable-next-line(unsafe-typecast)
         bytes memory initData = abi.encode(owner, QX, QY, bytes32("Test Device"), true);
 
         address accountAddr = factory.createAccount(
@@ -69,7 +70,7 @@ contract P256MFAValidatorModuleTest is Test {
     }
 
     function test_MFAIsEnabled() public view {
-        assertTrue(validator.isMFAEnabled(address(account)));
+        assertTrue(validator.isMfaEnabled(address(account)));
     }
 
     function test_PasskeyIsAdded() public view {
@@ -127,24 +128,24 @@ contract P256MFAValidatorModuleTest is Test {
     //////////////////////////////////////////////////////////////*/
 
     function test_DisableMFA() public {
-        assertTrue(validator.isMFAEnabled(address(account)));
+        assertTrue(validator.isMfaEnabled(address(account)));
 
         vm.prank(address(account));
-        validator.disableMFA();
+        validator.disableMfa();
 
-        assertFalse(validator.isMFAEnabled(address(account)));
+        assertFalse(validator.isMfaEnabled(address(account)));
     }
 
     function test_EnableMFA() public {
         // First disable
         vm.prank(address(account));
-        validator.disableMFA();
-        assertFalse(validator.isMFAEnabled(address(account)));
+        validator.disableMfa();
+        assertFalse(validator.isMfaEnabled(address(account)));
 
         // Then enable
         vm.prank(address(account));
-        validator.enableMFA();
-        assertTrue(validator.isMFAEnabled(address(account)));
+        validator.enableMfa();
+        assertTrue(validator.isMfaEnabled(address(account)));
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -232,7 +233,7 @@ contract P256MFAValidatorModuleTest is Test {
 
         vm.prank(newAccountAddr);
         vm.expectRevert(P256MFAValidatorModule.MFARequiresPasskey.selector);
-        validator.enableMFA();
+        validator.enableMfa();
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -257,6 +258,7 @@ contract P256MFAValidatorModuleTest is Test {
         assertEq(info.qx, QX);
         assertEq(info.qy, QY);
         assertTrue(info.active);
+        // forge-lint: disable-next-line(unsafe-typecast)
         assertEq(info.deviceId, bytes32("Test Device"));
     }
 
@@ -435,7 +437,7 @@ contract P256MFAValidatorModuleTest is Test {
         // Verify initial state
         assertTrue(validator.isInitialized(address(account)));
         assertEq(validator.getPasskeyCount(address(account)), 1);
-        assertTrue(validator.isMFAEnabled(address(account)));
+        assertTrue(validator.isMfaEnabled(address(account)));
 
         // Uninstall
         vm.prank(address(account));
@@ -444,7 +446,7 @@ contract P256MFAValidatorModuleTest is Test {
         // Verify cleared state
         assertFalse(validator.isInitialized(address(account)));
         assertEq(validator.getPasskeyCount(address(account)), 0);
-        assertFalse(validator.isMFAEnabled(address(account)));
+        assertFalse(validator.isMfaEnabled(address(account)));
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -546,7 +548,7 @@ contract P256MFAValidatorModuleTest is Test {
     function test_RemoveLastPasskey_MFADisabled() public {
         // Disable MFA first
         vm.prank(address(account));
-        validator.disableMFA();
+        validator.disableMfa();
 
         // Now we can remove the last passkey
         bytes32 passkeyId = keccak256(abi.encodePacked(QX, QY));

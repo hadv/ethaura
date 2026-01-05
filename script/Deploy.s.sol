@@ -3,7 +3,7 @@ pragma solidity ^0.8.23;
 
 import {Script, console2} from "forge-std/Script.sol";
 import {AuraAccountFactory} from "../src/modular/AuraAccountFactory.sol";
-import {AuraAccount} from "../src/modular/AuraAccount.sol";
+
 import {P256MFAValidatorModule} from "../src/modular/modules/validators/P256MFAValidatorModule.sol";
 
 /**
@@ -82,7 +82,7 @@ contract DeployScript is Script {
 
         // Get additional info from factory
         AuraAccountFactory factory = AuraAccountFactory(factoryAddress);
-        address implementationAddress = factory.accountImplementation();
+        address implementationAddress = factory.ACCOUNT_IMPLEMENTATION();
         address proxyFactoryAddress = address(factory.PROXY_FACTORY());
 
         console2.log("");
