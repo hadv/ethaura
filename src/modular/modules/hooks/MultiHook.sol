@@ -27,8 +27,7 @@ contract MultiHook is IHook {
 
     error HookAlreadyInstalled(address hook);
     error HookNotInstalled(address hook);
-    error NotManager();
-    error NotAccount();
+
     error InvalidHook();
 
     /*//////////////////////////////////////////////////////////////
@@ -193,26 +192,6 @@ contract MultiHook is IHook {
                             INTERNAL
     //////////////////////////////////////////////////////////////*/
 
-    function _checkAuthorized() internal view {
-        MultiHookStorage storage $ = _getStorage();
-        address account = _getAccount();
-        address manager = $.manager[account];
 
-        // Allow account itself or its manager
-        if (msg.sender != account && msg.sender != manager) {
-            revert NotManager();
-        }
-    }
-
-    function _getAccount() internal view returns (address) {
-        // MultiHookStorage storage $ = _getStorage();
-        // address manager = $.manager[msg.sender];
-
-        // If caller has a manager set, caller is the account
-        // If caller is the manager, we need to find the account
-        // For simplicity, when manager calls, msg.sender context should be the account
-        // This is handled by executeFromExecutor pattern
-        return msg.sender;
-    }
 }
 
