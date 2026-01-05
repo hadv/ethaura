@@ -31,3 +31,8 @@ Thumbs.db
 # Build logs and warnings
 build_log_full.txt
 build_warnings.txt
+
+# Agent artifacts
+task.md
+implementation_plan.md
+walkthrough.md

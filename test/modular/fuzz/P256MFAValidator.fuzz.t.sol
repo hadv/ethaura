@@ -37,13 +37,7 @@ contract P256MFAValidatorFuzzTest is Test {
         validator = new P256MFAValidatorModule();
         factory = new AuraAccountFactory(address(validator));
 
-        bytes memory initData = abi.encode(
-            owner,
-            QX,
-            QY,
-            bytes32("Test Device"),
-            true
-        );
+        bytes memory initData = abi.encode(owner, QX, QY, bytes32("Test Device"), true);
 
         address accountAddr = factory.createAccount(owner, initData, address(0), "", 0);
         account = AuraAccount(payable(accountAddr));
