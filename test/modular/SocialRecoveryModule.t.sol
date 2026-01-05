@@ -40,7 +40,6 @@ contract SocialRecoveryModuleTest is Test {
         factory = new AuraAccountFactory(address(validator));
 
         // Create account (factory uses P256MFAValidatorModule as mandatory default)
-        // forge-lint: disable-next-line(unsafe-typecast)
         bytes memory validatorData = abi.encode(owner, QX, QY, bytes32("Test Device"), true);
 
         address accountAddr = factory.createAccount(

@@ -41,7 +41,6 @@ contract P256MFAValidatorFuzzTest is Test {
             owner,
             QX,
             QY,
-            // forge-lint: disable-next-line(unsafe-typecast)
             bytes32("Test Device"),
             true
         );
@@ -244,7 +243,6 @@ contract P256MFAValidatorFuzzTest is Test {
         bytes32 newQx = bytes32(uint256(keccak256(abi.encode("qx", salt))));
         bytes32 newQy = bytes32(uint256(keccak256(abi.encode("qy", salt))));
 
-        // forge-lint: disable-next-line(unsafe-typecast)
         bytes memory initData = abi.encode(newOwner, newQx, newQy, bytes32("Device"), true);
 
         address newAccount = factory.createAccount(newOwner, initData, address(0), "", salt);
@@ -265,7 +263,6 @@ contract P256MFAValidatorFuzzTest is Test {
         bytes32 newQy = bytes32(uint256(keccak256(abi.encode("qy", salt))));
 
         // enableMFA = false
-        // forge-lint: disable-next-line(unsafe-typecast)
         bytes memory initData = abi.encode(newOwner, newQx, newQy, bytes32("Device"), false);
 
         address newAccount = factory.createAccount(newOwner, initData, address(0), "", salt);

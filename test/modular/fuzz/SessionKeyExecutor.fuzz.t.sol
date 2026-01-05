@@ -136,9 +136,7 @@ contract SessionKeyExecutorFuzzTest is Test {
         afterOffset = bound(afterOffset, 0, 30 days);
         duration = bound(duration, 1 hours, 365 days);
 
-        // forge-lint: disable-next-line(unsafe-typecast)
         uint48 validAfter = uint48(block.timestamp + afterOffset);
-        // forge-lint: disable-next-line(unsafe-typecast)
         uint48 validUntil = uint48(block.timestamp + afterOffset + duration);
 
         SessionKeyExecutorModule.SessionKeyPermission memory permission = SessionKeyExecutorModule.SessionKeyPermission({
@@ -199,9 +197,7 @@ contract SessionKeyExecutorFuzzTest is Test {
 
         SessionKeyExecutorModule.SessionKeyPermission memory permission = SessionKeyExecutorModule.SessionKeyPermission({
             sessionKey: sessionKey,
-            // forge-lint: disable-next-line(unsafe-typecast)
             validAfter: uint48(block.timestamp + delay),
-            // forge-lint: disable-next-line(unsafe-typecast)
             validUntil: uint48(block.timestamp + delay + 1 days),
             allowedTargets: new address[](0),
             allowedSelectors: new bytes4[](0),

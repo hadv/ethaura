@@ -41,7 +41,6 @@ contract AuraAccountInvariantTest is Test {
 
         factory = new AuraAccountFactory(address(validator));
 
-        // forge-lint: disable-next-line(unsafe-typecast)
         bytes memory initData = abi.encode(owner, QX, QY, bytes32("Test Device"), true);
 
         address accountAddr = factory.createAccount(owner, initData, address(0), "", 0);
