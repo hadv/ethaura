@@ -6,7 +6,6 @@ import {AuraAccount} from "../../../../src/modular/AuraAccount.sol";
 import {SessionKeyExecutorModule} from "../../../../src/modular/modules/executors/SessionKeyExecutorModule.sol";
 import {P256MFAValidatorModule} from "../../../../src/modular/modules/validators/P256MFAValidatorModule.sol";
 
-import {MODULE_TYPE_EXECUTOR} from "@erc7579/interfaces/IERC7579Module.sol";
 import {ModeLib} from "@erc7579/lib/ModeLib.sol";
 import {ExecutionLib} from "@erc7579/lib/ExecutionLib.sol";
 

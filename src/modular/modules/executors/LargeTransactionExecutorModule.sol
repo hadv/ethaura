@@ -2,6 +2,7 @@
 pragma solidity ^0.8.23;
 
 import {IExecutor, MODULE_TYPE_EXECUTOR} from "@erc7579/interfaces/IERC7579Module.sol";
+import {EfficientHashLib} from "solady/utils/EfficientHashLib.sol";
 import {IERC7579Account} from "@erc7579/interfaces/IERC7579Account.sol";
 import {
     ModeLib,
@@ -100,8 +101,8 @@ contract LargeTransactionExecutorModule is IExecutor {
         // Note: pending txs are left for reference, but won't be executable
     }
 
-    function isModuleType(uint256 typeID) external pure override returns (bool) {
-        return typeID == MODULE_TYPE_EXECUTOR;
+    function isModuleType(uint256 typeId) external pure override returns (bool) {
+        return typeId == MODULE_TYPE_EXECUTOR;
     }
 
     function isInitialized(address account) external view override returns (bool) {
@@ -116,7 +117,7 @@ contract LargeTransactionExecutorModule is IExecutor {
     function execute(address target, uint256 value, bytes calldata data) external {
         _onlyAccount();
 
-        bytes32 txHash = keccak256(abi.encode(msg.sender, target, value, data));
+        bytes32 txHash = EfficientHashLib.hash(abi.encode(msg.sender, target, value, data));
         ExecutorStorage storage $ = _getStorage();
         PendingTx storage pending = $.pendingTxs[msg.sender][txHash];
 
@@ -128,8 +129,8 @@ contract LargeTransactionExecutorModule is IExecutor {
             pending.proposedAt = block.timestamp;
             $.pendingTxHashes[msg.sender].push(txHash);
 
-            uint256 executeAfter = block.timestamp + $.timelockPeriod[msg.sender];
-            emit TransactionProposed(msg.sender, txHash, target, value, executeAfter);
+            uint256 proposedExecuteAfter = block.timestamp + $.timelockPeriod[msg.sender];
+            emit TransactionProposed(msg.sender, txHash, target, value, proposedExecuteAfter);
             return; // Don't execute yet
         }
 

@@ -54,8 +54,8 @@ contract LargeTransactionGuardHook is IHook {
         delete _getStorage().executor[msg.sender];
     }
 
-    function isModuleType(uint256 typeID) external pure override returns (bool) {
-        return typeID == MODULE_TYPE_HOOK;
+    function isModuleType(uint256 typeId) external pure override returns (bool) {
+        return typeId == MODULE_TYPE_HOOK;
     }
 
     function isInitialized(address account) external view override returns (bool) {

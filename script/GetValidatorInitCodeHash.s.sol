@@ -20,7 +20,7 @@ import {P256MFAValidatorModule} from "../src/modular/modules/validators/P256MFAV
 contract GetValidatorInitCodeHashScript is Script {
     address constant SOLADY_CREATE2_FACTORY = 0x0000000000FFe8B47B3e2130213B802212439497;
 
-    function run() external view {
+    function run() external pure {
         bytes memory creationCode = type(P256MFAValidatorModule).creationCode;
         bytes32 initCodeHash = keccak256(creationCode);
 

@@ -7,7 +7,7 @@ import {AuraAccountFactory} from "../../src/modular/AuraAccountFactory.sol";
 import {ERC1967FactoryConstants} from "solady/utils/ERC1967FactoryConstants.sol";
 
 // Use the battle-tested ERC-7579 library
-import {IERC7579Account, Execution} from "@erc7579/interfaces/IERC7579Account.sol";
+import {Execution} from "@erc7579/interfaces/IERC7579Account.sol";
 import {
     MODULE_TYPE_VALIDATOR,
     MODULE_TYPE_EXECUTOR,
@@ -18,8 +18,6 @@ import {
     ModeLib,
     ModeCode,
     CallType,
-    ExecType,
-    ModeSelector,
     ModePayload,
     CALLTYPE_SINGLE,
     CALLTYPE_BATCH,

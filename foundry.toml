@@ -15,6 +15,7 @@ remappings = [
     "solady/=lib/solady/src/"
 ]
 
+
 [rpc_endpoints]
 sepolia = "${SEPOLIA_RPC_URL}"
 base = "${BASE_RPC_URL}"
@@ -36,3 +37,6 @@ dictionary_weight = 40         # Weight for dictionary-based fuzzing
 runs = 256                     # Invariant test runs
 depth = 15                     # Maximum call depth per run
 fail_on_revert = false         # Don't fail on reverts
+
+[lint]
+exclude_lints = ["unsafe-typecast"]

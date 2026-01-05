@@ -5,6 +5,7 @@ import {IModule, IExecutor, MODULE_TYPE_EXECUTOR} from "@erc7579/interfaces/IERC
 import {IERC7579Account} from "@erc7579/interfaces/IERC7579Account.sol";
 import {ModeLib, ModeCode} from "@erc7579/lib/ModeLib.sol";
 import {ECDSA} from "solady/utils/ECDSA.sol";
+import {EfficientHashLib} from "solady/utils/EfficientHashLib.sol";
 
 /**
  * @title SessionKeyExecutorModule
@@ -188,7 +189,8 @@ contract SessionKeyExecutorModule is IExecutor {
         if (nonce != keyData.nonce) revert InvalidNonce();
 
         // Verify signature
-        bytes32 messageHash = keccak256(abi.encodePacked(account, target, value, keccak256(data), nonce, block.chainid));
+        bytes32 messageHash =
+            EfficientHashLib.hash(abi.encodePacked(account, target, value, keccak256(data), nonce, block.chainid));
         address recovered = messageHash.toEthSignedMessageHash().recover(signature);
         if (recovered != sessionKey) revert InvalidSignature();
 

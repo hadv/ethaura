@@ -7,7 +7,6 @@ import {AuraAccountFactory} from "../../src/modular/AuraAccountFactory.sol";
 import {SessionKeyExecutorModule} from "../../src/modular/modules/executors/SessionKeyExecutorModule.sol";
 import {ERC1967FactoryConstants} from "solady/utils/ERC1967FactoryConstants.sol";
 
-import {IERC7579Account} from "@erc7579/interfaces/IERC7579Account.sol";
 import {MODULE_TYPE_EXECUTOR} from "@erc7579/interfaces/IERC7579Module.sol";
 import {ModeLib} from "@erc7579/lib/ModeLib.sol";
 import {ExecutionLib} from "@erc7579/lib/ExecutionLib.sol";
@@ -475,20 +474,23 @@ contract SessionKeyExecutorModuleTest is Test {
         }
 
         // Now try to spend more - should fail
-        bytes memory targetCallData = abi.encodeCall(MockTarget.setValue, (999));
-        uint256 nonce = 5;
-        uint256 value = 0.1 ether;
+        // Now try to spend more - should fail
+        bytes memory failTargetCallData = abi.encodeCall(MockTarget.setValue, (999));
+        uint256 failNonce = 5;
+        uint256 failValue = 0.1 ether;
 
-        bytes32 messageHash = keccak256(
-            abi.encodePacked(address(account), address(target), value, keccak256(targetCallData), nonce, block.chainid)
+        bytes32 failMessageHash = keccak256(
+            abi.encodePacked(
+                address(account), address(target), failValue, keccak256(failTargetCallData), failNonce, block.chainid
+            )
         );
-        bytes32 ethSignedHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", messageHash));
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(sessionKeyPrivateKey, ethSignedHash);
-        bytes memory signature = abi.encodePacked(r, s, v);
+        bytes32 failEthSignedHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", failMessageHash));
+        (uint8 failV, bytes32 failR, bytes32 failS) = vm.sign(sessionKeyPrivateKey, failEthSignedHash);
+        bytes memory failSignature = abi.encodePacked(failR, failS, failV);
 
         vm.expectRevert(SessionKeyExecutorModule.SpendLimitTotalExceeded.selector);
         sessionKeyModule.executeWithSessionKey(
-            address(account), sessionKey, address(target), value, targetCallData, nonce, signature
+            address(account), sessionKey, address(target), failValue, failTargetCallData, failNonce, failSignature
         );
     }
 

@@ -7,8 +7,7 @@ import {AuraAccountFactory} from "../../../src/modular/AuraAccountFactory.sol";
 import {P256MFAValidatorModule} from "../../../src/modular/modules/validators/P256MFAValidatorModule.sol";
 import {SocialRecoveryModule} from "../../../src/modular/modules/executors/SocialRecoveryModule.sol";
 import {ERC1967FactoryConstants} from "solady/utils/ERC1967FactoryConstants.sol";
-
-import {MODULE_TYPE_VALIDATOR, MODULE_TYPE_EXECUTOR} from "@erc7579/interfaces/IERC7579Module.sol";
+import {MODULE_TYPE_EXECUTOR} from "@erc7579/interfaces/IERC7579Module.sol";
 
 /**
  * @title SocialRecoveryModule Fuzz Tests

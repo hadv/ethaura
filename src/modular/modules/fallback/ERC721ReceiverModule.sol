@@ -18,8 +18,8 @@ contract ERC721ReceiverModule is IERC721Receiver {
     /// @notice Uninstall the module (no-op for this simple module)
     function onUninstall(bytes calldata) external {}
 
-    function isModuleType(uint256 typeID) external pure returns (bool) {
-        return typeID == MODULE_TYPE_FALLBACK;
+    function isModuleType(uint256 typeId) external pure returns (bool) {
+        return typeId == MODULE_TYPE_FALLBACK;
     }
 
     function isInitialized(address) external pure returns (bool) {

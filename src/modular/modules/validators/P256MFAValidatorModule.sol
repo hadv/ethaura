@@ -11,6 +11,7 @@ import {
 } from "@erc7579/interfaces/IERC7579Module.sol";
 import {WebAuthn} from "solady/utils/WebAuthn.sol";
 import {ECDSA} from "solady/utils/ECDSA.sol";
+import {EfficientHashLib} from "solady/utils/EfficientHashLib.sol";
 
 /**
  * @title P256MFAValidatorModule
@@ -32,7 +33,7 @@ contract P256MFAValidatorModule is IValidator {
     //////////////////////////////////////////////////////////////*/
 
     /// @custom:storage-location erc7201:ethaura.storage.P256MFAValidatorModule
-    struct P256MFAValidatorStorage {
+    struct P256mfaValidatorStorage {
         // Per-account passkey storage
         mapping(address account => mapping(bytes32 passkeyId => PasskeyInfo)) passkeys;
         mapping(address account => bytes32[]) passkeyIds;
@@ -90,7 +91,7 @@ contract P256MFAValidatorModule is IValidator {
                           STORAGE ACCESS
     //////////////////////////////////////////////////////////////*/
 
-    function _getStorage() internal pure returns (P256MFAValidatorStorage storage $) {
+    function _getStorage() internal pure returns (P256mfaValidatorStorage storage $) {
         bytes32 location = STORAGE_LOCATION;
         assembly {
             $.slot := location
@@ -103,10 +104,10 @@ contract P256MFAValidatorModule is IValidator {
 
     /// @inheritdoc IModule
     function onInstall(bytes calldata data) external override {
-        P256MFAValidatorStorage storage $ = _getStorage();
+        P256mfaValidatorStorage storage $ = _getStorage();
 
         // Decode: owner, qx, qy, deviceId, enableMFA
-        (address owner, bytes32 qx, bytes32 qy, bytes32 deviceId, bool shouldEnableMFA) =
+        (address owner, bytes32 qx, bytes32 qy, bytes32 deviceId, bool shouldEnableMfa) =
             abi.decode(data, (address, bytes32, bytes32, bytes32, bool));
 
         if (owner == address(0)) revert InvalidOwner();
@@ -121,7 +122,7 @@ contract P256MFAValidatorModule is IValidator {
         }
 
         // Enable MFA if requested (requires passkey)
-        if (shouldEnableMFA) {
+        if (shouldEnableMfa) {
             if ($.passkeyCount[msg.sender] == 0) revert MFARequiresPasskey();
             $.mfaEnabled[msg.sender] = true;
             emit MFAEnabled(msg.sender);
@@ -130,7 +131,7 @@ contract P256MFAValidatorModule is IValidator {
 
     /// @inheritdoc IModule
     function onUninstall(bytes calldata) external override {
-        P256MFAValidatorStorage storage $ = _getStorage();
+        P256mfaValidatorStorage storage $ = _getStorage();
 
         // Clear owner
         delete $.owners[msg.sender];
@@ -168,7 +169,7 @@ contract P256MFAValidatorModule is IValidator {
         override
         returns (uint256)
     {
-        P256MFAValidatorStorage storage $ = _getStorage();
+        P256mfaValidatorStorage storage $ = _getStorage();
         address account = msg.sender;
         address owner = $.owners[account];
         bool mfaEnabled = $.mfaEnabled[account];
@@ -235,7 +236,7 @@ contract P256MFAValidatorModule is IValidator {
         if (signature.length < 20) return bytes4(0xffffffff);
         bytes calldata sig = signature[20:];
 
-        P256MFAValidatorStorage storage $ = _getStorage();
+        P256mfaValidatorStorage storage $ = _getStorage();
         address account = msg.sender;
         address owner = $.owners[account];
         bool mfaEnabled = $.mfaEnabled[account];
@@ -295,7 +296,7 @@ contract P256MFAValidatorModule is IValidator {
      * @param passkeyId The passkey ID to remove
      */
     function removePasskey(bytes32 passkeyId) external {
-        P256MFAValidatorStorage storage $ = _getStorage();
+        P256mfaValidatorStorage storage $ = _getStorage();
         address account = msg.sender;
 
         PasskeyInfo storage info = $.passkeys[account][passkeyId];
@@ -326,8 +327,8 @@ contract P256MFAValidatorModule is IValidator {
     function _addPasskeyInternal(address account, bytes32 qx, bytes32 qy, bytes32 deviceId) internal {
         if (qx == bytes32(0) || qy == bytes32(0)) revert InvalidPasskey();
 
-        P256MFAValidatorStorage storage $ = _getStorage();
-        bytes32 passkeyId = keccak256(abi.encodePacked(qx, qy));
+        P256mfaValidatorStorage storage $ = _getStorage();
+        bytes32 passkeyId = EfficientHashLib.hash(qx, qy);
 
         if ($.passkeys[account][passkeyId].active) revert PasskeyAlreadyExists();
 
@@ -347,8 +348,8 @@ contract P256MFAValidatorModule is IValidator {
     /**
      * @notice Enable MFA for the account
      */
-    function enableMFA() external {
-        P256MFAValidatorStorage storage $ = _getStorage();
+    function enableMfa() external {
+        P256mfaValidatorStorage storage $ = _getStorage();
         if ($.passkeyCount[msg.sender] == 0) revert MFARequiresPasskey();
         $.mfaEnabled[msg.sender] = true;
         emit MFAEnabled(msg.sender);
@@ -357,8 +358,8 @@ contract P256MFAValidatorModule is IValidator {
     /**
      * @notice Disable MFA for the account
      */
-    function disableMFA() external {
-        P256MFAValidatorStorage storage $ = _getStorage();
+    function disableMfa() external {
+        P256mfaValidatorStorage storage $ = _getStorage();
         $.mfaEnabled[msg.sender] = false;
         emit MFADisabled(msg.sender);
     }
@@ -373,7 +374,7 @@ contract P256MFAValidatorModule is IValidator {
      */
     function setOwner(address newOwner) external {
         if (newOwner == address(0)) revert InvalidOwner();
-        P256MFAValidatorStorage storage $ = _getStorage();
+        P256mfaValidatorStorage storage $ = _getStorage();
         $.owners[msg.sender] = newOwner;
         emit OwnerSet(msg.sender, newOwner);
     }
@@ -386,7 +387,7 @@ contract P256MFAValidatorModule is IValidator {
         return _getStorage().owners[account];
     }
 
-    function isMFAEnabled(address account) external view returns (bool) {
+    function isMfaEnabled(address account) external view returns (bool) {
         return _getStorage().mfaEnabled[account];
     }
 
